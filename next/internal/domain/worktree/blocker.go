@@ -9,10 +9,9 @@ const (
 	BlockerDirty           Blocker = "dirty"             // uncommitted changes
 	BlockerUnpushed        Blocker = "unpushed"          // commits no other branch nor remote holds
 	BlockerOpenPullRequest Blocker = "open_pull_request" // a pull request still open
-	BlockerJobsRunning     Blocker = "jobs_running"      // jobs of the run daemon up in it
 )
 
 // Blockers returns every Blocker.
 func Blockers() []Blocker {
-	return []Blocker{BlockerLocked, BlockerDirty, BlockerUnpushed, BlockerOpenPullRequest, BlockerJobsRunning}
+	return []Blocker{BlockerLocked, BlockerDirty, BlockerUnpushed, BlockerOpenPullRequest}
 }

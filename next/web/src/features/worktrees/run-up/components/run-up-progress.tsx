@@ -13,6 +13,7 @@ import { countOf, sharedOf } from '@/features/worktrees/run-up/utils/plan'
 import { recapOf } from '@/features/worktrees/run-up/utils/recap'
 import { sharedSuffix, startedWords, where } from '@/features/worktrees/run-up/utils/words'
 import { jobPlan } from '@/features/worktrees/utils/job-plan'
+import { owedOf } from '@/features/worktrees/utils/owed'
 import { ending, type PhaseRun, type Progress } from '@/features/worktrees/utils/progress'
 import { underWay } from '@/features/worktrees/utils/run-words'
 
@@ -36,9 +37,11 @@ export function RunUpProgress({
 }) {
   const envelope = progress.envelope
   const items = envelope?.items ?? []
+  // the drops owed it paid are items too, said in the outcome; the description counts the worktrees
+  const worktrees = items.filter((item) => !owedOf(item))
   const { done, total } = countOf(progress.units, ran.plan)
   const { cancelled } = ending(progress)
-  const failed = items.filter((item) => item.status === 'failed').length
+  const failed = worktrees.filter((item) => item.status === 'failed').length
   const refused =
     progress.refused ?? (cancelled || items.some((item) => item.error) ? undefined : envelope?.error?.message)
   const { groups, labels, warnings } = recapOf(envelope)
@@ -64,9 +67,9 @@ export function RunUpProgress({
   const description = () => {
     if (running && progress.cancelling) return `Cancelling · ${done} of ${total} up`
     if (running) return `Starting ${ran.profile} ${where(ran.worktrees)} · ${done} of ${total} up`
-    if (items.length === 0) return 'Nothing started.'
+    if (worktrees.length === 0) return 'Nothing started.'
     if (cancelled) return 'Cancelled: what started keeps running.'
-    if (failed > 0) return `${ran.profile} didn't start in ${failed} of ${items.length}.`
+    if (failed > 0) return `${ran.profile} didn't start in ${failed} of ${worktrees.length}.`
     return `${startedWords(ran.profile, envelope).title}.`
   }
 

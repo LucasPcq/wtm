@@ -13,8 +13,8 @@ $ api $U/api/repos/$A/commands | jq -c ".[] | {name, questions: [.form.fields[]?
 {"name":"create","questions":["branches","from","env_from","isolation","fast_forward","if_not_exists"]}
 {"name":"extract","questions":["source","files","to","to","from","env_from","isolation","fast_forward","keep","on_conflict"]}
 {"name":"checkout","questions":["pr","from","env_from","isolation","fast_forward","mine","review","no_fetch"]}
-{"name":"clean","questions":["worktree","reparent_children","force"]}
-{"name":"prune","questions":["worktree","reparent_children","force","merged","closed","gone","no_fetch"]}
+{"name":"clean","questions":["worktree","reparent_children","force","drop_data","keep_data"]}
+{"name":"prune","questions":["worktree","reparent_children","force","drop_data","keep_data","merged","closed","gone","no_fetch"]}
 {"name":"fast-forward","questions":["worktree","all","force","no_fetch"]}
 {"name":"sync","questions":["worktree","all","descendants","force","keep_conflict","ff_parents","push","no_fetch"]}
 {"name":"exec","questions":["worktree","command","all","jobs","print"]}

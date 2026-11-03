@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"context"
+	"github.com/LucasPcq/wtm/next/internal/domain/env"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
@@ -100,7 +102,7 @@ func TestEachEnvelopeOfPruneHasItsGolden(t *testing.T) {
 
 func TestAFollowUpNamingPruneIsSpelledFromItsSchema(t *testing.T) {
 	forced := domain.FollowUp{Command: prune.Name, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{dirty}}, {Path: prune.PathForce, Values: []string{"true"}}, {Path: prune.PathGone, Values: []string{"true"}}}, DryRun: true}
-	wrong := domain.FollowUp{Command: prune.Name, Answers: []domain.Answered{{Path: "keep_data", Values: []string{"true"}}}}
+	wrong := domain.FollowUp{Command: prune.Name, Answers: []domain.Answered{{Path: "no_such_field", Values: []string{"true"}}}}
 
 	assert.Equal(t, []string{"wtm-next", "prune", dirty, "--force", "--gone", "--dry-run"}, Line(forced))
 	assert.Nil(t, Line(wrong))
@@ -122,4 +124,21 @@ func TestAWorktreeTheCommandChoseWhoseRecordANewerWtmWroteIsKeptAndTheOthersGo(t
 	assert.Contains(t, got.Stdout+got.Stderr, merged+" is kept: a newer wtm wrote its record")
 	assert.NotContains(t, w.git.Calls(), "DeleteBranch "+merged)
 	assert.Contains(t, w.git.Calls(), "DeleteBranch "+gone)
+}
+
+func TestAPruneSaysEachDropOwedItMadeAndEachThatFailed(t *testing.T) {
+	owed := []env.OwedDrop{{Job: "db", Worktree: "feat-old", Ordinal: 4}, {Job: "db", Worktree: "feat-older", Ordinal: 5}}
+	failing := func(_ context.Context, chain env.HookChain) error {
+		if chain.Env["WTM_NAMESPACE"] == "acme_feat-older" {
+			return errHook
+		}
+		return nil
+	}
+
+	text := runPrune(t, newWorld(seed{Owed: owed, RunHooks: failing, NoPRs: true}), "--gone", "--no-fetch", "--yes")
+	doc := runPrune(t, newWorld(seed{Owed: owed, RunHooks: failing, NoPRs: true}), "--gone", "--no-fetch", "--yes", "--output", "json")
+
+	assert.Equal(t, uicli.ExitError, text.Code)
+	formtest.Golden(t, "owed_failed", text.Stdout+text.Stderr)
+	formtest.Golden(t, "envelope_owed_failed", doc.Stdout)
 }

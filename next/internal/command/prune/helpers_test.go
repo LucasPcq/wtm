@@ -14,6 +14,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/service/operationtest"
+	"github.com/LucasPcq/wtm/next/internal/service/teardown"
 	"github.com/stretchr/testify/require"
 )
 
@@ -190,4 +191,19 @@ func (w world) rawRecord(t *testing.T, name, content string) {
 // warningsOf are the warnings of code among warnings.
 func warningsOf(warnings []domain.Warning, code string) []domain.Warning {
 	return slices.DeleteFunc(slices.Clone(warnings), func(w domain.Warning) bool { return w.Code != code })
+}
+
+func readFile(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	return string(data)
+}
+
+// plainDebt is debt as its JSON shows it.
+func plainDebt(debt *teardown.Debt) *teardown.Debt {
+	if debt == nil {
+		return nil
+	}
+	return &teardown.Debt{Job: debt.Job, Name: debt.Name, Worktree: debt.Worktree}
 }

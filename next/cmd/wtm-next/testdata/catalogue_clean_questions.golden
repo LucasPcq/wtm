@@ -31,6 +31,25 @@
       "no_first": true,
       "rememberable": false,
       "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "drop_data",
+      "origin": "default",
+      "skip": "no_data_owed",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "keep_data",
+      "skip": "flag_only",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
     }
   ],
   "problems": []

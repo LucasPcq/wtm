@@ -7,27 +7,35 @@ import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/co
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert } from '@/features/worktrees/components/alert'
 import { ChildrenStep } from '@/features/worktrees/components/children-step'
+import { DataStep } from '@/features/worktrees/components/data-step'
 import { DialogBand } from '@/features/worktrees/components/dialog-band'
 import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
-import { ItemList } from '@/features/worktrees/components/item-list'
-import { type Left, LeftItem } from '@/features/worktrees/components/left-item'
+import type { Left } from '@/features/worktrees/components/left-item'
 import { NextButton } from '@/features/worktrees/components/next-button'
 import { PlanWarnings } from '@/features/worktrees/components/plan-warnings'
-import { RemovalDetails } from '@/features/worktrees/components/removal-details'
-import { RemovalItem } from '@/features/worktrees/components/removal-item'
 import { Stepper, type StepState } from '@/features/worktrees/components/stepper'
 import type { Start } from '@/features/worktrees/hooks/use-run'
 import { CandidateList } from '@/features/worktrees/prune/components/candidate-list'
 import { NothingToPrune } from '@/features/worktrees/prune/components/nothing-to-prune'
-import { ReasonLine } from '@/features/worktrees/prune/components/reason-line'
+import { PruneConfirm } from '@/features/worktrees/prune/components/prune-confirm'
 import { leftOut } from '@/features/worktrees/prune/utils/left'
 import { requestOf } from '@/features/worktrees/prune/utils/plan'
 import { notFinished } from '@/features/worktrees/prune/utils/words'
 import { blockerWords } from '@/features/worktrees/utils/blocker-words'
 import { planWide } from '@/features/worktrees/utils/outcome'
-import { kept, riskOf, unitsOf, unsafe } from '@/features/worktrees/utils/removal'
+import { downOf, kept, riskOf, unitsOf, unsafe } from '@/features/worktrees/utils/removal'
 import { sentence } from '@/features/worktrees/utils/sentence'
-import { initialWizard, type Step, wizardReducer } from '@/features/worktrees/utils/wizard-state'
+import {
+  type Asked,
+  initialWizard,
+  nextStep,
+  previousStep,
+  type Step,
+  settledStep,
+  stepState,
+  wizardReducer,
+} from '@/features/worktrees/utils/wizard-state'
+import { plural } from '@/lib/plural'
 
 export function PruneWizard({
   repo,
@@ -42,7 +50,7 @@ export function PruneWizard({
   onStart: (start: Start) => void
   onCancel: () => void
 }) {
-  const [{ step: chosen, checked, confirmed, reparent }, dispatch] = useReducer(wizardReducer, initialWizard)
+  const [{ step: chosen, checked, confirmed, reparent, dropData }, dispatch] = useReducer(wizardReducer, initialWizard)
   const [dropped, setDropped] = useState<Left[]>([])
 
   // forced, both list every candidate with what makes it unsafe; the review is the one read that fetches origin, and
@@ -59,6 +67,12 @@ export function PruneWizard({
   const candidates = (rows.data?.plan?.worktrees ?? []).filter(
     (candidate) => worktrees.length === 0 || worktrees.includes(candidate.worktree),
   )
+  // forced, the rows keep none: a plan that prunes nothing is one with no candidate
+  const rowsPlan = rows.data?.plan
+  const noneToPrune = rowsPlan !== undefined && (rowsPlan.worktrees ?? []).every(kept)
+  // drops owed alone, the plan's only change, go straight to Confirm, as the command line plans them
+  const owedOnly = noneToPrune && (rowsPlan?.owed ?? []).length > 0
+  const nothing = noneToPrune && !owedOnly
   // an unsafe worktree starts unchecked: none is touched unless asked for. A tick holds for the risk it was given
   // under, an untick whatever the risk: a worktree the person left out never comes back on its own
   const ticked = (candidate: PruneCandidate) => {
@@ -74,13 +88,13 @@ export function PruneWizard({
     })
   const going = candidates.filter(isChecked)
   const goingNames = going.map((candidate) => candidate.worktree)
-  const answers = requestOf({ named: worktrees, candidates, going, reparent })
+  const answers = requestOf({ named: worktrees, candidates, going, reparent, dropData })
   // a plan is asked on the rows once read in this opening and settled: until then its key holds nothing, not the plan
   // an earlier opening cached under the same read
   const read = rows.isFetchedAfterMount && !rows.isFetching ? rows.dataUpdatedAt : 0
   const planned = useQuery({
     ...planQuery(repo, 'prune', { answers, readAt: read }),
-    enabled: going.length > 0 && read > 0,
+    enabled: (going.length > 0 || owedOnly) && read > 0,
     placeholderData: keepPreviousData,
   })
 
@@ -133,29 +147,28 @@ export function PruneWizard({
       ))
   // back to the worktrees for good, not only on screen: only Next leaves them again, never a tick nor a read
   if (turned && chosen !== 'worktrees') dispatch({ type: 'go', to: 'worktrees' })
+  const asked: Asked = { children: moves.length > 0, data: downOf(pruning).length > 0 }
   const stepOf = (): Step => {
+    if (owedOnly) return 'confirm'
     if (turned) return 'worktrees'
-    if (chosen === 'children' && fresh && moves.length === 0) return 'confirm'
-    return chosen
+    return settledStep({ chosen, asked, fresh })
   }
   const step = stepOf()
-  // forced, the rows keep none: a plan that changes nothing is one with no candidate
-  const nothing = rows.data?.plan?.empty === true
 
-  const state = (of: Step): StepState => {
-    const order: Step[] = ['worktrees', 'children', 'confirm']
-    if (of === step) return 'now'
-    if (of === 'children' && moves.length === 0 && step === 'confirm') return 'skipped'
-    return order.indexOf(of) < order.indexOf(step) ? 'done' : 'todo'
+  const state = (of: Step): StepState => stepState({ of, step, asked })
+
+  const next = () =>
+    dispatch({ type: 'go', to: nextStep(step, asked), ...(step === 'worktrees' && { confirmed: goingNames }) })
+
+  const back = () => dispatch({ type: 'go', to: previousStep(step, asked) })
+
+  // the button says the plan it applies, not the rows that sent the wizard to Confirm
+  const label = () => {
+    const owed = (plan ?? rowsPlan)?.owed ?? []
+    if ((plan ? pruning.length === 0 : owedOnly) && owed.length > 0)
+      return `Drop ${plural(owed.length, 'owed namespace')}`
+    return count === 1 ? 'Prune' : `Prune ${count} worktrees`
   }
-
-  const next = () => {
-    if (step === 'worktrees')
-      return dispatch({ type: 'go', to: moves.length > 0 ? 'children' : 'confirm', confirmed: goingNames })
-    dispatch({ type: 'go', to: 'confirm' })
-  }
-
-  const back = () => dispatch({ type: 'go', to: step === 'confirm' && moves.length > 0 ? 'children' : 'worktrees' })
 
   // a Next that can't be pressed says why, so the step needs no sentence of its own
   const blocked = () => {
@@ -163,8 +176,6 @@ export function PruneWizard({
     return going.length === 0 ? 'Check a worktree to prune it' : undefined
   }
 
-  const leftRows = (some: Left[]) =>
-    some.map(({ worktree, why }) => <LeftItem key={worktree} worktree={worktree} why={why} />)
   const keptRows = keeping.map((candidate) => ({
     worktree: candidate.worktree,
     why: `Kept: ${(candidate.blockers ?? []).map((blocker) => blockerWords[blocker](candidate)).join(', ')}`,
@@ -200,21 +211,22 @@ export function PruneWizard({
       )
 
     if (!plan) return !unplanned && <Skeleton className="h-40 w-full" />
+    if (step === 'data')
+      return (
+        <DataStep
+          removals={pruning}
+          dropData={dropData}
+          onDropData={(on) => dispatch({ type: 'drop_data', dropData: on })}
+        />
+      )
     return (
-      <>
-        <ItemList label="Worktrees" left={leftRows([...keptRows, ...left])}>
-          {pruning.map((candidate) => (
-            <RemovalItem
-              key={candidate.worktree}
-              removal={candidate}
-              reason={<ReasonLine candidate={candidate} />}
-              moves={moves.filter((move) => move.from === candidate.branch)}
-              reparent={reparent}
-            />
-          ))}
-        </ItemList>
-        <RemovalDetails removals={pruning} />
-      </>
+      <PruneConfirm
+        pruning={pruning}
+        left={[...keptRows, ...left]}
+        moves={moves}
+        reparent={reparent}
+        owed={plan.owed ?? []}
+      />
     )
   }
 
@@ -222,15 +234,20 @@ export function PruneWizard({
     <>
       <DialogHeader>
         <DialogTitle>Prune worktrees</DialogTitle>
-        <DialogDescription>Each goes with its local branch and its record; the remote branch stays.</DialogDescription>
+        <DialogDescription>
+          {owedOnly
+            ? 'Nothing to prune, but worktrees removed earlier still owe their data to shared services now up.'
+            : 'Each goes with its local branch and its record; the remote branch stays.'}
+        </DialogDescription>
       </DialogHeader>
 
       <DialogBand>
-        {!nothing && (
+        {!nothing && !owedOnly && (
           <Stepper
             steps={[
               { title: 'Worktrees', state: state('worktrees') },
               { title: 'Children', state: state('children') },
+              { title: 'Data', state: state('data') },
               { title: 'Confirm', state: state('confirm') },
             ]}
           />
@@ -251,7 +268,7 @@ export function PruneWizard({
             <Button variant="ghost" className="mr-auto" onClick={onCancel}>
               Cancel
             </Button>
-            {step !== 'worktrees' && (
+            {step !== 'worktrees' && !owedOnly && (
               <Button variant="outline" onClick={back}>
                 Back
               </Button>
@@ -263,7 +280,7 @@ export function PruneWizard({
                 disabled={!fresh || !fingerprint}
                 onClick={() => plan && fingerprint && onStart({ answers, fingerprint, units: unitsOf(plan) })}
               >
-                {count === 1 ? 'Prune' : `Prune ${count} worktrees`}
+                {label()}
               </Button>
             )}
           </>

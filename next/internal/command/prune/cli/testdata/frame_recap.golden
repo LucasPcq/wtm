@@ -1,9 +1,11 @@
 
-  Step 8/8 • Confirm
+  Step 10/10 • Confirm
 
   ✓ Worktrees: feat/dirty, feat/gone, feat/merged
   ✓ Reparent children: leave orphaned
   ✓ Force: forced
+  · Data — no data waits on a service down
+  · Keep data — set by its flag only
   · Merged — set by its flag only
   · Closed — set by its flag only
   · Gone — set by its flag only

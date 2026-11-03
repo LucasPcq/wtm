@@ -21,9 +21,10 @@ type Worktree interface {
 // excerptLines is how many of an item's last lines its conclusion shows.
 const excerptLines = 10
 
-// AppliedParams is what DrawApplied draws an outcome as, beyond the outcome itself: the command it counts for, the note its tally adds, the note of the row of an item done without a change (create's "already open"), the view it draws from, the block the command draws under the plan (Block, nil for none), and, when the command keeps them, the last lines an item printed and where the whole of them is (Excerpt, nil for none), drawn under an item that did not end done.
+// AppliedParams is what DrawApplied draws an outcome as, beyond the outcome itself: the command it counts for, the noun its tally counts an item by that is not one of the run's own subjects (Noun, nil when all are), the note its tally adds, the note of the row of an item done without a change (create's "already open"), the view it draws from, the block the command draws under the plan (Block, nil for none), and, when the command keeps them, the last lines an item printed and where the whole of them is (Excerpt, nil for none), drawn under an item that did not end done.
 type AppliedParams struct {
 	Command   string
+	Noun      func(subject string) string
 	Note      string
 	Unchanged string
 	View      View
@@ -36,7 +37,11 @@ func DrawApplied[P RecappedPlan, D any](w io.Writer, outcome domain.Outcome[P, D
 	items := outcome.Result.Items
 	tallied := make([]Tallied, 0, len(items))
 	for _, item := range items {
-		tallied = append(tallied, Tallied{Status: item.Status, Reason: item.Reason})
+		counted := Tallied{Status: item.Status, Reason: item.Reason}
+		if params.Noun != nil {
+			counted.Noun = params.Noun(item.Subject)
+		}
+		tallied = append(tallied, counted)
 	}
 	Tally(w, TallyParams{Command: params.Command, Items: tallied, Note: params.Note})
 

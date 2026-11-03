@@ -8,7 +8,6 @@ export const blockerWords: Record<WorktreeBlocker, (removal: TeardownRemoval) =>
   dirty: () => 'Uncommitted changes',
   unpushed: ({ unpushed = 0 }) => `${plural(unpushed, 'commit')} on no other branch`,
   open_pull_request: () => 'An open pull request',
-  jobs_running: ({ jobs = [] }) => `Jobs running: ${jobs.join(', ')}`,
 }
 
 export const lostWords: Record<WorktreeBlocker, (removal: TeardownRemoval) => string> = {
@@ -19,5 +18,4 @@ export const lostWords: Record<WorktreeBlocker, (removal: TeardownRemoval) => st
       ? 'Its 1 commit on no other branch is lost.'
       : `Its ${unpushed} commits on no other branch are lost.`,
   open_pull_request: () => 'Its pull request stays open on GitHub.',
-  jobs_running: ({ jobs = [] }) => `Its jobs ${jobs.join(', ')} keep running.`,
 }

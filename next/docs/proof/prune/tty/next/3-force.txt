@@ -1,6 +1,6 @@
 $ wtm prune --merged; echo EXIT=$?
 
-  Step 3/8 • Force
+  Step 3/10 • Force
 
   ✓ Worktrees: feat/bad, feat/dirty, feat/merged, feat/squash
   ✓ Reparent children: leave orphaned

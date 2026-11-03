@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/config"
 	"github.com/LucasPcq/wtm/next/internal/adapter/git"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
+	"github.com/LucasPcq/wtm/next/internal/adapter/joblog"
 	"github.com/LucasPcq/wtm/next/internal/adapter/oplock"
 	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
 	"github.com/LucasPcq/wtm/next/internal/adapter/store"
@@ -34,6 +36,20 @@ const (
 	open        = "feat/open"      // its pull request open: not done with
 	plain       = "feat/plain"     // no pull request: not done with
 	projectToml = "[worktrees]\nbase_path = \"../.trees\"\nbase_branch = \"main\"\n"
+	// runToml declares a shared service whose namespace, named after the worktree, a remove command drops by writing its name into the main checkout's dropped.txt.
+	runToml = `
+[[job]]
+name = "db"
+kind = "service"
+cmd = "db"
+scope = "shared"
+ports = { DB_PORT = 5432 }
+
+[job.namespace]
+name = "app_{worktree}"
+create = "createdb"
+remove = "echo $WTM_NAMESPACE >> dropped.txt"
+`
 )
 
 var (
@@ -55,6 +71,7 @@ type world struct {
 	stateDir string
 	repo     git.Repo
 	meta     store.Meta
+	daemon   *daemon
 	prs      []worktree.PullRequest
 	usecase  prune.UseCase
 }
@@ -88,8 +105,10 @@ func newWorld(t *testing.T, s seed) world {
 	})
 	stateDir := filepath.Join(main, ".git", "wtm")
 	writeFile(t, filepath.Join(stateDir, "config.toml"), configOf(s))
+	writeFile(t, filepath.Join(stateDir, "run.toml"), runToml)
 	meta := store.Meta{StateDir: stateDir}
-	w := world{root: root, main: main, stateDir: stateDir, repo: repo, meta: meta}
+	d := &daemon{listed: slices.Clone(s.Jobs)}
+	w := world{root: root, main: main, stateDir: stateDir, repo: repo, meta: meta, daemon: d}
 	for _, branch := range []string{merged, closed, moved, gone, goneWork, dirty, open, plain} {
 		w.record(t, branch, worktree.Meta{SourceBranch: "main", CreatedAt: createdAt.Format(time.RFC3339)})
 	}
@@ -108,10 +127,13 @@ func newWorld(t *testing.T, s seed) world {
 	w.usecase = prune.UseCase{
 		Git:          repo,
 		Meta:         meta,
-		Jobs:         func(context.Context) ([]run.Job, error) { return s.Jobs, nil },
+		Jobs:         d.Jobs,
 		PullRequests: func(context.Context, []string) ([]worktree.PullRequest, error) { return w.prs, s.PRErr },
-		Teardown:     teardown.Service{Git: repo, Meta: meta, EnvFiles: store.EnvFiles{}, StateDir: stateDir, Gone: repository.GoneIn(repo), RunHooks: shell.RunHooks, Shield: shell.Shield},
-		Repository:   repository.Service{Config: config.Project{StateDir: stateDir, GlobalPath: filepath.Join(root, "no-global.toml")}, Git: repo, MainPath: main},
+		Teardown: teardown.Service{
+			Git: repo, Meta: meta, EnvFiles: store.EnvFiles{}, Daemon: d, Owed: store.Owed{StateDir: stateDir}, StateDir: stateDir, CommonDir: filepath.Join(main, ".git"),
+			Gone: repository.GoneIn(repo), RunHooks: shell.RunHooks, PurgeLogs: joblog.Purge, Shield: shell.Shield,
+		},
+		Repository: repository.Service{Config: config.Project{StateDir: stateDir, GlobalPath: filepath.Join(root, "no-global.toml")}, Git: repo, MainPath: main},
 		Operations: operation.Service{
 			Locker:    locks{oplock.Locks{StateDir: stateDir}},
 			Publisher: &operationtest.Recorder{},
@@ -187,3 +209,33 @@ func (uncountable) Unpushed(context.Context, worktree.Losing) (int, error) {
 
 // newerRecord is a record a newer wtm wrote, at a schema this one does not know.
 const newerRecord = `{"schema": 99, "source_branch": "main"}`
+
+// A daemon is the run daemon a test scripts: the jobs it lists, why it cannot list, and every start and stop it got.
+type daemon struct {
+	listed  []run.Job
+	jobsErr error
+	calls   []string
+}
+
+func (d *daemon) Jobs(context.Context) ([]run.Job, error) {
+	return slices.Clone(d.listed), d.jobsErr
+}
+
+func (d *daemon) Start(_ context.Context, spec run.Spec, _ func(run.Line)) (run.Job, error) {
+	d.calls = append(d.calls, "start "+spec.Job.Name)
+	job := run.Job{Name: spec.Job.Name, WorkDir: spec.WorkDir, Up: true, Hold: run.HoldOwn}
+	d.listed = append(d.listed, job)
+	return job, nil
+}
+
+func (d *daemon) Stop(_ context.Context, req run.Stop) (run.Outcome, error) {
+	d.calls = append(d.calls, "stop "+req.Name+" "+filepath.Base(req.WorkDir))
+	d.listed = slices.DeleteFunc(d.listed, func(job run.Job) bool { return job.Name == req.Name && job.WorkDir == req.WorkDir })
+	return run.OutcomeStopped, nil
+}
+
+func (d *daemon) StopAll(_ context.Context, req run.StopAll) ([]run.StoppedJob, error) {
+	d.calls = append(d.calls, "stop_all "+filepath.Base(req.WorkDir))
+	d.listed = slices.DeleteFunc(d.listed, func(job run.Job) bool { return job.WorkDir == req.WorkDir })
+	return nil, nil
+}

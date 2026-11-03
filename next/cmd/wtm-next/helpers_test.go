@@ -46,6 +46,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/teardown"
 	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
 	"github.com/LucasPcq/wtm/next/internal/web"
 	"github.com/santhosh-tekuri/jsonschema/v6"
@@ -508,6 +509,9 @@ var enums = map[reflect.Type]struct {
 	reflect.TypeFor[runup.JobStatus]():           {"What became of one job of a start.", runup.JobStatuses()},
 	reflect.TypeFor[list.Finished]():             {"How a worktree's pull request has done with it: merged, or closed unmerged.", list.Finisheds()},
 	reflect.TypeFor[prune.Reason]():              {"Why a worktree is done with, as a code each surface words its own way.", prune.Reasons()},
+	reflect.TypeFor[teardown.DataStatus]():       {"What a removal's plan does with a namespace its worktree made in a shared service.", teardown.DataStatuses()},
+	reflect.TypeFor[teardown.DataReason]():       {"Why a namespace a removed worktree made in a shared service is not dropped with it.", teardown.DataReasons()},
+	reflect.TypeFor[teardown.DropStatus]():       {"What became of a namespace a removed worktree made in a shared service.", teardown.DropStatuses()},
 	reflect.TypeFor[worktree.Blocker]():          {"What makes a worktree unsafe to remove, a safety refusal only force lifts, as a code each surface words its own way.", worktree.Blockers()},
 	reflect.TypeFor[fastforward.Standing]():      {"Where a worktree stands for a fast-forward, the first that applies; only behind moves.", fastforward.Standings()},
 	reflect.TypeFor[fastforward.Blocker]():       {"What makes a worktree behind origin unsafe to fast-forward, a safety refusal only force lifts.", fastforward.Blockers()},

@@ -1,0 +1,28 @@
+## jobs up (the daemon's index)
+## .git/wtm/worktrees/feat%2Fd/meta.json
+  "ordinal": 4,
+## .git/wtm/worktrees/feat%2Ff/meta.json
+  "ordinal": 5,
+## logs
+./main
+## namespaces made
+acme_feat-b
+acme_feat-c
+## pending-removals.toml
+schema = 2
+
+[[pending]]
+  job = "db"
+  worktree = "feat-c"
+  ordinal = 3
+  name = "acme_feat-c"
+  [pending.env]
+    COMPOSE_PROJECT_NAME = "acme-feat-c"
+    DB_PORT = "24393"
+    WTM_BRANCH = "feat/c"
+    WTM_ISOLATION = "isolated"
+    WTM_NAMESPACE = "acme_feat-c"
+    WTM_ORDINAL = "3"
+    WTM_PORT_OFFSET = "30"
+    WTM_PROJECT = "acme"
+    WTM_WORKTREE = "feat-c"

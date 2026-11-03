@@ -1,0 +1,22 @@
+
+  Profile data
+
+  › [1/3] db
+  ✓ db joined, running in main · :24393 · acme_feat-d ready
+
+  › [2/3] api
+  ✓ api started · http://api.feat-d.acme.localhost:24392
+
+  › [3/3] web
+  ✓ web started · http://web.feat-d.acme.localhost:24392
+
+  Shared, running in main
+    db   :24393 · acme_feat-d
+
+  Where to reach it
+    api  http://api.feat-d.acme.localhost:24392
+    web  http://web.feat-d.acme.localhost:24392
+
+  → wtm run logs   attach to the output
+  → wtm run down   stop the jobs
+

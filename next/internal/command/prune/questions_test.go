@@ -85,9 +85,9 @@ func TestTheAnswersOfTheFormGiveBackTheRequest(t *testing.T) {
 }
 
 func TestAPathNotOfTheRequestIsRefused(t *testing.T) {
-	_, err := prune.Request{}.Answer("keep_data", []string{"true"})
+	_, err := prune.Request{}.Answer("profile", []string{"dev"})
 
-	assert.Equal(t, map[string][]string{"keep_data": {domain.CodeUnknown}}, fieldCodes(failureOf(t, err).Fields))
+	assert.Equal(t, map[string][]string{"profile": {domain.CodeUnknown}}, fieldCodes(failureOf(t, err).Fields))
 }
 
 // Narrowed to the worktrees named, the checks left every other candidate without its blockers: back in the wizard's picker, feat/dirty read as safe.

@@ -39,6 +39,7 @@ const (
 	SkipAll             Skip = "all"              // every worktree is read
 	SkipNoOrphan        Skip = "no_orphan"        // no worktree removed leaves a child behind
 	SkipSafe            Skip = "safe"             // nothing asked is unsafe: nothing to force
+	SkipNoDataOwed      Skip = "no_data_owed"     // no data a removal holds waits on a service down
 	SkipNoCandidate     Skip = "no_candidate"     // nothing to pick from: no worktree is done with
 	SkipNoDescendant    Skip = "no_descendant"    // no worktree asked has worktrees under it
 	SkipNoRebase        Skip = "no_rebase"        // nothing is rebased: no conflict can stop it
@@ -50,7 +51,7 @@ const (
 
 // Skips returns every Skip.
 func Skips() []Skip {
-	return []Skip{SkipFlagOnly, SkipExists, SkipNotBehind, SkipHeld, SkipRunUnread, SkipNothingIsolated, SkipNoConflict, SkipAll, SkipNoOrphan, SkipSafe, SkipNoCandidate, SkipNoDescendant, SkipNoRebase, SkipNothingToPush, SkipOneProfile, SkipAlone, SkipConfigured}
+	return []Skip{SkipFlagOnly, SkipExists, SkipNotBehind, SkipHeld, SkipRunUnread, SkipNothingIsolated, SkipNoConflict, SkipAll, SkipNoOrphan, SkipSafe, SkipNoDataOwed, SkipNoCandidate, SkipNoDescendant, SkipNoRebase, SkipNothingToPush, SkipOneProfile, SkipAlone, SkipConfigured}
 }
 
 // Answer is the value a question settled on, and where that value came from.

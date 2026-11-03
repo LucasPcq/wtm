@@ -64,7 +64,7 @@ test('Next passes over a step the core asks nothing of once the branch is typed,
   await user.click(within(dialog).getByRole('button', { name: 'Next' }))
 
   expect(await within(dialog).findByRole('listitem', { name: 'feat/billing' })).toBeTruthy()
-  expect(within(dialog).getByText('Environment · not asked')).toBeTruthy()
+  expect(within(dialog).getByRole('listitem', { name: 'Environment, not asked' })).toBeTruthy()
 })
 
 // A follow-up the command line cannot spell was left out of the done state: it is said, never hidden.

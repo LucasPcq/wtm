@@ -19,18 +19,20 @@ const (
 		"A worktree on no branch is named by its path; a branch no worktree holds is deleted alone.\n" +
 		"\n" +
 		"A worktree that is locked, has uncommitted changes, holds commits no other branch nor remote\n" +
-		"holds, has an open pull request or runs jobs is unsafe: one unsafe worktree refuses the whole\n" +
+		"holds or has an open pull request is unsafe: one unsafe worktree refuses the whole\n" +
 		"run before anything is removed, unless --force. --force lifts that refusal only: it still\n" +
 		"asks to confirm, unless --yes.\n" +
 		"\n" +
-		"Each worktree is removed in turn, its on_clean hooks first: a failing hook keeps it. A failure\n" +
+		"Each worktree is removed in turn: the jobs it runs stopped first (one that will not stop keeps\n" +
+		"it, unless --force), then its on_clean hooks: a failing hook keeps it. A failure\n" +
 		"does not stop the others. The children a removal leaves behind stay on their removed parent,\n" +
 		"named with the `wtm reparent` that moves them, unless --reparent-children moves them onto the\n" +
 		"nearest worktree that stays, else the base branch.\n" +
 		"\n" +
-		"Until the run module moves to wtm-next, clean neither stops a worktree's jobs nor drops the\n" +
-		"data it holds in shared services: jobs up refuse the removal unless --force, and the data\n" +
-		"kept is named."
+		"The data a worktree made in shared services (a database, a bucket) is dropped once it is\n" +
+		"removed, its claims let go of after the last removal. A service that is down cannot drop it:\n" +
+		"it is owed until the service next starts (run up or prune drops it then), unless --drop-data\n" +
+		"starts the service to drop it now. --keep-data keeps it all."
 	cleanExample = `  # Pick the worktrees to remove
   wtm clean
 

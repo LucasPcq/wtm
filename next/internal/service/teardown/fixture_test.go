@@ -3,11 +3,13 @@ package teardown_test
 import (
 	"context"
 	"errors"
+	"slices"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
+	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
 	"github.com/LucasPcq/wtm/next/internal/service/teardown"
@@ -29,8 +31,12 @@ var errRefused = errors.New("refused")
 type world struct {
 	git     *gittest.Fake
 	store   *storetest.Fake
+	daemon  *daemon
+	queue   *queue
 	service teardown.Service
 	hooks   *[]env.HookChain
+	purged  *[]string
+	run     project.Run
 }
 
 type seed struct {
@@ -38,6 +44,9 @@ type seed struct {
 	Fail      map[string]error
 	StoreFail map[string]error
 	RunHooks  func(context.Context, env.HookChain) error
+	Run       project.Run // run.toml
+	Listed    []run.Job   // the jobs the run daemon lists
+	Owed      []env.OwedDrop
 }
 
 func at(branch string) string {
@@ -64,7 +73,7 @@ func newWorld(s seed) world {
 		Fail: s.Fail,
 	})
 	store := storetest.NewFake(storetest.FakeParams{Meta: map[string]worktree.Meta{
-		plain:  {SourceBranch: "main"},
+		plain:  {SourceBranch: "main", Ordinal: 1, Namespaces: []string{"db"}},
 		parent: {SourceBranch: "main"},
 		child:  {SourceBranch: parent},
 		alone:  {SourceBranch: "main"},
@@ -77,12 +86,98 @@ func newWorld(s seed) world {
 			return nil
 		}
 	}
+	d := &daemon{listed: slices.Clone(s.Listed)}
+	q := &queue{owed: slices.Clone(s.Owed)}
+	purged := &[]string{}
 	return world{
-		git:     git,
-		store:   store,
-		hooks:   hooks,
-		service: teardown.Service{Git: git, Meta: store, EnvFiles: store, StateDir: "/repo/main/.git/wtm", Gone: repository.GoneIn(git), RunHooks: runHooks, Shield: func(ctx context.Context) (context.Context, func()) { return ctx, func() {} }},
+		git:    git,
+		store:  store,
+		daemon: d,
+		queue:  q,
+		hooks:  hooks,
+		purged: purged,
+		run:    s.Run,
+		service: teardown.Service{
+			Git: git, Meta: store, EnvFiles: store, Daemon: d, Owed: q, StateDir: "/state", CommonDir: "/repo/main/.git",
+			Gone: repository.GoneIn(git), RunHooks: runHooks, Shield: func(ctx context.Context) (context.Context, func()) { return ctx, func() {} },
+			PurgeLogs: func(dir string) error { *purged = append(*purged, dir); return nil },
+		},
 	}
+}
+
+// sharedDB is a run.toml with a shared service whose namespace is named after the worktree.
+func sharedDB() project.Run {
+	return project.Run{Jobs: []project.Job{{Name: "db", Kind: project.Service, Cmd: "postgres", Scope: project.Shared, Ports: map[string]int{"PGPORT": 5432}, Namespace: &project.Namespace{Name: "acme_{worktree}", Create: "createdb", Remove: "dropdb"}}}}
+}
+
+// up is the shared db up in the main checkout, where it runs, and a worktree's claim on it.
+func up(claimer string) []run.Job {
+	return []run.Job{
+		{Name: "db", WorkDir: "/repo/main", Up: true, Hold: run.HoldOwn, SharedDir: "/repo/main"},
+		{Name: "db", WorkDir: at(claimer), Up: true, Hold: run.HoldClaim, SharedDir: "/repo/main"},
+	}
+}
+
+// A daemon is the run daemon a test scripts: the jobs it lists, those a stop leaves up, why it cannot list or start, and every start and stop it got.
+type daemon struct {
+	listed   []run.Job
+	stuck    []string
+	jobsErr  error
+	startErr error
+	stopErr  error
+	calls    []string
+}
+
+func (d *daemon) Jobs(context.Context) ([]run.Job, error) {
+	return slices.Clone(d.listed), d.jobsErr
+}
+
+func (d *daemon) Start(_ context.Context, spec run.Spec, _ func(run.Line)) (run.Job, error) {
+	d.calls = append(d.calls, "start "+spec.Job.Name+" "+spec.WorkDir)
+	if d.startErr != nil {
+		return run.Job{}, d.startErr
+	}
+	job := run.Job{Name: spec.Job.Name, WorkDir: spec.WorkDir, Up: true, Hold: run.HoldOwn}
+	d.listed = append(d.listed, job)
+	return job, nil
+}
+
+func (d *daemon) Stop(_ context.Context, req run.Stop) (run.Outcome, error) {
+	d.calls = append(d.calls, "stop "+req.Name+" "+req.WorkDir)
+	if slices.Contains(d.stuck, req.Name) {
+		return run.OutcomeStopped, nil
+	}
+	d.listed = slices.DeleteFunc(d.listed, func(job run.Job) bool { return job.Name == req.Name && job.WorkDir == req.WorkDir })
+	return run.OutcomeStopped, nil
+}
+
+func (d *daemon) StopAll(_ context.Context, req run.StopAll) ([]run.StoppedJob, error) {
+	d.calls = append(d.calls, "stop_all "+req.WorkDir)
+	if d.stopErr != nil {
+		return nil, d.stopErr
+	}
+	d.listed = slices.DeleteFunc(d.listed, func(job run.Job) bool { return job.WorkDir == req.WorkDir })
+	return nil, nil
+}
+
+// A queue is pending-removals.toml in memory; the update of each number in fail fails, the first being 1.
+type queue struct {
+	owed    []env.OwedDrop
+	updates int
+	fail    map[int]error
+}
+
+func (q *queue) Load() ([]env.OwedDrop, error) {
+	return slices.Clone(q.owed), nil
+}
+
+func (q *queue) Update(_ context.Context, change func([]env.OwedDrop) []env.OwedDrop) error {
+	q.updates++
+	if err := q.fail[q.updates]; err != nil {
+		return err
+	}
+	q.owed = change(slices.Clone(q.owed))
+	return nil
 }
 
 // leaving removes the worktree from git's list but fails as git does when files it cannot delete stay on disk.

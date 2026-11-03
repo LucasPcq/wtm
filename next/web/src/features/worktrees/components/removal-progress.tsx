@@ -14,6 +14,7 @@ import { useReparentNow } from '@/features/worktrees/hooks/use-reparent-now'
 import { useRun } from '@/features/worktrees/hooks/use-run'
 import { listed } from '@/features/worktrees/utils/listed'
 import type { Act, OutcomeKind } from '@/features/worktrees/utils/outcome'
+import { owedOf, owedTally } from '@/features/worktrees/utils/owed'
 import { phaseLabel } from '@/features/worktrees/utils/phases'
 import { current, doneOf, ending, type Progress } from '@/features/worktrees/utils/progress'
 import { plain } from '@/features/worktrees/utils/removal'
@@ -25,7 +26,7 @@ export type RemovalWords = {
   past: string
   noun: string
   outcome: Record<OutcomeKind, string>
-  dataKept: string
+  command: Teardown
 }
 
 export function RemovalProgress({
@@ -47,7 +48,7 @@ export function RemovalProgress({
 }) {
   const names = progress.units.map((unit) => unit.subject)
   const items = progress.envelope?.items ?? []
-  const removed = items.filter((item) => item.status === 'done').map((item) => item.subject)
+  const removed = items.filter((item) => item.status === 'done' && !owedOf(item)).map((item) => item.subject)
   const failed = names.filter((name) => !removed.includes(name))
   const now = current(progress)
   const { done, total } = doneOf(progress)
@@ -58,7 +59,7 @@ export function RemovalProgress({
   const error = progress.envelope?.error
   const refused =
     progress.refused ?? (items.some((item) => item.error) || error?.kind === 'cancelled' ? undefined : error?.message)
-  const { groups, warnings, kept } = recapOf(progress, words.dataKept)
+  const { groups, warnings, data } = recapOf(progress, words.command)
   const reparentNow = useReparentNow(repo)
   const reparenting = useRun(repo, 'reparent').running
   const act: Act = {
@@ -81,6 +82,8 @@ export function RemovalProgress({
   )
 
   const description = () => {
+    // a run of drops owed alone says them, as the command line's tally counts them
+    if (!running && names.length === 0 && owedTally(items).length > 0) return `${owedTally(items).join(' · ')}.`
     if (ok && !branched) return `${removed.length} ${words.past}.`
     if (ok)
       return names.length === 1
@@ -105,7 +108,7 @@ export function RemovalProgress({
         {!running && <RunFailure message={refused} />}
         {!running && <RunOutcome groups={groups} labels={words.outcome} warnings={toCheck} act={act} />}
         <RunSteps progress={progress} running={running}>
-          {kept.map((line) => (
+          {data.map((line) => (
             <p key={line} className="flex items-start gap-2 text-xs text-muted-foreground">
               <Database className="mt-px size-3.5 shrink-0" aria-hidden="true" />
               {line}

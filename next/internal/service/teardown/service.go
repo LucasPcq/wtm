@@ -3,9 +3,11 @@ package teardown
 import (
 	"context"
 	"slices"
+	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
+	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
@@ -14,14 +16,18 @@ import (
 
 // Service checks and removes worktrees for the commands that remove them. Every field must be set before Remove.
 type Service struct {
-	Git      Git
-	Meta     Meta
-	EnvFiles EnvFiles
-	StateDir string // wtm's state, where each worktree's hook log goes
+	Git       Git
+	Meta      Meta
+	EnvFiles  EnvFiles
+	Daemon    Daemon
+	Owed      Owed
+	StateDir  string // wtm's state, where each worktree's hook log and job logs go
+	CommonDir string // the repository's common directory, which the events of a job started to drop data name
 
-	Gone     func(ctx context.Context, w worktree.Worktree) (bool, error) // whether w's directory is gone (repository.Gone)
-	RunHooks func(ctx context.Context, chain env.HookChain) error         // runs the on_clean hooks, failing with an *env.HookFailure
-	Shield   func(ctx context.Context) (context.Context, func())          // a context the first cancel does not reach, and its release
+	Gone      func(ctx context.Context, w worktree.Worktree) (bool, error) // whether w's directory is gone (repository.Gone)
+	RunHooks  func(ctx context.Context, chain env.HookChain) error         // runs the on_clean hooks and a namespace's remove command, failing with an *env.HookFailure
+	PurgeLogs func(dir string) error                                       // removes a worktree's job logs
+	Shield    func(ctx context.Context) (context.Context, func())          // a context the first cancel does not reach, and its release
 }
 
 // ----------------------------------------------------------------------------
@@ -64,8 +70,10 @@ func (s Service) Read(ctx context.Context, params ReadParams) (map[string]Check,
 // ----------------------------------------------------------------------------
 // The removal
 
-// The codes of what becomes of a removal, after the command's name: an on_clean hook that failed, the hooks skipped or run without the worktree's environment, a worktree git could not remove or whose files stay on disk, a branch or a record that could not be deleted.
+// The codes of what becomes of a removal, after the command's name: jobs that would not stop, or left running when forced; an on_clean hook that failed, the hooks skipped or run without the worktree's environment, a worktree git could not remove or whose files stay on disk, a branch or a record that could not be deleted.
 const (
+	StopFailed         = ".stop_failed"
+	JobsLeft           = ".jobs_left"
 	HookFailed         = ".hook_failed"
 	HooksSkipped       = ".hooks_skipped"
 	HookEnvUnavailable = ".hook_env_unavailable"
@@ -75,24 +83,52 @@ const (
 	MetaKept           = ".meta_kept"
 )
 
-// RemoveParams are the command removing, the facts it planned on, the removal and where its events go.
+// BatchParams are the command removing, the facts it planned on, the removals in order, whether a worktree whose jobs would not stop is removed all the same, the operation's correlation id, which the run daemon's events carry, and where the events go.
+type BatchParams struct {
+	Command       string
+	Facts         Facts
+	Removals      []Removal
+	Force         bool
+	CorrelationID string
+	Report        domain.Report
+}
+
+// Batch removes each of the removals in turn, a failure stopping none of the others: first the shared services down their data asks started are started, then each removal (Remove), then, once every drop is made, what the worktrees removed held in the shared services is let go of, and the services started stopped again. It returns what became of each removal, in order, and the warnings of the batch.
+func (s Service) Batch(ctx context.Context, params BatchParams) ([]Removed, []domain.Warning) {
+	lit, unlit := s.light(ctx, params)
+	removed := make([]Removed, 0, len(params.Removals))
+	for _, removal := range params.Removals {
+		removed = append(removed, s.Remove(ctx, RemoveParams{Command: params.Command, Facts: params.Facts, Removal: removal, Force: params.Force, CorrelationID: params.CorrelationID, Unlit: unlit, Report: params.Report}))
+	}
+
+	// What went is let go of, interrupted or not: nothing would release it later.
+	shielded, release := s.Shield(ctx)
+	defer release()
+	return removed, s.release(shielded, params, removed, lit)
+}
+
+// RemoveParams are the command removing, the facts it planned on, the removal, whether it goes when its jobs would not stop, the operation's correlation id, why each shared service the batch was to start for its data could not start, and where its events go.
 type RemoveParams struct {
-	Command string
-	Facts   Facts
-	Removal Removal
-	Report  domain.Report
+	Command       string
+	Facts         Facts
+	Removal       Removal
+	Force         bool
+	CorrelationID string
+	Unlit         map[string]error
+	Report        domain.Report
 }
 
-// Removed is what became of one removal: its status and why, the error it failed on, its warnings, and whether its worktree went, its branch deleted or not.
+// Removed is what became of one removal: its status and why, the error it failed on, its warnings, whether its worktree went, its branch deleted or not, and what became of its data.
 type Removed struct {
-	Status   domain.Status
-	Reason   domain.Reason
-	Err      *domain.Error
-	Warnings []domain.Warning
-	Gone     bool
+	Status     domain.Status
+	Reason     domain.Reason
+	Err        *domain.Error
+	Warnings   []domain.Warning
+	Gone       bool
+	Namespaces []Dropped
 }
 
-// Remove removes one worktree between its unit events: its on_clean hooks, which refuse its removal when one fails, then the worktree, its branch and its meta record, shielded from a cancel, then the event that names it gone. A worktree reached after a cancel is skipped.
+// Remove removes one worktree between its unit events: its own jobs stopped, a job left running refusing its removal unless forced; its on_clean hooks, which refuse its removal when one fails; then, shielded from a cancel, the worktree, its branch and its meta record, the event that names it gone, its data dropped or owed and its job logs purged. A worktree reached after a cancel is skipped. Its claims on the shared services are let go of by Batch, once every drop is made.
 func (s Service) Remove(ctx context.Context, params RemoveParams) (removed Removed) {
 	removal, report := params.Removal, params.Report
 	if ctx.Err() != nil {
@@ -102,7 +138,17 @@ func (s Service) Remove(ctx context.Context, params RemoveParams) (removed Remov
 	report(domain.UnitStarted{Subject: removal.Worktree})
 	defer func() { report(domain.UnitFinished{Subject: removal.Worktree, Status: removed.Status}) }()
 
+	stopWarnings, stopErr := s.stopJobs(ctx, params)
+	if stopErr != nil {
+		removed = Removed{Status: domain.StatusFailed, Err: stopErr}
+		if ctx.Err() != nil {
+			removed.Status, removed.Reason = domain.StatusCancelled, domain.ReasonInterrupted
+		}
+		return removed
+	}
+
 	warnings, err := s.hooks(ctx, params)
+	warnings = append(stopWarnings, warnings...)
 	if err != nil {
 		removed = Removed{Status: domain.StatusFailed, Err: failure(params.Command+HookFailed, "on_clean hook failed", err), Warnings: warnings}
 		if ctx.Err() != nil {
@@ -119,7 +165,50 @@ func (s Service) Remove(ctx context.Context, params RemoveParams) (removed Remov
 	report(domain.PhaseFinished{Subject: removal.Worktree, Phase: domain.PhaseRemove, Failed: removed.Status != domain.StatusDone})
 
 	removed.Warnings = append(warnings, removed.Warnings...)
+	if !removed.Gone {
+		return removed
+	}
+	dropped, dataWarnings := s.dropData(shielded, params)
+	removed.Namespaces, removed.Warnings = dropped, append(removed.Warnings, dataWarnings...)
+	// Best effort: a log left over is not worth failing a removal that happened.
+	_ = s.PurgeLogs(run.LogDir(s.StateDir, removal.Branch))
 	return removed
+}
+
+// stopJobs stops the jobs the worktree runs for itself, between the events of its phase, its claims on shared services left for its data's drop; then asks the run daemon again: a job still up, or a daemon that cannot tell, fails the removal unless forced, warned then.
+func (s Service) stopJobs(ctx context.Context, params RemoveParams) ([]domain.Warning, *domain.Error) {
+	removal, report := params.Removal, params.Report
+	if !slices.Contains(removal.Phases, domain.PhaseStopJobs) {
+		return nil, nil
+	}
+
+	report(domain.PhaseStarted{Subject: removal.Worktree, Phase: domain.PhaseStopJobs})
+	names := removal.Jobs
+	if jobs, err := s.jobs(ctx); err == nil {
+		names = run.OwnUpIn(jobs, removal.Path)
+	}
+	for _, name := range names {
+		// A stop that fails shows in the listing after.
+		_, _ = s.Daemon.Stop(ctx, run.Stop{Name: name, WorkDir: removal.Path, CorrelationID: params.CorrelationID})
+	}
+	jobs, err := s.jobs(ctx)
+	left := run.OwnUpIn(jobs, removal.Path)
+	report(domain.PhaseFinished{Subject: removal.Worktree, Phase: domain.PhaseStopJobs, Failed: err != nil || len(left) > 0})
+
+	if err == nil && len(left) == 0 {
+		return nil, nil
+	}
+	about := domain.Params{"worktree": removal.Worktree}
+	still := strings.Join(left, ", ") + " would not stop"
+	if err != nil {
+		still = "whether its jobs stopped is unknown: " + run.UnknownMessage(err)
+	} else {
+		about["jobs"] = strings.Join(left, ", ")
+	}
+	if params.Force {
+		return []domain.Warning{{Code: params.Command + JobsLeft, Message: removal.Worktree + " is removed all the same: " + still, Params: about}}, nil
+	}
+	return nil, &domain.Error{Kind: domain.KindInternal, Code: params.Command + StopFailed, Message: removal.Worktree + " is kept: " + still, Params: about}
 }
 
 // hooks runs the on_clean hooks in the worktree, their variables expanded and the worktree's run environment set, between their phase's events; a worktree whose directory is gone runs none, with a warning.

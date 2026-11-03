@@ -15,6 +15,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/store"
 	"github.com/LucasPcq/wtm/next/internal/command/runup"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/env"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
@@ -22,6 +23,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/service/operationtest"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
+	"github.com/LucasPcq/wtm/next/internal/service/teardown"
 )
 
 const (
@@ -111,6 +113,7 @@ type world struct {
 	daemon   *daemon
 	silent   []int
 	onListen func() // runs as the ports are checked
+	drops    *[]env.HookChain
 	usecase  runup.UseCase
 }
 
@@ -135,7 +138,7 @@ func newWorld(t *testing.T) *world {
 	writeFile(t, filepath.Join(stateDir, "config.toml"), projectToml)
 	writeFile(t, filepath.Join(stateDir, "run.toml"), runToml)
 	meta := store.Meta{StateDir: stateDir}
-	w := &world{root: root, main: main, stateDir: stateDir, meta: meta, daemon: &daemon{}}
+	w := &world{root: root, main: main, stateDir: stateDir, meta: meta, daemon: &daemon{}, drops: &[]env.HookChain{}}
 	w.record(t, featA, worktree.Meta{SourceBranch: "main", Ordinal: 1, Isolation: project.Isolated})
 	w.record(t, featB, worktree.Meta{SourceBranch: "main", Ordinal: 2, Isolation: project.Isolated})
 	w.record(t, verbatim, worktree.Meta{SourceBranch: "main", Isolation: project.Verbatim})
@@ -169,6 +172,10 @@ func newWorld(t *testing.T) *world {
 			Now: func() time.Time { return startedAt },
 		},
 		Provision: provision.Service{Git: repo, Meta: meta},
+		Teardown: teardown.Service{EnvFiles: store.EnvFiles{}, Daemon: w.daemon, Owed: store.Owed{StateDir: stateDir}, RunHooks: func(_ context.Context, chain env.HookChain) error {
+			*w.drops = append(*w.drops, chain)
+			return nil
+		}},
 	}
 	return w
 }
@@ -258,6 +265,13 @@ func (d *daemon) Start(_ context.Context, spec run.Spec, out func(run.Line)) (ru
 		return run.Job{}, context.Canceled
 	}
 	return job, nil
+}
+
+func (d *daemon) Stop(_ context.Context, req run.Stop) (run.Outcome, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.stopped = append(d.stopped, req.WorkDir+" "+req.Name)
+	return run.OutcomeStopped, nil
 }
 
 func (d *daemon) StopAll(_ context.Context, req run.StopAll) ([]run.StoppedJob, error) {

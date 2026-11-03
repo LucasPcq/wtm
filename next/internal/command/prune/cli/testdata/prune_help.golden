@@ -9,17 +9,20 @@
   them all, the safe ones checked. Name worktrees to prune only those.
 
   A worktree that is locked, has uncommitted changes, holds commits no other branch nor remote
-  holds, has an open pull request or runs jobs is unsafe. One not named is kept, and named with
+  holds or has an open pull request is unsafe. One not named is kept, and named with
   the command that prunes it anyway; one named refuses the whole run before anything is removed,
   unless --force. --force lifts that refusal only: it still asks to confirm, unless --yes.
 
-  Each worktree is removed in turn, its on_clean hooks first: a failing hook keeps it. A failure
+  Each worktree is removed in turn: the jobs it runs stopped first (one that will not stop keeps
+  it, unless --force), then its on_clean hooks: a failing hook keeps it. A failure
   does not stop the others. The children a removal leaves behind stay on their removed parent,
   named with the `wtm reparent` that moves them, unless --reparent-children moves them onto the
   nearest worktree that stays, else the base branch.
 
-  Until the run module moves to wtm-next, prune neither stops a worktree's jobs nor drops the
-  data it holds in shared services: jobs up make it unsafe, and the data kept is named.
+  The data a worktree made in shared services (a database, a bucket) is dropped once it is
+  removed, its claims let go of after the last removal. A service that is down cannot drop it:
+  it is owed until the service next starts, unless --drop-data starts the service to drop it now.
+  --keep-data keeps it all. prune first drops what earlier removals owe a service that is up.
 
   Usage:
     wtm-next prune [worktree...] [flags]
@@ -44,11 +47,13 @@
   Flags:
         --ask                         Ask again the questions this repository remembers an answer to, to change or forget it
         --closed                      Prune the worktrees whose pull request was closed unmerged
+        --drop-data                   Start a shared service that is down to drop the namespaces the pruned worktrees made in it now, rather than once it next starts
     -n, --dry-run                     Show the plan and its fingerprint, apply nothing
         --expect-fingerprint string   Apply only if the facts still have this fingerprint, the one --dry-run printed
-        --force                       Prune a worktree that is locked, has uncommitted changes, unpushed commits, an open pull request or jobs running
+        --force                       Prune a worktree that is locked, has uncommitted changes, unpushed commits or an open pull request, or whose jobs would not stop
         --gone                        Prune the worktrees whose branch origin deleted
     -h, --help                        help for prune
+        --keep-data                   Keep the namespaces the pruned worktrees made in shared services (databases, buckets): nothing is dropped
         --merged                      Prune the worktrees whose pull request merged (none of --merged, --closed, --gone asks for all three)
         --no-fetch                    Read origin's branches as last fetched, for --gone
         --output string               Output format: text or json (default "text")

@@ -1,6 +1,7 @@
 import type { Applied } from '@/api/queries/commands'
 import type { DomainOption, RunupJobPlan, RunupJobStatus } from '@/api/types.gen'
 import { named, type Shared } from '@/features/worktrees/run-up/utils/plan'
+import { owedOf, owedTally } from '@/features/worktrees/utils/owed'
 import { jobsSummary } from '@/features/worktrees/utils/run-words'
 
 export const resultWords: Record<RunupJobStatus, string> = {
@@ -61,7 +62,8 @@ export const where = (worktrees: string[]) =>
 // what the start's jobs became, counted: the services up, the shared ones joined, the tasks done
 export function startedWords(profile: string, envelope: Applied<'run-up'> | undefined) {
   const items = envelope?.items ?? []
-  const jobs = items.flatMap((item) => item.detail?.jobs ?? [])
+  const worktrees = items.filter((item) => !owedOf(item))
+  const jobs = worktrees.flatMap((item) => item.detail?.jobs ?? [])
   const count = (statuses: RunupJobStatus[]) => jobs.filter((job) => statuses.includes(job.status)).length
   const said = [
     [count(['started', 'already_running']), 'up'],
@@ -69,7 +71,7 @@ export function startedWords(profile: string, envelope: Applied<'run-up'> | unde
     [count(['done']), 'done'],
   ] as const
   return {
-    title: `${profile} started ${where(items.map((item) => item.subject))}`,
-    description: said.flatMap(([n, word]) => (n > 0 ? [`${n} ${word}`] : [])).join(' · '),
+    title: `${profile} started ${where(worktrees.map((item) => item.subject))}`,
+    description: [...said.flatMap(([n, word]) => (n > 0 ? [`${n} ${word}`] : [])), ...owedTally(items)].join(' · '),
   }
 }

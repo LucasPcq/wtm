@@ -1,4 +1,4 @@
-// Package clean removes worktrees, their branches and their meta records: what the request settles on, what refuses an unsafe one, then each removed in turn, its on_clean hooks first, and the children it leaves behind reparented or named.
+// Package clean removes worktrees, their branches and their meta records: what the request settles on, what refuses an unsafe one, then each removed in turn, its jobs stopped and its on_clean hooks run first, its data in shared services dropped or owed after, and the children it leaves behind reparented or named.
 package clean
 
 import (
@@ -47,9 +47,10 @@ type Result = domain.Result[Detail]
 // An Item is what became of one worktree asked: its status and why, the error it failed on, its warnings, and its Detail once it is removed.
 type Item = domain.Unit[Detail]
 
-// A Detail describes a worktree removed as the JSON envelope reports it: where it was.
+// A Detail describes a worktree removed as the JSON envelope reports it: where it was, and what became of the namespaces it made in shared services.
 type Detail struct {
-	Path string `json:"path"`
+	Path       string             `json:"path"`
+	Namespaces []teardown.Dropped `json:"namespaces,omitempty"`
 }
 
 // ----------------------------------------------------------------------------
@@ -86,11 +87,12 @@ func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (
 
 	// 5. Apply between the started and finished events other processes listen to.
 	report := op.Started()
+	plan.correlationID = opts.CorrelationID
 	result := u.Apply(ctx, plan, report)
 	op.Finished(result.Failure())
 
 	outcome.Result = &result
-	outcome.Warnings = op.Warnings(append(teardown.OfRemoved(outcome.Warnings, result.Items), result.Warnings...))
+	outcome.Warnings = op.Warnings(append(outcome.Warnings, result.Warnings...))
 	return outcome, nil
 }
 
@@ -117,12 +119,12 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 // ----------------------------------------------------------------------------
 // Apply
 
-// Apply carries out the plan, reporting each step: it removes each worktree in turn, a failure stopping none of the others, reports each name that is no worktree as already absent, then reparents the children of the worktrees removed onto the nearest one that stayed, or warns of each one left orphaned; it ends on the step out of a worktree removed under the caller's feet. Once ctx is cancelled, the worktrees not yet started are skipped.
+// Apply carries out the plan, reporting each step: it removes each worktree in turn (teardown.Service.Batch), a failure stopping none of the others, reports each name that is no worktree as already absent, then reparents the children of the worktrees removed onto the nearest one that stayed, or warns of each one left orphaned; it ends on the step out of a worktree removed under the caller's feet. Once ctx is cancelled, the worktrees not yet started are skipped.
 func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Result {
+	removed, warnings := u.Teardown.Batch(ctx, teardown.BatchParams{Command: Name, Facts: plan.facts.Facts, Removals: plan.Worktrees, Force: plan.Force, CorrelationID: plan.correlationID, Report: report})
 	items := make([]Item, 0, len(plan.Worktrees)+len(plan.Absent))
-	for _, removal := range plan.Worktrees {
-		removed := u.Teardown.Remove(ctx, teardown.RemoveParams{Command: Name, Facts: plan.facts.Facts, Removal: removal, Report: report})
-		items = append(items, itemOf(removal, removed))
+	for i, removal := range plan.Worktrees {
+		items = append(items, itemOf(removal, removed[i]))
 	}
 	for _, name := range plan.Absent {
 		items = append(items, Item{Subject: name, Status: domain.StatusDone, Reason: domain.ReasonUnchanged})
@@ -130,12 +132,12 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 
 	// The moves are decided again on what went: a worktree that failed to go is a parent that stays.
 	moves := plan.facts.Moves(teardown.Went(plan.Worktrees, items))
-	warnings := teardown.OrphanedBy(Name, moves)
+	orphaned := teardown.OrphanedBy(Name, moves)
 	if plan.ReparentChildren {
-		warnings = u.reparent(ctx, plan, moves, report)
+		orphaned = u.reparent(ctx, plan, moves, report)
 	}
 
-	return Result{Items: items, Warnings: warnings, FollowUps: plan.next(items)}
+	return Result{Items: items, Warnings: append(warnings, orphaned...), FollowUps: plan.next(items)}
 }
 
 // ----------------------------------------------------------------------------
@@ -154,7 +156,7 @@ func (u UseCase) Questions(ctx context.Context, req Request) (Questions, error) 
 // ----------------------------------------------------------------------------
 // Observe
 
-// Observe reads what clean decides from: the project's config, the repository's snapshot, the meta record of each worktree and of each branch asked no worktree holds, and, for each worktree req asks, what makes it unsafe to remove: its uncommitted changes, the commits no other branch holds but its merged pull request's head, its open pull request and its jobs up, the forge and the run daemon asked while git reads. A repository with no wtm config is refused with CodeConfigNotFound.
+// Observe reads what clean decides from: the project's config, the repository's snapshot, the meta record of each worktree and of each branch asked no worktree holds, and, for each worktree req asks, what makes it unsafe to remove (its uncommitted changes, the commits no other branch holds but its merged pull request's head, its open pull request), the jobs it runs and the environment they got, the forge and the run daemon asked while git reads. A repository with no wtm config is refused with CodeConfigNotFound.
 func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	repo, err := u.Repository.Observe(ctx, Name)
 	if err != nil {
@@ -206,6 +208,7 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 		skew := repository.SkewWarning(repository.SkewWarningParams{Command: Name, Skewed: answered.Skewed, Restart: u.Repository.Restart})
 		facts.Skew = &skew
 	}
+	facts.Envs = u.Teardown.Envs(facts.Facts, asked)
 	facts.Settle(asked, answered.Jobs, answered.PullRequests)
 	return facts, nil
 }
@@ -257,8 +260,10 @@ func (u UseCase) root(ctx context.Context, worktrees []worktree.Worktree, path s
 // ----------------------------------------------------------------------------
 // The steps of Apply
 
-// The codes of what becomes of a removal: an on_clean hook that failed, the hooks skipped or run without the worktree's environment, a worktree git could not remove or whose files stay on disk, a branch or a record that could not be deleted.
+// The codes of what becomes of a removal: jobs that would not stop, or left running when forced; an on_clean hook that failed, the hooks skipped or run without the worktree's environment, a worktree git could not remove or whose files stay on disk, a branch or a record that could not be deleted; a namespace owed to a service down, a drop that failed, a namespace kept, the drops owed unrecorded, the shared services not let go of.
 const (
+	CodeStopFailed         = Name + teardown.StopFailed
+	CodeJobsLeft           = Name + teardown.JobsLeft
 	CodeHookFailed         = Name + teardown.HookFailed
 	CodeHooksSkipped       = Name + teardown.HooksSkipped
 	CodeHookEnvUnavailable = Name + teardown.HookEnvUnavailable
@@ -266,13 +271,18 @@ const (
 	CodeLeftOnDisk         = Name + teardown.LeftOnDisk
 	CodeBranchKept         = Name + teardown.BranchKept
 	CodeMetaKept           = Name + teardown.MetaKept
+	CodeDataDeferred       = Name + teardown.DataDeferred
+	CodeDropFailed         = Name + teardown.DropFailed
+	CodeDataKept           = Name + teardown.DataKept
+	CodeOwedUnrecorded     = Name + teardown.OwedUnrecorded
+	CodeReleaseFailed      = Name + teardown.ReleaseFailed
 )
 
-// itemOf is what became of removal as clean reports it: where it was, once it went.
+// itemOf is what became of removal as clean reports it: where it was and what became of its data, once it went.
 func itemOf(removal teardown.Removal, removed teardown.Removed) Item {
 	item := Item{Subject: removal.Worktree, Status: removed.Status, Reason: removed.Reason, Err: removed.Err, Warnings: removed.Warnings}
 	if removed.Gone {
-		item.Detail = &Detail{Path: removal.Path}
+		item.Detail = &Detail{Path: removal.Path, Namespaces: removed.Namespaces}
 	}
 
 	return item

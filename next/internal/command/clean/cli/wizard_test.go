@@ -41,6 +41,7 @@ func TestASafeRemovalAsksNeitherReparentNorForce(t *testing.T) {
 	assert.Contains(t, screen, "✓ Worktrees: feat/plain")
 	assert.Contains(t, screen, "· Reparent children — no child worktree is left behind")
 	assert.Contains(t, screen, "· Force — every worktree is safe to remove")
+	assert.Contains(t, screen, "· Data — no data waits on a service down")
 }
 
 func TestForceGivenStandsInTheTrailWithItsFlag(t *testing.T) {

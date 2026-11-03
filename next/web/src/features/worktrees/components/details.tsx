@@ -7,11 +7,13 @@ export function Details({
   label,
   summary,
   quiet = false,
+  flush = false,
   children,
 }: {
   label: string
   summary?: string | undefined
   quiet?: boolean
+  flush?: boolean
   children: ReactNode
 }) {
   return (
@@ -21,7 +23,9 @@ export function Details({
         <span className={cn(quiet ? 'text-muted-foreground' : 'font-medium')}>{label}</span>
         {summary && <span className="text-muted-foreground">· {summary}</span>}
       </CollapsibleTrigger>
-      <CollapsibleContent className="flex flex-col gap-4 pl-[22px]">{children}</CollapsibleContent>
+      <CollapsibleContent className={cn('flex flex-col gap-4', flush ? 'pt-1' : 'pl-[22px]')}>
+        {children}
+      </CollapsibleContent>
     </Collapsible>
   )
 }

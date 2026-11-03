@@ -67,7 +67,7 @@ test('a cancelled run says what was cancelled, with no failure of its own', asyn
 // A worktree that turned unsafe between the last plan and the apply refused the run, and the dialog ended on it.
 test('an apply refused because a worktree changed goes back to the worktrees, saying which changed', async () => {
   let changed = false
-  const billing = () => (changed ? { ...merged, blockers: ['dirty' as const, 'jobs_running' as const] } : merged)
+  const billing = () => (changed ? { ...merged, blockers: ['dirty' as const, 'locked' as const] } : merged)
   answeringPrune(
     (call) => prunePlan(call, { found: [billing(), gone] }),
     () => {

@@ -12,9 +12,10 @@ const marker: Record<PhaseRun['state'], ReactNode> = {
   failed: <X className="size-3 text-destructive" />,
 }
 
-// once a run ended, its failed step's output is shown with the failure, not again among its steps
+// once a run ended, its failed step's output is shown with the failure, not again among its steps; its steps are
+// then read apart from the rows, so each worktree heads its own, one alone too
 export function Timeline({ units, settled = false }: { units: Unit[]; settled?: boolean }) {
-  const named = units.length > 1
+  const named = settled || units.length > 1
 
   return (
     <div className="flex flex-col gap-4">

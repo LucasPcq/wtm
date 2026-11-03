@@ -1,15 +1,21 @@
 {
   "v": 2,
   "command": "clean",
-  "ok": true,
+  "ok": false,
   "op": "op-1",
   "items": [
     {
       "subject": "feat/plain",
-      "status": "done",
-      "detail": {
-        "path": "/repo/wt-feat-plain"
-      }
+      "status": "failed",
+      "error": {
+        "kind": "internal",
+        "code": "clean.stop_failed",
+        "message": "feat/plain is kept: whether its jobs stopped is unknown: the run daemon is not running: which jobs are up is unknown",
+        "params": {
+          "worktree": "feat/plain"
+        }
+      },
+      "detail": {}
     }
   ],
   "plan": {
@@ -19,6 +25,7 @@
         "branch": "feat/plain",
         "path": "/repo/wt-feat-plain",
         "phases": [
+          "stop_jobs",
           "remove"
         ],
         "blockers": []
@@ -44,7 +51,15 @@
   "warnings": [
     {
       "code": "clean.jobs_unknown",
-      "message": "the run daemon is not running: which jobs are up is unknown — a job may still run in a worktree removed"
+      "message": "the run daemon is not running: which jobs are up is unknown — a removal whose jobs cannot be seen stopped fails unless forced"
     }
-  ]
+  ],
+  "error": {
+    "kind": "internal",
+    "code": "clean.stop_failed",
+    "message": "feat/plain is kept: whether its jobs stopped is unknown: the run daemon is not running: which jobs are up is unknown",
+    "params": {
+      "worktree": "feat/plain"
+    }
+  }
 }

@@ -1,10 +1,12 @@
 $ wtm clean; echo EXIT=$?
 
-  Step 4/4 • Confirm
+  Step 6/6 • Confirm
 
   ✓ Worktrees: feat/tty-dirty, feat/tty-parent
   ✓ Reparent children: reparent
   ✓ Force: forced
+  · Data — no data waits on a service down
+  · Keep data — set by its flag only
 
   ┃  Review & confirm
   ┃

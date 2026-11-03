@@ -1,0 +1,16 @@
+$ wtm clean feat/a; echo EXIT=$?
+
+  Step 4/6 • Data
+
+  ✓ Worktrees: feat/a
+  · Reparent children — no child worktree is left behind
+  · Force — every worktree is safe to remove
+
+  The removed worktrees made data in db, which is down: start it to drop that data now, or keep it
+  until it next starts (then run up or prune drops it)
+
+▌› Keep it until db next starts
+   Start db and drop it now
+
+  ↑↓ navigate • / filter • enter confirm • esc cancel
+

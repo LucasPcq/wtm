@@ -1,4 +1,4 @@
-// Package teardown removes worktrees for the commands that do, clean and prune: what makes one unsafe to remove and the refusal it makes, the children a removal leaves behind, the recap of both, then each worktree removed, its on_clean hooks first. Every code it gives is the asking command's: <command>.<code>.
+// Package teardown removes worktrees for the commands that do, clean and prune: what makes one unsafe to remove and the refusal it makes, the children a removal leaves behind, the data it made in shared services, the recap of all three, then each worktree removed (its jobs stopped and its on_clean hooks run first, its data dropped or owed after) and its hold on the shared services let go of; and the drops owed paid once their service is up. Every code it gives is the asking command's: <command>.<code>.
 package teardown
 
 import (
@@ -16,32 +16,36 @@ import (
 // ----------------------------------------------------------------------------
 // Facts
 
-// Facts are what a removal decides from: the repository, the meta record of each worktree on a branch, the records a newer wtm wrote, what each worktree checked holds that makes it unsafe to remove, where the caller stands, and why the run daemon or the forge could not be asked.
+// Facts are what a removal, or a run paying the drops owed, decides from: the repository, the meta record of each worktree on a branch, the records a newer wtm wrote, what each worktree checked holds that makes it unsafe to remove, the job environment of each, where the caller stands, the jobs the run daemon lists, the drops owed, and why the run daemon or the forge could not be asked.
 type Facts struct {
 	worktree.Repository
 	Records map[string]worktree.Meta       // by branch
 	Newer   map[string]*domain.SchemaNewer // by branch, the records this wtm can neither read nor delete
 	Checks  map[string]Check               // by the name a worktree is checked by
+	Envs    map[string]map[string]string   // by the name a worktree is checked by, its job environment (Service.Envs)
 	Cwd     string                         // where the caller stands, through its symbolic links
+	Jobs    []run.Job                      // the jobs the run daemon lists
+	Owed    []env.OwedDrop                 // the drops removed worktrees owe the shared services (Service.Owing)
 	JobsErr error                          // why the run daemon could not tell which jobs are up
 	Skew    *domain.Warning                // the warning of a run daemon of another build, worded by the command
 	PRsErr  error                          // why the forge could not be asked for open pull requests
 }
 
-// A Check is whether a worktree's directory is gone, and what it holds that its removal would lose or cut short: uncommitted changes, commits no other branch holds, an open pull request, jobs up.
+// A Check is whether a worktree's directory is gone, and what it holds that its removal would lose or stop: uncommitted changes, commits no other branch holds, an open pull request, the jobs it runs for itself.
 type Check struct {
 	Missing     bool
 	Dirty       bool
 	Unpushed    int
 	PullRequest string   // the page of its open pull request, empty when it has none
-	Jobs        []string // its jobs up, sorted
+	Jobs        []string // the jobs up it runs for itself, sorted: its claims on shared services are no job of its own
 }
 
-// Settle completes the checks of worktrees with what the run daemon and the forge said: the jobs up in each, its open pull request, and no commit unpushed when its merged pull request holds them all (landed), which a forge that could not be asked cannot tell.
-func (f Facts) Settle(worktrees []worktree.Worktree, jobs []run.Job, prs []worktree.PullRequest) {
+// Settle completes the facts with what the run daemon and the forge said: the jobs it lists, those each worktree runs for itself, its open pull request, and no commit unpushed when its merged pull request holds them all (landed), which a forge that could not be asked cannot tell.
+func (f *Facts) Settle(worktrees []worktree.Worktree, jobs []run.Job, prs []worktree.PullRequest) {
+	f.Jobs = jobs
 	for _, w := range worktrees {
 		check := f.Checks[w.Name()]
-		check.Jobs = run.UpIn(jobs, w.Path)
+		check.Jobs = run.OwnUpIn(jobs, w.Path)
 		check.PullRequest = openPullRequest(prs, w.Branch())
 		if f.PRsErr == nil && f.landed(prs, w) {
 			check.Unpushed = 0
@@ -83,7 +87,7 @@ func Branches(worktrees []worktree.Worktree) []string {
 // ----------------------------------------------------------------------------
 // The removal of each worktree
 
-// A Removal is one worktree a plan removes: its name, its branch, deleted with it (none on no branch), its path (none for a branch no worktree holds, deleted alone), whether its directory is gone already, the on_clean hooks it runs first as they will run (none once its directory is gone), the phases of its removal, the namespaces its record names, which stay in their shared services, and what makes it unsafe to remove with what forcing would lose.
+// A Removal is one worktree a plan removes: its name, its branch, deleted with it (none on no branch), its path (none for a branch no worktree holds, deleted alone), whether its directory is gone already, the on_clean hooks it runs first as they will run (none once its directory is gone), the phases of its removal, the namespaces it made in shared services and their fate, what makes it unsafe to remove with what forcing would lose, and the jobs it runs for itself, stopped first.
 type Removal struct {
 	Worktree    string             `json:"worktree"`
 	Branch      string             `json:"branch,omitempty"`
@@ -91,12 +95,13 @@ type Removal struct {
 	Missing     bool               `json:"missing,omitempty"`
 	Hooks       []string           `json:"hooks,omitempty"`
 	Phases      []domain.Phase     `json:"phases"`
-	Namespaces  []string           `json:"namespaces,omitempty"`
+	Data        []Namespace        `json:"data,omitempty"`
 	Blockers    []worktree.Blocker `json:"blockers"`
 	Unpushed    int                `json:"unpushed,omitempty"`
 	PullRequest string             `json:"pull_request,omitempty"`
 	Jobs        []string           `json:"jobs,omitempty"`
 	entry       int                // its index among the worktrees asked, which its problems are on
+	stop        bool               // whether its jobs are stopped first: it runs some, or the run daemon could not tell
 }
 
 // Removal is the removal of w, asked at index entry of the request's worktrees.
@@ -112,21 +117,34 @@ func (f Facts) Removal(w worktree.Worktree, entry int) Removal {
 	for _, hook := range f.onClean(removal) {
 		removal.Hooks = append(removal.Hooks, hook.Cmd)
 	}
-	removal.Phases = []domain.Phase{domain.PhaseRemove}
-	if len(removal.Hooks) > 0 {
-		removal.Phases = []domain.Phase{domain.PhaseOnClean, domain.PhaseRemove}
-	}
 	if removal.Branch != "" {
-		removal.Namespaces = f.Records[removal.Branch].Namespaces
+		removal.Data = f.data(w)
 	}
 
 	add(worktree.BlockerLocked, w.Locked)
 	add(worktree.BlockerDirty, check.Dirty)
 	add(worktree.BlockerUnpushed, check.Unpushed > 0)
 	add(worktree.BlockerOpenPullRequest, check.PullRequest != "")
-	add(worktree.BlockerJobsRunning, len(check.Jobs) > 0)
 	removal.Unpushed, removal.PullRequest, removal.Jobs = check.Unpushed, check.PullRequest, check.Jobs
+	removal.stop = removal.Path != "" && (len(check.Jobs) > 0 || f.JobsErr != nil)
+	removal.Phases = removal.phases()
 	return removal
+}
+
+// phases are the phases of the removal, in order: its jobs stopped, its on_clean hooks, the removal, its data dropped, each when it has some.
+func (r Removal) phases() []domain.Phase {
+	var phases []domain.Phase
+	if r.stop {
+		phases = append(phases, domain.PhaseStopJobs)
+	}
+	if len(r.Hooks) > 0 {
+		phases = append(phases, domain.PhaseOnClean)
+	}
+	phases = append(phases, domain.PhaseRemove)
+	if slices.ContainsFunc(r.Data, func(n Namespace) bool { return n.Status == DataDrop || n.Status == DataStart }) {
+		phases = append(phases, domain.PhaseDropData)
+	}
+	return phases
 }
 
 // onClean are the on_clean hooks of removal, their variables expanded as they will run; none once its directory is gone, where they cannot run.
@@ -165,11 +183,10 @@ func (f Facts) Standing(removals []Removal) string {
 // ----------------------------------------------------------------------------
 // The refusal
 
-// The codes a command's refusal of an unsafe removal carries, after its name: the refusal, its follow-up (the same request forced), and the follow-up that stops a worktree's jobs; each blocker is a problem coded <command>.<blocker>.
+// The codes a command's refusal of an unsafe removal carries, after its name: the refusal and its follow-up (the same request forced); each blocker is a problem coded <command>.<blocker>.
 const (
-	Unsafe   = ".unsafe"
-	Force    = ".force"
-	StopJobs = ".stop_jobs"
+	Unsafe = ".unsafe"
+	Force  = ".force"
 )
 
 // NewerRefusal refuses a request that would remove a worktree among removals whose record a newer wtm wrote, forced or not, with <command>.meta_newer caused by each *domain.SchemaNewer: deleting the record is a write this wtm refuses, and what the teardown must undo is that wtm's to know. Nil when no record is newer.
@@ -212,7 +229,7 @@ func Refusal(params RefusalParams) *domain.Error {
 	}
 }
 
-// problem is blocker as a problem of the removal's entry, coded <command>.<blocker>; jobs up are followed by the command that stops them.
+// problem is blocker as a problem of the removal's entry, coded <command>.<blocker>.
 func (r Removal) problem(command string, blocker worktree.Blocker) domain.FieldError {
 	problem := domain.FieldError{Path: EntryPath(r.entry), Code: command + "." + string(blocker), Params: domain.Params{"value": r.Worktree}}
 	switch blocker {
@@ -227,16 +244,10 @@ func (r Removal) problem(command string, blocker worktree.Blocker) domain.FieldE
 		}
 	case worktree.BlockerOpenPullRequest:
 		problem.Template, problem.Params["url"] = "{value} has an open pull request: {url}", r.PullRequest
-	case worktree.BlockerJobsRunning:
-		problem.Template, problem.Params["jobs"] = "{value} runs {jobs}", strings.Join(r.Jobs, ", ")
-		problem.FollowUp = &domain.FollowUp{Command: commandRunDown, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{r.Worktree}}}, Code: command + StopJobs, Message: "stop its jobs"}
 	}
 
 	return problem
 }
-
-// commandRunDown stops a worktree's jobs: the run module's, not migrated yet.
-const commandRunDown = "run down"
 
 // EntryPath is the path of the worktree asked at index, as a problem names it.
 func EntryPath(index int) string {
@@ -246,24 +257,17 @@ func EntryPath(index int) string {
 // ----------------------------------------------------------------------------
 // The warnings
 
-// The codes of the warnings of a plan, after the command's name: jobs a forced removal leaves running, the namespaces a removed worktree keeps in shared services.
-const (
-	JobsLeft = ".jobs_left"
-	DataKept = ".data_kept"
-)
-
-// WarningsParams are the command planning, the removals it plans, and what a forge that could not be asked leaves it unable to decide, which it words.
+// WarningsParams are the command planning and what a forge that could not be asked leaves it unable to decide, which it words.
 type WarningsParams struct {
-	Command  string
-	Removals []Removal
-	Unasked  string
+	Command string
+	Unasked string
 }
 
-// Warnings are what a plan cannot see to or leaves behind: the jobs or the pull requests that could not be asked, the jobs a forced removal leaves running, and the data each removed worktree keeps in shared services, which wtm-next does not drop yet.
+// Warnings are what a plan cannot see to: the jobs or the pull requests that could not be asked, a run daemon of another build.
 func (f Facts) Warnings(params WarningsParams) []domain.Warning {
 	var warnings []domain.Warning
 	if f.JobsErr != nil {
-		warnings = append(warnings, domain.Warning{Code: params.Command + domain.JobsUnknown, Message: run.UnknownMessage(f.JobsErr) + " — a job may still run in a worktree removed"})
+		warnings = append(warnings, domain.Warning{Code: params.Command + domain.JobsUnknown, Message: run.UnknownMessage(f.JobsErr) + " — a removal whose jobs cannot be seen stopped fails unless forced"})
 	}
 	if f.Skew != nil {
 		warnings = append(warnings, *f.Skew)
@@ -272,26 +276,7 @@ func (f Facts) Warnings(params WarningsParams) []domain.Warning {
 		warnings = append(warnings, domain.Warning{Code: params.Command + domain.PRsUnavailable, Message: "couldn't ask for pull requests (" + f.PRsErr.Error() + "): " + params.Unasked, Params: worktree.UnavailableParams(f.PRsErr)})
 	}
 
-	for _, r := range params.Removals {
-		about := domain.Params{"worktree": r.Worktree}
-		if len(r.Jobs) > 0 {
-			warnings = append(warnings, domain.Warning{Code: params.Command + JobsLeft, Message: r.Worktree + " is removed with its jobs still running: " + strings.Join(r.Jobs, ", "), Params: about})
-		}
-		if len(r.Namespaces) > 0 {
-			about["namespaces"] = strings.Join(r.Namespaces, ", ")
-			warnings = append(warnings, domain.Warning{Code: params.Command + DataKept, Message: r.Worktree + " keeps its data in shared services: " + about["namespaces"] + " (wtm-next does not drop it yet)", Params: about})
-		}
-	}
-
 	return warnings
-}
-
-// OfRemoved keeps, once the apply ran, the plan's warnings about a removal (its jobs left running, its data kept) only for those that went: one git failed to remove still has its jobs and its data where they were.
-func OfRemoved[D any](warnings []domain.Warning, items []domain.Unit[D]) []domain.Warning {
-	return slices.DeleteFunc(slices.Clone(warnings), func(warning domain.Warning) bool {
-		about := strings.HasSuffix(warning.Code, JobsLeft) || strings.HasSuffix(warning.Code, DataKept)
-		return about && !RemovedIn(items, warning.Params["worktree"])
-	})
 }
 
 // RemovedIn reports whether the worktree of name was removed among items, its branch deleted or not: its item has a detail.
@@ -314,7 +299,7 @@ const (
 	NoteOrphaned   = "orphaned"
 )
 
-// Recapped are removals as a recap row's values, each forced one with what it loses.
+// Recapped are removals as a recap row's values, each with the jobs it stops and, forced, what it loses.
 func Recapped(removals []Removal) []domain.RecapValue {
 	values := make([]domain.RecapValue, 0, len(removals))
 	for _, r := range removals {
@@ -322,6 +307,9 @@ func Recapped(removals []Removal) []domain.RecapValue {
 		var notes []string
 		if r.Path == "" {
 			value.Note, notes = NoteBranchOnly, append(notes, "branch only: no worktree")
+		}
+		if len(r.Jobs) > 0 {
+			notes = append(notes, "stops "+strings.Join(r.Jobs, ", "))
 		}
 		if len(r.Blockers) > 0 {
 			lost := strings.Join(domain.Names(r.Blockers), ", ")
@@ -331,6 +319,45 @@ func Recapped(removals []Removal) []domain.RecapValue {
 			value.Text += " (" + strings.Join(notes, "; ") + ")"
 		}
 		values = append(values, value)
+	}
+
+	return values
+}
+
+// RecappedData are the namespaces removals made in shared services as a recap row's values, each noted with its fate and, when kept, why.
+func RecappedData(removals []Removal) []domain.RecapValue {
+	var values []domain.RecapValue
+	for _, r := range removals {
+		for _, namespace := range r.Data {
+			value := domain.RecapValue{Value: namespace.Name, Note: string(namespace.Status), Params: domain.Params{"job": namespace.Job, "worktree": r.Worktree}}
+			fate := map[DataStatus]string{
+				DataDrop:  "dropped once it is removed",
+				DataStart: namespace.Job + " started to drop it, then stopped",
+				DataDefer: "kept until " + namespace.Job + " is up: it is down",
+				DataKeep:  "kept: --keep-data",
+			}[namespace.Status]
+			if namespace.Reason == ReasonSharedName {
+				fate = "kept: another worktree reaches it under the same name"
+			}
+			if namespace.Reason != "" {
+				value.Params["reason"] = string(namespace.Reason)
+			}
+			value.Text = namespace.Name + " in " + namespace.Job + " (" + fate + ")"
+			values = append(values, value)
+		}
+	}
+
+	return values
+}
+
+// RecapOwed is the key of the recap's row of the drops owed a run pays, which a surface that draws what became of each leaves out of its outcome.
+const RecapOwed = "owed"
+
+// RecappedDebts are the drops owed a run pays as a recap row's values.
+func RecappedDebts(debts []Debt) []domain.RecapValue {
+	values := make([]domain.RecapValue, 0, len(debts))
+	for _, debt := range debts {
+		values = append(values, domain.RecapValue{Value: debt.Name, Params: domain.Params{"job": debt.Job, "worktree": debt.Worktree}, Text: debt.Name + " in " + debt.Job + " (owed since " + debt.Worktree + " was removed)"})
 	}
 
 	return values

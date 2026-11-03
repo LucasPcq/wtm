@@ -30,6 +30,7 @@ other=$(mktemp -d)/wtm-next && (cd ../../.. && go build -ldflags "-X main.versio
 ./daemon.sh "$wtm" "$next" "$other" daemon
 ./run-up.sh "$wtm" "$next" run-up
 ./run-view.sh "$wtm" "$next" run-view
+./clean-data.sh "$wtm" "$next" clean-data
 git diff --stat .
 ```
 
@@ -379,7 +380,7 @@ The reference is the legacy `wtm clean` of 0.30.1. Its output differs by design 
   24. `--expect-fingerprint` with that fingerprint (next only)
   25. `--expect-fingerprint` with a stale fingerprint (next only)
   26. a branch no worktree holds, as create's undo can leave one
-- The states are identical but for 7, 16, 21, 22, 24 and 26. The differences, all deliberate:
+- The states are identical but for 7, 16, 22, 24 and 26. The differences, all deliberate:
   - 2, 4, 5, 10 and 17 are refused by both, nothing removed; next exits 23 (`clean.unsafe`, a safety refusal) where legacy exits 1, names what it refuses (`nothing removed: feat/dirty can't be removed safely`) and each reason on its line under the failure (`feat/dirty has uncommitted changes`, `feat/unpushed has 1 commit no other branch nor remote holds`, `feat/locked is locked`), and follows it with the same request forced, `→ wtm-next clean feat/dirty --force   remove anyway`. In JSON (17) each reason is a problem of its entry, `error.fields[]` (`worktree[0]`, `clean.dirty`), and the forced request is `error.follow_up` (`clean.force`); legacy prints its refusal as text on stderr and nothing on stdout.
   - The sandbox's `gh` is signed out (the sandbox has its own HOME): next asks the forge about every branch it removes (a pull request squash-merged then deleted on origin holds its commits), so each such removal warns `clean.prs_unavailable`, its `reason` `signed_out` in its params (15, 16, 23), legacy nothing.
   - 7, a legacy bug: legacy counts unpushed commits against `origin/<branch>`, none for a branch origin never had, so it ran the hook and removed the worktree, then `git branch -d` refused the unmerged branch: the worktree gone, its branch and `meta.json` left behind, exit 1. Next counts the commits no other branch nor remote holds, the branch's and those of the commit the worktree stands on (a commit on no branch, a rebase under way, its directory gone or not), and refuses the worktree before anything runs (exit 23); a branch whose merged pull request's head is its tip and the worktree's commit loses nothing, which GitHub keeps. Once the checks pass, next deletes the branch with `-D`, so a branch pushed but not merged locally goes whole too (legacy's `-d` refused it the same way).
@@ -389,7 +390,7 @@ The reference is the legacy `wtm clean` of 0.30.1. Its output differs by design 
   - 16: legacy refuses `--output json` without `--yes` (exit 2); next runs it unattended, as every next command.
   - 18: legacy exits 1; next exits 2, naming `<worktree>` as required.
   - 20 and 23 to 25: legacy has no dry run nor fingerprint (exit 2).
-  - 21: next has no `--keep-data` nor `--drop-data` until the run module migrates (LUC-339): it never drops a namespace and names the data kept (`clean.data_kept`); it refuses the flag (exit 2).
+  - 21: both remove the worktree, exit 0; this sandbox runs no shared service, so there is no data to keep (`clean-data.sh` proves `--keep-data`).
   - 22: legacy takes only branches and says the path is already absent; next removes the worktree on no branch by its path, leaving the branch it was made from.
   - 26, an owner decision: legacy says the branch is already absent and keeps it, so create's `→ wtm clean feat/x --force` repaired nothing after an undo that left the branch; next deletes a branch no worktree holds, with its record, behind the same checks (refused when it holds commits no other branch nor remote holds, unless `--force`).
   - The tty: legacy's recap offers to delete the safe ones, to force all, or to cancel; next asks a `Force` step only when a worktree is unsafe, its help naming each reason (`feat/tty-dirty — uncommitted changes`), then a recap whose button names what goes (`Yes, remove 2 worktrees`). Next's `Reparent children` puts `Leave them orphaned` first (no by default), legacy `Reparent onto main (1)`. Leaving the wizard exits 19 on both.
@@ -706,3 +707,22 @@ Each difference between `wtm` and `wtm-next` in `create` and `extract` is one of
 - **Extract's wizard**: its file step is titled `Files` (legacy: `Select files to extract`) with each file's tag as a badge at the row's end, a source is badged with its count of changes, and the branch name shows no `Branch name is required` before any input. (tty `extract-1`, `extract-2`, `extract-4`.)
 - **Wording chosen over legacy's where legacy is odd or differs between commands.** The recap step is titled `Confirm` in both commands (legacy: `Confirm & create` in create, `Confirm` in extract). The source update not asked reads `nothing to fast-forward: the source is not behind origin` (legacy's `source already up to date` is false for a source that is ahead, diverged or not on origin). The fast-forward is a `Fast-forward  <branch>` row of the plan (legacy: an `Update:` line). A remembered answer that follows config.toml reads `config default (<strategy>)`, naming the strategy it stands for (legacy: `config default`). The recap's button reads `Yes, apply` when the plan creates no worktree (legacy: `Yes, create worktree`). A branch only origin has is offered as `origin/<branch>`, without legacy's `remote` badge, which would repeat the prefix.
 - **`$WTM_PROJECT_DIR` naming a linked worktree resolves to its main worktree**, as every repository a use case opens.
+
+# Proof: `clean` and `prune` with the run module (legacy `flow/teardown`, `flow/run/owed`) vs `wtm-next`
+
+The reference is the legacy `wtm` of 0.30.1. The proof compares what each leaves on disk (the daemon's index, `meta.json`, the job logs, the namespaces a shared service made, `pending-removals.toml`) and keeps both outputs side by side.
+
+- `clean-data.sh <wtm> <wtm-next> clean-data`: two identical sandboxes (the `docs/demos` "acme" project with a shared service `db`, a Python server, whose namespace per worktree is a line `acme_<slug>` of `$HOME/namespaces.txt`, made by its `create` and taken out by its `remove`, which also prints the port it reads; profiles `data` (db, api, web) and `shared` (db)), one per binary, each with its own HOME, so its own run daemon, socket and index; no Docker. The jobs are started by the side's own binary and stopped by the legacy `run down` (next has none yet). After each scenario, the exit code, stdout, stderr and the state; `clean-data/states.diff` holds the differences of state. Then, in a fresh sandbox per side, clean's Data step in tmux while `db` is down (`clean-data/tty/<side>`).
+  0. feat/a and feat/b run `data`: `db` up in main, a claim and a namespace each
+  1. `clean feat/a --yes`: its api and web stopped, `acme_feat-a` dropped, `db` kept up by feat/b's claim
+  2. `clean feat/b --keep-data --yes`: `acme_feat-b` kept; its claim was `db`'s last, so `db` stops
+  3. feat/c starts `data` then is stopped (`db` down), `clean feat/c --yes`: `acme_feat-c` owed in `pending-removals.toml`
+  4. `run up feat/d --profile data -d --yes`: `db` up again, the start pays the debt (`acme_feat-c` dropped, the queue gone)
+  5. feat/d stopped (`db` down), `clean feat/d --drop-data --yes`: `db` started in main, `acme_feat-d` dropped, `db` stopped again
+  6. `db` up in main, then a debt the legacy wtm wrote by hand (`feat-old`, ordinal 9), `prune --yes` with nothing to prune: the debt paid
+  7. `clean feat/f --dry-run --output json` while feat/f runs `data` (next only)
+- The states are identical but for 3: next's `pending-removals.toml` keeps the namespace's `name` and the `env` its drop runs with (B17), so it is written `schema = 2`; a legacy entry is paid from its slug and ordinal (6). The differences of output, all deliberate:
+  - next words what becomes of the data in the recap's `Data` row (`acme_feat-a in db (dropped once it is removed)`, `(kept: --keep-data)`, `(kept until db is up: it is down)`, `(db started to drop it, then stopped)`) and warns of what stays (`clean.data_kept`, `clean.data_deferred`); legacy prints `✓ dropped acme_feat-a from db`, `! db is down: acme_feat-c kept, dropped on its next start`, and nothing for `--keep-data`. The remove command's output shows under next's `drop_data · <worktree>` phase. Next names the jobs it stops in the recap's `Remove` row (`feat/a (stops api, web)`), a `stop_jobs` phase; legacy prints `✓ Stopped services on feat/a`.
+  - A drop paid is planned (the plan's `owed`, its recap's `Owed` row in the dry run and the wizard) and reported as an item of the outcome: `✓ dropped acme_feat-c from db, owed since feat-c was removed`, the tally counting it apart from the worktrees (`✓ run up: 1 done · 1 owed drop made`, `✓ prune: 1 owed drop made` for a prune that only pays one). Legacy prints a line after the start, and `= Nothing to prune.` in prune.
+  - 7: legacy has no dry run (exit 2); next's plan lists the phases (`stop_jobs`, `remove`, `drop_data`), the jobs it stops and the data (`data: [{job: db, name: acme_feat-f, status: drop}]`).
+  - The tty: both ask the Data step only while a service holding data is down. Legacy's cursor is on `Start db and drop it now` and its description names each namespace; next's is on `Keep it until db next starts`, the answer `--yes` takes (`drop_data`, no first), and its help names the services down. Ctrl+C there exits 19 in both.

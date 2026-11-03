@@ -1,4 +1,2 @@
-
-  ✗ the request is invalid: unknown flag: --keep-data
-  → wtm clean --help
-
+  on_clean · feat/dry
+tearing down feat/dry

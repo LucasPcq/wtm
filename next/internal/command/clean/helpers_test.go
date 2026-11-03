@@ -162,3 +162,10 @@ func (w world) rawRecord(t *testing.T, name, content string) {
 	require.True(t, ok)
 	writeFile(t, filepath.Join(dir, "meta.json"), content)
 }
+
+func readFile(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	return string(data)
+}

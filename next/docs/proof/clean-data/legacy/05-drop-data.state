@@ -1,0 +1,10 @@
+## jobs up (the daemon's index)
+## .git/wtm/worktrees/feat%2Ff/meta.json
+  "ordinal": 5,
+## logs
+./main
+## namespaces made
+acme_feat-b
+acme_main
+## pending-removals.toml
+(none)

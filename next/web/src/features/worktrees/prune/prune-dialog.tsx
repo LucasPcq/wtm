@@ -9,6 +9,7 @@ import { useSelection } from '@/features/worktrees/hooks/use-selection'
 import { PruneWizard } from '@/features/worktrees/prune/components/prune-wizard'
 import { pruneWords, unsafeCode } from '@/features/worktrees/prune/utils/words'
 import { changedSincePlan } from '@/features/worktrees/utils/changed'
+import { owedOf, owedTally } from '@/features/worktrees/utils/owed'
 
 // one prune at a time: opened while one runs, or one that failed is still to be read, the dialog shows it; what went
 // leaves the selection
@@ -27,9 +28,12 @@ export function PruneDialog({ repo }: { repo: string }) {
   const told = (envelope: Applied<'prune'> | undefined, { pruned, asked }: { pruned: number; asked: number }) => {
     if (usePruneDialog.getState().open) return
     const details = { action: { label: 'Details', onClick: () => usePruneDialog.setState({ open: true }) } }
-    if (!succeeded(envelope)) return void toast.error(`${pruned} of ${asked} pruned.`, details)
-    if (envelope?.warnings.some((warning) => warning.follow_up)) return void toast.warning(`${pruned} pruned.`, details)
-    toast.success(`${pruned} pruned.`)
+    const owed = owedTally(envelope?.items ?? [])
+    const said = (pruning: string) => `${[...(asked > 0 || owed.length === 0 ? [pruning] : []), ...owed].join(' · ')}.`
+    if (!succeeded(envelope)) return void toast.error(said(`${pruned} of ${asked} pruned`), details)
+    if (envelope?.warnings.some((warning) => warning.follow_up))
+      return void toast.warning(said(`${pruned} pruned`), details)
+    toast.success(said(`${pruned} pruned`))
   }
 
   const content = () => {
@@ -59,7 +63,9 @@ export function PruneDialog({ repo }: { repo: string }) {
         notice={notice}
         onStart={(start) =>
           run.start(start, (envelope) => {
-            const pruned = (envelope?.items ?? []).filter((item) => item.status === 'done').map((item) => item.subject)
+            const pruned = (envelope?.items ?? [])
+              .filter((item) => item.status === 'done' && !owedOf(item))
+              .map((item) => item.subject)
             told(envelope, { pruned: pruned.length, asked: start.units.length })
             selection.drop(pruned)
           })

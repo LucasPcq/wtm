@@ -17,6 +17,7 @@ import (
 	bus "github.com/LucasPcq/wtm/next/internal/adapter/events"
 	"github.com/LucasPcq/wtm/next/internal/adapter/git"
 	"github.com/LucasPcq/wtm/next/internal/adapter/github"
+	"github.com/LucasPcq/wtm/next/internal/adapter/joblog"
 	"github.com/LucasPcq/wtm/next/internal/adapter/oplock"
 	"github.com/LucasPcq/wtm/next/internal/adapter/portprobe"
 	"github.com/LucasPcq/wtm/next/internal/adapter/proxyport"
@@ -116,13 +117,17 @@ func wire(params wireParams) app {
 	}
 
 	teardowns := teardown.Service{
-		Git:      repo,
-		Meta:     meta,
-		EnvFiles: store.EnvFiles{},
-		StateDir: params.StateDir,
-		Gone:     repository.GoneIn(repo),
-		RunHooks: shell.RunHooks,
-		Shield:   shell.Shield,
+		Git:       repo,
+		Meta:      meta,
+		EnvFiles:  store.EnvFiles{},
+		Daemon:    runs,
+		Owed:      store.Owed{StateDir: params.StateDir},
+		StateDir:  params.StateDir,
+		CommonDir: bus.Resolved(params.CommonDir),
+		Gone:      repository.GoneIn(repo),
+		RunHooks:  shell.RunHooks,
+		PurgeLogs: joblog.Purge,
+		Shield:    shell.Shield,
 	}
 
 	return app{
@@ -239,6 +244,7 @@ func wire(params wireParams) app {
 			Repository: facts,
 			Operations: operations,
 			Provision:  provisions,
+			Teardown:   teardowns,
 		},
 	}
 }

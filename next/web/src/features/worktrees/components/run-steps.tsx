@@ -20,7 +20,7 @@ export function RunSteps<C extends MutationCommand>({
 
   const { total } = doneOf(progress)
   return (
-    <Details label={plural(total, 'step')} summary={took(progress)} quiet>
+    <Details label={plural(total, 'step')} summary={took(progress)} quiet flush>
       <Timeline units={progress.units} settled />
       {children}
     </Details>

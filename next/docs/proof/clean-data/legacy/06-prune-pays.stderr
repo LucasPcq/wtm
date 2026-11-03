@@ -1,0 +1,7 @@
+
+  ╭─────────────────────────────────────────────────────────────────────────────────────────╮
+  │ GitHub not connected                                                                    │
+  │ prune detects merged & closed PRs via the GitHub CLI — without it, only --gone applies. │
+  │ Connect: run `gh auth login`                                                            │
+  ╰─────────────────────────────────────────────────────────────────────────────────────────╯
+  ✓ dropped acme_feat-old from db, left over from removed worktree feat-old
