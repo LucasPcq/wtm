@@ -223,11 +223,13 @@ test('children left on removed parents are reparented all at once, in one run on
   ])
 })
 
-test('a service down that holds their data asks whether to start it to drop the data now, and the run says so', async () => {
+test('a service down that holds their data asks, on a Data step of its own, whether to drop it now; the plan and the run take the answer', async () => {
+  const plans: WebCall[] = []
   const runs: WebCall[] = []
   server.use(
     answeringClean(
       async (call) => {
+        plans.push(call)
         const answer = await cleanPlan(call).json()
         const start = call.answers?.some((a) => a.path === 'drop_data') ?? false
         const data = [{ job: 'db', name: 'acme_feat_billing', status: start ? 'start' : 'defer' }]
@@ -244,21 +246,49 @@ test('a service down that holds their data asks whether to start it to drop the 
   await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
   await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
 
+  const steps = within(dialog).getByRole('list', { name: 'Steps' })
+  expect(within(steps).getByText('Data').closest('li')?.getAttribute('aria-current')).toBe('step')
   expect(
     await within(dialog).findByText("db is down: the data these worktrees made there can't be dropped yet."),
   ).toBeTruthy()
+  const concerned = within(dialog).getByRole('listitem', { name: 'feat/billing' })
+  expect(within(concerned).getByText('acme_feat_billing in db')).toBeTruthy()
   expect(
     within(dialog)
       .getByRole('radio', { name: /^Keep it until db next starts/ })
       .getAttribute('aria-checked'),
   ).toBe('true')
   await user.click(within(dialog).getByRole('radio', { name: /^Start db and drop it now/ }))
+  await waitFor(() => expect(plans.at(-1)?.answers).toContainEqual({ path: 'drop_data', values: ['true'] }))
+  await user.click(within(dialog).getByRole('button', { name: 'Next' }))
+
+  expect(within(dialog).queryByRole('radio')).toBeNull()
+  expect(within(dialog).getByRole('button', { name: /^Details/ }).textContent).toContain(
+    'data in shared services for 1',
+  )
   await user.click(within(dialog).getByRole('button', { name: /^Details/ }))
   expect(
     await within(dialog).findByText('acme_feat_billing in db is dropped: db is started for it, then stopped'),
   ).toBeTruthy()
-  await user.click(within(dialog).getByRole('button', { name: 'Remove' }))
+  await user.click(within(dialog).getByRole('button', { name: 'Back' }))
+  expect(
+    within(dialog)
+      .getByRole('radio', { name: /^Start db and drop it now/ })
+      .getAttribute('aria-checked'),
+  ).toBe('true')
+  await user.click(within(dialog).getByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Remove' }))
 
   await within(dialog).findByText(/^1 removed\./)
   expect(runs[0]?.answers).toContainEqual({ path: 'drop_data', values: ['true'] })
+})
+
+test('no service down holding their data: the Data step is not asked', async () => {
+  const { user, dialog } = await selectAndRemove('feat/billing')
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+
+  expect(await within(dialog).findByRole('button', { name: 'Remove' })).toBeTruthy()
+  expect(within(dialog).getByText('Data · not asked')).toBeTruthy()
+  expect(within(dialog).queryByRole('radio')).toBeNull()
 })

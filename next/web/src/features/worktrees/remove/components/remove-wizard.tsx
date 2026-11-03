@@ -7,7 +7,7 @@ import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/co
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert } from '@/features/worktrees/components/alert'
 import { ChildrenStep } from '@/features/worktrees/components/children-step'
-import { DataChoice } from '@/features/worktrees/components/data-choice'
+import { DataStep } from '@/features/worktrees/components/data-step'
 import { DialogBand } from '@/features/worktrees/components/dialog-band'
 import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
 import { ItemList } from '@/features/worktrees/components/item-list'
@@ -23,7 +23,16 @@ import { requestOf } from '@/features/worktrees/remove/utils/plan'
 import { searched } from '@/features/worktrees/utils/filters'
 import { planWide } from '@/features/worktrees/utils/outcome'
 import { downOf, plain, riskOf, unitsOf, unsafe } from '@/features/worktrees/utils/removal'
-import { initialWizard, type Step, wizardReducer } from '@/features/worktrees/utils/wizard-state'
+import {
+  type Asked,
+  initialWizard,
+  nextStep,
+  previousStep,
+  type Step,
+  settledStep,
+  stepState,
+  wizardReducer,
+} from '@/features/worktrees/utils/wizard-state'
 
 export function RemoveWizard({
   repo,
@@ -94,39 +103,27 @@ export function RemoveWizard({
       removals.some((removal) => confirmed.includes(removal.worktree) && !goingNames.includes(removal.worktree)))
   // back to the worktrees for good, not only on screen: only Next leaves them again, never a tick nor a read
   if (turned && chosen !== 'worktrees') dispatch({ type: 'go', to: 'worktrees' })
-  const stepOf = (): Step => {
-    if (turned) return 'worktrees'
-    if (chosen === 'children' && fresh && moves.length === 0) return 'confirm'
-    return chosen
-  }
-  const step = stepOf()
+  const removing = plan?.worktrees ?? []
+  const asked: Asked = { children: moves.length > 0, data: downOf(removing).length > 0 }
+  const step = turned ? 'worktrees' : settledStep({ chosen, asked, fresh })
   const visible = removals.filter((removal) => searched(removal.worktree, query))
 
-  const state = (of: Step): StepState => {
-    const order: Step[] = ['worktrees', 'children', 'confirm']
-    if (of === step) return 'now'
-    if (of === 'children' && moves.length === 0 && step === 'confirm') return 'skipped'
-    return order.indexOf(of) < order.indexOf(step) ? 'done' : 'todo'
-  }
+  const state = (of: Step): StepState => stepState({ of, step, asked })
 
-  const next = () => {
-    if (step === 'worktrees')
-      return dispatch({
-        type: 'go',
-        to: moves.length > 0 ? 'children' : 'confirm',
-        confirmed: going.map((removal) => removal.worktree),
-      })
-    dispatch({ type: 'go', to: 'confirm' })
-  }
+  const next = () =>
+    dispatch({
+      type: 'go',
+      to: nextStep(step, asked),
+      ...(step === 'worktrees' && { confirmed: going.map((removal) => removal.worktree) }),
+    })
 
-  const back = () => dispatch({ type: 'go', to: step === 'confirm' && moves.length > 0 ? 'children' : 'worktrees' })
+  const back = () => dispatch({ type: 'go', to: previousStep(step, asked) })
 
   // a Next that can't be pressed says why, so the step needs no sentence of its own
   const blocked = () => (review.data && going.length === 0 ? 'Check a worktree to remove it' : undefined)
 
   const leftRows = left.map(({ worktree, why }) => <LeftItem key={worktree} worktree={worktree} why={why} />)
 
-  const removing = plan?.worktrees ?? []
   const warnings = step === 'confirm' ? (planned.data?.warnings ?? []).filter(planWide) : []
   const body = () => {
     if (review.isPending) return <Skeleton className="h-40 w-full" />
@@ -176,6 +173,14 @@ export function RemoveWizard({
       )
 
     if (!plan) return !unplanned && <Skeleton className="h-40 w-full" />
+    if (step === 'data')
+      return (
+        <DataStep
+          removals={removing}
+          dropData={dropData}
+          onDropData={(on) => dispatch({ type: 'drop_data', dropData: on })}
+        />
+      )
     return (
       <>
         <ItemList label="Worktrees" left={leftRows}>
@@ -189,13 +194,6 @@ export function RemoveWizard({
           ))}
         </ItemList>
         <RemovalDetails removals={removing} />
-        {downOf(removing).length > 0 && (
-          <DataChoice
-            down={downOf(removing)}
-            dropData={dropData}
-            onDropData={(on) => dispatch({ type: 'drop_data', dropData: on })}
-          />
-        )}
       </>
     )
   }
@@ -216,6 +214,7 @@ export function RemoveWizard({
           steps={[
             { title: 'Worktrees', state: state('worktrees') },
             { title: 'Children', state: state('children') },
+            { title: 'Data', state: state('data') },
             { title: 'Confirm', state: state('confirm') },
           ]}
         />

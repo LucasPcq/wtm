@@ -1,4 +1,4 @@
-import { within } from '@testing-library/react'
+import { waitFor, within } from '@testing-library/react'
 import { HttpResponse } from 'msw'
 import { expect, test } from 'vitest'
 import { envelope } from '@/test/fixtures'
@@ -6,7 +6,7 @@ import { candidates, merged, prunePlan } from '@/test/prune'
 import { answeringPrune, openFromTheHeader } from '@/test/prune-dialog'
 import { streamed } from '@/test/stream'
 
-test('a service down that holds their data asks whether to start it to drop the data now, and the run says so', async () => {
+test('a service down that holds their data asks, on a Data step of its own, whether to drop it now; the plan and the run take the answer', async () => {
   const prune = answeringPrune((call) => {
     const start = call.answers?.some((a) => a.path === 'drop_data') ?? false
     const data = [{ job: 'db', name: 'acme_feat_billing', status: start ? ('start' as const) : ('defer' as const) }]
@@ -16,11 +16,19 @@ test('a service down that holds their data asks whether to start it to drop the 
 
   await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
   await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  const steps = within(dialog).getByRole('list', { name: 'Steps' })
+  expect(within(steps).getByText('Data').closest('li')?.getAttribute('aria-current')).toBe('step')
   expect(
     await within(dialog).findByText("db is down: the data these worktrees made there can't be dropped yet."),
   ).toBeTruthy()
   await user.click(within(dialog).getByRole('radio', { name: /^Start db and drop it now/ }))
-  await user.click(within(dialog).getByRole('button', { name: /^Details/ }))
+  await waitFor(() =>
+    expect(prune.answered(prune.calls.filter((call) => call.dry_run).at(-1), 'drop_data')).toEqual(['true']),
+  )
+  await user.click(within(dialog).getByRole('button', { name: 'Next' }))
+
+  expect(within(dialog).queryByRole('radio')).toBeNull()
+  await user.click(await within(dialog).findByRole('button', { name: /^Details/ }))
   expect(
     await within(dialog).findByText('acme_feat_billing in db is dropped: db is started for it, then stopped'),
   ).toBeTruthy()

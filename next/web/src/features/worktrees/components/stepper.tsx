@@ -28,7 +28,8 @@ export function Stepper({ steps }: { steps: { title: string; state: StepState }[
             </span>
             <span className={cn('text-sm', step.state === 'now' ? 'font-medium' : 'text-muted-foreground')}>
               {step.title}
-              {step.state === 'skipped' && ' · not asked'}
+              {/* four steps don't hold on one line in a dialog: a skipped one breaks only before "not asked" */}
+              {step.state === 'skipped' && '\u00a0· not\u00a0asked'}
             </span>
           </li>
         </Fragment>

@@ -131,7 +131,12 @@ test('a removal that failed is one line, its output and log one click under it, 
   )
   expect(within(dialog).getByText('Error response from daemon: permission denied')).toBeTruthy()
   expect(within(dialog).getByRole('button', { name: "Copy the log's path" })).toBeTruthy()
-  expect(within(dialog).getByRole('button', { name: /^2 steps/ })).toBeTruthy()
+  await user.click(within(dialog).getByRole('button', { name: /^2 steps/ }))
+  const steps = within(dialog).getByRole('region', { name: 'feat/billing-ui' })
+  expect(
+    within(steps).getByRole('heading', { name: 'feat/billing-ui' }),
+    'one worktree heads its steps too',
+  ).toBeTruthy()
 })
 
 test('a finished removal says a warning of the whole run first, as its Alert, then the groups that need the person first', async () => {
