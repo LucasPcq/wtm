@@ -820,7 +820,7 @@ func (p Plan) next(items []Item) []domain.FollowUp {
 		}
 		on := []domain.Answered{{Path: domain.PathWorktree, Values: []string{item.Subject}}}
 		for _, followUp := range []domain.FollowUp{
-			{Command: commandRunLogs, Answers: on, Code: CodeLogs, Message: "follow " + item.Subject + "'s output"},
+			{Command: commandRunLogs, Answers: on, Code: CodeLogs, Message: "see " + item.Subject + "'s output"},
 			{Command: commandRunDown, Answers: on, Code: CodeDown, Message: "stop " + item.Subject + "'s jobs"},
 		} {
 			if runs[followUp.Command] {

@@ -267,7 +267,7 @@
         }
       ],
       "code": "run-up.logs",
-      "message": "follow feat/a's output"
+      "message": "see feat/a's output"
     }
   ],
   "warnings": [],

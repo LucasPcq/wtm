@@ -13,4 +13,5 @@
   full output:  <SB>/acme/.git/wtm/logs/feat%2Fb/crashy.log
 
   → wtm run up feat/b --profile crash   start it again where it did not pass
+  → wtm run logs feat/b                 see feat/b's output
 

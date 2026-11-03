@@ -11,6 +11,8 @@ $ wtm run up; echo EXIT=$?
 ┃  Addresses
 ┃    api  http://api.main.acme.localhost:24372
 ┃    web  http://web.main.acme.localhost:24372
+┃
+┃  → wtm-next run logs main   see main's output
 
 EXIT=0
 $
