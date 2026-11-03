@@ -410,3 +410,21 @@ func TestAFollowedSearchStreamsOnlyTheLinesItMatches(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"feat/a api POST /x 500 error"}, got)
 }
+
+// The review of #268: the job a follow followed to its end was dropped; the web needs it for a crash.
+func TestAFollowSaysHowItsJobEnded(t *testing.T) {
+	w := newWorld(t)
+	w.daemon.listed = []run.Job{ran("api", w.at(featA), run.Running)}
+	w.daemon.lines[key(w.at(featA), "api")] = []script{{lines: lines("boom"), ended: run.Job{State: run.Crashed, ExitCode: new(1)}}}
+	var ended []runlogs.Ended
+
+	err := w.usecase.Watch(t.Context(), runlogs.Request{Worktrees: []string{featA}, Job: "api", Follow: true}, runlogs.Out{
+		Emit:   func(runlogs.Entry) error { return nil },
+		Absent: func(runlogs.Absent) error { return nil },
+		Ended:  func(e runlogs.Ended) error { ended = append(ended, e); return nil },
+		Warn:   func(domain.Warning) {},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, []runlogs.Ended{{Worktree: featA, Job: "api", State: runlogs.JobCrashed, ExitCode: new(1)}}, ended)
+}

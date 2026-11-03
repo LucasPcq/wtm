@@ -117,6 +117,7 @@ type script struct {
 	before func() // called as the follow starts
 	lines  []run.Line
 	wait   bool // it waits for the follow's context to end after its lines
+	ended  run.Job
 	err    error
 }
 
@@ -169,7 +170,9 @@ func (d *daemon) Lines(ctx context.Context, req run.Tail, out func(run.Line)) (r
 		<-ctx.Done()
 		return run.Job{}, ctx.Err()
 	}
-	return run.Job{Name: req.Name, WorkDir: req.WorkDir}, answer.err
+	ended := answer.ended
+	ended.Name, ended.WorkDir = req.Name, req.WorkDir
+	return ended, answer.err
 }
 
 // ran is job of kind as the daemon lists it in dir.

@@ -116,7 +116,7 @@ func (w world) readLog(file run.LogFile, n int) ([]run.Line, error) {
 	return lines[max(0, len(lines)-n):], nil
 }
 
-// A daemon lists its jobs; a follow of one of them sends its last lines, then its live lines, then waits for the follow to end when wait is set, else ends with the job.
+// A daemon lists its jobs; a follow of one of them sends its last lines, then its live lines, then waits for the follow to end when wait is set, else ends with the job, crashed.
 type daemon struct {
 	mu     sync.Mutex
 	listed []run.Job
@@ -158,7 +158,8 @@ func (d *daemon) Lines(ctx context.Context, req run.Tail, out func(run.Line)) (r
 		<-ctx.Done()
 		return run.Job{}, ctx.Err()
 	}
-	return run.Job{Name: req.Name, WorkDir: req.WorkDir}, nil
+	exit := 1
+	return run.Job{Name: req.Name, WorkDir: req.WorkDir, State: run.Crashed, ExitCode: &exit}, nil
 }
 
 // Attach gives a terminal the job never prints to.

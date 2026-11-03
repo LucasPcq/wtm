@@ -1,12 +1,10 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 
 	"github.com/LucasPcq/wtm/next/internal/command/runlogs"
-	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
@@ -64,37 +62,9 @@ func drawAbsent(w io.Writer, worktree, job string) {
 	output.UnchangedLine(w, fmt.Sprintf("%s: %s has not run", worktree, job))
 }
 
-// The types of the lines of JSON a follow writes: a line a job printed, a worktree or job named with none, a warning, and the failure that ended it.
-const (
-	typeLine    = "line"
-	typeAbsent  = "absent"
-	typeWarning = "warning"
-	typeError   = "error"
-)
-
-type streamedLine struct {
-	Type string `json:"type"`
-	runlogs.Entry
-}
-
-type streamedAbsent struct {
-	Type string `json:"type"`
-	runlogs.Absent
-}
-
-type streamedWarning struct {
-	Type string `json:"type"`
-	domain.Warning
-}
-
-type streamedError struct {
-	Type  string        `json:"type"`
-	Error *domain.Error `json:"error"`
-}
-
-// writeLine writes v to w as one line of JSON.
+// writeLine writes v to w as one line of the stream's JSON (runlogs.JSONOf).
 func writeLine(w io.Writer, v any) error {
-	line, err := json.Marshal(v)
+	line, err := runlogs.JSONOf(v)
 	if err != nil {
 		return err
 	}

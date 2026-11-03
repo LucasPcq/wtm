@@ -4,6 +4,7 @@ package runlogs
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -60,11 +61,61 @@ type Absent struct {
 	Job      string `json:"job,omitempty"`
 }
 
-// Out is where Watch streams: Emit receives each line, its error ending the stream with it; Absent each worktree, or job named, it has no line of, as the read says it; Warn what kept lines away (the daemon's skew, a log that cannot be read, lines dropped by a follow that fell behind).
+// An Ended is a job a follow followed to its end, as the daemon then lists it: its state (crashed, exited, stopped) and the code it exited with.
+type Ended struct {
+	Worktree string   `json:"worktree"`
+	Job      string   `json:"job"`
+	State    JobState `json:"state"`
+	ExitCode *int     `json:"exit_code,omitempty"`
+}
+
+// Out is where Watch streams: Emit receives each line, its error ending the stream with it; Absent each worktree, or job named, it has no line of, as the read says it; Ended each job followed to its end; Warn what kept lines away (the daemon's skew, a log that cannot be read, lines dropped by a follow that fell behind).
 type Out struct {
 	Emit   func(Entry) error
 	Absent func(Absent) error
+	Ended  func(Ended) error
 	Warn   func(domain.Warning)
+}
+
+// The types of a stream's lines as JSON (JSONOf): a line a job printed, a worktree or job named with none, a job followed to its end, a warning, and the failure that ended the stream.
+const (
+	TypeLine    = "line"
+	TypeAbsent  = "absent"
+	TypeEnded   = "ended"
+	TypeWarning = "warning"
+	TypeError   = "error"
+)
+
+// JSONOf is v, an Entry, an Absent, an Ended, a domain.Warning or a *domain.Error, as one line of a stream's JSON: its fields, and its type.
+func JSONOf(v any) ([]byte, error) {
+	switch v := v.(type) {
+	case Entry:
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			Entry
+		}{TypeLine, v})
+	case Absent:
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			Absent
+		}{TypeAbsent, v})
+	case Ended:
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			Ended
+		}{TypeEnded, v})
+	case domain.Warning:
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			domain.Warning
+		}{TypeWarning, v})
+	case *domain.Error:
+		return json.Marshal(struct {
+			Type  string        `json:"type"`
+			Error *domain.Error `json:"error"`
+		}{TypeError, v})
+	}
+	return nil, fmt.Errorf("no line of a stream is a %T", v)
 }
 
 // ----------------------------------------------------------------------------
@@ -161,7 +212,7 @@ func (u UseCase) follow(s *stream, src Source, match Matcher) {
 		if last != nil {
 			resume = &Resume{Last: *last, Sent: sent}
 		}
-		_, err := u.Daemon.Lines(s.ctx, tail, func(line run.Line) {
+		job, err := u.Daemon.Lines(s.ctx, tail, func(line run.Line) {
 			if resume != nil && resume.Drops(line) {
 				return
 			}
@@ -183,6 +234,8 @@ func (u UseCase) follow(s *stream, src Source, match Matcher) {
 		switch {
 		case errors.As(err, &refused) && refused.Code == run.CodeFollowerBehind:
 			continue
+		case err == nil && s.ctx.Err() == nil:
+			s.ended(Ended{Worktree: src.Target.Worktree, Job: src.Name, State: JobState(job.State), ExitCode: job.ExitCode})
 		case err == nil || s.ctx.Err() != nil:
 		case last == nil:
 			lines, readErr := u.ReadLog(src.Log, run.MaxTail)
@@ -221,6 +274,17 @@ func (s *stream) emit(src Source, lines ...Line) {
 		if err := s.out.Emit(Entry{Worktree: src.Target.Worktree, Job: src.Name, At: line.At, Text: line.Text, N: line.N}); err != nil {
 			s.cancel(err)
 		}
+	}
+}
+
+func (s *stream) ended(ended Ended) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.ctx.Err() != nil || s.out.Ended == nil {
+		return
+	}
+	if err := s.out.Ended(ended); err != nil {
+		s.cancel(err)
 	}
 }
 

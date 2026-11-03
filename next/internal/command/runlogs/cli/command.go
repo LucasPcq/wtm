@@ -127,7 +127,7 @@ func (c *logsCommand) follow(cmd *cobra.Command, req runlogs.Request) error {
 	app, err := c.open(ctx, c.io.Env.ProjectDir)
 	if err == nil {
 		prefix := prefixer(len(req.Worktrees) > 1)
-		err = app.Watch(ctx, req, runlogs.Out{Emit: func(entry runlogs.Entry) error { return c.emit(entry, prefix) }, Absent: c.absent, Warn: c.warn})
+		err = app.Watch(ctx, req, runlogs.Out{Emit: func(entry runlogs.Entry) error { return c.emit(entry, prefix) }, Absent: c.absent, Ended: c.ended, Warn: c.warn})
 	}
 	if err == nil || readerLeft(gone, err) {
 		return nil
@@ -137,12 +137,20 @@ func (c *logsCommand) follow(cmd *cobra.Command, req runlogs.Request) error {
 
 // emit writes entry as a line of JSON, or draws it for a person; --quiet silences the drawing alone.
 func (c *logsCommand) emit(entry runlogs.Entry, prefix func(worktree, job string) string) error {
-	return c.write(streamedLine{Type: typeLine, Entry: entry}, func(w io.Writer) { drawLine(w, prefix(entry.Worktree, entry.Job), entry.Text) })
+	return c.write(entry, func(w io.Writer) { drawLine(w, prefix(entry.Worktree, entry.Job), entry.Text) })
 }
 
 // absent says a worktree where no job ran, or a job named that never ran there, as the read says it.
 func (c *logsCommand) absent(absent runlogs.Absent) error {
-	return c.write(streamedAbsent{Type: typeAbsent, Absent: absent}, func(w io.Writer) { drawAbsent(w, absent.Worktree, absent.Job) })
+	return c.write(absent, func(w io.Writer) { drawAbsent(w, absent.Worktree, absent.Job) })
+}
+
+// ended writes a job followed to its end as a line of JSON; a person reads it in the job's last lines.
+func (c *logsCommand) ended(ended runlogs.Ended) error {
+	if c.io.Human() {
+		return nil
+	}
+	return c.write(ended, nil)
 }
 
 // write writes v as a line of JSON, or draws it for a person; --quiet silences the drawing alone.
@@ -163,7 +171,7 @@ func (c *logsCommand) write(v any, draw func(io.Writer)) error {
 func (c *logsCommand) warn(warning domain.Warning) {
 	if !c.io.Human() {
 		c.started = true
-		_ = writeLine(c.io.Streams.Out, streamedWarning{Type: typeWarning, Warning: warning})
+		_ = writeLine(c.io.Streams.Out, warning)
 		return
 	}
 	output.WarningLine(c.io.Streams.Err, warning.Message)
@@ -175,7 +183,7 @@ func (c *logsCommand) fail(failure *domain.Error) error {
 	case !c.started:
 		return c.io.FailWith(failure, nil)
 	case !c.io.Human():
-		_ = writeLine(c.io.Streams.Out, streamedError{Type: typeError, Error: failure})
+		_ = writeLine(c.io.Streams.Out, failure)
 		return c.io.Failed(failure)
 	}
 
