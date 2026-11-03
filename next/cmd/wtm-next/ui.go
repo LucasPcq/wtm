@@ -138,6 +138,8 @@ func webParams(token string, idle time.Duration) web.Params {
 	return web.Params{
 		Catalogue:   catalogue(),
 		Events:      eventsStream(),
+		Logs:        jobLines(),
+		LogFile:     jobLogFile,
 		Repos:       knownRepos(reposjson.Path(), bus.SocketPath()).Prune,
 		Version:     version,
 		Token:       token,

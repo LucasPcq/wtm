@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -490,4 +493,68 @@ func TestAKnownRouteAskedWithAnotherMethodIsRefusedWithTheMethodsItAnswers(t *te
 	assert.Equal(t, CodeMethodNotAllowed, decoded[envelope](t, wrong).Error.Code)
 	assert.Equal(t, http.StatusNotFound, unknown.StatusCode)
 	assert.Equal(t, CodeNotFound, decoded[envelope](t, unknown).Error.Code)
+}
+
+func TestTheLinesOfAJobAreStreamedFromItsWorktreeAndItsJob(t *testing.T) {
+	s := &stream{lines: []string{`{"type":"line","text":"ready"}`}, refusal: errors.New("the daemon went away")}
+
+	response := do(t, serving(t, Params{Logs: s.bind()}), req{method: http.MethodGet, path: "/api/repos/" + RepoID(repo) + "/jobs/api/logs?worktree=feat/a&search=err&regex=true"})
+	still := do(t, serving(t, Params{Logs: s.bind()}), req{method: http.MethodGet, path: "/api/repos/" + RepoID(repo) + "/jobs/web/logs?worktree=main&follow=false"})
+
+	require.Equal(t, http.StatusOK, response.StatusCode)
+	read := events(t, response.Body)
+	require.Len(t, read, 2)
+	assert.Equal(t, sse{data: `{"type":"line","text":"ready"}`}, read[0], "a line goes out as its stream spells it")
+	assert.Equal(t, eventEnvelope, read[1].name)
+	_ = events(t, still.Body)
+	require.Len(t, s.calls, 2)
+	assert.Equal(t, api.Call{Dir: repo.Root, Answers: []domain.Answered{
+		{Path: domain.PathWorktree, Values: []string{"feat/a"}},
+		{Path: "job", Values: []string{"api"}},
+		{Path: "follow", Values: []string{"true"}},
+		{Path: "search", Values: []string{"err"}},
+		{Path: "regex", Values: []string{"true"}},
+	}}, s.calls[0], "followed unless asked not to, its search as asked")
+	assert.Equal(t, []string{"false"}, s.calls[1].Answers[2].Values)
+}
+
+func TestTheLogFileOfAJobIsServedToSave(t *testing.T) {
+	log := filepath.Join(t.TempDir(), "api.log")
+	require.NoError(t, os.WriteFile(log, []byte("2026-11-03T20:17:21Z  ready\n"), 0o600))
+	var asked JobLog
+	logFile := func(_ context.Context, job JobLog) (string, error) {
+		asked = job
+		return log, nil
+	}
+
+	response := do(t, serving(t, Params{LogFile: logFile}), req{method: http.MethodGet, path: "/api/repos/" + RepoID(repo) + "/jobs/api/log?worktree=feat/a"})
+
+	require.Equal(t, http.StatusOK, response.StatusCode)
+	body, err := io.ReadAll(response.Body)
+	require.NoError(t, err)
+	assert.Equal(t, "2026-11-03T20:17:21Z  ready\n", string(body))
+	assert.Equal(t, `attachment; filename=api.log`, response.Header.Get("Content-Disposition"))
+	assert.Equal(t, JobLog{Dir: repo.Root, Worktree: "feat/a", Job: "api"}, asked)
+}
+
+func TestALogFileThatCannotBeServedIsRefused(t *testing.T) {
+	for name, c := range map[string]struct {
+		logFile func(context.Context, JobLog) (string, error)
+		status  int
+		code    string
+	}{
+		"none": {logFile: func(context.Context, JobLog) (string, error) { return "", nil }, status: http.StatusNotFound, code: CodeLogMissing},
+		"gone": {logFile: func(context.Context, JobLog) (string, error) { return "/no/such.log", nil }, status: http.StatusNotFound, code: CodeLogMissing},
+		"refused": {logFile: func(context.Context, JobLog) (string, error) {
+			return "", &domain.Error{Kind: domain.KindInvalid, Code: "run-logs.job_unknown"}
+		}, status: http.StatusBadRequest, code: "run-logs.job_unknown"},
+		"no_server": {status: http.StatusNotFound, code: CodeNotFound},
+	} {
+		t.Run(name, func(t *testing.T) {
+			response := do(t, serving(t, Params{LogFile: c.logFile}), req{method: http.MethodGet, path: "/api/repos/" + RepoID(repo) + "/jobs/api/log?worktree=feat/a"})
+
+			assert.Equal(t, c.status, response.StatusCode)
+			assert.Equal(t, c.code, decoded[envelope](t, response).Error.Code)
+		})
+	}
 }
