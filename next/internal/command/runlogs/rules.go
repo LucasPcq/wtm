@@ -180,9 +180,9 @@ func (s Source) Shows(logged bool) bool {
 	return logged
 }
 
-// Ran reports whether the source's job ran, given that its log holds lines (or cannot be read): the daemon lists it, or it left a log.
+// Ran reports whether the source's job ran, given that its log holds lines (or cannot be read): its state is any but not started.
 func (s Source) Ran(logged bool) bool {
-	return s.Listed || logged
+	return s.state(logged) != JobNotStarted
 }
 
 // Follows reports whether the lines of the source are followed: its service is a process of a daemon of this protocol, running.

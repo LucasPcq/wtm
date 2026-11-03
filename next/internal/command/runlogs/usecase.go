@@ -107,29 +107,35 @@ func (u UseCase) Watch(ctx context.Context, req Request, out Out) error {
 	s := newStream(ctx, out)
 	defer s.cancel(nil)
 	var following sync.WaitGroup
-	shown := map[string]bool{}
-	for _, src := range Sources(facts, req, targets) {
-		if req.Follow && src.Follows(facts) {
-			shown[src.Target.Path] = true
-			following.Go(func() { u.follow(s, src) })
-			continue
-		}
-		lines, err := u.last(s.ctx, src)
-		if err != nil {
-			s.warn(unreadable(src, err))
-		}
-		if !src.Shows(len(lines) > 0 || err != nil) {
-			continue
-		}
-		shown[src.Target.Path] = true
-		if !src.Ran(len(lines) > 0 || err != nil) {
-			s.absent(Absent{Worktree: src.Target.Worktree, Job: src.Name})
-			continue
-		}
-		s.emit(src, lines...)
-	}
+	sources := Sources(facts, req, targets)
 	for _, t := range targets {
-		if !shown[t.Path] {
+		shown := false
+		for _, src := range sources {
+			if src.Target.Path != t.Path {
+				continue
+			}
+			if req.Follow && src.Follows(facts) {
+				shown = true
+				following.Go(func() { u.follow(s, src) })
+				continue
+			}
+			lines, err := u.last(s.ctx, src)
+			logged := len(lines) > 0 || err != nil
+			if !src.Shows(logged) {
+				continue
+			}
+			shown = true
+			if err != nil {
+				s.warn(unreadable(src, err))
+			}
+			if !src.Ran(logged) {
+				s.absent(Absent{Worktree: t.Worktree, Job: src.Name})
+				continue
+			}
+			s.emit(src, lines...)
+		}
+		// said where the read says it: in the worktree's place
+		if !shown {
 			s.absent(Absent{Worktree: t.Worktree})
 		}
 	}

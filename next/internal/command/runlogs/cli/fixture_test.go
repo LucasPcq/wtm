@@ -111,6 +111,7 @@ type daemon struct {
 	live   map[string][]run.Line // by job: what it prints while followed
 	wait   func()                // called once the live lines are sent; the follow then waits for its end
 	refuse error                 // what a tail of a job's lines fails with: the legacy daemon's
+	broke  error                 // what a tail fails with once it sent the job's last lines
 	skewed *run.Skewed
 }
 
@@ -126,6 +127,12 @@ func (d *daemon) Jobs(context.Context) ([]run.Job, error) {
 func (d *daemon) Lines(ctx context.Context, req run.Tail, out func(run.Line)) (run.Job, error) {
 	if d.refuse != nil {
 		return run.Job{}, d.refuse
+	}
+	if d.broke != nil {
+		for _, line := range d.past[req.Name] {
+			out(line)
+		}
+		return run.Job{}, d.broke
 	}
 	if !req.Follow {
 		return run.Job{}, &run.Error{Code: run.CodeJobNotFound}

@@ -31,7 +31,7 @@ const (
 		"each new line as the jobs print it, until they all ended or Ctrl+C, which exits 0.\n" +
 		"\n" +
 		"--output json is the read's v2 envelope, each job with its state and its lines; with\n" +
-		"--follow, one JSON object per line instead (JSON Lines: worktree, job, at, text).\n" +
+		"--follow, one typed JSON object per line instead: line, absent, warning, error.\n" +
 		"It never starts the run daemon: with none running, the lines come from the logs."
 	logsExample = `  # Pick worktrees, then watch their jobs live
   wtm run logs

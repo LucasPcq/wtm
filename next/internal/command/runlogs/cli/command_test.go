@@ -219,3 +219,21 @@ func TestAFailureAfterTheFirstLineEndsAJSONStreamOnAnErrorLine(t *testing.T) {
 	assert.Empty(t, stderr.String())
 	assert.JSONEq(t, `{"type":"error","error":{"kind":"internal","code":"run-logs.broken","message":"the daemon went away"}}`, stdout.String())
 }
+
+// The review of #268: the view repeated a job's lines when the daemon broke off after sending them.
+func TestTheViewNeverRepeatsLinesTheDaemonSentBeforeItBrokeOff(t *testing.T) {
+	streams, _, _, _ := output.Test()
+	daemon := newWorld().daemon
+	daemon.broke = errors.New("connection reset")
+	c := &logsCommand{io: uicli.Run{Streams: streams}, view: View{Daemon: daemon}}
+	read := runlogs.Outcome{Items: []runlogs.Item{{Subject: featA, Status: domain.StatusDone, Detail: &runlogs.Detail{Path: pathOf(featA), Jobs: []runlogs.Job{
+		{Name: "api", Kind: project.Service, State: runlogs.JobRunning, Hold: run.HoldOwn, Lines: []runlogs.Line{{At: at, Text: "api ready"}}},
+	}}}}}
+
+	params, _ := c.viewOf(read, runlogs.Request{})
+	var lines []string
+	_, err := params.Daemon.Lines(t.Context(), run.Tail{Name: "api", WorkDir: pathOf(featA)}, func(line run.Line) { lines = append(lines, line.Text) })
+
+	assert.Error(t, err)
+	assert.Equal(t, []string{"api ready"}, lines, "the daemon's lines alone, never the read's after them")
+}

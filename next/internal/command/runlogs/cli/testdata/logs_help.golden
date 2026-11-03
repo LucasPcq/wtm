@@ -9,7 +9,7 @@
   each new line as the jobs print it, until they all ended or Ctrl+C, which exits 0.
 
   --output json is the read's v2 envelope, each job with its state and its lines; with
-  --follow, one JSON object per line instead (JSON Lines: worktree, job, at, text).
+  --follow, one typed JSON object per line instead: line, absent, warning, error.
   It never starts the run daemon: with none running, the lines come from the logs.
 
   Usage:
@@ -28,7 +28,7 @@
   Flags:
     -f, --follow          Print each new line as the jobs print it, until they end or Ctrl+C
     -h, --help            help for logs
-        --job string      Read this job of run.toml alone (default: every job that ran)
+        --job string      Read this job alone, one of run.toml or one the run daemon runs there (default: every job that ran)
         --output string   Output format: text or json (default "text")
     -y, --yes             Ask nothing: read the worktree you stand in unless named
 

@@ -16,7 +16,7 @@
           "value": "ghost"
         },
         "flag": "--job",
-        "message": "ghost is no job of run.toml"
+        "message": "ghost is no job of run.toml, nor one the run daemon runs in these worktrees"
       }
     ]
   }

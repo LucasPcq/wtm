@@ -91,8 +91,13 @@ func (d viewDaemon) Jobs(ctx context.Context) ([]run.Job, error) {
 // Lines are the daemon's, or those read of the job when the daemon has none to give.
 func (d viewDaemon) Lines(ctx context.Context, req run.Tail, out func(run.Line)) (run.Job, error) {
 	job, logged := d.logged[logKey{dir: req.WorkDir, name: req.Name}]
-	listed, err := d.Daemon.Lines(ctx, req, out)
-	if err == nil || !logged || len(job.Lines) == 0 {
+	sent := false
+	listed, err := d.Daemon.Lines(ctx, req, func(line run.Line) {
+		sent = true
+		out(line)
+	})
+	// once the daemon gave lines, the read's would repeat them
+	if err == nil || sent || !logged || len(job.Lines) == 0 {
 		return listed, err
 	}
 	for _, line := range job.Lines {

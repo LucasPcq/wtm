@@ -293,3 +293,30 @@ func TestAJobTheDaemonRunsIsReadByNameEvenOnceRunTomlDropsIt(t *testing.T) {
 	assert.Equal(t, []string{"still up"}, textsOf(jobOf(t, read.Items[0], "old")))
 	assert.Equal(t, []string{runlogs.CodeJobUnknown}, fieldCodes(failure.Fields), "a worktree the daemon runs no such job in")
 }
+
+// The review of #268: a shared service's log that cannot be read was warned once per worktree that does not show it.
+func TestAnUnreadableLogIsWarnedOnlyWhereItsJobShows(t *testing.T) {
+	w := newWorld(t)
+	require.NoError(t, os.MkdirAll(run.LogDir(w.stateDir, "main")+"/db.log", 0o700))
+
+	_, warned, err := w.watched(t.Context(), t, runlogs.Request{Worktrees: []string{"main", featA, featB}})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{runlogs.CodeLogUnreadable}, warned, "main shows its shared service; feat/a and feat/b, which hold no claim, do not")
+}
+
+// The review of #268: the follow said a worktree where nothing ran after every other worktree's lines, not where the read says it.
+func TestWatchSaysWhatNeverRanInTheReadsOrder(t *testing.T) {
+	w := newWorld(t)
+	w.logged(t, featA, "migrate", "migrated")
+	var said []string
+	out := runlogs.Out{
+		Emit:   func(e runlogs.Entry) error { said = append(said, e.Worktree+" "+e.Text); return nil },
+		Absent: func(a runlogs.Absent) error { said = append(said, a.Worktree+" nothing"); return nil },
+		Warn:   func(domain.Warning) {},
+	}
+
+	require.NoError(t, w.usecase.Watch(t.Context(), runlogs.Request{Worktrees: []string{featB, featA}}, out))
+
+	assert.Equal(t, []string{"feat/b nothing", "feat/a migrated"}, said)
+}

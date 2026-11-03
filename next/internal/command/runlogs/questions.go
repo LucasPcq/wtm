@@ -109,7 +109,7 @@ func NewQuestions(f Facts, req Request) Questions {
 		questions.Errors = append(questions.Errors, domain.Required(domain.PathWorktree))
 	}
 	if req.Job != "" && !f.knows(req.Job, targets) {
-		questions.Errors = append(questions.Errors, domain.FieldError{Path: PathJob, Code: CodeJobUnknown, Template: "{value} is no job of run.toml", Params: domain.Params{"value": req.Job}})
+		questions.Errors = append(questions.Errors, domain.FieldError{Path: PathJob, Code: CodeJobUnknown, Template: "{value} is no job of run.toml, nor one the run daemon runs in these worktrees", Params: domain.Params{"value": req.Job}})
 	}
 
 	return questions
