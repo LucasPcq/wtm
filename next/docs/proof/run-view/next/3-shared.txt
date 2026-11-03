@@ -1,0 +1,40 @@
+
+  ! flaky · feat/b crashed (exit 1) since the view opened
+  esc dismisses this report
+  ╭────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────╮
+  │ JOBS                   │ │ db · joined, running in main · :24393                                            live │
+  │                        │ │                                                                                       │
+  │ shared                 │ │db listening on 24393                                                                  │
+  │ ›• db              00s │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │ feat/b                 │ │                                                                                       │
+  │  ✓ migrate             │ │                                                                                       │
+  │  • api             00s │ │                                                                                       │
+  │  • web             00s │ │                                                                                       │
+  │  ✗ flaky               │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  ╰────────────────────────╯ ╰───────────────────────────────────────────────────────────────────────────────────────╯
+
+  ↑↓ job · / filter · pgup/pgdn scroll · enter focus · o open · a addresses · q detach                     3/5 running

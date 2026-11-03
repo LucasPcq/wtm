@@ -1,0 +1,20 @@
+
+  ╭────────────────────────╮ ╭───────────────────────────────────────────────╮
+  │ JOBS                   │ │ db · joined, running in main · :26653    live │
+  │                        │ │                                               │
+  │ shared                 │ │ Waiting for output…                           │
+  │ ›• db               1m │ │                                               │
+  │                        │ │                                               │
+  │ feat/b                 │ │                                               │
+  │  ✓ migrate             │ │                                               │
+  │  • api              1m │ │                                               │
+  │  − web                 │ │                                               │
+  │                        │ │                                               │
+  │ feat/a                 │ │                                               │
+  │  • seed             1m │ │                                               │
+  │  • api              1m │ │                                               │
+  │                        │ │                                               │
+  │                        │ │                                               │
+  ╰────────────────────────╯ ╰───────────────────────────────────────────────╯
+
+  ↑↓ job · / filter · pgup/pgdn scroll · enter focus 2 worktrees · 4/6 running

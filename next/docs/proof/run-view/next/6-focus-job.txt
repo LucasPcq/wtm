@@ -1,0 +1,40 @@
+
+  ╭────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────╮
+  │ JOBS                   │ │ api · feat/b · running · http://api.feat-b.acme.localhost:24392                 focus │
+  │                        │ │                                                                                       │
+  │ feat/b                 │ │  api v1.4.2  ready in 312 ms                                                          │
+  │ ›• api             00s │ │  ➜  Local:   http://localhost:24401/                                                  │
+  │                        │ │                                                                                       │
+  │                        │ │00:00:00 GET /health 200 2ms                                                           │
+  │                        │ │00:00:00 POST /session 201 18ms                                                        │
+  │                        │ │00:00:00 GET /users/me 200 6ms                                                         │
+  │                        │ │00:00:00 GET /health 200 1ms                                                           │
+  │                        │ │00:00:00 GET /health 200 2ms                                                           │
+  │                        │ │00:00:00 POST /session 201 18ms                                                        │
+  │                        │ │00:00:00 GET /users/me 200 6ms                                                         │
+  │                        │ │00:00:00 GET /health 200 1ms                                                           │
+  │                        │ │00:00:00 GET /health 200 2ms                                                           │
+  │                        │ │00:00:00 POST /session 201 18ms                                                        │
+  │                        │ │00:00:00 GET /users/me 200 6ms                                                         │
+  │                        │ │00:00:00 GET /health 200 1ms                                                           │
+  │                        │ │00:00:00 GET /health 200 2ms                                                           │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  ╰────────────────────────╯ ╰───────────────────────────────────────────────────────────────────────────────────────╯
+
+  focus api · feat/b — every key goes to the job · esc twice gives them back

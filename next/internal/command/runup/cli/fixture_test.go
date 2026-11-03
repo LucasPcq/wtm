@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"net"
 	"slices"
 	"sync"
 	"time"
@@ -28,6 +29,9 @@ const (
 	featC       = "feat/c"
 	fingerprint = "0123456789abcdef01234567"
 )
+
+// altScreen is what a program writes as it takes the terminal's alternate screen.
+const altScreen = "\x1b[?1049h"
 
 var startedAt = time.Date(2026, 10, 31, 12, 0, 0, 0, time.UTC)
 
@@ -100,6 +104,8 @@ func (w world) open(context.Context, string) (runup.UseCase, error) {
 type daemon struct {
 	mu     sync.Mutex
 	listed []run.Job
+	// interrupt, when set, is the Ctrl+C that lands as web starts.
+	interrupt func()
 }
 
 func (d *daemon) Jobs(context.Context) ([]run.Job, error) {
@@ -118,12 +124,27 @@ func (d *daemon) Start(_ context.Context, spec run.Spec, out func(run.Line)) (ru
 		exit := 3
 		return run.Job{}, &run.Error{Code: run.CodeTaskFailed, Message: "run daemon: task migrate exited with code 3", ExitCode: &exit}
 	}
+	if spec.Job.Name == "web" && d.interrupt != nil {
+		d.interrupt()
+	}
 	job := run.Job{Name: spec.Job.Name, WorkDir: spec.WorkDir, Up: spec.Job.Kind == project.Service, Kind: spec.Job.Kind, State: run.Running, URL: spec.URL(11080)}
 	d.listed = append(d.listed, job)
 	return job, nil
 }
 
 func (d *daemon) StopAll(context.Context, run.StopAll) ([]run.StoppedJob, error) { return nil, nil }
+
+// Attach gives a terminal the job never prints to.
+func (d *daemon) Attach(context.Context, run.Window) (net.Conn, error) {
+	view, _ := net.Pipe()
+	return view, nil
+}
+
+func (d *daemon) Resize(context.Context, run.Window) error { return nil }
+
+func (d *daemon) Lines(context.Context, run.Tail, func(run.Line)) (run.Job, error) {
+	return run.Job{}, nil
+}
 
 // answering is a loopback where something answers on every port.
 func answering(_ context.Context, ports []int, _ time.Duration) map[int]bool {

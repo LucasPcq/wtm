@@ -95,8 +95,8 @@ func (d Detail) Reached() []JobResult {
 	})
 }
 
-// leftUp reports whether the start left a job up in its worktree.
-func (d Detail) leftUp() bool {
+// LeftUp reports whether the start left a job up in its worktree.
+func (d Detail) LeftUp() bool {
 	return slices.ContainsFunc(d.Jobs, func(job JobResult) bool {
 		return job.Status == JobStarted || job.Status == JobAlreadyRunning || job.Status == JobJoined
 	})

@@ -1,0 +1,20 @@
+$ wtm run up feat/b --profile view --yes; echo EXIT=$?
+  ✓ feat/b · migrate (<DUR>)
+  ✓ feat/b · db (<DUR>)
+  ✓ feat/b · api (<DUR>)
+  ✓ feat/b · web (<DUR>)
+  ✓ feat/b · flaky (<DUR>)
+
+┃  ✓ run up: 1 done
+┃
+┃  Worktrees  feat/b
+┃  Profile    view
+┃  Jobs       migrate, db (joined, in main), api, web, flaky
+┃
+┃  Addresses
+┃    api  http://api.feat-b.acme.localhost:24392
+┃    web  http://web.feat-b.acme.localhost:24392
+
+EXIT=0
+$
+

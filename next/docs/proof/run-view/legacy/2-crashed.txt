@@ -1,0 +1,40 @@
+
+  ╭────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────╮
+  │ JOBS                   │ │ web · feat/b · running · http://web.feat-b.acme.localhost:24392                  live │
+  │                        │ │                                                                                       │
+  │ shared                 │ │  web v1.4.2  ready in 312 ms                                                          │
+  │  ◈  db              0s │ │  ➜  Local:   http://localhost:24400/                                                  │
+  │                        │ │                                                                                       │
+  │ feat/b                 │ │00:00:00 hmr update /src/App.tsx                                                       │
+  │  ●  api             0s │ │00:00:00 GET / 200 in 12ms                                                             │
+  │ ▸●  web             0s │ │00:00:00 hmr update /src/Login.tsx                                                     │
+  │  ✗  flaky              │ │00:00:00 GET /assets/app.js 200 in 4ms                                                 │
+  │                        │ │00:00:00 hmr update /src/App.tsx                                                       │
+  │                        │ │00:00:00 GET / 200 in 12ms                                                             │
+  │                        │ │00:00:00 hmr update /src/Login.tsx                                                     │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  ╰────────────────────────╯ ╰───────────────────────────────────────────────────────────────────────────────────────╯
+
+  ↑↓ job · / filter · pgup/pgdn scroll · enter focus · o open · a addresses · q detach                     3/4 running

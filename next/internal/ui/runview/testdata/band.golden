@@ -1,0 +1,30 @@
+
+  ! web's port 3000 never answered
+  ! api · feat/b crashed (exit 3) since the view opened
+  esc dismisses this report
+  ╭────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────╮
+  │ JOBS                   │ │ db · joined, running in main · :26653                                            live │
+  │                        │ │                                                                                       │
+  │ shared                 │ │ Waiting for output…                                                                   │
+  │ ›• db               1m │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │ feat/b                 │ │                                                                                       │
+  │  ✓ migrate             │ │                                                                                       │
+  │  ✗ api                 │ │                                                                                       │
+  │  − web                 │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │ feat/a                 │ │                                                                                       │
+  │  • seed             1m │ │                                                                                       │
+  │  • api              1m │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  ╰────────────────────────╯ ╰───────────────────────────────────────────────────────────────────────────────────────╯
+
+  ↑↓ job · / filter · pgup/pgdn scroll · enter focus · o open · a addresses · q detach       2 worktrees · 3/6 running
