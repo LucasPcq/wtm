@@ -3,6 +3,7 @@ package runlogs_test
 import (
 	"context"
 	"errors"
+	"os"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/runlogs"
@@ -186,6 +187,7 @@ func TestAFollowerThatLostLinesSaysSo(t *testing.T) {
 	w.daemon.listed = []run.Job{ran("api", w.at(featA), run.Running)}
 	all := lines("one", "two", "three", "four")
 	w.daemon.lines[key(w.at(featA), "api")] = []script{{lines: all[:1], err: &run.Error{Code: run.CodeFollowerBehind}}, {lines: all[2:]}}
+	// "one" rotated out of what the daemon keeps: "two" was never sent
 
 	got, warned, err := w.watched(t.Context(), t, runlogs.Request{Worktrees: []string{featA}, Job: "api", Follow: true})
 
@@ -220,16 +222,17 @@ func TestAnInterruptedFollowEndsWithoutError(t *testing.T) {
 	assert.NoError(t, err, "a follow is stopped by an interrupt, exit 0")
 }
 
-func TestAFollowInterruptedBeforeItsFirstLineEndsCancelled(t *testing.T) {
+// The review of #268: a quiet job, then Ctrl+C, exited 130 where an interrupted follow exits 0 (D3).
+func TestAFollowInterruptedBeforeItsFirstLineEndsWithoutError(t *testing.T) {
 	w := newWorld(t)
 	w.daemon.listed = []run.Job{ran("api", w.at(featA), run.Running)}
-	w.daemon.lines[key(w.at(featA), "api")] = []script{{wait: true}}
 	ctx, cancel := context.WithCancel(t.Context())
-	cancel()
+	w.daemon.lines[key(w.at(featA), "api")] = []script{{wait: true, before: cancel}}
 
-	_, _, err := w.watched(ctx, t, runlogs.Request{Worktrees: []string{featA}, Follow: true})
+	got, _, err := w.watched(ctx, t, runlogs.Request{Worktrees: []string{featA}, Job: "api", Follow: true})
 
-	assert.ErrorIs(t, err, context.Canceled)
+	assert.NoError(t, err)
+	assert.Empty(t, got)
 }
 
 func TestAReaderThatFailsEndsTheStreamWithItsError(t *testing.T) {
@@ -245,4 +248,48 @@ func TestAReaderThatFailsEndsTheStreamWithItsError(t *testing.T) {
 
 	assert.ErrorIs(t, err, gone)
 	assert.Equal(t, 1, emitted, "no line is emitted once the reader failed")
+}
+
+// The review of #268: a worktree where nothing ran, and a job named that never ran, said nothing under --follow (B6, D6).
+func TestWatchSaysWhatItHasNoLineOf(t *testing.T) {
+	w := newWorld(t)
+	var absent []runlogs.Absent
+	out := runlogs.Out{
+		Emit:   func(runlogs.Entry) error { return nil },
+		Absent: func(a runlogs.Absent) error { absent = append(absent, a); return nil },
+		Warn:   func(domain.Warning) {},
+	}
+
+	require.NoError(t, w.usecase.Watch(t.Context(), runlogs.Request{Worktrees: []string{featB}, Follow: true}, out))
+	require.NoError(t, w.usecase.Watch(t.Context(), runlogs.Request{Worktrees: []string{featA}, Job: "never", Follow: true}, out))
+
+	assert.Equal(t, []runlogs.Absent{{Worktree: featB}, {Worktree: featA, Job: "never"}}, absent)
+}
+
+// The review of #268: a log that cannot be read read as a job that never ran.
+func TestALogThatCannotBeReadIsWarnedOnItsJob(t *testing.T) {
+	w := newWorld(t)
+	require.NoError(t, os.MkdirAll(run.LogDir(w.stateDir, featA)+"/api.log", 0o700))
+
+	read := w.read(t, runlogs.Request{Worktrees: []string{featA}})
+	_, warned, err := w.watched(t.Context(), t, runlogs.Request{Worktrees: []string{featA}})
+
+	require.Equal(t, []string{"api"}, namesOf(read.Items[0]), "a log that cannot be read is a job that ran")
+	assert.Equal(t, runlogs.JobStopped, jobOf(t, read.Items[0], "api").State)
+	assert.Equal(t, []string{runlogs.CodeLogUnreadable}, codes(read.Items[0].Warnings))
+	require.NoError(t, err)
+	assert.Equal(t, []string{runlogs.CodeLogUnreadable}, warned)
+}
+
+// The review of #268: --job refused a job the daemon still runs that run.toml no longer declares.
+func TestAJobTheDaemonRunsIsReadByNameEvenOnceRunTomlDropsIt(t *testing.T) {
+	w := newWorld(t)
+	w.logged(t, featA, "old", "still up")
+	w.daemon.listed = []run.Job{ran("old", w.at(featA), run.Running)}
+
+	read := w.read(t, runlogs.Request{Worktrees: []string{featA}, Job: "old"})
+	failure := w.refused(t, runlogs.Request{Worktrees: []string{featB}, Job: "old"})
+
+	assert.Equal(t, []string{"still up"}, textsOf(jobOf(t, read.Items[0], "old")))
+	assert.Equal(t, []string{runlogs.CodeJobUnknown}, fieldCodes(failure.Fields), "a worktree the daemon runs no such job in")
 }

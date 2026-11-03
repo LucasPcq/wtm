@@ -91,7 +91,7 @@ func newWorld(t *testing.T) *world {
 	w.usecase = runlogs.UseCase{
 		Git:        repo,
 		Daemon:     w.daemon,
-		ReadLog:    joblog.Last,
+		ReadLog:    joblog.Tail,
 		StateDir:   stateDir,
 		Repository: repository.Service{Config: config.Project{StateDir: stateDir, GlobalPath: filepath.Join(root, "no-global.toml")}, Git: repo, MainPath: main, Restart: &domain.FollowUp{Command: "run daemon restart"}},
 	}
@@ -104,9 +104,10 @@ func linkedPath(root, name string) string {
 
 // A script is one answer of the daemon to lines: the lines it sends, then how it ends.
 type script struct {
-	lines []run.Line
-	wait  bool // it waits for the follow's context to end after its lines
-	err   error
+	before func() // called as the follow starts
+	lines  []run.Line
+	wait   bool // it waits for the follow's context to end after its lines
+	err    error
 }
 
 // A daemon is the run daemon a test scripts: the jobs it lists, whether it could not tell them or is of another build, and what each lines of a job answers, in turn (the last one again once they ran out); every tail it was asked.
@@ -148,6 +149,9 @@ func (d *daemon) Lines(ctx context.Context, req run.Tail, out func(run.Line)) (r
 	}
 	d.mu.Unlock()
 
+	if answer.before != nil {
+		answer.before()
+	}
 	for _, line := range answer.lines {
 		out(line)
 	}

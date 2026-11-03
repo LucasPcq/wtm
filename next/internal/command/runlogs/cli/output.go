@@ -1,10 +1,12 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 
 	"github.com/LucasPcq/wtm/next/internal/command/runlogs"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
@@ -24,12 +26,12 @@ func drawItem(w io.Writer, item runlogs.Item, prefix func(worktree, job string) 
 		return
 	}
 	if len(item.Detail.Jobs) == 0 {
-		output.UnchangedLine(w, item.Subject+": no job has run")
+		drawAbsent(w, item.Subject, "")
 		return
 	}
 	for _, job := range item.Detail.Jobs {
 		if job.State == runlogs.JobNotStarted {
-			output.UnchangedLine(w, fmt.Sprintf("%s: %s has not run", item.Subject, job.Name))
+			drawAbsent(w, item.Subject, job.Name)
 			continue
 		}
 		for _, line := range job.Lines {
@@ -51,4 +53,51 @@ func prefixer(several bool) func(worktree, job string) string {
 // drawLine draws a line a job printed under prefix, muted: the prefix is chrome, the job's text its own.
 func drawLine(w io.Writer, prefix, text string) {
 	fmt.Fprintf(w, "%s%s %s\n", output.Indent, output.StylesOf(w).Muted.Render(prefix), text)
+}
+
+// drawAbsent says a worktree where no job ran, or the job named, which never ran there.
+func drawAbsent(w io.Writer, worktree, job string) {
+	if job == "" {
+		output.UnchangedLine(w, worktree+": no job has run")
+		return
+	}
+	output.UnchangedLine(w, fmt.Sprintf("%s: %s has not run", worktree, job))
+}
+
+// The types of the lines of JSON a follow writes: a line a job printed, a worktree or job named with none, a warning, and the failure that ended it.
+const (
+	typeLine    = "line"
+	typeAbsent  = "absent"
+	typeWarning = "warning"
+	typeError   = "error"
+)
+
+type streamedLine struct {
+	Type string `json:"type"`
+	runlogs.Entry
+}
+
+type streamedAbsent struct {
+	Type string `json:"type"`
+	runlogs.Absent
+}
+
+type streamedWarning struct {
+	Type string `json:"type"`
+	domain.Warning
+}
+
+type streamedError struct {
+	Type  string        `json:"type"`
+	Error *domain.Error `json:"error"`
+}
+
+// writeLine writes v to w as one line of JSON.
+func writeLine(w io.Writer, v any) error {
+	line, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	_, err = w.Write(append(line, '\n'))
+	return err
 }

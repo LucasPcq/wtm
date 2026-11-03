@@ -98,9 +98,9 @@ func (w world) open(context.Context, string) (runlogs.UseCase, error) {
 	}, nil
 }
 
-func (w world) readLog(file run.LogFile, n int) []run.Line {
+func (w world) readLog(file run.LogFile, n int) ([]run.Line, error) {
 	lines := w.logs[file.Dir+" "+file.Job]
-	return lines[max(0, len(lines)-n):]
+	return lines[max(0, len(lines)-n):], nil
 }
 
 // A daemon lists its jobs; a follow of one of them sends its last lines, then its live lines, then waits for the follow to end when wait is set, else ends with the job.
@@ -110,15 +110,23 @@ type daemon struct {
 	past   map[string][]run.Line // by job: the last lines it keeps
 	live   map[string][]run.Line // by job: what it prints while followed
 	wait   func()                // called once the live lines are sent; the follow then waits for its end
+	refuse error                 // what a tail of a job's lines fails with: the legacy daemon's
+	skewed *run.Skewed
 }
 
 func (d *daemon) Jobs(context.Context) ([]run.Job, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	if d.skewed != nil {
+		return slices.Clone(d.listed), d.skewed
+	}
 	return slices.Clone(d.listed), nil
 }
 
 func (d *daemon) Lines(ctx context.Context, req run.Tail, out func(run.Line)) (run.Job, error) {
+	if d.refuse != nil {
+		return run.Job{}, d.refuse
+	}
 	if !req.Follow {
 		return run.Job{}, &run.Error{Code: run.CodeJobNotFound}
 	}

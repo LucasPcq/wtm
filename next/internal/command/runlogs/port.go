@@ -18,5 +18,5 @@ type Daemon interface {
 	Lines(ctx context.Context, req run.Tail, out func(run.Line)) (run.Job, error)
 }
 
-// ReadLog returns the last n lines of the log file names, oldest first, none when it does not exist.
-type ReadLog func(file run.LogFile, n int) []run.Line
+// ReadLog returns the last n lines of the log file names, oldest first, none when it does not exist; it fails when a file of the log exists and cannot be read, with the lines read before.
+type ReadLog func(file run.LogFile, n int) ([]run.Line, error)

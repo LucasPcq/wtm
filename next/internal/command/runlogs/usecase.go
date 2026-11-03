@@ -49,10 +49,17 @@ type Entry struct {
 	Text     string    `json:"text"`
 }
 
-// Out is where Watch streams: Emit receives each line, its error ending the stream with it; Warn what kept lines away (the daemon's skew, lines dropped by a follow that fell behind).
+// An Absent is what Watch has no line of: a worktree where no job ran (Job empty), or the job a request named, which never ran there.
+type Absent struct {
+	Worktree string `json:"worktree"`
+	Job      string `json:"job,omitempty"`
+}
+
+// Out is where Watch streams: Emit receives each line, its error ending the stream with it; Absent each worktree, or job named, it has no line of, as the read says it; Warn what kept lines away (the daemon's skew, a log that cannot be read, lines dropped by a follow that fell behind).
 type Out struct {
-	Emit func(Entry) error
-	Warn func(domain.Warning)
+	Emit   func(Entry) error
+	Absent func(Absent) error
+	Warn   func(domain.Warning)
 }
 
 // ----------------------------------------------------------------------------
@@ -68,9 +75,9 @@ func (u UseCase) Run(ctx context.Context, req Request, _ domain.RunOptions) (Out
 
 	// 2. Read each job's last lines.
 	sources := Sources(facts, req, targets)
-	read := Logged{}
+	read := Logged{Lines: map[int][]run.Line{}, Unreadable: map[int]error{}}
 	for i, s := range sources {
-		read[i] = u.last(ctx, s)
+		read.Lines[i], read.Unreadable[i] = u.last(ctx, s)
 	}
 
 	// 3. Report each worktree.
@@ -87,7 +94,7 @@ const (
 	CodeFollowBroken = Name + ".follow_broken"
 )
 
-// Watch streams to out the last lines of the jobs Run reads, a job after the other, then, when req.Follow, each new line of each job running as it prints it, until every one ended or ctx is done. It returns nil once ctx is done after its first line, ctx's error before; else the refusal, or the error of Emit that ended it.
+// Watch streams to out the last lines of the jobs Run reads, a job after the other, and each worktree or job named it has none of, then, when req.Follow, each new line of each job running as it prints it, until every one ended or ctx is done. It returns nil once ctx is done after the request was settled; else the refusal, or the error of Emit or Absent that ended it.
 func (u UseCase) Watch(ctx context.Context, req Request, out Out) error {
 	facts, req, targets, err := u.resolved(ctx, req)
 	if err != nil {
@@ -100,13 +107,30 @@ func (u UseCase) Watch(ctx context.Context, req Request, out Out) error {
 	s := newStream(ctx, out)
 	defer s.cancel(nil)
 	var following sync.WaitGroup
+	shown := map[string]bool{}
 	for _, src := range Sources(facts, req, targets) {
 		if req.Follow && src.Follows(facts) {
+			shown[src.Target.Path] = true
 			following.Go(func() { u.follow(s, src) })
 			continue
 		}
-		if lines := u.last(s.ctx, src); src.Shows(len(lines) > 0) {
-			s.emit(src, lines...)
+		lines, err := u.last(s.ctx, src)
+		if err != nil {
+			s.warn(unreadable(src, err))
+		}
+		if !src.Shows(len(lines) > 0 || err != nil) {
+			continue
+		}
+		shown[src.Target.Path] = true
+		if !src.Ran(len(lines) > 0 || err != nil) {
+			s.absent(Absent{Worktree: src.Target.Worktree, Job: src.Name})
+			continue
+		}
+		s.emit(src, lines...)
+	}
+	for _, t := range targets {
+		if !shown[t.Path] {
+			s.absent(Absent{Worktree: t.Worktree})
 		}
 	}
 	following.Wait()
@@ -119,14 +143,20 @@ func (u UseCase) follow(s *stream, src Source) {
 	tail := src.Lines
 	tail.Follow = true
 	var last *run.Line
+	sent := 0 // the lines sent with last's time
 	for {
 		var resume *Resume
 		if last != nil {
-			resume = &Resume{Last: *last}
+			resume = &Resume{Last: *last, Sent: sent}
 		}
 		_, err := u.Daemon.Lines(s.ctx, tail, func(line run.Line) {
 			if resume != nil && resume.Drops(line) {
 				return
+			}
+			if last != nil && line.At.Equal(last.At) {
+				sent++
+			} else {
+				sent = 1
 			}
 			last = &line
 			s.emit(src, line)
@@ -141,7 +171,11 @@ func (u UseCase) follow(s *stream, src Source) {
 			continue
 		case err == nil || s.ctx.Err() != nil:
 		case last == nil:
-			s.emit(src, u.ReadLog(src.Log, run.MaxTail)...)
+			lines, readErr := u.ReadLog(src.Log, run.MaxTail)
+			if readErr != nil {
+				s.warn(unreadable(src, readErr))
+			}
+			s.emit(src, lines...)
 		default:
 			s.warn(domain.Warning{Code: CodeFollowBroken, Message: fmt.Sprintf("%s · %s: %v", src.Target.Worktree, src.Name, err), Params: domain.Params{"worktree": src.Target.Worktree, "job": src.Name}})
 		}
@@ -151,11 +185,10 @@ func (u UseCase) follow(s *stream, src Source) {
 
 // A stream is a Watch under way: its context, cancelled with the error of Emit, and its out, called by one job at a time.
 type stream struct {
-	ctx     context.Context
-	cancel  context.CancelCauseFunc
-	mu      sync.Mutex
-	out     Out
-	emitted bool
+	ctx    context.Context
+	cancel context.CancelCauseFunc
+	mu     sync.Mutex
+	out    Out
 }
 
 func newStream(ctx context.Context, out Out) *stream {
@@ -171,10 +204,20 @@ func (s *stream) emit(src Source, lines ...run.Line) {
 		if s.ctx.Err() != nil {
 			return
 		}
-		s.emitted = true
 		if err := s.out.Emit(Entry{Worktree: src.Target.Worktree, Job: src.Name, At: line.At, Text: line.Text}); err != nil {
 			s.cancel(err)
 		}
+	}
+}
+
+func (s *stream) absent(absent Absent) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.ctx.Err() != nil {
+		return
+	}
+	if err := s.out.Absent(absent); err != nil {
+		s.cancel(err)
 	}
 }
 
@@ -184,13 +227,10 @@ func (s *stream) warn(warning domain.Warning) {
 	s.out.Warn(warning)
 }
 
-// end is how the stream ended: the error of Emit; nil when parent was done after its first line, parent's error before.
+// end is how the stream ended: the error of Emit or Absent, nil when parent was done.
 func (s *stream) end(parent context.Context) error {
 	if cause := context.Cause(s.ctx); cause != nil && parent.Err() == nil && !errors.Is(cause, context.Canceled) {
 		return cause
-	}
-	if parent.Err() != nil && !s.emitted {
-		return parent.Err()
 	}
 	return nil
 }
@@ -263,15 +303,22 @@ func (u UseCase) resolved(ctx context.Context, req Request) (Facts, Request, []T
 	return facts, req, targets, err
 }
 
-// last are src's last lines: its log's, else, for a job that keeps none, the daemon's.
-func (u UseCase) last(ctx context.Context, src Source) []run.Line {
+// last are src's last lines: its log's, else, for a job that keeps none, the daemon's; and why its log could not be read.
+func (u UseCase) last(ctx context.Context, src Source) ([]run.Line, error) {
 	if src.Log.Dir != "" {
 		return u.ReadLog(src.Log, run.MaxTail)
 	}
 	if !src.Listed {
-		return nil
+		return nil, nil
 	}
 	var lines []run.Line
 	_, _ = u.Daemon.Lines(ctx, src.Lines, func(line run.Line) { lines = append(lines, line) })
-	return lines
+	return lines, nil
+}
+
+// CodeLogUnreadable warns of a job's log that exists and cannot be read.
+const CodeLogUnreadable = Name + ".log_unreadable"
+
+func unreadable(src Source, err error) domain.Warning {
+	return domain.Warning{Code: CodeLogUnreadable, Message: fmt.Sprintf("%s · %s: its log cannot be read: %v", src.Target.Worktree, src.Name, err), Params: domain.Params{"worktree": src.Target.Worktree, "job": src.Name, "cause": err.Error()}}
 }

@@ -71,7 +71,8 @@ func (w *world) watched(ctx context.Context, t *testing.T, req runlogs.Request) 
 			got = append(got, entry.Worktree+" "+entry.Job+" "+entry.Text)
 			return nil
 		},
-		Warn: func(warning domain.Warning) { warned = append(warned, warning.Code) },
+		Absent: func(runlogs.Absent) error { return nil },
+		Warn:   func(warning domain.Warning) { warned = append(warned, warning.Code) },
 	})
 	return got, warned, err
 }

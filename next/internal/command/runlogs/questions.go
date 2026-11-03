@@ -7,6 +7,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
+	"github.com/LucasPcq/wtm/next/internal/domain/run"
 )
 
 // ----------------------------------------------------------------------------
@@ -86,7 +87,7 @@ type Worktrees struct {
 	Options []domain.Option
 }
 
-// The codes of the problems of a request: a worktree whose directory is gone, a job run.toml does not declare.
+// The codes of the problems of a request: a worktree whose directory is gone, a job neither run.toml declares nor the daemon lists in the worktrees asked.
 const (
 	CodeWorktreeGone = Name + ".worktree_gone"
 	CodeJobUnknown   = Name + ".job_unknown"
@@ -95,7 +96,7 @@ const (
 // NewQuestions builds the questions for the request on the facts.
 func NewQuestions(f Facts, req Request) Questions {
 	picked, origin := f.picked(req)
-	_, problems := f.targets(picked)
+	targets, problems := f.targets(picked)
 	standing := f.standing()
 	questions := Questions{
 		Worktrees: Worktrees{Picked: picked, Origin: origin, Options: domain.RunningIn(domain.WorktreeOptions(standing, domain.WorktreeQuery{Cwd: f.Cwd}), standing, f.Jobs)},
@@ -107,7 +108,7 @@ func NewQuestions(f Facts, req Request) Questions {
 	if len(picked) == 0 {
 		questions.Errors = append(questions.Errors, domain.Required(domain.PathWorktree))
 	}
-	if req.Job != "" && !slices.ContainsFunc(f.Run.Jobs, func(job project.Job) bool { return job.Name == req.Job }) {
+	if req.Job != "" && !f.knows(req.Job, targets) {
 		questions.Errors = append(questions.Errors, domain.FieldError{Path: PathJob, Code: CodeJobUnknown, Template: "{value} is no job of run.toml", Params: domain.Params{"value": req.Job}})
 	}
 
@@ -121,6 +122,16 @@ func (q Questions) Form() domain.Form {
 		domain.SelectField{FieldSpec: domain.FieldSpec{Path: PathJob, Origin: q.jobOrigin()}, Value: q.Job, Options: q.Jobs},
 		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: PathFollow, Skip: domain.SkipFlagOnly}, Value: q.Follow, NoFirst: true},
 	}}
+}
+
+// knows reports whether name is a job run.toml declares, or one the daemon lists in one of targets (run.toml renamed or dropped it since it started).
+func (f Facts) knows(name string, targets []Target) bool {
+	if slices.ContainsFunc(f.Run.Jobs, func(job project.Job) bool { return job.Name == name }) {
+		return true
+	}
+	return slices.ContainsFunc(f.Jobs, func(job run.Job) bool {
+		return job.Name == name && slices.ContainsFunc(targets, func(t Target) bool { return t.Path == job.WorkDir })
+	})
 }
 
 func jobOptions(jobs []project.Job) []domain.Option {

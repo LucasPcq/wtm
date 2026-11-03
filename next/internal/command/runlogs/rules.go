@@ -169,7 +169,7 @@ func (f Facts) declared(name string) (project.Job, bool) {
 	return f.Run.Jobs[at], true
 }
 
-// Shows reports whether the source is read given that its log holds lines: a job named, a job the daemon lists, or one that left a log; a shared service only in the main checkout or in a worktree holding it.
+// Shows reports whether the source is read given that its log holds lines (or cannot be read): a job named, a job the daemon lists, or one that left a log; a shared service only in the main checkout or in a worktree holding it.
 func (s Source) Shows(logged bool) bool {
 	switch {
 	case s.Named, s.Listed:
@@ -178,6 +178,11 @@ func (s Source) Shows(logged bool) bool {
 		return false
 	}
 	return logged
+}
+
+// Ran reports whether the source's job ran, given that its log holds lines (or cannot be read): the daemon lists it, or it left a log.
+func (s Source) Ran(logged bool) bool {
+	return s.Listed || logged
 }
 
 // Follows reports whether the lines of the source are followed: its service is a process of a daemon of this protocol, running.
@@ -241,9 +246,9 @@ func JobStates() []JobState {
 	return []JobState{JobStarting, JobRunning, JobCrashed, JobExited, JobStopped, JobNotStarted}
 }
 
-// JobOf is the job source reads, with lines, the last it printed.
-func JobOf(s Source, lines []run.Line) Job {
-	job := Job{Name: s.Name, Kind: s.Kind, State: s.state(len(lines) > 0), Log: s.LogPath(), Lines: make([]Line, 0, len(lines))}
+// JobOf is the job source reads, with lines, the last it printed, and whether its log holds any (or cannot be read).
+func JobOf(s Source, lines []run.Line, logged bool) Job {
+	job := Job{Name: s.Name, Kind: s.Kind, State: s.state(logged), Log: s.LogPath(), Lines: make([]Line, 0, len(lines))}
 	if s.Listed {
 		job.Hold, job.ExitCode, job.URL, job.Profile = s.Job.Hold, s.Service.ExitCode, cmp.Or(s.Job.URL, s.Service.URL), s.Job.Profile
 	}
@@ -271,20 +276,28 @@ func (s Source) state(logged bool) JobState {
 // ----------------------------------------------------------------------------
 // Report
 
-// Logged are the lines read of each source, by its index in the sources.
-type Logged map[int][]run.Line
+// Logged is what was read of each source, by its index in the sources: its last lines, or why its log could not be read.
+type Logged struct {
+	Lines      map[int][]run.Line
+	Unreadable map[int]error
+}
 
 // Report is one item per target, its jobs those of sources it shows, given the lines read of each; and the warnings of what could not be asked.
 func Report(f Facts, targets []Target, sources []Source, read Logged) ([]Item, []domain.Warning) {
 	items := make([]Item, 0, len(targets))
 	for _, t := range targets {
-		detail := Detail{Path: t.Path, Jobs: []Job{}}
+		item := Item{Subject: t.Worktree, Status: domain.StatusDone, Detail: &Detail{Path: t.Path, Jobs: []Job{}}}
 		for i, s := range sources {
-			if s.Target.Path == t.Path && s.Shows(len(read[i]) > 0) {
-				detail.Jobs = append(detail.Jobs, JobOf(s, read[i]))
+			logged := len(read.Lines[i]) > 0 || read.Unreadable[i] != nil
+			if s.Target.Path != t.Path || !s.Shows(logged) {
+				continue
+			}
+			item.Detail.Jobs = append(item.Detail.Jobs, JobOf(s, read.Lines[i], logged))
+			if err := read.Unreadable[i]; err != nil {
+				item.Warnings = append(item.Warnings, unreadable(s, err))
 			}
 		}
-		items = append(items, Item{Subject: t.Worktree, Status: domain.StatusDone, Detail: &detail})
+		items = append(items, item)
 	}
 
 	return items, f.Asked.Warnings(Name)
@@ -293,11 +306,12 @@ func Report(f Facts, targets []Target, sources []Source, read Logged) ([]Item, [
 // ----------------------------------------------------------------------------
 // The follow
 
-// A Resume drops, from the lines a follow started again sends, those the follow before it sent: every line up to Last, the last one it sent. Gap says lines were lost between the two: the first line sent again is already newer than Last.
+// A Resume drops, from the lines a follow started again sends, those the follow before it sent: every line older than Last, the last one it sent, and the first Sent of Last's time (two lines may share a millisecond). Gap says lines were lost between the two: Last is not where it should be among them.
 type Resume struct {
 	Last    run.Line
+	Sent    int
 	Gap     bool
-	started bool
+	dropped int
 	passed  bool
 }
 
@@ -306,15 +320,17 @@ func (r *Resume) Drops(line run.Line) bool {
 	if r.passed {
 		return false
 	}
-	first := !r.started
-	r.started = true
 	switch {
 	case line.At.Before(r.Last.At):
 		return true
-	case line.At.Equal(r.Last.At):
-		r.passed = line == r.Last
+	case line.At.Equal(r.Last.At) && r.dropped < r.Sent:
+		r.dropped++
+		if r.dropped == r.Sent {
+			r.passed, r.Gap = true, line != r.Last
+		}
 		return true
 	}
-	r.passed, r.Gap = true, first
+	// Last's lines sent before rotated out of what the daemon keeps.
+	r.passed, r.Gap = true, true
 	return false
 }

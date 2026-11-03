@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/runlogs"
@@ -150,4 +151,71 @@ func TestAJobOnlyItsLogKnowsIsShownStoppedWithTheLinesRead(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, run.Stopped, listed.State)
 	assert.Equal(t, []string{"migrated"}, lines, "its pane holds the lines read from its log")
+}
+
+// The review of #268: under --follow, a worktree where nothing ran and a job named that never ran printed nothing (B6, D6).
+func TestFollowSaysWhatNeverRanAsTheReadDoes(t *testing.T) {
+	nothing := runLogs(t, newWorld(), featB, "--follow")
+	never := runLogs(t, newWorld(), featA, "--job", "never", "--follow")
+
+	require.Equal(t, uicli.ExitOK, nothing.Code, nothing.Stderr)
+	assert.Contains(t, nothing.Stdout, "= feat/b: no job has run")
+	require.Equal(t, uicli.ExitOK, never.Code, never.Stderr)
+	assert.Contains(t, never.Stdout, "= feat/a: never has not run")
+}
+
+// The review of #268: a quiet job, then Ctrl+C, exited 130 (D3: an interrupted follow exits 0).
+func TestAFollowInterruptedBeforeItsFirstLineExitsZero(t *testing.T) {
+	w := newWorld()
+	ctx, interrupt := context.WithCancel(t.Context())
+	w.daemon.wait = interrupt
+
+	got := runLogsIn(ctx, w, featA, "--job", "web", "-f")
+
+	assert.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
+	assert.Empty(t, got.Stdout)
+}
+
+// The review of #268: the legacy daemon keeps no lines of its jobs, and its history pane showed an error though the read held them (D8).
+func TestTheViewShowsTheLinesReadOfAJobTheDaemonHasNoLinesOf(t *testing.T) {
+	streams, _, _, _ := output.Test()
+	legacy := newWorld().daemon
+	legacy.refuse = errors.New("unknown action lines")
+	c := &logsCommand{io: uicli.Run{Streams: streams}, view: View{Daemon: legacy}}
+	read := runlogs.Outcome{Items: []runlogs.Item{{Subject: featA, Status: domain.StatusDone, Detail: &runlogs.Detail{Path: pathOf(featA), Jobs: []runlogs.Job{
+		{Name: "migrate", Kind: project.Task, State: runlogs.JobExited, Hold: run.HoldOwn, Lines: []runlogs.Line{{At: at, Text: "migrated"}}},
+	}}}}}
+
+	params, _ := c.viewOf(read, runlogs.Request{})
+	var lines []string
+	listed, err := params.Daemon.Lines(t.Context(), run.Tail{Name: "migrate", WorkDir: pathOf(featA)}, func(line run.Line) { lines = append(lines, line.Text) })
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"migrated"}, lines)
+	assert.Equal(t, run.Exited, listed.State)
+}
+
+func TestAFollowInJSONTypesEachLineItWrites(t *testing.T) {
+	w := newWorld()
+	w.daemon.skewed = &run.Skewed{Skew: run.SkewBuild, Daemon: "0.30.9"}
+
+	got := runLogs(t, w, featA, "--job", "api", "-f", "--output", "json")
+	nothing := runLogs(t, newWorld(), featB, "-f", "--output", "json")
+
+	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
+	assert.Empty(t, got.Stderr, "a warning is a line of the stream, never text on stderr")
+	formtest.Golden(t, "followed_json_typed", got.Stdout)
+	assert.JSONEq(t, `{"type":"absent","worktree":"feat/b"}`, nothing.Stdout)
+}
+
+// The review of #268: a failure once lines were written ended a JSON stream on a human frame on stderr.
+func TestAFailureAfterTheFirstLineEndsAJSONStreamOnAnErrorLine(t *testing.T) {
+	streams, _, stdout, stderr := output.Test()
+	c := &logsCommand{io: uicli.Run{Command: runlogs.Name, Streams: streams, Output: uicli.OutputJSON}, started: true}
+
+	err := c.fail(&domain.Error{Kind: domain.KindInternal, Code: "run-logs.broken", Message: "the daemon went away"})
+
+	assert.Error(t, err)
+	assert.Empty(t, stderr.String())
+	assert.JSONEq(t, `{"type":"error","error":{"kind":"internal","code":"run-logs.broken","message":"the daemon went away"}}`, stdout.String())
 }

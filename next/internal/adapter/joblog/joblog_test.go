@@ -138,3 +138,16 @@ func TestANewLogDirectoryIsItsUsersAlone(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0o700), info.Mode().Perm())
 }
+
+func TestTailSaysALogThatCannotBeRead(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.Mkdir(filepath.Join(dir, "web.log"), 0o700))
+
+	lines, err := Tail(run.LogFile{Dir: dir, Job: "web"}, 10)
+	none, noneErr := Tail(run.LogFile{Dir: dir, Job: "ghost"}, 10)
+
+	assert.Error(t, err, "a log that is a directory cannot be read")
+	assert.Empty(t, lines)
+	assert.NoError(t, noneErr, "a log that does not exist is no failure")
+	assert.Empty(t, none)
+}

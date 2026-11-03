@@ -252,7 +252,7 @@ func wire(params wireParams) app {
 		RunLogs: runlogs.UseCase{
 			Git:        repo,
 			Daemon:     runs,
-			ReadLog:    joblog.Last,
+			ReadLog:    joblog.Tail,
 			StateDir:   params.StateDir,
 			Repository: facts,
 		},
