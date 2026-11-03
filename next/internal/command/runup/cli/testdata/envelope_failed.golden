@@ -255,6 +255,19 @@
       ],
       "code": "run-up.retry",
       "message": "start it again where it did not pass"
+    },
+    {
+      "command": "run-logs",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/a"
+          ]
+        }
+      ],
+      "code": "run-up.logs",
+      "message": "follow feat/a's output"
     }
   ],
   "warnings": [],

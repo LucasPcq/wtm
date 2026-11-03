@@ -1,0 +1,4 @@
+$ wtm run logs; echo EXIT=$?
+EXIT=0
+$
+

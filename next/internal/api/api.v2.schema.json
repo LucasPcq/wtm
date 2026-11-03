@@ -16,7 +16,8 @@
         "resolve",
         "status",
         "tree",
-        "run-up"
+        "run-up",
+        "run-logs"
       ]
     },
     "checkout.Action": {
@@ -4184,6 +4185,107 @@
       },
       "type": "array"
     },
+    "run-logs.envelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/domain.Envelope"
+        }
+      ],
+      "properties": {
+        "command": {
+          "const": "run-logs"
+        },
+        "items": {
+          "items": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/runlogs.Detail"
+                  },
+                  {
+                    "maxProperties": 0,
+                    "type": "object"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "plan": false
+      }
+    },
+    "run-logs.request": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "worktree"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "job"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "follow"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "type": "array"
+    },
     "run-up.envelope": {
       "allOf": [
         {
@@ -4400,6 +4502,110 @@
         "exited",
         "stopped"
       ]
+    },
+    "runlogs.Detail": {
+      "additionalProperties": false,
+      "properties": {
+        "jobs": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runlogs.Job"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "jobs"
+      ],
+      "type": "object"
+    },
+    "runlogs.Job": {
+      "additionalProperties": false,
+      "properties": {
+        "exit_code": {
+          "type": "integer"
+        },
+        "hold": {
+          "$ref": "#/$defs/run.Hold"
+        },
+        "kind": {
+          "$ref": "#/$defs/project.JobKind"
+        },
+        "lines": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runlogs.Line"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "log": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "profile": {
+          "type": "string"
+        },
+        "shared_in": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/runlogs.JobState"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "state",
+        "lines"
+      ],
+      "type": "object"
+    },
+    "runlogs.JobState": {
+      "description": "Where a job whose output is read stands: the run daemon's state, stopped for a job only its log knows, not_started for one that never ran.",
+      "enum": [
+        "starting",
+        "running",
+        "crashed",
+        "exited",
+        "stopped",
+        "not_started"
+      ]
+    },
+    "runlogs.Line": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "type": "object"
     },
     "runup.Action": {
       "description": "What a start does to one job of its profile.",

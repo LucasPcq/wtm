@@ -258,6 +258,19 @@ func TestTheSubjectIsAskedOnItsValueAndEachOptionReadsAsItsLabel(t *testing.T) {
 	assert.Equal(t, "feat/x", subject.Picked())
 }
 
+func TestSeveralSubjectsAreAskedWithThoseTheFieldPicksPicked(t *testing.T) {
+	field := domain.MultiSelectField{FieldSpec: domain.FieldSpec{Path: domain.PathWorktree}, Picked: []string{"feat/x"}, Options: []domain.Option{{Value: "main"}, {Value: "feat/x"}}}
+	subjects := &form.Subjects{Field: field}
+	d := start(form.New(t.Context(), form.SubjectScript(subjects)))
+
+	assert.Contains(t, d.Screen(), "[ ] main")
+	assert.Contains(t, d.Screen(), "[x] feat/x")
+	d.Keys("space", "enter")
+
+	assert.Equal(t, form.Finished, d.Wizard.Ending())
+	assert.Equal(t, []string{"main", "feat/x"}, subjects.Picked())
+}
+
 func TestLeavingTheSubjectCancelsTheRead(t *testing.T) {
 	field, ok := subjects{}.Form().Fields[0].(domain.SelectField)
 	require.True(t, ok)

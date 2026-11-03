@@ -1,0 +1,248 @@
+package runlogs_test
+
+import (
+	"context"
+	"errors"
+	"testing"
+
+	"github.com/LucasPcq/wtm/next/internal/command/runlogs"
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/run"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestEachJobThatRanIsReadWithItsLastLinesInRunTomlsOrder(t *testing.T) {
+	w := newWorld(t)
+	w.logged(t, featA, "migrate", "migrating", "migrated")
+	w.logged(t, featA, "api", "api ready", "GET /health 200")
+	w.logged(t, featA, "crashy", "starting", "boom")
+	crashed := ran("crashy", w.at(featA), run.Crashed)
+	crashed.ExitCode = new(1)
+	w.daemon.listed = []run.Job{ran("api", w.at(featA), run.Running), crashed}
+
+	read := w.read(t, runlogs.Request{Worktrees: []string{featA}})
+
+	require.Len(t, read.Items, 1)
+	item := read.Items[0]
+	assert.Equal(t, domain.StatusDone, item.Status)
+	assert.Equal(t, []string{"api", "migrate", "crashy"}, namesOf(item), "a job that never ran is left out")
+	api := jobOf(t, item, "api")
+	assert.Equal(t, runlogs.JobRunning, api.State)
+	assert.Equal(t, run.HoldOwn, api.Hold)
+	assert.Equal(t, "http://api.localhost", api.URL)
+	assert.Equal(t, []string{"api ready", "GET /health 200"}, textsOf(api), "a line from the log is its text alone, its stamp in at")
+	assert.Equal(t, at, api.Lines[0].At)
+	assert.Equal(t, w.stateDir+"/logs/feat%2Fa/api.log", api.Log)
+	assert.Equal(t, runlogs.JobStopped, jobOf(t, item, "migrate").State, "a job only its log knows has stopped")
+	assert.Equal(t, runlogs.JobCrashed, jobOf(t, item, "crashy").State)
+	assert.Equal(t, new(1), jobOf(t, item, "crashy").ExitCode)
+}
+
+func TestAWorktreeWhereNothingRanHasNoJob(t *testing.T) {
+	w := newWorld(t)
+
+	read := w.read(t, runlogs.Request{Worktrees: []string{featB}})
+
+	require.Len(t, read.Items, 1)
+	assert.Equal(t, domain.StatusDone, read.Items[0].Status)
+	assert.Empty(t, read.Items[0].Detail.Jobs)
+}
+
+func TestAJobNamedThatNeverRanIsListedNotStarted(t *testing.T) {
+	w := newWorld(t)
+	w.logged(t, featA, "api", "api ready")
+
+	read := w.read(t, runlogs.Request{Worktrees: []string{featA}, Job: "never"})
+
+	assert.Equal(t, []string{"never"}, namesOf(read.Items[0]), "the job named alone")
+	assert.Equal(t, runlogs.JobNotStarted, jobOf(t, read.Items[0], "never").State)
+	assert.Empty(t, jobOf(t, read.Items[0], "never").Lines)
+}
+
+func TestARequestRunTomlCannotAnswerIsRefusedByItsField(t *testing.T) {
+	for name, c := range map[string]struct {
+		req  runlogs.Request
+		code string
+	}{
+		"job_undeclared":   {req: runlogs.Request{Worktrees: []string{featA}, Job: "ghost"}, code: runlogs.CodeJobUnknown},
+		"worktree_unknown": {req: runlogs.Request{Worktrees: []string{"feat"}}, code: domain.CodeNotFound},
+		"worktree_gone":    {req: runlogs.Request{Worktrees: []string{gone}}, code: runlogs.CodeWorktreeGone},
+		"nowhere":          {req: runlogs.Request{}, code: domain.CodeRequired},
+	} {
+		t.Run(name, func(t *testing.T) {
+			failure := newWorld(t).refused(t, c.req)
+			assert.Equal(t, domain.KindInvalid, failure.Kind)
+			assert.Equal(t, []string{c.code}, fieldCodes(failure.Fields))
+		})
+	}
+}
+
+func TestNoWorktreeNamedReadsTheOneTheCallerStandsIn(t *testing.T) {
+	w := newWorld(t)
+	w.logged(t, featA, "api", "api ready")
+
+	read := w.read(t, runlogs.Request{Caller: domain.Caller{Cwd: w.at(featA)}})
+
+	require.Len(t, read.Items, 1)
+	assert.Equal(t, featA, read.Items[0].Subject)
+}
+
+func TestARepositoryWithNoRunTomlIsRefused(t *testing.T) {
+	w := newWorld(t)
+	require.NoError(t, removeFile(w.stateDir+"/run.toml"))
+
+	failure := w.refused(t, runlogs.Request{Worktrees: []string{featA}})
+
+	assert.Equal(t, domain.KindPrecondition, failure.Kind)
+	assert.Equal(t, runlogs.CodeNotInitialized, failure.Code)
+}
+
+func TestWithNoDaemonTheLinesComeFromTheLogs(t *testing.T) {
+	w := newWorld(t)
+	w.logged(t, featA, "api", "api ready")
+	w.daemon.jobsErr = run.ErrUnknown
+
+	read := w.read(t, runlogs.Request{Worktrees: []string{featA}})
+
+	assert.Equal(t, []string{"api ready"}, textsOf(jobOf(t, read.Items[0], "api")))
+	assert.Equal(t, []string{runlogs.Name + domain.JobsUnknown}, codes(read.Warnings))
+	assert.Empty(t, w.daemon.asked, "the logs are read, the daemon is never asked for lines")
+}
+
+func TestADaemonOfAnotherBuildIsWarnedWithItsRestart(t *testing.T) {
+	w := newWorld(t)
+	w.daemon.skewed = &run.Skewed{Skew: run.SkewLegacy, Daemon: "0.30.1"}
+
+	read := w.read(t, runlogs.Request{Worktrees: []string{featA}})
+
+	require.Equal(t, []string{runlogs.Name + domain.DaemonSkew}, codes(read.Warnings))
+	assert.NotNil(t, read.Warnings[0].FollowUp)
+}
+
+func TestAWorktreeHoldingASharedServiceReadsItsLinesInTheMainCheckout(t *testing.T) {
+	w := newWorld(t)
+	w.logged(t, "main", "db", "db listening")
+	db := ran("db", w.main, run.Running)
+	db.SharedDir = w.main
+	claim := run.Job{Name: "db", WorkDir: w.at(featA), Up: true, Hold: run.HoldClaim, SharedDir: w.main}
+	w.daemon.listed = []run.Job{db, claim}
+
+	read := w.read(t, runlogs.Request{Worktrees: []string{featA, featB, "main"}})
+
+	held := jobOf(t, read.Items[0], "db")
+	assert.Equal(t, run.HoldClaim, held.Hold)
+	assert.Equal(t, "main", held.SharedIn)
+	assert.Equal(t, runlogs.JobRunning, held.State, "the state of the service it holds")
+	assert.Equal(t, []string{"db listening"}, textsOf(held))
+	assert.Empty(t, read.Items[1].Detail.Jobs, "a worktree holding no claim does not show the shared service")
+	assert.Equal(t, []string{"db listening"}, textsOf(jobOf(t, read.Items[2], "db")))
+}
+
+func TestWatchWithoutFollowStreamsEachJobsLastLinesThenEnds(t *testing.T) {
+	w := newWorld(t)
+	w.logged(t, featA, "api", "api ready")
+	w.logged(t, featA, "migrate", "migrated")
+	w.daemon.listed = []run.Job{ran("api", w.at(featA), run.Running)}
+
+	got, _, err := w.watched(t.Context(), t, runlogs.Request{Worktrees: []string{featA}})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"feat/a api api ready", "feat/a migrate migrated"}, got)
+	assert.Empty(t, w.daemon.asked, "without follow the daemon is not asked")
+}
+
+func TestWatchFollowsARunningJobUntilItEnds(t *testing.T) {
+	w := newWorld(t)
+	w.logged(t, featA, "migrate", "migrated")
+	w.daemon.listed = []run.Job{ran("api", w.at(featA), run.Running)}
+	w.daemon.lines[key(w.at(featA), "api")] = []script{{lines: lines("api ready", "GET / 200")}}
+
+	got, _, err := w.watched(t.Context(), t, runlogs.Request{Worktrees: []string{featA}, Follow: true})
+
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"feat/a api api ready", "feat/a api GET / 200", "feat/a migrate migrated"}, got)
+	require.Len(t, w.daemon.asked, 1)
+	assert.Equal(t, run.Tail{Name: "api", WorkDir: w.at(featA), Lines: run.MaxTail, Follow: true}, w.daemon.asked[0])
+}
+
+func TestAFollowerThatFellBehindFollowsAgainWithoutRepeatingALine(t *testing.T) {
+	w := newWorld(t)
+	w.daemon.listed = []run.Job{ran("api", w.at(featA), run.Running)}
+	all := lines("one", "two", "three", "four", "five")
+	behind := &run.Error{Code: run.CodeFollowerBehind}
+	w.daemon.lines[key(w.at(featA), "api")] = []script{{lines: all[:3], err: behind}, {lines: all[1:]}}
+
+	got, warned, err := w.watched(t.Context(), t, runlogs.Request{Worktrees: []string{featA}, Job: "api", Follow: true})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"feat/a api one", "feat/a api two", "feat/a api three", "feat/a api four", "feat/a api five"}, got)
+	assert.Empty(t, warned)
+}
+
+func TestAFollowerThatLostLinesSaysSo(t *testing.T) {
+	w := newWorld(t)
+	w.daemon.listed = []run.Job{ran("api", w.at(featA), run.Running)}
+	all := lines("one", "two", "three", "four")
+	w.daemon.lines[key(w.at(featA), "api")] = []script{{lines: all[:1], err: &run.Error{Code: run.CodeFollowerBehind}}, {lines: all[2:]}}
+
+	got, warned, err := w.watched(t.Context(), t, runlogs.Request{Worktrees: []string{featA}, Job: "api", Follow: true})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"feat/a api one", "feat/a api three", "feat/a api four"}, got)
+	assert.Equal(t, []string{runlogs.CodeLinesDropped}, warned)
+}
+
+func TestAFollowTheDaemonRefusesReadsTheLogInstead(t *testing.T) {
+	w := newWorld(t)
+	w.logged(t, featA, "api", "api ready")
+	w.daemon.listed = []run.Job{ran("api", w.at(featA), run.Running)}
+	w.daemon.lines[key(w.at(featA), "api")] = []script{{err: errors.New("unknown action lines")}}
+
+	got, _, err := w.watched(t.Context(), t, runlogs.Request{Worktrees: []string{featA}, Follow: true})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"feat/a api api ready"}, got)
+}
+
+func TestAnInterruptedFollowEndsWithoutError(t *testing.T) {
+	w := newWorld(t)
+	w.daemon.listed = []run.Job{ran("api", w.at(featA), run.Running)}
+	w.daemon.lines[key(w.at(featA), "api")] = []script{{lines: lines("api ready"), wait: true}}
+	ctx, cancel := context.WithCancel(t.Context())
+
+	err := w.usecase.Watch(ctx, runlogs.Request{Worktrees: []string{featA}, Follow: true}, runlogs.Out{
+		Emit: func(runlogs.Entry) error { cancel(); return nil },
+		Warn: func(domain.Warning) {},
+	})
+
+	assert.NoError(t, err, "a follow is stopped by an interrupt, exit 0")
+}
+
+func TestAFollowInterruptedBeforeItsFirstLineEndsCancelled(t *testing.T) {
+	w := newWorld(t)
+	w.daemon.listed = []run.Job{ran("api", w.at(featA), run.Running)}
+	w.daemon.lines[key(w.at(featA), "api")] = []script{{wait: true}}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	_, _, err := w.watched(ctx, t, runlogs.Request{Worktrees: []string{featA}, Follow: true})
+
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
+func TestAReaderThatFailsEndsTheStreamWithItsError(t *testing.T) {
+	w := newWorld(t)
+	w.logged(t, featA, "api", "one", "two")
+	gone := errors.New("broken pipe")
+	emitted := 0
+
+	err := w.usecase.Watch(t.Context(), runlogs.Request{Worktrees: []string{featA}}, runlogs.Out{
+		Emit: func(runlogs.Entry) error { emitted++; return gone },
+		Warn: func(domain.Warning) {},
+	})
+
+	assert.ErrorIs(t, err, gone)
+	assert.Equal(t, 1, emitted, "no line is emitted once the reader failed")
+}

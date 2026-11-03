@@ -1,0 +1,23 @@
+{
+  "v": 2,
+  "command": "run-logs",
+  "ok": false,
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "invalid",
+    "code": "request.invalid",
+    "message": "the request is invalid",
+    "fields": [
+      {
+        "path": "job",
+        "code": "run-logs.job_unknown",
+        "params": {
+          "value": "ghost"
+        },
+        "flag": "--job",
+        "message": "ghost is no job of run.toml"
+      }
+    ]
+  }
+}

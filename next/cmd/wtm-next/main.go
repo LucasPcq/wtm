@@ -18,6 +18,7 @@ import (
 	prunecli "github.com/LucasPcq/wtm/next/internal/command/prune/cli"
 	reparentcli "github.com/LucasPcq/wtm/next/internal/command/reparent/cli"
 	resolvecli "github.com/LucasPcq/wtm/next/internal/command/resolve/cli"
+	runlogscli "github.com/LucasPcq/wtm/next/internal/command/runlogs/cli"
 	runupcli "github.com/LucasPcq/wtm/next/internal/command/runup/cli"
 	statuscli "github.com/LucasPcq/wtm/next/internal/command/status/cli"
 	synccli "github.com/LucasPcq/wtm/next/internal/command/sync/cli"
@@ -60,13 +61,13 @@ func commands(streams *output.Streams, env cli.Env) []*cobra.Command {
 		statuscli.New(streams, env, openStatus, commandLine),
 		treecli.New(streams, env, openTree, commandLine),
 		eventscli.New(streams, env, systemStream(), commandLine),
-		runCmd(runupcli.New(streams, env, openRunUp, commandLine, liveView()), runDaemonCmd(streams)),
+		runCmd(runupcli.New(streams, env, openRunUp, commandLine, liveView()), runlogscli.New(streams, env, openRunLogs, commandLine, runlogscli.View(liveView())), runDaemonCmd(streams)),
 		uiCmd(env),
 		daemonCmd(),
 	}
 }
 
-// liveView is where run up shows the jobs it started: the run daemon of this machine, never started for it, and the browser.
+// liveView is where run up shows the jobs it started, and run logs those it read: the run daemon of this machine, never started for it, and the browser.
 func liveView() runupcli.View {
 	return runupcli.View{Daemon: runDaemon(), Open: openURL}
 }

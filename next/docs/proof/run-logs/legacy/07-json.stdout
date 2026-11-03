@@ -1,0 +1,18 @@
+[
+  {
+    "branch": "feat/b",
+    "path": "<SB>/acme.trees/feat-b",
+    "lines": [
+      {
+        "job": "crashy",
+        "at": "<TIME>",
+        "text": "starting"
+      },
+      {
+        "job": "crashy",
+        "at": "<TIME>",
+        "text": "boom"
+      }
+    ]
+  }
+]

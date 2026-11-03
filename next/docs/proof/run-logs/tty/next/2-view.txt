@@ -1,0 +1,36 @@
+
+  ╭────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────╮
+  │ JOBS                   │ │ web · feat/b · running · http://web.feat-b.acme.localhost:24472                  live │
+  │                        │ │                                                                                       │
+  │ feat/b                 │ │  web v1.4.2  ready in 312 ms                                                          │
+  │ ›• web              0s │ │  ➜  Local:   http://localhost:24480/                                                  │
+  │  • api              0s │ │                                                                                       │
+  │  ✓ migrate             │ │00:00:00 hmr update /src/App.tsx                                                       │
+  │  ✗ crashy              │ │00:00:00 GET / 200 in 12ms                                                             │
+  │                        │ │00:00:00 hmr update /src/Login.tsx                                                     │
+  │                        │ │00:00:00 GET /assets/app.js 200 in 4ms                                                 │
+  │                        │ │00:00:00 hmr update /src/App.tsx                                                       │
+  │                        │ │00:00:00 GET / 200 in 12ms                                                             │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  │                        │ │                                                                                       │
+  ╰────────────────────────╯ ╰───────────────────────────────────────────────────────────────────────────────────────╯
+
+  ↑↓ job · / filter · pgup/pgdn scroll · enter focus · o open · a addresses · q detach                     2/4 running

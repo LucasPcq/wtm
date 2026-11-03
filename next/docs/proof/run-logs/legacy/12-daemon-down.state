@@ -1,0 +1,8 @@
+## jobs up (the daemon's index)
+## logs
+./feat%2Fb/api.log
+./feat%2Fb/crashy.log
+./feat%2Fb/migrate.log
+./feat%2Fb/web.log
+## a run daemon answers
+yes

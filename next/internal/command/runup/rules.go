@@ -819,14 +819,14 @@ const (
 	CodeRetry = Name + ".retry"
 )
 
-// The commands the follow-ups of a start name, not migrated yet.
+// The commands the follow-ups of a start name: run logs, migrated, by its catalogue name; run down, not migrated yet.
 const (
-	commandRunLogs = "run logs"
+	commandRunLogs = domain.CommandRunLogs
 	commandRunDown = "run down"
 )
 
-// runs says whether wtm-next runs a command: the legacy run logs and run down act on the legacy daemon's jobs, never on next's, so their follow-ups wait for LUC-343 and LUC-341 to turn them on here.
-var runs = map[string]bool{commandRunLogs: false, commandRunDown: false}
+// runs says whether wtm-next runs a command: the legacy run down acts on the legacy daemon's jobs, never on next's, so its follow-up waits for LUC-341 to turn it on here.
+var runs = map[string]bool{commandRunLogs: true, commandRunDown: false}
 
 // next are the follow-ups of a start: the start again where it did not pass, then each worktree's output and the stop of what it left up.
 func (p Plan) next(items []Item) []domain.FollowUp {

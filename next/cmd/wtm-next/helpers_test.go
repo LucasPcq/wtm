@@ -38,6 +38,8 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/fastforward"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
+	"github.com/LucasPcq/wtm/next/internal/command/runlogs"
+	runlogscli "github.com/LucasPcq/wtm/next/internal/command/runlogs/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/runup"
 	runupcli "github.com/LucasPcq/wtm/next/internal/command/runup/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/status"
@@ -198,6 +200,13 @@ func keepsTheMutationContract(t *testing.T, m mutation) {
 func keepsTheReadContract(t *testing.T, name string) {
 	t.Helper()
 	main, c, shape := drive(t, name)
+	if name == runlogs.Name {
+		// run logs reads the jobs of run.toml: one that ran, its log left behind.
+		writeRun(t, main, seedJob)
+		logs := filepath.Join(main, ".git", "wtm", "logs", "main")
+		require.NoError(t, os.MkdirAll(logs, 0o700))
+		require.NoError(t, os.WriteFile(filepath.Join(logs, "seed.log"), []byte("2026-11-03T20:17:21Z  seeded\n"), 0o600))
+	}
 
 	asked, err := c.Questions(t.Context(), api.Call{Dir: main})
 	require.NoError(t, err)
@@ -507,6 +516,7 @@ var enums = map[reflect.Type]struct {
 	reflect.TypeFor[checkout.Action]():           {"How a pull request's branch gets its worktree.", checkout.Actions()},
 	reflect.TypeFor[runup.Action]():              {"What a start does to one job of its profile.", runup.Actions()},
 	reflect.TypeFor[runup.JobStatus]():           {"What became of one job of a start.", runup.JobStatuses()},
+	reflect.TypeFor[runlogs.JobState]():          {"Where a job whose output is read stands: the run daemon's state, stopped for a job only its log knows, not_started for one that never ran.", runlogs.JobStates()},
 	reflect.TypeFor[list.Finished]():             {"How a worktree's pull request has done with it: merged, or closed unmerged.", list.Finisheds()},
 	reflect.TypeFor[prune.Reason]():              {"Why a worktree is done with, as a code each surface words its own way.", prune.Reasons()},
 	reflect.TypeFor[teardown.DataStatus]():       {"What a removal's plan does with a namespace its worktree made in a shared service.", teardown.DataStatuses()},
@@ -924,8 +934,11 @@ func shortDir(t *testing.T) string {
 
 // spelling is how the command line spells a command a follow-up names: run up for the catalogue's run-up.
 func spelling(command string) string {
-	if command == runup.Name {
+	switch command {
+	case runup.Name:
 		return runupcli.Use
+	case runlogs.Name:
+		return runlogscli.Use
 	}
 	return command
 }

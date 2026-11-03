@@ -1,0 +1,61 @@
+{
+  "v": 2,
+  "command": "run-logs",
+  "ok": true,
+  "items": [
+    {
+      "subject": "feat/a",
+      "status": "done",
+      "detail": {
+        "path": "/repo/wt-feat-a",
+        "jobs": [
+          {
+            "name": "migrate",
+            "kind": "task",
+            "state": "stopped",
+            "log": "/repo/main/.git/wtm/logs/feat%2Fa/migrate.log",
+            "lines": [
+              {
+                "at": "2026-11-03T20:17:21Z",
+                "text": "migrating"
+              },
+              {
+                "at": "2026-11-03T20:17:22Z",
+                "text": "migrated"
+              }
+            ]
+          },
+          {
+            "name": "api",
+            "kind": "service",
+            "state": "running",
+            "hold": "own",
+            "url": "http://api.feat-a.localhost",
+            "log": "/repo/main/.git/wtm/logs/feat%2Fa/api.log",
+            "lines": [
+              {
+                "at": "2026-11-03T20:17:21Z",
+                "text": "api ready"
+              }
+            ]
+          },
+          {
+            "name": "web",
+            "kind": "service",
+            "state": "running",
+            "hold": "own",
+            "log": "/repo/main/.git/wtm/logs/feat%2Fa/web.log",
+            "lines": [
+              {
+                "at": "2026-11-03T20:17:21Z",
+                "text": "web ready"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}
