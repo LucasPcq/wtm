@@ -14,9 +14,10 @@ export type Note =
 export type LogView = {
   query: LogQuery
   only: boolean
-  // which match the view is on, counted from the last: a log grows at its end
-  fromLast: number
-  // a line the view jumped to that no search names (a time); the latest error is the last of the lines held, as they come
+  // the key of the match the view is on (lineKey), none for the last: a line keeps its key as lines come and go
+  anchor: number | undefined
+  // the key of a line the view jumped to that no search names (a time); the latest error is the last of the lines
+  // held, as they come
   focus: number | undefined
   note: Note | undefined
   follow: boolean
@@ -27,7 +28,7 @@ export type LogView = {
 
 type Action =
   | { type: 'search'; change: Partial<LogQuery> }
-  | { type: 'step'; by: 1 | -1; count: number }
+  | { type: 'step'; anchor: number }
   | { type: 'only'; only: boolean }
   | { type: 'jump'; focus: number | undefined; note: Note }
   | { type: 'follow'; follow: boolean }
@@ -38,7 +39,7 @@ type Action =
 const initial: LogView = {
   query: { text: '', matchCase: false, regex: false },
   only: false,
-  fromLast: 0,
+  anchor: undefined,
   focus: undefined,
   note: undefined,
   follow: true,
@@ -49,13 +50,15 @@ const initial: LogView = {
 
 function reduce(view: LogView, action: Action): LogView {
   switch (action.type) {
-    case 'search':
-      return { ...view, query: { ...view.query, ...action.change }, fromLast: 0, focus: undefined, note: undefined }
-    case 'step': {
-      if (action.count === 0) return view
-      const fromLast = (view.fromLast - action.by + action.count) % action.count
-      return { ...view, fromLast, focus: undefined, note: undefined, follow: false }
+    case 'search': {
+      const query = { ...view.query, ...action.change }
+      const cleared = { ...view, query, anchor: undefined, focus: undefined, note: undefined }
+      // the whole log was searched for the query before: a new one reads the lines held again
+      if (view.whole && 'search' in view.whole) return { ...cleared, whole: undefined, follow: true }
+      return cleared
     }
+    case 'step':
+      return { ...view, anchor: action.anchor, focus: undefined, note: undefined, follow: false }
     case 'only':
       return { ...view, only: action.only }
     case 'jump':
@@ -67,7 +70,14 @@ function reduce(view: LogView, action: Action): LogView {
     case 'stamps':
       return { ...view, stamps: !view.stamps }
     case 'whole':
-      return { ...view, whole: action.whole, focus: undefined, note: undefined, fromLast: 0, follow: !action.whole }
+      return {
+        ...view,
+        whole: action.whole,
+        focus: undefined,
+        note: undefined,
+        anchor: undefined,
+        follow: !action.whole,
+      }
   }
 }
 

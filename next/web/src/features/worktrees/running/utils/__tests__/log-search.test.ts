@@ -59,3 +59,22 @@ test('only the lines matching say how many are hidden between them and printed s
   ])
   expect(onlyMatching([0, 1], 2)).toEqual([{ line: 0 }, { line: 1 }])
 })
+
+// The review of #270: a lookahead compiled here but reached the server, whose RE2 reads none, as a failure.
+test('a regular expression the server could not read is no regex here either', () => {
+  expect(patternOf({ text: 'GET (?=/health)', matchCase: false, regex: true })).toBe('invalid')
+  expect(patternOf({ text: '(a)\\1', matchCase: false, regex: true })).toBe('invalid')
+  expect(patternOf({ text: '(?=x)', matchCase: false, regex: false })).toBeInstanceOf(RegExp)
+})
+
+// The review of #270: a log printing past midnight took every time on its first line's day.
+test('a time past midnight is found on the day of the last line', () => {
+  const held = [
+    { at: new Date(2026, 10, 3, 23, 59, 58).toISOString(), text: 'late' },
+    { at: new Date(2026, 10, 4, 0, 0, 2).toISOString(), text: 'early' },
+  ]
+
+  expect(lineAt(held, '00:00:01')).toBe(1)
+  expect(lineAt(held, '23:59:59')).toBe(1)
+  expect(lineAt(held, '23:59:58')).toBe(0)
+})

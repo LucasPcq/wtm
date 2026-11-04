@@ -1,21 +1,9 @@
 import { screen, waitFor, within } from '@testing-library/react'
-import { HttpResponse, http } from 'msw'
 import { expect, test } from 'vitest'
-import { envelope } from '@/test/fixtures'
 import { renderApp } from '@/test/render'
-import { answeringRunLogs } from '@/test/run-logs'
+import { answeringRunLogs, listing, onLine, panelOf, shown } from '@/test/run-logs'
 import { job, runningWorktrees } from '@/test/run-up'
 import { server } from '@/test/server'
-
-const listing = (details = runningWorktrees) =>
-  server.use(http.post('/api/repos/r1/commands/list', () => HttpResponse.json(envelope('list', details))))
-
-const panelOf = (job: string) => screen.findByRole('region', { name: `${job} in feat/billing` })
-
-const shown = (panel: HTMLElement) =>
-  within(panel)
-    .getByRole('log', { name: 'Its lines' })
-    .textContent?.replaceAll(/\d\d:\d\d:\d\d/g, '')
 
 test('a job picked shows where it runs, its address, its folder and command, and its lines', async () => {
   listing()
@@ -64,7 +52,7 @@ test('a search counts its matches and steps through them; only matching says how
 
   await user.type(within(panel).getByRole('textbox', { name: 'Search this log' }), 'invoice')
   expect(within(panel).getByText('2 of 2')).toBeDefined()
-  expect(within(panel).getByRole('log').querySelector('[aria-current="true"]')?.textContent).toContain('inv_0042')
+  expect(onLine(panel)).toContain('inv_0042')
   await user.click(within(panel).getByRole('button', { name: 'Previous match' }))
   expect(within(panel).getByText('1 of 2')).toBeDefined()
 
@@ -83,9 +71,7 @@ test('the latest error is a search of text, said under the toolbar, also on its 
   await user.keyboard('e')
 
   expect(within(panel).getByText(/^Latest error: the last line matching error, fail, panic or exception/)).toBeDefined()
-  expect(within(panel).getByRole('log').querySelector('[aria-current="true"]')?.textContent).toContain(
-    'Cannot find module',
-  )
+  expect(onLine(panel)).toContain('Cannot find module')
 })
 
 test('a search reads the whole log, beyond the lines held, for the lines that match', async () => {
@@ -150,10 +136,6 @@ test('the latest error asked before the lines arrive lands on it once they do', 
 
   await user.keyboard('e')
 
-  await waitFor(() =>
-    expect(within(panel).getByRole('log').querySelector('[aria-current="true"]')?.textContent).toContain(
-      'Cannot find module',
-    ),
-  )
+  await waitFor(() => expect(onLine(panel)).toContain('Cannot find module'))
   expect(within(panel).getByText(/^Latest error: /)).toBeDefined()
 })

@@ -3,10 +3,15 @@ import { EventSourceParserStream } from 'eventsource-parser/stream'
 import { HttpError, request } from '@/api/fetch'
 import type { DomainEnvelope, WebJobLine } from '@/api/types.gen'
 
-export type JobLine = Extract<WebJobLine, { type: 'line' }>
+// seq numbers a line in the stream, so that a line keeps its key while the oldest go
+export type JobLine = Extract<WebJobLine, { type: 'line' }> & { seq: number }
 export type JobEnd = Extract<WebJobLine, { type: 'ended' }>
+export type JobWarning = Extract<WebJobLine, { type: 'warning' }>
 
-export type JobLines = { lines: JobLine[]; ended: JobEnd | undefined; warnings: string[] }
+export type JobLines = { lines: JobLine[]; count: number; ended: JobEnd | undefined; warnings: JobWarning[] }
+
+// the server answered: the job may print nothing for a while, the stream is no longer being read
+type Opened = { type: 'opened' }
 
 export type JobAt = { repo: string; worktree: string; job: string }
 
@@ -21,28 +26,36 @@ const path = ({ repo, worktree, job }: JobAt, file: 'logs' | 'log') =>
 export const jobLinesQuery = (at: JobAt, startedAt: string | undefined) =>
   queryOptions({
     queryKey: ['job-lines', at.repo, at.worktree, at.job, startedAt ?? ''],
-    queryFn: streamedQuery<WebJobLine, JobLines>({
+    queryFn: streamedQuery<WebJobLine | Opened, JobLines>({
       streamFn: ({ signal }) => lines(at, signal),
       refetchMode: 'reset',
       reducer: (read, line) => {
-        if (line.type === 'line') return { ...read, lines: [...read.lines, line].slice(-keptLines) }
+        if (line.type === 'line')
+          return {
+            ...read,
+            lines: [...read.lines, { ...line, seq: read.count }].slice(-keptLines),
+            count: read.count + 1,
+          }
         if (line.type === 'ended') return { ...read, ended: line }
-        if (line.type === 'warning') return { ...read, warnings: [...read.warnings, line.message] }
+        // a warning said again says nothing new
+        if (line.type === 'warning' && !read.warnings.some((said) => said.message === line.message))
+          return { ...read, warnings: [...read.warnings, line] }
         return read
       },
-      initialValue: { lines: [], ended: undefined, warnings: [] },
+      initialValue: { lines: [], count: 0, ended: undefined, warnings: [] },
     }),
     staleTime: Infinity,
     retry: false,
     refetchOnWindowFocus: false,
   })
 
-async function* lines(at: JobAt, signal: AbortSignal): AsyncGenerator<WebJobLine> {
+async function* lines(at: JobAt, signal: AbortSignal): AsyncGenerator<WebJobLine | Opened> {
   const response = await request(path(at, 'logs'), { signal })
   if (!response.ok || !response.body) {
     const refused = (await response.json().catch(() => undefined)) as DomainEnvelope | undefined
     throw new HttpError(response.status, refused?.error?.message ?? 'the job’s lines were refused', refused?.error)
   }
+  yield { type: 'opened' }
 
   const reader = response.body
     .pipeThrough(new TextDecoderStream())
@@ -67,5 +80,6 @@ export async function downloadLog(at: JobAt) {
   link.href = URL.createObjectURL(await response.blob())
   link.download = `${at.job}.log`
   link.click()
-  URL.revokeObjectURL(link.href)
+  // Safari cancels a download whose URL is revoked as it starts
+  setTimeout(() => URL.revokeObjectURL(link.href), 60_000)
 }

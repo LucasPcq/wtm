@@ -50,6 +50,7 @@ export function LogLines({
           total ?? lines.length,
         ).map((row) => ('line' in row ? { line: matches[row.line] ?? 0 } : row))
       : lines.map((_, line) => ({ line }))
+  let after = -1
 
   return (
     <div
@@ -66,13 +67,14 @@ export function LogLines({
       <div className="min-w-fit">
         {rows.map((row) => {
           if ('hidden' in row || 'since' in row) {
-            const key = 'hidden' in row ? `h${row.hidden}` : `s${row.since}`
+            // a gap is keyed by the line it follows: two may hide as many lines
             return (
-              <p key={key} className="px-6 font-mono text-xs leading-5 text-muted-foreground">
+              <p key={`gap-${after}`} className="px-6 font-mono text-xs leading-5 text-muted-foreground">
                 {'hidden' in row ? `··· ${counted(row.hidden)} hidden` : `··· ${counted(row.since)} since`}
               </p>
             )
           }
+          after = row.line
           const line = lines[row.line]
           if (!line) return null
           const on = row.line === current

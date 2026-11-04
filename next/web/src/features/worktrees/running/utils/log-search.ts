@@ -1,8 +1,13 @@
 export type LogQuery = { text: string; matchCase: boolean; regex: boolean }
 
-// what a search looks for, none for no text; a regular expression that does not compile looks for nothing, and says so
+// the whole log is searched by the server, in Go's RE2, which has no lookaround nor backreference
+const notRE2 = /\(\?<?[=!]|\\[1-9]|\\k</
+
+// what a search looks for, none for no text; a regular expression that does not compile, or that the server could not
+// read, looks for nothing, and says so
 export function patternOf({ text, matchCase, regex }: LogQuery): RegExp | 'invalid' | undefined {
   if (text === '') return undefined
+  if (regex && notRE2.test(text)) return 'invalid'
   const source = regex ? text : text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   try {
     return new RegExp(source, matchCase ? 'g' : 'gi')
@@ -11,12 +16,20 @@ export function patternOf({ text, matchCase, regex }: LogQuery): RegExp | 'inval
   }
 }
 
-// the stretches of text pattern matches, as [start, end); an empty match counts for nothing
+// the stretches of text pattern (global, compiled once per search) matches, as [start, end); an empty match counts
+// for nothing
 export function rangesIn(text: string, pattern: RegExp): [number, number][] {
-  return [...text.matchAll(new RegExp(pattern.source, pattern.flags))]
-    .filter((match) => match[0] !== '')
-    .map((match) => [match.index, match.index + match[0].length])
+  const ranges: [number, number][] = []
+  pattern.lastIndex = 0
+  for (let match = pattern.exec(text); match; match = pattern.exec(text)) {
+    if (match[0] === '') pattern.lastIndex++
+    else ranges.push([match.index, match.index + match[0].length])
+  }
+  return ranges
 }
+
+// a line's key: its number in the whole log, else its place in the stream, else its place among the lines held
+export const lineKey = (line: { n?: number; seq?: number } | undefined, at: number) => line?.n ?? line?.seq ?? at
 
 export const matchingLines = (lines: { text: string }[], pattern: RegExp) =>
   lines.flatMap((line, at) => (rangesIn(line.text, pattern).length > 0 ? [at] : []))
@@ -36,12 +49,14 @@ export function clock(at: string | undefined): string {
   return [time.getHours(), time.getMinutes(), time.getSeconds()].map((part) => String(part).padStart(2, '0')).join(':')
 }
 
-// the first line printed at or after time (HH:MM or HH:MM:SS, the day of the first line held); older when time comes
-// before every line held, none when it comes after them
+// the first line printed at or after time (HH:MM or HH:MM:SS, on the day of the first line held, else of the last,
+// past midnight); older when time comes before every line held, none when it comes after them
 export function lineAt(lines: { at?: string }[], time: string): number | 'older' | undefined {
   const first = lines.find((line) => line.at)?.at
-  if (!first) return undefined
-  const wanted = instantOn(first, time)
+  const last = lines.findLast((line) => line.at)?.at
+  if (!first || !last) return undefined
+  const onFirst = instantOn(first, time)
+  const wanted = onFirst < Date.parse(first) ? instantOn(last, time) : onFirst
   if (wanted < Date.parse(first)) return 'older'
   const at = lines.findIndex((line) => line.at !== undefined && Date.parse(line.at) >= wanted)
   return at < 0 ? undefined : at

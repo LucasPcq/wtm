@@ -19,6 +19,8 @@ export function LogToolbar({
   view,
   dispatch,
   matches,
+  position,
+  onStep,
   invalid,
   search,
   onLatestError,
@@ -29,6 +31,8 @@ export function LogToolbar({
   view: LogView
   dispatch: LogDispatch
   matches: number
+  position: number
+  onStep: (by: 1 | -1) => void
   invalid: boolean
   search: RefObject<HTMLInputElement | null>
   onLatestError: () => void
@@ -37,14 +41,13 @@ export function LogToolbar({
   onTimeOpen: (open: boolean) => void
 }) {
   const [time, setTime] = useState('')
-  const step = (by: 1 | -1) => dispatch({ type: 'step', by, count: matches })
 
   const counter = () => {
     if (view.query.text === '') return ''
     if (invalid) return 'not a regex'
     if (matches === 0) return 'no match'
     if (view.only) return `${matches} ${matches === 1 ? 'line' : 'lines'}`
-    return `${matches - view.fromLast} of ${matches}`
+    return `${position} of ${matches}`
   }
 
   return (
@@ -60,7 +63,7 @@ export function LogToolbar({
           value={view.query.text}
           onChange={(e) => dispatch({ type: 'search', change: { text: e.target.value } })}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') step(e.shiftKey ? -1 : 1)
+            if (e.key === 'Enter') onStep(e.shiftKey ? -1 : 1)
             if (e.key === 'Escape') {
               dispatch({ type: 'search', change: { text: '' } })
               e.currentTarget.blur()
@@ -78,11 +81,17 @@ export function LogToolbar({
           size="icon"
           aria-label="Previous match"
           disabled={matches === 0}
-          onClick={() => step(-1)}
+          onClick={() => onStep(-1)}
         >
           <ChevronUp />
         </Button>
-        <Button variant="outline" size="icon" aria-label="Next match" disabled={matches === 0} onClick={() => step(1)}>
+        <Button
+          variant="outline"
+          size="icon"
+          aria-label="Next match"
+          disabled={matches === 0}
+          onClick={() => onStep(1)}
+        >
           <ChevronDown />
         </Button>
         <Toggle

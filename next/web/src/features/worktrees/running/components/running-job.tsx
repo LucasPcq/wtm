@@ -44,6 +44,7 @@ export function RunningJob({
         to="/r/$repo/running"
         params={{ repo }}
         search={{ worktree, job: job.name }}
+        aria-current={selected ? 'page' : undefined}
         className="flex items-center gap-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <Icon className={cn(toneIcon({ tone }), 'size-4')} aria-hidden="true" />

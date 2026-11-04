@@ -48,7 +48,12 @@ export function JobSwitcher({
                 const { icon: Icon, tone } = jobLook[row.job.state ?? 'stopped']
                 return [
                   <DropdownMenuItem key={row.name} asChild>
-                    <Link to="/r/$repo/running" params={{ repo }} search={{ worktree: group.worktree, job: row.name }}>
+                    <Link
+                      to="/r/$repo/running"
+                      params={{ repo }}
+                      search={{ worktree: group.worktree, job: row.name }}
+                      aria-current={group.worktree === worktree && row.name === job ? 'page' : undefined}
+                    >
                       <Icon className={toneIcon({ tone })} aria-hidden="true" />
                       {row.name}
                     </Link>

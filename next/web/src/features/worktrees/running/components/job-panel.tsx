@@ -4,6 +4,7 @@ import { type ReactNode, useRef, useState } from 'react'
 import { readQuery } from '@/api/queries/commands'
 import { jobLinesQuery } from '@/api/queries/job-logs'
 import type { DomainAnswered, ListJob } from '@/api/types.gen'
+import { Button } from '@/components/ui/button'
 import { Alert } from '@/features/worktrees/components/alert'
 import { CopyCommand } from '@/features/worktrees/components/copy-command'
 import { JobHeader } from '@/features/worktrees/running/components/job-header'
@@ -12,9 +13,16 @@ import { LogNote } from '@/features/worktrees/running/components/log-note'
 import { LogStatus } from '@/features/worktrees/running/components/log-status'
 import { LogToolbar } from '@/features/worktrees/running/components/log-toolbar'
 import { useLogView, type Whole } from '@/features/worktrees/running/hooks/use-log-view'
-import { clock, latestError, lineAt, matchingLines, patternOf } from '@/features/worktrees/running/utils/log-search'
+import {
+  clock,
+  latestError,
+  lineAt,
+  lineKey,
+  matchingLines,
+  patternOf,
+} from '@/features/worktrees/running/utils/log-search'
 
-export type LogLine = { at?: string; text: string; n?: number }
+export type LogLine = { at?: string; text: string; n?: number; seq?: number }
 
 // actions holds what acts on the job (Restart, Stop, Release): the panel places them left of its ⋯ menu
 export function JobPanel({
@@ -53,17 +61,34 @@ export function JobPanel({
   const lines: LogLine[] = view.whole ? (read?.lines ?? []) : (live.data?.lines ?? [])
   const pattern = patternOf(view.query)
   const matches = pattern instanceof RegExp ? matchingLines(lines, pattern) : []
+  const keyAt = (at: number) => lineKey(lines[at], at)
   const error = view.note?.kind === 'error' ? latestError(lines) : undefined
-  const current = error ?? view.focus ?? matches[matches.length - 1 - view.fromLast]
+  const focused = view.focus === undefined ? -1 : lines.findIndex((line, at) => lineKey(line, at) === view.focus)
+  const anchored = view.anchor === undefined ? -1 : matches.findIndex((at) => keyAt(at) === view.anchor)
+  const onMatch = anchored >= 0 ? anchored : matches.length - 1
+  const current = error ?? (focused >= 0 ? focused : matches[onMatch])
   const crashed = job.state === 'crashed' || live.data?.ended?.state === 'crashed'
   const exitCode = job.exit_code ?? live.data?.ended?.exit_code
+  const warnings = live.data?.warnings ?? []
+
+  // the stream ended with no word of the job's end while it runs: the server let it go, or the connection broke
+  const runs = job.hold === 'own' && (job.state === 'running' || job.state === 'starting')
+  const unfollowed = warnings.some((warning) => warning.code === 'run-logs.daemon_skew')
+  const stopped =
+    !view.whole && live.isSuccess && live.fetchStatus === 'idle' && !live.data.ended && runs && !unfollowed
 
   const latest = () => dispatch({ type: 'jump', focus: undefined, note: { kind: 'error' } })
+
+  const step = (by: 1 | -1) => {
+    const next = matches[(onMatch + by + matches.length) % matches.length]
+    if (next !== undefined) dispatch({ type: 'step', anchor: keyAt(next) })
+  }
 
   const goTo = (time: string) => {
     const at = lineAt(lines, time)
     if (at === 'older') return dispatch({ type: 'jump', focus: undefined, note: { kind: 'older', time } })
-    dispatch({ type: 'jump', focus: at, note: at === undefined ? { kind: 'after', time } : { kind: 'time', time } })
+    if (at === undefined) return dispatch({ type: 'jump', focus: undefined, note: { kind: 'after', time } })
+    dispatch({ type: 'jump', focus: keyAt(at), note: { kind: 'time', time } })
   }
 
   const status = () => {
@@ -73,17 +98,19 @@ export function JobPanel({
     if (view.only && pattern instanceof RegExp) return `${matches.length} of ${lines.length} lines`
     if (job.hold === 'detached') return `${lines.length} lines · the launch’s output`
     if (live.data?.ended || crashed) return `ended ${clock(lines.at(-1)?.at)} · ${lines.length} lines`
-    if (lines.length >= 1000) return 'The last 1,000 lines · older ones are in the log file'
+    if (lines.length >= 1000) return `The last ${lines.length.toLocaleString()} lines · older ones are in the log file`
     return `${lines.length} lines`
   }
 
-  // the panel's keys, while no field is being typed in: / searches, E the latest error, T a time, F follows, W wraps;
-  // Alt keys set the search's options, read by their key, which Alt changes the character of on a Mac
+  // the panel's keys, never from a dialog or a menu, nor while a field is being typed in: / searches, E the latest
+  // error, T a time, F follows, W wraps; Alt keys set the search's options, from its own field too, read by their key,
+  // which Alt changes the character of on a Mac
   const keys = (panel: HTMLElement | null) => {
     if (!panel) return
     const onKey = (e: KeyboardEvent) => {
-      const typing = e.target instanceof HTMLElement && e.target.closest('input, textarea, select, [contenteditable]')
-      if (e.metaKey || e.ctrlKey) return
+      const target = e.target instanceof HTMLElement ? e.target : undefined
+      if (e.metaKey || e.ctrlKey || target?.closest('[role="dialog"], [role="alertdialog"], [role="menu"]')) return
+      const field = target?.closest('input, textarea, select, [contenteditable]')
       const alt = () => {
         switch (e.code) {
           case 'KeyC':
@@ -102,7 +129,7 @@ export function JobPanel({
         f: () => dispatch({ type: 'follow', follow: !view.follow }),
         w: () => dispatch({ type: 'wrap' }),
       }
-      const act = e.altKey ? alt() : !typing && plain[e.key.toLowerCase()]
+      const act = e.altKey ? (!field || target === search.current) && alt() : !field && plain[e.key.toLowerCase()]
       if (!act) return
       e.preventDefault()
       act()
@@ -135,6 +162,21 @@ export function JobPanel({
             description="Its last lines stay below until it starts again."
           />
         )}
+        {stopped && (
+          <Alert
+            tone="amber"
+            title={`Stopped following ${job.name}`}
+            description="It still runs: its new lines no longer arrive."
+            action={
+              <Button variant="outline" size="sm" onClick={() => live.refetch()}>
+                Reconnect
+              </Button>
+            }
+          />
+        )}
+        {warnings.map((warning) => (
+          <Alert key={warning.message} tone="amber" description={warning.message} />
+        ))}
         {facts?.compose_logs && (
           <Alert
             tone="muted"
@@ -149,6 +191,8 @@ export function JobPanel({
         view={view}
         dispatch={dispatch}
         matches={matches.length}
+        position={onMatch + 1}
+        onStep={step}
         invalid={pattern === 'invalid'}
         search={search}
         onLatestError={latest}
@@ -168,7 +212,7 @@ export function JobPanel({
         failure={live.error?.message ?? whole.error?.message}
         loading={view.whole ? whole.isPending : live.isPending}
       />
-      <LogStatus status={status()} view={view} dispatch={dispatch} />
+      <LogStatus status={status()} view={view} dispatch={dispatch} canFollow={!view.whole && !stopped} />
     </section>
   )
 }
