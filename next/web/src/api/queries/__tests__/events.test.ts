@@ -248,6 +248,18 @@ test("a job's event reads its repository again, as the job comes up, crashes or 
   client.setQueryData(['repo', 'r1', 'list', []], { ok: true })
   client.setQueryData(['repo', 'r1', 'status', []], { ok: true })
   client.setQueryData(['repo', 'r1', 'run-up', 'dry_run', []], { ok: true })
+  const facts = ['repo', 'r1', 'run-logs', [{ path: 'job', values: ['web'] }]]
+  const whole = [
+    'repo',
+    'r1',
+    'run-logs',
+    [
+      { path: 'job', values: ['web'] },
+      { path: 'search', values: ['error'] },
+    ],
+  ]
+  client.setQueryData(facts, { ok: true })
+  client.setQueryData(whole, { ok: true })
   serve(
     200,
     'data: {"v":2,"type":"job.started","repo":{"root":"/acme","common_dir":"/acme/.git"},"worktree":{"branch":"feat/a","path":"/acme.trees/feat-a"},"job":{"name":"web","kind":"service","hold":"own"}}\n\n',
@@ -261,4 +273,8 @@ test("a job's event reads its repository again, as the job comes up, crashes or 
     client.getQueryState(['repo', 'r1', 'run-up', 'dry_run', []])?.isInvalidated,
     'a dialog open on a plan is not asked again at each job',
   ).toBe(false)
+  expect(client.getQueryState(facts)?.isInvalidated, "a job's facts").toBe(true)
+  expect(client.getQueryState(whole)?.isInvalidated, 'a scan of a whole log is not started again at each job').toBe(
+    false,
+  )
 })

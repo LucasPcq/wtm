@@ -87,7 +87,7 @@ export function RunningPage({ repo, search }: { repo: string; search: RunningSea
         </div>
         {picked && (
           <JobPanel
-            key={`${picked.group.worktree}/${picked.job.name}`}
+            key={`${picked.group.worktree}/${picked.job.name}/${picked.job.started_at ?? ''}`}
             repo={repo}
             worktree={picked.group.worktree}
             profile={picked.group.profile}

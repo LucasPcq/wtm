@@ -65,6 +65,11 @@ test('a regular expression the server could not read is no regex here either', (
   expect(patternOf({ text: 'GET (?=/health)', matchCase: false, regex: true })).toBe('invalid')
   expect(patternOf({ text: '(a)\\1', matchCase: false, regex: true })).toBe('invalid')
   expect(patternOf({ text: '(?=x)', matchCase: false, regex: false })).toBeInstanceOf(RegExp)
+  expect(
+    patternOf({ text: 'C:\\\\1', matchCase: false, regex: true }),
+    'an escaped backslash, then a digit',
+  ).toBeInstanceOf(RegExp)
+  expect(patternOf({ text: 'a\\(?=b', matchCase: false, regex: true }), 'an escaped parenthesis').toBeInstanceOf(RegExp)
 })
 
 // The review of #270: a log printing past midnight took every time on its first line's day.
@@ -77,4 +82,6 @@ test('a time past midnight is found on the day of the last line', () => {
   expect(lineAt(held, '00:00:01')).toBe(1)
   expect(lineAt(held, '23:59:59')).toBe(1)
   expect(lineAt(held, '23:59:58')).toBe(0)
+  expect(lineAt(held, '23:59:00'), 'before the first line, on its day').toBe('older')
+  expect(lineAt(held, '00:00:05'), 'after the last line, on its day').toBeUndefined()
 })

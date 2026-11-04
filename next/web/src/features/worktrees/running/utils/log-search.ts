@@ -1,7 +1,8 @@
 export type LogQuery = { text: string; matchCase: boolean; regex: boolean }
 
-// the whole log is searched by the server, in Go's RE2, which has no lookaround nor backreference
-const notRE2 = /\(\?<?[=!]|\\[1-9]|\\k</
+// the whole log is searched by the server, in Go's RE2, which has no lookaround nor backreference: an unescaped one,
+// after an even number of backslashes
+const notRE2 = /(?:^|[^\\])(?:\\\\)*(?:\(\?<?[=!]|\\[1-9]|\\k<)/
 
 // what a search looks for, none for no text; a regular expression that does not compile, or that the server could not
 // read, looks for nothing, and says so
@@ -55,9 +56,18 @@ export function lineAt(lines: { at?: string }[], time: string): number | 'older'
   const first = lines.find((line) => line.at)?.at
   const last = lines.findLast((line) => line.at)?.at
   if (!first || !last) return undefined
+  const start = Date.parse(first)
+  const end = Date.parse(last)
   const onFirst = instantOn(first, time)
-  const wanted = onFirst < Date.parse(first) ? instantOn(last, time) : onFirst
-  if (wanted < Date.parse(first)) return 'older'
+  const onLast = instantOn(last, time)
+  // the day that puts time among the lines held, else the one nearest to them
+  const onDay = () => {
+    if (onFirst >= start) return onFirst
+    if (onLast <= end) return onLast
+    return start - onFirst <= onLast - end ? onFirst : onLast
+  }
+  const wanted = onDay()
+  if (wanted < start) return 'older'
   const at = lines.findIndex((line) => line.at !== undefined && Date.parse(line.at) >= wanted)
   return at < 0 ? undefined : at
 }

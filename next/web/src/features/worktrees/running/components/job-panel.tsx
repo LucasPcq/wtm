@@ -72,12 +72,18 @@ export function JobPanel({
   const exitCode = job.exit_code ?? live.data?.ended?.exit_code
   const warnings = live.data?.warnings ?? []
 
-  // the stream ended with no word of the job's end while it runs: the server let it go, or the connection broke
+  // the stream ended, or broke off once it had answered, with no word of the job's end while it runs: the lines read
+  // stay
   const runs = job.hold === 'own' && (job.state === 'running' || job.state === 'starting')
   // the legacy daemon keeps no lines to follow: its jobs are read from their logs
   const unfollowed = warnings.some((warning) => warning.params?.skew === 'legacy')
   const stopped =
-    !view.whole && live.isSuccess && live.fetchStatus === 'idle' && !live.data.ended && runs && !unfollowed
+    !view.whole && live.data !== undefined && live.fetchStatus === 'idle' && !live.data.ended && runs && !unfollowed
+
+  const reconnect = () => {
+    dispatch({ type: 'reconnect' })
+    live.refetch()
+  }
 
   const latest = () => dispatch({ type: 'jump', focus: undefined, note: { kind: 'error' } })
 
@@ -111,7 +117,12 @@ export function JobPanel({
     if (!panel) return
     const onKey = (e: KeyboardEvent) => {
       const target = e.target instanceof HTMLElement ? e.target : undefined
-      if (e.metaKey || e.ctrlKey || target?.closest('[role="dialog"], [role="alertdialog"], [role="menu"]')) return
+      if (
+        e.metaKey ||
+        e.ctrlKey ||
+        target?.closest('[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]')
+      )
+        return
       const field = target?.closest('input, textarea, select, [contenteditable]')
       const alt = () => {
         switch (e.code) {
@@ -168,9 +179,16 @@ export function JobPanel({
           <Alert
             tone="amber"
             title={`Stopped following ${job.name}`}
-            description="It still runs: its new lines no longer arrive."
+            description={
+              <>
+                {live.error
+                  ? `It still runs; the stream broke off: ${live.error.message}.`
+                  : 'It still runs: its new lines no longer arrive.'}
+                <span className="block text-xs">Reconnecting reads its last 1,000 lines again.</span>
+              </>
+            }
             action={
-              <Button variant="outline" size="sm" onClick={() => live.refetch()}>
+              <Button variant="outline" size="sm" onClick={reconnect}>
                 Reconnect
               </Button>
             }
@@ -211,7 +229,7 @@ export function JobPanel({
         view={view}
         dispatch={dispatch}
         total={view.whole ? read?.count : undefined}
-        failure={live.error?.message ?? whole.error?.message}
+        failure={(live.data ? undefined : live.error?.message) ?? whole.error?.message}
         loading={view.whole ? whole.isPending : live.isPending}
       />
       <LogStatus status={status()} view={view} dispatch={dispatch} canFollow={!view.whole && !stopped} />

@@ -88,6 +88,56 @@ test('a follow that stops is said beside a daemon of another build, not beside t
   expect(within(panel).queryByText('Stopped following web')).toBeNull()
 })
 
+// The review of #270: a connection broken mid-stream replaced every line held with a red failure, with no way back.
+test('a stream that breaks off keeps the lines read and offers to reconnect', async () => {
+  listing()
+  let asked = 0
+  server.use(
+    http.get('/api/repos/r1/jobs/:job/logs', () => {
+      asked++
+      const stream = openStream('feat/billing', 'web')
+      stream.send(...linesOf(`run ${asked}`))
+      if (asked === 1) setTimeout(stream.fail, 100)
+      return stream.response()
+    }),
+  )
+  const { user } = await renderApp('/r/r1/running?worktree=feat/billing&job=web')
+  const panel = await panelOf('web')
+
+  expect(await within(panel).findByText('Stopped following web')).toBeDefined()
+  expect(within(panel).getByText(/the stream broke off/)).toBeDefined()
+  expect(shown(panel)).toBe('run 1')
+  await user.click(within(panel).getByRole('button', { name: 'Reconnect' }))
+
+  await waitFor(() => expect(shown(panel)).toBe('run 2'))
+})
+
+// The review of #270: a stream read again numbers its lines from 0, so the match stepped to became another line.
+test('a reconnect forgets the match stepped to, its lines numbered again', async () => {
+  listing()
+  let asked = 0
+  server.use(
+    http.get('/api/repos/r1/jobs/:job/logs', () => {
+      asked++
+      const stream = openStream('feat/billing', 'web')
+      stream.send(...linesOf(...(asked === 1 ? ['GET /a', 'GET /b'] : ['GET /x', 'GET /y'])))
+      stream.end()
+      return stream.response()
+    }),
+  )
+  const { user } = await renderApp('/r/r1/running?worktree=feat/billing&job=web')
+  const panel = await panelOf('web')
+  await waitFor(() => expect(shown(panel)).toContain('GET /b'))
+  await user.type(within(panel).getByRole('textbox', { name: 'Search this log' }), 'GET')
+  await user.click(within(panel).getByRole('button', { name: 'Previous match' }))
+  expect(onLine(panel)).toContain('GET /a')
+
+  await user.click(within(panel).getByRole('button', { name: 'Reconnect' }))
+
+  await waitFor(() => expect(shown(panel)).toContain('GET /y'))
+  expect(onLine(panel)).toContain('GET /y')
+})
+
 // The review of #270: the match the view was on was counted from the last, so a new match moved it.
 test('the match stepped to stays as new matching lines arrive', async () => {
   listing()

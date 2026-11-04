@@ -35,6 +35,7 @@ type Action =
   | { type: 'wrap' }
   | { type: 'stamps' }
   | { type: 'whole'; whole: Whole | undefined }
+  | { type: 'reconnect' }
 
 const initial: LogView = {
   query: { text: '', matchCase: false, regex: false },
@@ -69,6 +70,9 @@ function reduce(view: LogView, action: Action): LogView {
       return { ...view, wrap: !view.wrap }
     case 'stamps':
       return { ...view, stamps: !view.stamps }
+    // a stream read again numbers its lines from the start: a key of the one before names another line
+    case 'reconnect':
+      return { ...view, anchor: undefined, focus: undefined, note: undefined, follow: true }
     case 'whole':
       return {
         ...view,

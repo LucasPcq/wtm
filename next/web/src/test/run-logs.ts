@@ -58,6 +58,8 @@ export function openStream(worktree: string, job: string) {
       for (const line of lines) write('type' in line ? line : { type: 'line', worktree, job, ...line })
     },
     end: () => controller?.close(),
+    // the connection breaks: the reader's next read rejects
+    fail: () => controller?.error(new TypeError('network error')),
   }
 }
 
