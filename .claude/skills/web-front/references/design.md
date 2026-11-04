@@ -184,6 +184,17 @@ Create's step 1 opens on `wtm/Start From`, `New branch | Pull request`, above it
 
 A warning is drawn where its subject is, on the steps and on Done: one whose params name no worktree nor branch is the plan's `wtm/Alert`, first, on both; one with a subject is a reason line on that row during the steps (`create.source_diverged` on its `BranchPlan`) and a "To check" row on Done (`RunOutcome` splits them). A lone group drops its label. Success contracts to a count in the description. A row folds: its folded line is the code's fixed message worded by the screen ("git refused to move the branch"); opened, it shows the output or `error.params.cause` verbatim, and the log's path when there is a log. Steps and folders sit in `wtm/Details`, folded.
 
+## To check
+
+**A misconfiguration is never a warning on its row**, on any screen: a value on disk wtm can't use, a job that ignores its variable, a file not copied, a key out of step, a profile naming a missing job. It goes in a **To check** group at the top of its part or section, one row per problem, in the outcome's anatomy (`wtm/Run Outcome`, `wtm/Run Outcome Row`): the glyph (amber for something to do, red for something refused), the subject, the consequence in one line, a compact fix as the row's own action, and the fix's effect on the line under it.
+
+- **The list or table below shows state only** (copied / not copied, a key's mark, a card's red chip), never the problem's sentence.
+- **The group is a disclosure** (`wtm/Disclosure Head`: chevron, "To check · 3"), open by default, foldable. Inside a part, a subsection or a dialog, the disclosure alone is enough. At the very top of a page, a 1 px rule follows it and the rest of the page takes its own section label (12/500 muted: "Keys by file", "Profiles"), so To check reads as a section of its own.
+- **A fix wtm can't check** (a command rewrite) opens its row on the proposal, before / after in mono, with one muted line saying so ("Proposed from the script; wtm can't check it runs. Check it before Write."); its action names a proposal ("Use this command"), not a certainty.
+- **A plan's consequence is not a misconfiguration**: a Confirm's warning such as "web, api keep 3020, 4020 until restarted" stays on its row. An outcome's To check (Done's rows with Restart, Reconcile) is the Outcome's group above.
+
+Drawn in Settings 12, Run settings 06–07 (Docker compose), Profiles & jobs 12, .env files 01–07, Run setup 05, 06 and 08.
+
 ## Running
 
 The Running page (`features/worktrees/running/`, frames "Area — Running") lists the jobs per worktree; Start a profile (`features/worktrees/run-up/`) is its one primary. Its own rules, beside the ones above:
