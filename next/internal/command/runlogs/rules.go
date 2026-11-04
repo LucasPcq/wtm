@@ -384,6 +384,15 @@ func MatcherOf(req Request) (Matcher, error) {
 	return re.MatchString, nil
 }
 
+// KeepsOf tells whether a line a follow streams is one req reads: one its search matches, printed from its Since on.
+func KeepsOf(req Request) func(run.Line) bool {
+	match, _ := MatcherOf(req)
+	since, _ := sinceOf(req)
+	return func(line run.Line) bool {
+		return (match == nil || match(line.Text)) && !line.At.Before(since)
+	}
+}
+
 func sinceOf(req Request) (time.Time, error) {
 	if req.Since == "" {
 		return time.Time{}, nil

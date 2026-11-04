@@ -1,6 +1,7 @@
 package web
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -516,6 +517,24 @@ func TestTheLinesOfAJobAreStreamedFromItsWorktreeAndItsJob(t *testing.T) {
 		{Path: "regex", Values: []string{"true"}},
 	}}, s.calls[0], "followed unless asked not to, its search as asked")
 	assert.Equal(t, []string{"false"}, s.calls[1].Answers[2].Values)
+}
+
+// The review of #270: a running job that had printed nothing kept the page reading its lines, the headers held until a first line.
+func TestAJobsStreamAnswersOnceItsRequestIsSettledBeforeAnyLine(t *testing.T) {
+	silent := api.Stream{Name: "run-logs", Watch: func(ctx context.Context, _ api.Call, sink api.Sink) api.Response {
+		sink.Open()
+		<-ctx.Done()
+		return api.Response{}
+	}}
+
+	response := do(t, serving(t, Params{Logs: silent}), req{method: http.MethodGet, path: "/api/repos/" + RepoID(repo) + "/jobs/api/logs?worktree=feat/a"})
+	defer response.Body.Close()
+
+	assert.Equal(t, http.StatusOK, response.StatusCode)
+	assert.Equal(t, "text/event-stream", response.Header.Get("Content-Type"))
+	comment, err := bufio.NewReader(response.Body).ReadString('\n')
+	require.NoError(t, err)
+	assert.Equal(t, ": settled\n", comment, "a comment, no event, goes out at once")
 }
 
 func TestTheLogFileOfAJobIsServedToSave(t *testing.T) {

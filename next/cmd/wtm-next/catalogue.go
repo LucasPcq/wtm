@@ -74,10 +74,11 @@ func jobLines() api.Stream {
 			return sink.Send(line)
 		}
 		return logs.Watch(ctx, req, runlogs.Out{
-			Emit:   func(entry runlogs.Entry) error { return send(entry) },
-			Absent: func(absent runlogs.Absent) error { return send(absent) },
-			Ended:  func(ended runlogs.Ended) error { return send(ended) },
-			Warn:   func(warning domain.Warning) { _ = send(warning) },
+			Settled: sink.Open,
+			Emit:    func(entry runlogs.Entry) error { return send(entry) },
+			Absent:  func(absent runlogs.Absent) error { return send(absent) },
+			Ended:   func(ended runlogs.Ended) error { return send(ended) },
+			Warn:    func(warning domain.Warning) { _ = send(warning) },
 		})
 	})
 }

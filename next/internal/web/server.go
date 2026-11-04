@@ -405,7 +405,7 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	s.watch(w, r, s.params.Events, call)
 }
 
-// watch serves stream to the call as server-sent events: its headers go out with its first line, so that a refusal before any keeps its status; it ends when the client leaves, the server stops or the stream does, a failure after the first line as the event envelope.
+// watch serves stream to the call as server-sent events: its headers go out once the stream opens or with its first line, so that a refusal before keeps its status; it ends when the client leaves, the server stops or the stream does, a failure after the first line as the event envelope.
 func (s *Server) watch(w http.ResponseWriter, r *http.Request, stream api.Stream, call api.Call) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
@@ -422,6 +422,7 @@ func (s *Server) watch(w http.ResponseWriter, r *http.Request, stream api.Stream
 			events.open()
 			events.named(eventWarning, warning{Message: err.Error()})
 		},
+		Open: events.settled,
 	})
 	switch {
 	case response.Envelope.Err == nil:

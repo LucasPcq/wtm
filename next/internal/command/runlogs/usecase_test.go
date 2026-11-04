@@ -411,6 +411,49 @@ func TestAFollowedSearchStreamsOnlyTheLinesItMatches(t *testing.T) {
 	assert.Equal(t, []string{"feat/a api POST /x 500 error"}, got)
 }
 
+// The review of #270: a job that keeps no log printed every line the daemon keeps, matching or not.
+func TestASearchSiftsTheDaemonsLinesOfAJobThatKeepsNoLog(t *testing.T) {
+	w := newWorld(t)
+	w.usecase.StateDir = ""
+	w.daemon.listed = []run.Job{ran("api", w.at(featA), run.Running)}
+	w.daemon.lines[key(w.at(featA), "api")] = []script{{lines: lines("GET / 200", "POST /x 500 error", "GET / 200")}}
+
+	api := jobOf(t, w.read(t, runlogs.Request{Worktrees: []string{featA}, Job: "api", Search: "error"}).Items[0], "api")
+
+	assert.Equal(t, []string{"POST /x 500 error"}, textsOf(api))
+}
+
+// The review of #270: a follow from a time streamed every line, the time dropped.
+func TestAFollowFromATimeStreamsOnlyTheLinesPrintedSince(t *testing.T) {
+	w := newWorld(t)
+	w.daemon.listed = []run.Job{ran("api", w.at(featA), run.Running)}
+	w.daemon.lines[key(w.at(featA), "api")] = []script{{lines: lines("old", "new", "newer")}}
+
+	got, _, err := w.watched(t.Context(), t, runlogs.Request{Worktrees: []string{featA}, Job: "api", Follow: true, Since: at.Add(time.Second).Format(time.RFC3339)})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"feat/a api new", "feat/a api newer"}, got)
+}
+
+// The review of #270: a running job that printed nothing left the web reading its lines.
+func TestAFollowSaysItIsSettledBeforeAnyLine(t *testing.T) {
+	w := newWorld(t)
+	w.daemon.listed = []run.Job{ran("api", w.at(featA), run.Running)}
+	w.daemon.lines[key(w.at(featA), "api")] = []script{{}}
+	var said []string
+
+	err := w.usecase.Watch(t.Context(), runlogs.Request{Worktrees: []string{featA}, Job: "api", Follow: true}, runlogs.Out{
+		Settled: func() { said = append(said, "settled") },
+		Emit:    func(runlogs.Entry) error { said = append(said, "line"); return nil },
+		Absent:  func(runlogs.Absent) error { return nil },
+		Warn:    func(domain.Warning) {},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"settled"}, said)
+	assert.Error(t, w.usecase.Watch(t.Context(), runlogs.Request{Worktrees: []string{"nope"}}, runlogs.Out{Settled: func() { t.Error("a refused request is never settled") }}))
+}
+
 // The review of #268: the job a follow followed to its end was dropped; the web needs it for a crash.
 func TestAFollowSaysHowItsJobEnded(t *testing.T) {
 	w := newWorld(t)

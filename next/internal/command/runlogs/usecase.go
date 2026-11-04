@@ -69,12 +69,13 @@ type Ended struct {
 	ExitCode *int     `json:"exit_code,omitempty"`
 }
 
-// Out is where Watch streams: Emit receives each line, its error ending the stream with it; Absent each worktree, or job named, it has no line of, as the read says it; Ended each job followed to its end; Warn what kept lines away (the daemon's skew, a log that cannot be read, lines dropped by a follow that fell behind).
+// Out is where Watch streams: Settled is called once the request is settled, before any line (nil skips it); Emit receives each line, its error ending the stream with it; Absent each worktree, or job named, it has no line of, as the read says it; Ended each job followed to its end; Warn what kept lines away (the daemon's skew, a log that cannot be read, lines dropped by a follow that fell behind).
 type Out struct {
-	Emit   func(Entry) error
-	Absent func(Absent) error
-	Ended  func(Ended) error
-	Warn   func(domain.Warning)
+	Settled func()
+	Emit    func(Entry) error
+	Absent  func(Absent) error
+	Ended   func(Ended) error
+	Warn    func(domain.Warning)
 }
 
 // The types of a stream's lines as JSON (JSONOf): a line a job printed, a worktree or job named with none, a job followed to its end, a warning, and the failure that ended the stream.
@@ -150,11 +151,14 @@ const (
 	CodeFollowBroken = Name + ".follow_broken"
 )
 
-// Watch streams to out the last lines of the jobs Run reads, a job after the other, and each worktree or job named it has none of, then, when req.Follow, each new line of each job running as it prints it (those a search matches; a running job's past lines are then the last ones the daemon keeps), until every one ended or ctx is done. It returns nil once ctx is done after the request was settled; else the refusal, or the error of Emit or Absent that ended it.
+// Watch streams to out the last lines of the jobs Run reads, a job after the other, and each worktree or job named it has none of, then, when req.Follow, each new line of each job running as it prints it (those a search matches, from its time on; a running job's past lines are then the last ones the daemon keeps), until every one ended or ctx is done. It returns nil once ctx is done after the request was settled; else the refusal, or the error of Emit or Absent that ended it.
 func (u UseCase) Watch(ctx context.Context, req Request, out Out) error {
 	facts, req, targets, err := u.resolved(ctx, req)
 	if err != nil {
 		return err
+	}
+	if out.Settled != nil {
+		out.Settled()
 	}
 	for _, warning := range facts.Asked.Warnings(Name) {
 		out.Warn(warning)
@@ -162,7 +166,7 @@ func (u UseCase) Watch(ctx context.Context, req Request, out Out) error {
 
 	s := newStream(ctx, out)
 	defer s.cancel(nil)
-	match, _ := MatcherOf(req)
+	keeps := KeepsOf(req)
 	var following sync.WaitGroup
 	sources := Sources(facts, req, targets)
 	for _, t := range targets {
@@ -173,7 +177,7 @@ func (u UseCase) Watch(ctx context.Context, req Request, out Out) error {
 			}
 			if req.Follow && src.Follows(facts) {
 				shown = true
-				following.Go(func() { u.follow(s, src, match) })
+				following.Go(func() { u.follow(s, src, keeps) })
 				continue
 			}
 			found, err := u.found(s.ctx, req, src)
@@ -202,7 +206,7 @@ func (u UseCase) Watch(ctx context.Context, req Request, out Out) error {
 }
 
 // follow streams src's last lines then each new one until its job ends: a follower the daemon let go as it fell behind follows again, the lines it already sent dropped (a gap warned); one the daemon refuses before any line falls back on the log.
-func (u UseCase) follow(s *stream, src Source, match Matcher) {
+func (u UseCase) follow(s *stream, src Source, keeps func(run.Line) bool) {
 	tail := src.Lines
 	tail.Follow = true
 	var last *run.Line
@@ -222,7 +226,7 @@ func (u UseCase) follow(s *stream, src Source, match Matcher) {
 				sent = 1
 			}
 			last = &line
-			if match == nil || match(line.Text) {
+			if keeps(line) {
 				s.emit(src, Line{At: line.At, Text: line.Text})
 			}
 		})
@@ -383,11 +387,19 @@ func (u UseCase) resolved(ctx context.Context, req Request) (Facts, Request, []T
 
 // found is what req reads of src's log: the whole log sifted when req searches it or reads it from a time, else its last lines; and why it could not be read.
 func (u UseCase) found(ctx context.Context, req Request, src Source) (Found, error) {
-	if !req.Whole() || src.Log.Dir == "" {
+	if !req.Whole() {
 		lines, err := u.last(ctx, src)
 		return LastOf(lines), err
 	}
 	sift := NewSift(req)
+	// a job that keeps no log has only the lines the daemon keeps
+	if src.Log.Dir == "" {
+		lines, err := u.last(ctx, src)
+		for _, line := range lines {
+			sift.Take(line)
+		}
+		return sift.Found(), err
+	}
 	err := u.ScanLog(src.Log, func(line run.Line) bool {
 		sift.Take(line)
 		return ctx.Err() == nil
