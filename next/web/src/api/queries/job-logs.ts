@@ -45,6 +45,8 @@ export const jobLinesQuery = (at: JobAt, startedAt: string | undefined) =>
       initialValue: { lines: [], count: 0, ended: undefined, warnings: [] },
     }),
     staleTime: Infinity,
+    // shared structure would copy every line once the oldest go, each row then drawn again
+    structuralSharing: false,
     retry: false,
     refetchOnWindowFocus: false,
   })

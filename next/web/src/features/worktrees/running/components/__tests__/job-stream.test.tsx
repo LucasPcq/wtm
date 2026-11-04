@@ -60,6 +60,34 @@ test('a stream that ends while its job runs says it stopped following, and recon
   expect(asked).toBe(2)
 })
 
+// Seen in the sandbox: a daemon of another build follows its jobs, yet its warning hid a follow that stopped.
+test('a follow that stops is said beside a daemon of another build, not beside the legacy one', async () => {
+  listing()
+  let skew = 'build'
+  server.use(
+    http.get('/api/repos/r1/jobs/:job/logs', () => {
+      const stream = openStream('feat/billing', 'web')
+      stream.send(...linesOf('ready'), {
+        type: 'warning',
+        code: 'run-logs.daemon_skew',
+        params: { skew },
+        message: `the run daemon is ${skew === 'legacy' ? 'the legacy one' : 'of another build'}`,
+      })
+      stream.end()
+      return stream.response()
+    }),
+  )
+  const { user } = await renderApp('/r/r1/running?worktree=feat/billing&job=web')
+  const panel = await panelOf('web')
+
+  expect(await within(panel).findByText('Stopped following web')).toBeDefined()
+  skew = 'legacy'
+  await user.click(within(panel).getByRole('button', { name: 'Reconnect' }))
+
+  expect(await within(panel).findByText('the run daemon is the legacy one')).toBeDefined()
+  expect(within(panel).queryByText('Stopped following web')).toBeNull()
+})
+
 // The review of #270: the match the view was on was counted from the last, so a new match moved it.
 test('the match stepped to stays as new matching lines arrive', async () => {
   listing()

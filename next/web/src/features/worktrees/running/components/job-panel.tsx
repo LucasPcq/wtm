@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Info } from 'lucide-react'
-import { type ReactNode, useRef, useState } from 'react'
+import { type ReactNode, useMemo, useRef, useState } from 'react'
 import { readQuery } from '@/api/queries/commands'
 import { jobLinesQuery } from '@/api/queries/job-logs'
 import type { DomainAnswered, ListJob } from '@/api/types.gen'
@@ -59,7 +59,8 @@ export function JobPanel({
   const read = whole.data?.items[0]?.detail?.jobs?.[0]
 
   const lines: LogLine[] = view.whole ? (read?.lines ?? []) : (live.data?.lines ?? [])
-  const pattern = patternOf(view.query)
+  // one pattern per search, so that a line already printed is not drawn again
+  const pattern = useMemo(() => patternOf(view.query), [view.query])
   const matches = pattern instanceof RegExp ? matchingLines(lines, pattern) : []
   const keyAt = (at: number) => lineKey(lines[at], at)
   const error = view.note?.kind === 'error' ? latestError(lines) : undefined
@@ -73,7 +74,8 @@ export function JobPanel({
 
   // the stream ended with no word of the job's end while it runs: the server let it go, or the connection broke
   const runs = job.hold === 'own' && (job.state === 'running' || job.state === 'starting')
-  const unfollowed = warnings.some((warning) => warning.code === 'run-logs.daemon_skew')
+  // the legacy daemon keeps no lines to follow: its jobs are read from their logs
+  const unfollowed = warnings.some((warning) => warning.params?.skew === 'legacy')
   const stopped =
     !view.whole && live.isSuccess && live.fetchStatus === 'idle' && !live.data.ended && runs && !unfollowed
 

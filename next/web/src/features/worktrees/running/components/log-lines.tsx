@@ -1,8 +1,8 @@
-import { useCallback } from 'react'
+import { memo, useCallback } from 'react'
 import { Alert } from '@/features/worktrees/components/alert'
 import type { LogLine } from '@/features/worktrees/running/components/job-panel'
 import type { LogDispatch, LogView } from '@/features/worktrees/running/hooks/use-log-view'
-import { clock, onlyMatching, rangesIn, type ShownRow } from '@/features/worktrees/running/utils/log-search'
+import { clock, lineKey, onlyMatching, rangesIn, type ShownRow } from '@/features/worktrees/running/utils/log-search'
 import { cn } from '@/lib/utils'
 
 export function LogLines({
@@ -79,29 +79,58 @@ export function LogLines({
           if (!line) return null
           const on = row.line === current
           return (
-            <div
-              key={row.line}
-              ref={on ? onCurrent : undefined}
-              aria-current={on ? 'true' : undefined}
-              className={cn(
-                'flex gap-4 px-6 font-mono text-xs leading-5',
-                matched.has(row.line) && 'bg-amber-500/8',
-                on && 'bg-amber-500/20',
-              )}
-            >
-              {view.stamps && (
-                <span className="w-16 shrink-0 text-muted-foreground tabular-nums">{clock(line.at)}</span>
-              )}
-              <span className={cn('min-w-0', view.wrap ? 'break-all whitespace-pre-wrap' : 'whitespace-pre')}>
-                <Marked text={line.text} pattern={pattern} current={on} />
-              </span>
-            </div>
+            <LogRow
+              key={lineKey(line, row.line)}
+              line={line}
+              on={on}
+              onCurrent={on ? onCurrent : undefined}
+              matched={matched.has(row.line)}
+              pattern={pattern}
+              stamps={view.stamps}
+              wrap={view.wrap}
+            />
           )
         })}
       </div>
     </div>
   )
 }
+
+// a line printed renders once: a job printing on re-renders only its new rows, keyed by the line, not its place
+const LogRow = memo(function LogRow({
+  line,
+  on,
+  onCurrent,
+  matched,
+  pattern,
+  stamps,
+  wrap,
+}: {
+  line: LogLine
+  on: boolean
+  onCurrent: ((row: HTMLDivElement | null) => void) | undefined
+  matched: boolean
+  pattern: RegExp | undefined
+  stamps: boolean
+  wrap: boolean
+}) {
+  return (
+    <div
+      ref={onCurrent}
+      aria-current={on ? 'true' : undefined}
+      className={cn(
+        'flex gap-4 px-6 font-mono text-xs leading-5',
+        matched && 'bg-amber-500/8',
+        on && 'bg-amber-500/20',
+      )}
+    >
+      {stamps && <span className="w-16 shrink-0 text-muted-foreground tabular-nums">{clock(line.at)}</span>}
+      <span className={cn('min-w-0', wrap ? 'break-all whitespace-pre-wrap' : 'whitespace-pre')}>
+        <Marked text={line.text} pattern={pattern} current={on} />
+      </span>
+    </div>
+  )
+})
 
 const counted = (count: number) => (count === 1 ? '1 line' : `${count} lines`)
 
