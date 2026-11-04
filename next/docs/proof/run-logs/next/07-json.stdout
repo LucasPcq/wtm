@@ -16,6 +16,7 @@
             "hold": "own",
             "exit_code": 1,
             "profile": "logs",
+            "command": "echo starting; sleep 2; echo boom >&2; exit 1",
             "log": "<SB>/acme/.git/wtm/logs/feat%2Fb/crashy.log",
             "lines": [
               {
