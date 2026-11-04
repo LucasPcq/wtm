@@ -11,7 +11,7 @@ export type JobLines = { lines: JobLine[]; ended: JobEnd | undefined; warnings: 
 export type JobAt = { repo: string; worktree: string; job: string }
 
 // a job printing for days would hold every line in the page: the oldest go once it holds this many
-export const keptLines = 5000
+const keptLines = 5000
 
 const path = ({ repo, worktree, job }: JobAt, file: 'logs' | 'log') =>
   `/api/repos/${repo}/jobs/${encodeURIComponent(job)}/${file}?worktree=${encodeURIComponent(worktree)}`
