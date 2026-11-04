@@ -745,6 +745,7 @@ The reference is the legacy `wtm run logs` of 0.30.1. next speaks the v2 envelop
   10. `--job api`, a running service, followed (next with `--follow`; legacy always follows)
   11. feat/b, every job
   12. the run daemon stopped (`run daemon stop`), then `--job crashy`
+  13. next only: feat/b, `--search 'boom|migrated' --regex` (legacy has no search)
 - The states are identical but for 12: legacy's read starts a run daemon (`a run daemon answers: yes`, B4), next's never does, its lines coming from the logs.
 - The differences, each an owner-approved departure (the spec's D1–D10, Q1–Q3) or a legacy bug fixed with its test:
   - **Without a terminal, the lines and an end** (Q1): each job's last lines, `[job] text` (`[job · branch]` over several worktrees, 6), then exit 0 (1, 11); legacy follows every running job until it ends, so `11-all` never ends on its own. `--follow` (`-f`) follows (10), unframed, and SIGINT ends it with exit 0 (B1: legacy ignores SIGINT and SIGTERM, exit 137 once killed; `TestAnInterruptedFollowExitsZero`, `TestAnInterruptedFollowEndsWithoutError`). With `--output json`, `--follow` writes one typed JSON object per line (below).
@@ -755,5 +756,6 @@ The reference is the legacy `wtm run logs` of 0.30.1. next speaks the v2 envelop
   - **The read never starts the run daemon** (D4, B4, 12): with none, the lines come from the logs; legacy started one, and replaced one of another build holding no job.
   - **The picker** (Q2): with no worktree named, at a terminal, the worktrees are asked, the one run from picked, each with what it runs (`feat/b — runs logs: api, web · 1 crashed`, its profile `logs` first, `tty/next/1-picker.txt`), as run up's; legacy's said `2 running`. `--yes` skips it for the worktree run from (legacy's `--yes` too).
   - **`--output json --follow` is JSON Lines** (decided by the orchestrator; the spec had JSON never follow): each line typed `line`, `absent`, `warning` or `error`, the warnings among the lines rather than on stderr, a failure once lines were written ending the stream on an `error` line; the exit codes unchanged (`TestAFollowInJSONTypesEachLineItWrites`, `TestAFailureAfterTheFirstLineEndsAJSONStreamOnAnErrorLine`).
+  - **A search reads the whole log** (next only, 13): `--search` (`--regex`, `--match-case`) and `--since` read each job's log, its rotated files included, and print the matching lines of every job (`TestASearchReadsTheWholeLogItsBackupsFirst`).
   - **The view** is `ui/runview`, as run up opens it, on the jobs read (`tty/next/2-view.txt`; a task done is `✓`, B7: legacy's `○`), `--job` selected; leaving it prints nothing of the read (`3-left`).
 
