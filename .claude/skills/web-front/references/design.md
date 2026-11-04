@@ -186,12 +186,12 @@ A warning is drawn where its subject is, on the steps and on Done: one whose par
 
 ## To check
 
-**A misconfiguration is never a warning on its row**, on any screen: a value on disk wtm can't use, a job that ignores its variable, a file not copied, a key out of step, a profile naming a missing job. It goes in a **To check** group at the top of its part or section, one row per problem, in the outcome's anatomy (`wtm/Run Outcome`, `wtm/Run Outcome Row`): the glyph (amber for something to do, red for something refused), the subject, the consequence in one line, a compact fix as the row's own action, and the fix's effect on the line under it.
+**On a configuration or settings screen, a misconfiguration is never a warning on its row**: a value on disk wtm can't use, a job that ignores its variable, a file not copied, a key out of step, a profile naming a missing job. It goes in a **To check** disclosure at the top of its part or section (`wtm/Disclosure Head`: chevron, "To check · 3"), open by default, foldable, one row per problem in the outcome's row anatomy (`wtm/Run Outcome Row`): the glyph (amber for something to do, red for something refused), the subject, the consequence in one line, a compact fix as the row's own action, and the fix's effect on the line under it.
 
 - **The list or table below shows state only** (copied / not copied, a key's mark, a card's red chip), never the problem's sentence.
-- **The group is a disclosure** (`wtm/Disclosure Head`: chevron, "To check · 3"), open by default, foldable. Inside a part, a subsection or a dialog, the disclosure alone is enough. At the very top of a page, a 1 px rule follows it and the rest of the page takes its own section label (12/500 muted: "Keys by file", "Profiles"), so To check reads as a section of its own.
+- **Inside a part or a subsection, the disclosure alone is enough.** At the very top of a page, a 1 px rule follows it and the rest of the page takes its own section label (12/500 muted: "Keys by file", "Profiles"), so To check reads as a section of its own.
 - **A fix wtm can't check** (a command rewrite) opens its row on the proposal, before / after in mono, with one muted line saying so ("Proposed from the script; wtm can't check it runs. Check it before Write."); its action names a proposal ("Use this command"), not a certainty.
-- **A plan's consequence is not a misconfiguration**: a Confirm's warning such as "web, api keep 3020, 4020 until restarted" stays on its row. An outcome's To check (Done's rows with Restart, Reconcile) is the Outcome's group above.
+- **An operation's outcome is not a settings screen**: in a dialog's Done, To check is the Outcome's labelled group, in its order (above), with no disclosure (Done's rows with Restart, Reconcile). A plan's consequence is no misconfiguration either: a Confirm's warning such as "web, api keep 3020, 4020 until restarted" stays on its row.
 
 Drawn in Settings 12, Run settings 06–07 (Docker compose), Profiles & jobs 12, .env files 01–07, Run setup 05, 06 and 08.
 
