@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -205,12 +206,16 @@ func (u UseCase) Watch(ctx context.Context, req Request, out Out) error {
 	return s.end(ctx)
 }
 
-// follow streams src's last lines then each new one until its job ends: a follower the daemon let go as it fell behind follows again, the lines it already sent dropped (a gap warned); one the daemon refuses before any line falls back on the log.
+// FollowResumes is how many times in a row a follow whose connection to the daemon broke follows again before it gives up.
+const FollowResumes = 3
+
+// follow streams src's last lines then each new one until its job ends: a follower the daemon let go, as it fell behind or as its connection broke (the daemon lets go a client that stops reading for a second), follows again, the lines it already sent dropped (a gap warned), FollowResumes times in a row at most for a broken connection; one the daemon refuses before any line falls back on the log.
 func (u UseCase) follow(s *stream, src Source, keeps func(run.Line) bool) {
 	tail := src.Lines
 	tail.Follow = true
 	var last *run.Line
-	sent := 0 // the lines sent with last's time
+	sent := 0   // the lines sent with last's time
+	broken := 0 // the connections that broke since the last line
 	for {
 		var resume *Resume
 		if last != nil {
@@ -220,6 +225,7 @@ func (u UseCase) follow(s *stream, src Source, keeps func(run.Line) bool) {
 			if resume != nil && resume.Drops(line) {
 				return
 			}
+			broken = 0
 			if last != nil && line.At.Equal(last.At) {
 				sent++
 			} else {
@@ -238,6 +244,9 @@ func (u UseCase) follow(s *stream, src Source, keeps func(run.Line) bool) {
 		switch {
 		case errors.As(err, &refused) && refused.Code == run.CodeFollowerBehind:
 			continue
+		case err != nil && refused == nil && last != nil && s.ctx.Err() == nil && broken < FollowResumes:
+			broken++
+			continue
 		case err == nil && s.ctx.Err() == nil:
 			s.ended(Ended{Worktree: src.Target.Worktree, Job: src.Name, State: JobState(job.State), ExitCode: job.ExitCode})
 		case err == nil || s.ctx.Err() != nil:
@@ -246,7 +255,8 @@ func (u UseCase) follow(s *stream, src Source, keeps func(run.Line) bool) {
 			if readErr != nil {
 				s.warn(unreadable(src, readErr))
 			}
-			s.emit(src, LastOf(lines).Lines...)
+			kept := slices.DeleteFunc(lines, func(line run.Line) bool { return !keeps(line) })
+			s.emit(src, LastOf(kept).Lines...)
 		default:
 			s.warn(domain.Warning{Code: CodeFollowBroken, Message: fmt.Sprintf("%s · %s: %v", src.Target.Worktree, src.Name, err), Params: domain.Params{"worktree": src.Target.Worktree, "job": src.Name}})
 		}

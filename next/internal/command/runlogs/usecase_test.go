@@ -197,6 +197,47 @@ func TestAFollowerThatLostLinesSaysSo(t *testing.T) {
 	assert.Equal(t, []string{runlogs.CodeLinesDropped}, warned)
 }
 
+// The review of #270: the daemon lets go a client that stops reading for a second (a browser busy or in the background); the follow then ended.
+func TestAFollowWhoseConnectionBrokeFollowsAgainWithoutRepeatingALine(t *testing.T) {
+	w := newWorld(t)
+	w.daemon.listed = []run.Job{ran("api", w.at(featA), run.Running)}
+	all := lines("one", "two", "three", "four", "five")
+	w.daemon.lines[key(w.at(featA), "api")] = []script{{lines: all[:3], err: errors.New("read: connection reset by peer")}, {lines: all[1:]}}
+
+	got, warned, err := w.watched(t.Context(), t, runlogs.Request{Worktrees: []string{featA}, Job: "api", Follow: true})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"feat/a api one", "feat/a api two", "feat/a api three", "feat/a api four", "feat/a api five"}, got)
+	assert.Empty(t, warned)
+}
+
+func TestAFollowThatKeepsBreakingSaysSoAndEnds(t *testing.T) {
+	w := newWorld(t)
+	w.daemon.listed = []run.Job{ran("api", w.at(featA), run.Running)}
+	broken := errors.New("read: connection reset by peer")
+	w.daemon.lines[key(w.at(featA), "api")] = []script{{lines: lines("one"), err: broken}, {err: broken}}
+
+	got, warned, err := w.watched(t.Context(), t, runlogs.Request{Worktrees: []string{featA}, Job: "api", Follow: true})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"feat/a api one"}, got)
+	assert.Equal(t, []string{runlogs.CodeFollowBroken}, warned)
+	assert.Len(t, w.daemon.asked, 1+runlogs.FollowResumes, "it follows again a bounded number of times")
+}
+
+// The review of #270: the log read in place of a follow the daemon refused ignored the search and the time.
+func TestAFollowTheDaemonRefusesReadsTheLogItsSearchKept(t *testing.T) {
+	w := newWorld(t)
+	w.logged(t, featA, "api", "api ready", "POST /x 500 error")
+	w.daemon.listed = []run.Job{ran("api", w.at(featA), run.Running)}
+	w.daemon.lines[key(w.at(featA), "api")] = []script{{err: errors.New("unknown action lines")}}
+
+	got, _, err := w.watched(t.Context(), t, runlogs.Request{Worktrees: []string{featA}, Follow: true, Search: "error"})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"feat/a api POST /x 500 error"}, got)
+}
+
 func TestAFollowTheDaemonRefusesReadsTheLogInstead(t *testing.T) {
 	w := newWorld(t)
 	w.logged(t, featA, "api", "api ready")
