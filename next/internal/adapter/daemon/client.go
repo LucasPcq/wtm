@@ -192,7 +192,7 @@ func (d Daemon) start(ctx context.Context, spec run.Spec, out func(run.Line)) (r
 // that worktree, a detached stack outliving its daemon; otherwise nothing was
 // running.
 func (d Daemon) Stop(ctx context.Context, req run.Stop, out func(run.Line)) (run.Outcome, error) {
-	stopped, err := d.reach(ctx, reachParams{WorkDir: req.WorkDir, Request: request{Action: actionStop, Name: req.Name, WorkDir: req.WorkDir, CorrelationID: req.CorrelationID}, Out: out})
+	stopped, err := d.reach(ctx, reachParams{WorkDir: req.WorkDir, Request: request{Action: actionStop, Name: req.Name, WorkDir: req.WorkDir, CorrelationID: req.CorrelationID, Lines: out != nil}, Out: out})
 	if errors.Is(err, errNoDaemon) {
 		return run.OutcomeNotRunning, nil
 	}

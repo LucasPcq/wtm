@@ -473,15 +473,17 @@ func (d *Daemon) stopStack(j *job, out func(run.Line)) error {
 }
 
 // linesTo cuts what a command prints into lines, each handed to out as it
-// ends, the last one at flush; with out nil, what it prints is dropped.
+// ends, the last one at flush; with out nil, write is nil: the command's
+// output goes nowhere, as a stop that asks for none had it.
 func (d *Daemon) linesTo(out func(run.Line)) (write func([]byte), flush func()) {
+	if out == nil {
+		return nil, func() {}
+	}
 	var mu sync.Mutex
 	var splitter run.Splitter
 	hand := func(lines []run.Line) {
 		for _, line := range lines {
-			if out != nil {
-				out(line)
-			}
+			out(line)
 		}
 	}
 	write = func(chunk []byte) {

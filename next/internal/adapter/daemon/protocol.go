@@ -39,6 +39,8 @@ type request struct {
 	Follow        bool   `json:"follow,omitempty"`
 	Cols          int    `json:"cols,omitempty"`
 	Rows          int    `json:"rows,omitempty"`
+	// Lines asks a stop to send the lines its stop command prints: a client that does not ask (the legacy wtm's, which reads the first answer that is no "output" as the stop's) gets none.
+	Lines bool `json:"lines,omitempty"`
 }
 
 // answer is one line the daemon writes back.

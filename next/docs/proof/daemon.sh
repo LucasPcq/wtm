@@ -140,7 +140,7 @@ by_name <"$global/jobs.json" | normalise >"$out/06-index-left-by-legacy.json"
 # 3. next's daemon takes the stack over, and stops it with its stop command.
 start_daemon "$next"
 ask 07-next-adopts-legacy-stack '{"action":"list"}'
-ask 08-next-stops-the-stack "{\"action\":\"stop\",\"name\":\"db\",\"work_dir\":\"$acme\"}"
+ask 08-next-stops-the-stack "{\"action\":\"stop\",\"name\":\"db\",\"work_dir\":\"$acme\",\"lines\":true}"
 echo "marker $( [[ -f $marker ]] && echo present || echo removed)" >"$out/08-marker.txt"
 
 # 4. Jobs started, listed, stopped and started again, and what it refuses.
@@ -215,7 +215,7 @@ ask 30-shared-claimed-by-b "{\"action\":\"start\",\"spec\":$(shared_spec "$root/
 ask 31-shared-list '{"action":"list"}'
 ask 32-shared-lines-of-a-claim "{\"action\":\"lines\",\"name\":\"cache\",\"work_dir\":\"$root/wt-a\"}"
 ask 33-shared-released-by-a "{\"action\":\"stop\",\"name\":\"cache\",\"work_dir\":\"$root/wt-a\"}"
-ask 34-shared-stopped-by-b "{\"action\":\"stop\",\"name\":\"cache\",\"work_dir\":\"$root/wt-b\"}"
+ask 34-shared-stopped-by-b "{\"action\":\"stop\",\"name\":\"cache\",\"work_dir\":\"$root/wt-b\",\"lines\":true}"
 echo "marker $( [[ -f $shared_marker ]] && echo present || echo removed)" >"$out/34-shared-marker.txt"
 normalise <"$global/jobs.json" >"$out/35-index-after-shared.json"
 stop_daemon

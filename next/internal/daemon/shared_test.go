@@ -569,3 +569,21 @@ func TestAShutdownDuringANamespaceCreateLeavesTheStackToTheIndex(t *testing.T) {
 	assert.NotContains(t, w.spawner.lines(), "down db", "halted, never released")
 	assert.Contains(t, w.index.names(), "/repo:db")
 }
+
+func TestTheLastReleaseOfASharedStackHandsTheLinesOfItsStopCommandToTheStop(t *testing.T) {
+	w := newWorld(t, map[string]script{"up db": exits(0), "down db": exits(0, "Container db Stopped")})
+	for _, at := range []string{"/wt/a", "/wt/b"} {
+		_, err := w.Start(shared("db", at, "down db"), nil)
+		require.NoError(t, err)
+	}
+	var lines []string
+	out := func(line run.Line) { lines = append(lines, line.Text) }
+
+	released, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"}, out)
+	require.NoError(t, err)
+	stopped, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/b"}, out)
+
+	require.NoError(t, err)
+	assert.Equal(t, []run.Outcome{run.OutcomeReleased, run.OutcomeStopped}, []run.Outcome{released, stopped})
+	assert.Equal(t, []string{"Container db Stopped"}, lines, "only the release that stops the stack runs its stop command")
+}

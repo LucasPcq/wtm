@@ -133,22 +133,10 @@ func (r Running) standingWorktrees() []worktree.Worktree {
 	return slices.DeleteFunc(r.MainFirst(), func(w worktree.Worktree) bool { return r.Gone[w.Path] })
 }
 
-// WorktreeOptions are the worktrees a stop may reach: each one whose directory stands, the main one first, the caller's tagged current, each with what it runs; its holds only the shared services a stop of it reaches, those its main checkout holds itself (or may, when that cannot be told), never one it runs for the others alone.
+// WorktreeOptions are the worktrees a stop may reach: each one whose directory stands, the main one first, the caller's tagged current, each with what it runs.
 func (r Running) WorktreeOptions() []domain.Option {
 	worktrees := r.standingWorktrees()
-	options := domain.RunningIn(domain.WorktreeOptions(worktrees, domain.WorktreeQuery{Cwd: r.Cwd}), worktrees, r.Jobs)
-	held := func(name string) bool {
-		return slices.ContainsFunc(r.Jobs, func(job run.Job) bool {
-			return job.Name == name && job.Up && job.SharedDir != "" && job.WorkDir == job.SharedDir && (job.MainHolds || job.MainHoldsUnknown)
-		})
-	}
-	for i, option := range options {
-		options[i].Holds = slices.DeleteFunc(option.Holds, func(name string) bool { return !held(name) })
-		if len(options[i].Holds) == 0 {
-			options[i].Holds = nil
-		}
-	}
-	return options
+	return domain.RunningIn(domain.WorktreeOptions(worktrees, domain.WorktreeQuery{Cwd: r.Cwd}), worktrees, r.Jobs)
 }
 
 // nameAt is how the worktree at path is named: its name, else the path itself (a worktree removed whose jobs still run).

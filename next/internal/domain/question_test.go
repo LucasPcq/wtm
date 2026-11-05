@@ -36,6 +36,35 @@ func TestEachWorktreeOptionSaysWhatItRunsByItsName(t *testing.T) {
 	// feat is ambiguous: the options are those it matches, no longer one per worktree.
 	options := RunningIn(WorktreeOptions(worktrees, WorktreeQuery{Name: "feat"}), worktrees, jobs)
 
-	assert.Equal(t, []Option{{Value: "feat/a"}, {Value: "feat/ab", Up: []string{"web"}, Crashed: 1, Profile: "dev"}}, options)
-	assert.Equal(t, []string{"db"}, RunningIn(WorktreeOptions(worktrees, WorktreeQuery{}), worktrees, jobs)[0].Holds)
+	assert.Equal(t, []Option{{Value: "feat/a"}, {Value: "feat/ab", Up: []string{"web"}, Crashed: 1, Holds: []string{"db"}, Profile: "dev"}}, options)
+}
+
+func TestAWorktreeHoldsItsClaimsAndMainOnlyTheSharedServicesItHoldsItself(t *testing.T) {
+	worktrees := []worktree.Worktree{
+		{Path: "/repo/main", Main: true, State: worktree.OnBranch{Branch: "main"}},
+		{Path: "/repo/feat-a", State: worktree.OnBranch{Branch: "feat/a"}},
+	}
+	served := func(mainHolds, unknown bool) []run.Job {
+		return []run.Job{
+			{Name: "db", WorkDir: "/repo/main", Up: true, State: run.Running, Hold: run.HoldOwn, SharedDir: "/repo/main", MainHolds: mainHolds, MainHoldsUnknown: unknown},
+			{Name: "db", WorkDir: "/repo/feat-a", Up: true, Hold: run.HoldClaim, SharedDir: "/repo/main"},
+		}
+	}
+	for _, tc := range []struct {
+		name      string
+		mainHolds bool
+		unknown   bool
+		main      []string
+	}{
+		{name: "for_the_others", main: nil},
+		{name: "held", mainHolds: true, main: []string{"db"}},
+		{name: "unknown", unknown: true, main: []string{"db"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			options := RunningIn(WorktreeOptions(worktrees, WorktreeQuery{}), worktrees, served(tc.mainHolds, tc.unknown))
+
+			assert.Equal(t, tc.main, options[0].Holds, "main holds a shared service it runs only when it holds it itself")
+			assert.Equal(t, []string{"db"}, options[1].Holds, "a claim-only worktree holds its claim")
+		})
+	}
 }

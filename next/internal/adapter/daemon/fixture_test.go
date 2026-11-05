@@ -90,7 +90,9 @@ func (j *jobs) Start(spec run.Spec, out func(run.Line)) (run.Job, error) {
 func (j *jobs) Stop(req run.Stop, out func(run.Line)) (run.Outcome, error) {
 	j.record(req)
 	for _, line := range j.lines {
-		out(run.Line{At: started, Text: line})
+		if out != nil {
+			out(run.Line{At: started, Text: line})
+		}
 	}
 	return j.outcome, j.err
 }

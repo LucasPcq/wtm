@@ -73,6 +73,19 @@ func TestAReleaseAnswersTheLegacyClientsWordForIt(t *testing.T) {
 	assert.Equal(t, true, answers[0]["released"])
 }
 
+func TestAStopSendsItsStopCommandsLinesOnlyToAClientThatAsks(t *testing.T) {
+	socket, _ := served(t, &jobs{lines: []string{"Container db Stopped"}, outcome: run.OutcomeStopped}, "1.0")
+
+	legacy := asked(t, socket, `{"action":"stop","name":"db","work_dir":"/wt/a"}`)
+	asking := asked(t, socket, `{"action":"stop","name":"db","work_dir":"/wt/a","lines":true}`)
+
+	require.Len(t, legacy, 1, "a legacy client takes its first answer that is no output as the stop's")
+	assert.Equal(t, "stopped", legacy[0]["outcome"])
+	require.Len(t, asking, 2)
+	assert.Equal(t, []any{"line", "Container db Stopped"}, []any{asking[0]["status"], asking[0]["text"]})
+	assert.Equal(t, "stopped", asking[1]["outcome"])
+}
+
 func TestARequestTheDaemonCannotReadIsRefusedWithItsCode(t *testing.T) {
 	cases := map[string]struct {
 		request string

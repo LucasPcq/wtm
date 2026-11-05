@@ -81,7 +81,7 @@ type Option struct {
 	Jobs      []string              `json:"jobs,omitempty"`         // a profile's jobs, in the order they start
 	Up        []string              `json:"up,omitempty"`           // the jobs a worktree runs for itself that are up, sorted: neither its claims nor the shared services it runs for every worktree
 	Crashed   int                   `json:"crashed,omitempty"`      // the jobs a worktree runs for itself that crashed
-	Holds     []string              `json:"holds,omitempty"`        // the shared services a worktree runs for every worktree, up, sorted
+	Holds     []string              `json:"holds,omitempty"`        // the shared services a worktree holds, up, sorted: its claims, and in the main checkout those it holds itself (or may: MainHoldsUnknown)
 	Profile   string                `json:"profile,omitempty"`      // the profile a worktree's jobs up were started under, empty when they say none
 	RunningIn []string              `json:"running_in,omitempty"`   // the worktrees picked whose jobs up a profile started, or that a job is up in
 	Kind      project.JobKind       `json:"kind,omitempty"`         // a job's kind
@@ -166,7 +166,7 @@ func OptionsOf[T ~string](values []T) []Option {
 	return options
 }
 
-// RunningIn is options, the options WorktreeOptions gives of worktrees, each, by its name, with what jobs says it runs: the jobs up for itself and the profile they were started under, those it runs for itself that crashed, and the shared services it runs for every worktree; its claims are not its own.
+// RunningIn is options, the options WorktreeOptions gives of worktrees, each, by its name, with what jobs says it runs: the jobs up for itself and the profile they were started under, those it runs for itself that crashed, and the shared services it holds (Holds): its claims, and in the main checkout those it holds itself, never one it runs for the others alone.
 func RunningIn(options []Option, worktrees []worktree.Worktree, jobs []run.Job) []Option {
 	for i, option := range options {
 		at := slices.IndexFunc(worktrees, func(w worktree.Worktree) bool { return w.Name() == option.Value })
@@ -177,12 +177,14 @@ func RunningIn(options []Option, worktrees []worktree.Worktree, jobs []run.Job) 
 		var up, holds []string
 		for _, job := range jobs {
 			switch {
-			case job.WorkDir != w.Path || job.Hold == run.HoldClaim:
+			case job.WorkDir != w.Path:
 			case job.State == run.Crashed && run.Own(job):
 				options[i].Crashed++
 			case !job.Up:
-			case !run.Own(job):
+			// A shared service the main checkout runs for the others alone is theirs, not its hold.
+			case job.Hold == run.HoldClaim || (!run.Own(job) && (job.MainHolds || job.MainHoldsUnknown)):
 				holds = append(holds, job.Name)
+			case !run.Own(job):
 			default:
 				up = append(up, job.Name)
 			}

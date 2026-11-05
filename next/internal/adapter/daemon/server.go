@@ -77,10 +77,11 @@ func (s Server) Serve(conn net.Conn, line []byte) {
 	case actionStart:
 		s.start(req, reply)
 	case actionStop:
-		// A stack's stop command prints as a start does: each line goes to the client before the outcome.
-		outcome, err := s.Jobs.Stop(run.Stop{Name: req.Name, WorkDir: req.WorkDir, CorrelationID: req.CorrelationID}, func(line run.Line) {
-			_ = reply(answer{Status: statusLine, At: stamp(line.At), Text: line.Text})
-		})
+		var out func(run.Line)
+		if req.Lines {
+			out = func(line run.Line) { _ = reply(answer{Status: statusLine, At: stamp(line.At), Text: line.Text}) }
+		}
+		outcome, err := s.Jobs.Stop(run.Stop{Name: req.Name, WorkDir: req.WorkDir, CorrelationID: req.CorrelationID}, out)
 		// released is the legacy client's word for a stop that let go of a shared job.
 		_ = reply(answerOf(err, answer{Status: statusOK, Outcome: string(outcome), Released: outcome == run.OutcomeReleased}))
 	case actionStopAll:
