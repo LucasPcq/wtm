@@ -181,6 +181,33 @@ func Tail(file run.LogFile, n int) ([]run.Line, error) {
 	return lines[max(0, len(lines)-n):], err
 }
 
+// Each hands visit every line of the log file names, oldest first, its backups before it, until visit returns false; a log that does not exist has none. It fails only when a file that exists cannot be read.
+func Each(file run.LogFile, visit func(run.Line) bool) error {
+	path := Path(file.Dir, file.Job)
+	if path == "" {
+		return nil
+	}
+	for rank := backups; rank >= 0; rank-- {
+		name := path
+		if rank > 0 {
+			name = backup(path, rank)
+		}
+		data, err := os.ReadFile(name)
+		switch {
+		case errors.Is(err, os.ErrNotExist):
+			continue
+		case err != nil:
+			return err
+		}
+		for line := range strings.Lines(string(data)) {
+			if !visit(parse(strings.TrimSuffix(line, "\n"))) {
+				return nil
+			}
+		}
+	}
+	return nil
+}
+
 // tail returns the lines of the last tailRead bytes of the file at path, and
 // whether they are the whole file; a file that does not exist has none.
 func tail(path string) ([]run.Line, bool, error) {

@@ -20,6 +20,8 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/status"
 	"github.com/LucasPcq/wtm/next/internal/command/sync"
 	"github.com/LucasPcq/wtm/next/internal/command/tree"
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/web"
 )
 
 // catalogue lists every command for a surface other than the command line, one line per command.
@@ -55,4 +57,46 @@ func watchEvents(stream events.UseCase) func(ctx context.Context, req events.Req
 	return func(ctx context.Context, req events.Request, sink api.Sink) error {
 		return stream.Watch(ctx, req, events.Out{Emit: func(received events.Received) error { return sink.Send(received.JSON) }, Warn: sink.Warn})
 	}
+}
+
+// jobLines is run logs' stream for a surface: the lines of a job, each one line of JSON its type names (runlogs.JSONOf), its warnings among them; the use case is opened on the call's directory.
+func jobLines() api.Stream {
+	return api.BindStream[runlogs.Request, runlogs.Questions](runlogs.Name, func(ctx context.Context, req runlogs.Request, sink api.Sink) error {
+		logs, err := openRunLogs(ctx, req.Caller.Dir)
+		if err != nil {
+			return err
+		}
+		send := func(v any) error {
+			line, err := runlogs.JSONOf(v)
+			if err != nil {
+				return err
+			}
+			return sink.Send(line)
+		}
+		return logs.Watch(ctx, req, runlogs.Out{
+			Settled: sink.Open,
+			Emit:    func(entry runlogs.Entry) error { return send(entry) },
+			Absent:  func(absent runlogs.Absent) error { return send(absent) },
+			Ended:   func(ended runlogs.Ended) error { return send(ended) },
+			Warn:    func(warning domain.Warning) { _ = send(warning) },
+		})
+	})
+}
+
+// jobLogFile is the log file of the job of a repository's worktree job names, as run logs reads it: "" when it keeps none.
+func jobLogFile(ctx context.Context, job web.JobLog) (string, error) {
+	logs, err := openRunLogs(ctx, job.Dir)
+	if err != nil {
+		return "", err
+	}
+	read, err := logs.Run(ctx, runlogs.Request{Worktrees: []string{job.Worktree}, Job: job.Job, Caller: domain.Caller{Dir: job.Dir, Named: true, Cwd: job.Dir}}, domain.RunOptions{Surface: domain.SurfaceAPI})
+	if err != nil {
+		return "", err
+	}
+	for _, item := range read.Items {
+		if item.Detail != nil && len(item.Detail.Jobs) > 0 {
+			return item.Detail.Jobs[0].Log, nil
+		}
+	}
+	return "", nil
 }

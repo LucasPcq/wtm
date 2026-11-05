@@ -17,10 +17,11 @@ type Stream struct {
 	Watch func(ctx context.Context, call Call, sink Sink) Response
 }
 
-// A Sink is where a stream goes: Send receives each line, its error ending the stream; Warn receives what kept the stream from a line or a repository for a while (the bus lost and joined again, a repository skipped), nil dropping it.
+// A Sink is where a stream goes: Send receives each line, its error ending the stream; Warn receives what kept the stream from a line or a repository for a while (the bus lost and joined again, a repository skipped), nil dropping it; Open says the request is settled before any line, so that the surface answers it, nil skipping it.
 type Sink struct {
 	Send func(line json.RawMessage) error
 	Warn func(err error)
+	Open func()
 }
 
 // BindStream returns the stream called name that folds the call's answers into its request, refusing an answer by its path and a relative directory, then watches with watch, the request asked from the call's directory, or from nowhere when the call names none; the call's options are not read.

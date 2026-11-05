@@ -3,6 +3,7 @@ package runlogs
 import (
 	"cmp"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -96,19 +97,20 @@ func (f Facts) listed(dir, name string) (run.Job, bool) {
 // ----------------------------------------------------------------------------
 // The sources
 
-// A Source is one job of a worktree run logs reads: the worktree, the worktree it prints in (the main checkout for a shared service), the job, as the daemon lists it there (Listed false when it does not), the job that prints its lines (a claim's is the shared service), how to ask the daemon for them and its log file, whether the request named it, and whether it is a shared service another worktree than the main one may hold.
+// A Source is one job of a worktree run logs reads: the worktree, the worktree it prints in (the main checkout for a shared service), the job, as run.toml declares it and as the daemon lists it there (Listed false when it does not), the job that prints its lines (a claim's is the shared service), how to ask the daemon for them and its log file, whether the request named it, and whether it is a shared service another worktree than the main one may hold.
 type Source struct {
-	Target  Target
-	Home    Target
-	Name    string
-	Kind    project.JobKind
-	Job     run.Job
-	Listed  bool
-	Service run.Job // the job that prints its lines: Job itself, a claim's shared service
-	Lines   run.Tail
-	Log     run.LogFile
-	Named   bool
-	Claimed bool
+	Target   Target
+	Home     Target
+	Name     string
+	Kind     project.JobKind
+	Declared project.Job
+	Job      run.Job
+	Listed   bool
+	Service  run.Job // the job that prints its lines: Job itself, a claim's shared service
+	Lines    run.Tail
+	Log      run.LogFile
+	Named    bool
+	Claimed  bool
 }
 
 // Sources are the jobs req reads in each of targets, in run.toml's order then the others the daemon lists there: the job req names alone, else every job.
@@ -142,7 +144,7 @@ func (f Facts) names(req Request, t Target) []string {
 func (f Facts) source(t Target, name string, named bool) Source {
 	declared, _ := f.declared(name)
 	job, listed := f.listed(t.Path, name)
-	src := Source{Target: t, Name: name, Kind: declared.Kind, Job: job, Listed: listed, Service: job, Named: named}
+	src := Source{Target: t, Name: name, Kind: declared.Kind, Declared: declared, Job: job, Listed: listed, Service: job, Named: named}
 	if src.Kind == "" {
 		src.Kind = job.Kind
 	}
@@ -208,24 +210,29 @@ type Detail struct {
 	Jobs []Job  `json:"jobs"`
 }
 
-// A Job is one job of a worktree: its name and kind, its state, what of it the daemon holds and, for a shared service, the main checkout's worktree it runs in; the code its process exited with, its address, the profile it was started under, the file its lines are kept in, and its last lines.
+// A Job is one job of a worktree: its name and kind, its state, what of it the daemon holds and, for a shared service, the main checkout's worktree it runs in; the code its process exited with, its address, the profile it was started under, the folder it runs in (run.toml's cwd, relative to the worktree) and its command, the file its lines are kept in, the command that follows the containers of a docker compose stack it left running (whose services log to Docker, not to wtm), its lines, and, for a read of the whole log, how many lines the log holds.
 type Job struct {
-	Name     string          `json:"name"`
-	Kind     project.JobKind `json:"kind,omitempty"`
-	State    JobState        `json:"state"`
-	Hold     run.Hold        `json:"hold,omitempty"`
-	SharedIn string          `json:"shared_in,omitempty"`
-	ExitCode *int            `json:"exit_code,omitempty"`
-	URL      string          `json:"url,omitempty"`
-	Profile  string          `json:"profile,omitempty"`
-	Log      string          `json:"log,omitempty"`
-	Lines    []Line          `json:"lines"`
+	Name        string          `json:"name"`
+	Kind        project.JobKind `json:"kind,omitempty"`
+	State       JobState        `json:"state"`
+	Hold        run.Hold        `json:"hold,omitempty"`
+	SharedIn    string          `json:"shared_in,omitempty"`
+	ExitCode    *int            `json:"exit_code,omitempty"`
+	URL         string          `json:"url,omitempty"`
+	Profile     string          `json:"profile,omitempty"`
+	Dir         string          `json:"dir,omitempty"`
+	Command     string          `json:"command,omitempty"`
+	Log         string          `json:"log,omitempty"`
+	ComposeLogs string          `json:"compose_logs,omitempty"`
+	Lines       []Line          `json:"lines"`
+	Count       int             `json:"count,omitempty"`
 }
 
-// A Line is one line a job printed: when (zero for a line of a log that kept no time), and its text.
+// A Line is one line a job printed: when (zero for a line of a log that kept no time), its text, and, read from the whole log, its number in it from 1.
 type Line struct {
 	At   time.Time `json:"at,omitzero"`
 	Text string    `json:"text"`
+	N    int       `json:"n,omitempty"`
 }
 
 // JobState is where a job stands, as run logs reads it.
@@ -246,19 +253,35 @@ func JobStates() []JobState {
 	return []JobState{JobStarting, JobRunning, JobCrashed, JobExited, JobStopped, JobNotStarted}
 }
 
-// JobOf is the job source reads, with lines, the last it printed, and whether its log holds any (or cannot be read).
-func JobOf(s Source, lines []run.Line, logged bool) Job {
-	job := Job{Name: s.Name, Kind: s.Kind, State: s.state(logged), Log: s.LogPath(), Lines: make([]Line, 0, len(lines))}
+// JobOf is the job source reads, with what was read of its log, whether its log holds a line (or cannot be read), and the project name of its compose stack ("" for none).
+func JobOf(s Source, found Found, logged bool, project string) Job {
+	job := Job{Name: s.Name, Kind: s.Kind, State: s.state(logged), Dir: s.Declared.Cwd, Command: s.Declared.Cmd, Log: s.LogPath(), Lines: found.Lines, Count: found.Count}
+	if job.Lines == nil {
+		job.Lines = []Line{}
+	}
 	if s.Listed {
 		job.Hold, job.ExitCode, job.URL, job.Profile = s.Job.Hold, s.Service.ExitCode, cmp.Or(s.Job.URL, s.Service.URL), s.Job.Profile
 	}
 	if s.Home.Path != s.Target.Path {
 		job.SharedIn = s.Home.Worktree
 	}
-	for _, line := range lines {
-		job.Lines = append(job.Lines, Line{At: line.At, Text: line.Text})
+	if s.Compose() {
+		job.ComposeLogs = composeLogs(project)
 	}
 	return job
+}
+
+// Compose reports whether the source is a docker compose stack its launcher left running: its containers log to Docker.
+func (s Source) Compose() bool {
+	return s.Listed && s.Job.Hold == run.HoldDetached && (strings.Contains(s.Declared.Cmd, "docker compose") || strings.Contains(s.Declared.Cmd, "docker-compose"))
+}
+
+// composeLogs is the command that follows the containers of a compose project, the one its folder names when project is "".
+func composeLogs(project string) string {
+	if project == "" {
+		return "docker compose logs -f"
+	}
+	return "docker compose -p " + project + " logs -f"
 }
 
 func (s Source) state(logged bool) JobState {
@@ -276,10 +299,11 @@ func (s Source) state(logged bool) JobState {
 // ----------------------------------------------------------------------------
 // Report
 
-// Logged is what was read of each source, by its index in the sources: its last lines, or why its log could not be read.
+// Logged is what was read of each source, by its index in the sources, or why its log could not be read; and the compose project of each worktree a stack runs in, by its path.
 type Logged struct {
-	Lines      map[int][]run.Line
+	Found      map[int]Found
 	Unreadable map[int]error
+	Projects   map[string]string
 }
 
 // Report is one item per target, its jobs those of sources it shows, given the lines read of each; and the warnings of what could not be asked.
@@ -288,11 +312,11 @@ func Report(f Facts, targets []Target, sources []Source, read Logged) ([]Item, [
 	for _, t := range targets {
 		item := Item{Subject: t.Worktree, Status: domain.StatusDone, Detail: &Detail{Path: t.Path, Jobs: []Job{}}}
 		for i, s := range sources {
-			logged := len(read.Lines[i]) > 0 || read.Unreadable[i] != nil
+			logged := read.Found[i].Logged || read.Unreadable[i] != nil
 			if s.Target.Path != t.Path || !s.Shows(logged) {
 				continue
 			}
-			item.Detail.Jobs = append(item.Detail.Jobs, JobOf(s, read.Lines[i], logged))
+			item.Detail.Jobs = append(item.Detail.Jobs, JobOf(s, read.Found[i], logged, read.Projects[s.Home.Path]))
 			if err := read.Unreadable[i]; err != nil {
 				item.Warnings = append(item.Warnings, unreadable(s, err))
 			}
@@ -333,4 +357,103 @@ func (r *Resume) Drops(line run.Line) bool {
 	// Last's lines sent before rotated out of what the daemon keeps.
 	r.passed, r.Gap = true, true
 	return false
+}
+
+// ----------------------------------------------------------------------------
+// The whole log
+
+// A Matcher tells whether the text of a line is one a search looks for.
+type Matcher func(text string) bool
+
+// MatcherOf is the matcher of req's search: its text, or its regular expression with Regex, its case ignored unless MatchCase; nil when req searches nothing. It fails on a regular expression that does not compile.
+func MatcherOf(req Request) (Matcher, error) {
+	if req.Search == "" {
+		return nil, nil
+	}
+	pattern := req.Search
+	if !req.Regex {
+		pattern = regexp.QuoteMeta(pattern)
+	}
+	if !req.MatchCase {
+		pattern = "(?i)" + pattern
+	}
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, err
+	}
+	return re.MatchString, nil
+}
+
+// KeepsOf tells whether a line a follow streams is one req reads: one its search matches, printed from its Since on.
+func KeepsOf(req Request) func(run.Line) bool {
+	match, _ := MatcherOf(req)
+	since, _ := sinceOf(req)
+	return func(line run.Line) bool {
+		return (match == nil || match(line.Text)) && !line.At.Before(since)
+	}
+}
+
+func sinceOf(req Request) (time.Time, error) {
+	if req.Since == "" {
+		return time.Time{}, nil
+	}
+	return time.Parse(time.RFC3339, req.Since)
+}
+
+// Whole reports whether req reads each job's whole log, its backups included, rather than its last lines: it searches it, or reads it from a time.
+func (r Request) Whole() bool {
+	return r.Search != "" || r.Since != ""
+}
+
+// Found is what was read of a job's log: its lines (numbered from 1 in the whole log when it was read whole), how many lines the whole log holds (0 for its last lines only), and whether it holds any.
+type Found struct {
+	Lines  []Line
+	Count  int
+	Logged bool
+}
+
+// LastOf is found of the last lines of a log.
+func LastOf(lines []run.Line) Found {
+	found := Found{Lines: make([]Line, 0, len(lines)), Logged: len(lines) > 0}
+	for _, line := range lines {
+		found.Lines = append(found.Lines, Line{At: line.At, Text: line.Text})
+	}
+	return found
+}
+
+// A Sift keeps what a request reads of a whole log as it goes by, a line after the other: from Since on, the lines its search matches (every line without one); the last run.MaxTail of a search, the first run.MaxTail from a time.
+type Sift struct {
+	match   Matcher
+	since   time.Time
+	started bool
+	found   Found
+}
+
+// NewSift is the sift of req, a request Resolve settled.
+func NewSift(req Request) *Sift {
+	match, _ := MatcherOf(req)
+	since, _ := sinceOf(req)
+	return &Sift{match: match, since: since, started: since.IsZero()}
+}
+
+// Take takes the next line of the log.
+func (s *Sift) Take(line run.Line) {
+	s.found.Count++
+	s.found.Logged = true
+	// a line no stamp dates follows the one before it
+	if !s.started && !line.At.IsZero() && !line.At.Before(s.since) {
+		s.started = true
+	}
+	switch {
+	case !s.started || s.match != nil && !s.match(line.Text):
+	case len(s.found.Lines) < run.MaxTail:
+		s.found.Lines = append(s.found.Lines, Line{At: line.At, Text: line.Text, N: s.found.Count})
+	case s.match != nil:
+		s.found.Lines = append(s.found.Lines[1:], Line{At: line.At, Text: line.Text, N: s.found.Count})
+	}
+}
+
+// Found is what the sift kept, and how many lines it saw.
+func (s *Sift) Found() Found {
+	return s.found
 }

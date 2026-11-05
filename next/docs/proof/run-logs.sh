@@ -138,6 +138,10 @@ run_side() {
       scenario 10-follow 3 run logs feat/b --job api --follow
     fi
     scenario 11-all 3 run logs feat/b
+    # next only: a search reads each job's whole log (legacy has no --search)
+    if [[ $side == next ]]; then
+      scenario 13-search 3 run logs feat/b --search 'boom|migrated' --regex
+    fi
     "$bin" run daemon stop --yes </dev/null >/dev/null 2>&1 || "$legacy" run daemon stop --yes </dev/null >/dev/null 2>&1 || true
     sleep 1
     state >"$dir/12-daemon-stopped.state"

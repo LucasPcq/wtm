@@ -42,6 +42,16 @@ func (e *eventStream) open() {
 	e.flush()
 }
 
+// settled opens the stream and writes a comment, which carries no event: a client sees the stream answered before any line, whatever buffers the headers alone.
+func (e *eventStream) settled() {
+	e.open()
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if _, err := fmt.Fprint(e.w, ": settled\n\n"); err == nil {
+		e.flush()
+	}
+}
+
 // isOpen reports whether the stream wrote its headers.
 func (e *eventStream) isOpen() bool {
 	e.mu.Lock()

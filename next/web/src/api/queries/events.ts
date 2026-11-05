@@ -6,7 +6,7 @@ import {
 } from '@tanstack/react-query'
 import { EventSourceParserStream } from 'eventsource-parser/stream'
 import { HttpError, request } from '@/api/fetch'
-import type { WebRepos, WebWarning, WtmEventsV2 } from '@/api/types.gen'
+import type { DomainAnswered, WebRepos, WebWarning, WtmEventsV2 } from '@/api/types.gen'
 
 export type UnderWay = { repo: string | undefined; command: string; subjects: string[]; since: number }
 
@@ -137,13 +137,16 @@ const repoOf = (client: QueryClient, line: WtmEventsV2) =>
 function invalidate(client: QueryClient, line: WtmEventsV2) {
   if (line.type === 'repo.added' || line.type === 'repo.removed')
     return client.invalidateQueries({ queryKey: ['repos'] })
-  // a job's event changes the reads that list jobs, never a dialog's questions nor its plan: a start of N jobs would
-  // ask them N times
+  // a job's event changes the reads that list jobs or say a job's facts, never a dialog's questions nor its plan, nor a
+  // read of a whole log: a start of N jobs would ask them N times
   if (line.type.startsWith('job.')) {
     const id = repoOf(client, line)
     return Promise.all(
-      (['list', 'status'] as const).map((read) =>
-        client.invalidateQueries({ queryKey: id ? ['repo', id, read] : ['repo'] }),
+      (['list', 'status', 'run-logs'] as const).map((read) =>
+        client.invalidateQueries({
+          queryKey: id ? ['repo', id, read] : ['repo'],
+          predicate: (query) => !readsWhole(query),
+        }),
       ),
     )
   }
@@ -180,3 +183,9 @@ export function connectionOf(query: { status: string; fetchStatus: string; error
   if (query.status === 'pending') return 'connecting'
   return query.status === 'success' && query.fetchStatus === 'fetching' ? 'live' : 'reconnecting'
 }
+
+// a read of run logs that searches a job's whole log or reads it from a time
+const readsWhole = (query: Query) =>
+  query.queryKey[2] === 'run-logs' &&
+  Array.isArray(query.queryKey[3]) &&
+  (query.queryKey[3] as DomainAnswered[]).some((answer) => answer.path === 'search' || answer.path === 'since')

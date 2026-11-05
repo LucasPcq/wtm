@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/LucasPcq/wtm/next/internal/command/runlogs"
 	"io"
 	"net/http"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/web"
@@ -197,4 +199,48 @@ func TestTheSchemaRefusesWhatNoCommandSends(t *testing.T) {
 			assert.Error(t, validates(t, defs(c.def), []byte(c.document)))
 		})
 	}
+}
+
+func TestEachLineOfAJobsStreamMatchesTheSchema(t *testing.T) {
+	defs := apiDefs(t)
+	at := time.Date(2026, 11, 3, 20, 17, 21, 0, time.UTC)
+
+	for name, v := range map[string]any{
+		"line":    runlogs.Entry{Worktree: "feat/a", Job: "api", At: at, Text: "ready", N: 3},
+		"undated": runlogs.Entry{Worktree: "feat/a", Job: "api", Text: "no stamp"},
+		"absent":  runlogs.Absent{Worktree: "feat/a"},
+		"never":   runlogs.Absent{Worktree: "feat/a", Job: "never"},
+		"ended":   runlogs.Ended{Worktree: "feat/a", Job: "api", State: runlogs.JobCrashed, ExitCode: new(1)},
+		"warning": domain.Warning{Code: "run-logs.daemon_skew", Message: "of another build", Params: domain.Params{"skew": "build"}, FollowUp: &domain.FollowUp{Command: "run daemon restart", Code: "run-logs.restart_daemon", Message: "restart it"}},
+		"failure": &domain.Error{Kind: domain.KindInternal, Code: "run-logs.broken", Message: "the daemon went away"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			line, err := runlogs.JSONOf(v)
+			require.NoError(t, err)
+			assert.NoError(t, validates(t, defs("web.JobLine"), line), string(line))
+		})
+	}
+}
+
+func TestTheLinesAndTheLogOfAJobAreServedByTheWebServer(t *testing.T) {
+	main := configured(t)
+	ownConfigDir(t)
+	writeRun(t, main, seedJob)
+	logs := filepath.Join(main, ".git", "wtm", "logs", "main")
+	require.NoError(t, os.MkdirAll(logs, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(logs, "seed.log"), []byte("2026-11-03T20:17:21Z  seeded\n2026-11-03T20:17:22Z  done\n"), 0o600))
+	server, _ := webServing(t, version)
+	repo := registered(t, main)
+
+	lines := get(t, server, "/api/repos/"+repo+"/jobs/seed/logs?worktree=main&follow=false", false)
+	file := get(t, server, "/api/repos/"+repo+"/jobs/seed/log?worktree=main", false)
+
+	require.Equal(t, http.StatusOK, lines.StatusCode)
+	body, err := io.ReadAll(lines.Body)
+	require.NoError(t, err)
+	assert.Contains(t, string(body), `data: {"type":"line","worktree":"main","job":"seed","at":"2026-11-03T20:17:21Z","text":"seeded"}`)
+	require.Equal(t, http.StatusOK, file.StatusCode)
+	saved, err := io.ReadAll(file.Body)
+	require.NoError(t, err)
+	assert.Equal(t, "2026-11-03T20:17:21Z  seeded\n2026-11-03T20:17:22Z  done\n", string(saved))
 }

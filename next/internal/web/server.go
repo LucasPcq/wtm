@@ -10,9 +10,12 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"mime"
 	"net"
 	"net/http"
+	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -21,10 +24,14 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain"
 )
 
-// Params are what a server serves and the functions it is given in place of the world it cannot reach: the catalogue and the event stream, the repositories wtm knows, the version of the binary, the token every request carries, the kill of a forced cancel, the command line of a follow-up and the published schema.
+// Params are what a server serves and the functions it is given in place of the world it cannot reach: the catalogue, the event stream and the stream of a job's lines, a job's log file, the repositories wtm knows, the version of the binary, the token every request carries, the kill of a forced cancel, the command line of a follow-up and the published schema.
 type Params struct {
 	Catalogue api.Catalogue
 	Events    api.Stream
+	// Logs streams a job's lines, the call's answers naming its worktree and its job, each line one line of JSON; its zero value serves none.
+	Logs api.Stream
+	// LogFile returns the path of a job's log file, "" when it keeps none; nil serves none.
+	LogFile func(ctx context.Context, job JobLog) (string, error)
 	// Repos lists the repositories wtm knows, dropping those no longer initialized.
 	Repos   func(ctx context.Context) ([]domain.Repo, error)
 	Version string
@@ -77,6 +84,8 @@ func New(params Params) *Server {
 	mux.HandleFunc("POST /api/repos/{repo}/commands/{name}", s.execute)
 	mux.HandleFunc("DELETE /api/repos/{repo}/operations/{id}", s.cancel)
 	mux.HandleFunc("GET /api/events", s.events)
+	mux.HandleFunc("GET /api/repos/{repo}/jobs/{job}/logs", s.jobLines)
+	mux.HandleFunc("GET /api/repos/{repo}/jobs/{job}/log", s.jobLog)
 	mux.HandleFunc("GET /api/schema", s.schema)
 	mux.HandleFunc("POST /api/stop", s.stopAsked)
 	mux.HandleFunc("POST /api/command-line", s.commandLine)
@@ -393,13 +402,18 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 		call.Dir = repo.Root
 	}
 
+	s.watch(w, r, s.params.Events, call)
+}
+
+// watch serves stream to the call as server-sent events: its headers go out once the stream opens or with its first line, so that a refusal before keeps its status; it ends when the client leaves, the server stops or the stream does, a failure after the first line as the event envelope.
+func (s *Server) watch(w http.ResponseWriter, r *http.Request, stream api.Stream, call api.Call) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
 	stopped := context.AfterFunc(s.stopping, cancel)
 	defer stopped()
 
 	events := newEventStream(w)
-	response := s.params.Events.Watch(ctx, call, api.Sink{
+	response := stream.Watch(ctx, call, api.Sink{
 		Send: func(line json.RawMessage) error {
 			events.open()
 			return events.raw(line)
@@ -408,6 +422,7 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 			events.open()
 			events.named(eventWarning, warning{Message: err.Error()})
 		},
+		Open: events.settled,
 	})
 	switch {
 	case response.Envelope.Err == nil:
@@ -416,6 +431,75 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeEnvelope(w, response.Envelope)
 	}
+}
+
+// jobQueries are the queries of a job's lines that answer the stream's fields of the same name.
+var jobQueries = []string{"search", "regex", "match_case", "since"}
+
+// jobLines streams the lines of the job {job} of the worktree ?worktree= names, the last ones then each new one until it ends (?follow=false: the last ones alone), or those of its whole log ?search= (?regex=, ?match_case=) or ?since= reads; each line is a line of JSON its stream types.
+func (s *Server) jobLines(w http.ResponseWriter, r *http.Request) {
+	repo, ok := s.repo(w, r)
+	if !ok {
+		return
+	}
+	if s.params.Logs.Watch == nil {
+		writeError(w, http.StatusNotFound, &domain.Error{Kind: domain.KindInvalid, Code: CodeNotFound, Message: "this server streams no job's lines"})
+		return
+	}
+
+	query := r.URL.Query()
+	call := api.Call{Dir: repo.Root, Answers: []domain.Answered{
+		{Path: domain.PathWorktree, Values: []string{query.Get("worktree")}},
+		{Path: "job", Values: []string{r.PathValue("job")}},
+		{Path: "follow", Values: []string{strconv.FormatBool(query.Get("follow") != "false")}},
+	}}
+	for _, name := range jobQueries {
+		if query.Has(name) {
+			call.Answers = append(call.Answers, domain.Answered{Path: name, Values: []string{query.Get(name)}})
+		}
+	}
+	s.watch(w, r, s.params.Logs, call)
+}
+
+// A JobLog is a job whose log is asked: the root of its repository, its worktree and its name.
+type JobLog struct {
+	Dir      string
+	Worktree string
+	Job      string
+}
+
+// jobLog answers the log file of the job {job} of the worktree ?worktree= names, to save: 404 when the job keeps none.
+func (s *Server) jobLog(w http.ResponseWriter, r *http.Request) {
+	repo, ok := s.repo(w, r)
+	if !ok {
+		return
+	}
+	if s.params.LogFile == nil {
+		writeError(w, http.StatusNotFound, &domain.Error{Kind: domain.KindInvalid, Code: CodeNotFound, Message: "this server serves no job's log"})
+		return
+	}
+
+	job := r.PathValue("job")
+	path, err := s.params.LogFile(r.Context(), JobLog{Dir: repo.Root, Worktree: r.URL.Query().Get("worktree"), Job: job})
+	if err != nil {
+		writeEnvelope(w, domain.Envelope{Err: domain.AsError(domain.AsErrorParams{Err: err})})
+		return
+	}
+	file, err := os.Open(path)
+	if path == "" || err != nil {
+		writeError(w, http.StatusNotFound, &domain.Error{Kind: domain.KindInvalid, Code: CodeLogMissing, Message: job + " keeps no log"})
+		return
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, domain.AsError(domain.AsErrorParams{Err: err}))
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": job + ".log"}))
+	http.ServeContent(w, r, job+".log", info.ModTime(), file)
 }
 
 // A warning is what kept the event stream from a line or a repository for a while, the data of an event named warning.

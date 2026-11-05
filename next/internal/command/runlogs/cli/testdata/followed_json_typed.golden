@@ -1,3 +1,4 @@
 {"type":"warning","code":"run-logs.daemon_skew","params":{"daemon":"0.30.9","skew":"build"},"message":"the run daemon is of another build (0.30.9): restart it to start jobs beside its own","follow_up":{"command":"run daemon restart","code":"run-logs.restart_daemon","message":"restart it: its services stop, its stacks are kept"}}
 {"type":"line","worktree":"feat/a","job":"api","at":"2026-11-03T20:17:21Z","text":"api ready"}
 {"type":"line","worktree":"feat/a","job":"api","at":"2026-11-03T20:18:21Z","text":"GET /users 200"}
+{"type":"ended","worktree":"feat/a","job":"api","state":"crashed","exit_code":1}

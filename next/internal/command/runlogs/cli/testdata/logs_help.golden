@@ -8,6 +8,9 @@
   in unless named, prints each job's lines as `[job] text` and ends; --follow (-f) then prints
   each new line as the jobs print it, until they all ended or Ctrl+C, which exits 0.
 
+  --search reads each job's whole log, its rotated files included, for the lines holding
+  a text (--regex, --match-case), its newest 1000 matches; --since reads it from a time.
+
   --output json is the read's v2 envelope, each job with its state and its lines; with
   --follow, one typed JSON object per line instead: line, absent, warning, error.
   It never starts the run daemon: with none running, the lines come from the logs.
@@ -19,6 +22,9 @@
     # Pick worktrees, then watch their jobs live
     wtm run logs
 
+    # Every error api ever logged
+    wtm run logs feat/login --job api --search 'error|panic' --regex
+
     # One job's last lines, for a script or an agent
     wtm run logs feat/login --job api --output json
 
@@ -29,7 +35,11 @@
     -f, --follow          Print each new line as the jobs print it, until they end or Ctrl+C
     -h, --help            help for logs
         --job string      Read this job alone, one of run.toml or one the run daemon runs there (default: every job that ran)
+        --match-case      Keep the case of --search
         --output string   Output format: text or json (default "text")
+        --regex           Read --search as a regular expression (RE2)
+        --search string   The lines holding this text in each job's whole log, its rotated files included (case ignored unless --match-case)
+        --since string    The lines of each job's whole log printed from this time on (RFC 3339: 2026-11-03T14:00:00Z)
     -y, --yes             Ask nothing: read the worktree you stand in unless named
 
   Global Flags:
