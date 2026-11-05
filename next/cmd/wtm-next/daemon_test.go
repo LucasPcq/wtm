@@ -40,7 +40,7 @@ func TestTheDaemonRunsStopsAndAnnouncesTheJobsItsClientsAsk(t *testing.T) {
 	require.NoError(t, err)
 	listed, err := client.Jobs(t.Context())
 	require.NoError(t, err)
-	outcome, err := client.Stop(t.Context(), run.Stop{Name: "web", WorkDir: dir, CorrelationID: "stop-1"})
+	outcome, err := client.Stop(t.Context(), run.Stop{Name: "web", WorkDir: dir, CorrelationID: "stop-1"}, nil)
 	require.NoError(t, err)
 
 	assert.Equal(t, run.Exited, migrate.State)
@@ -96,7 +96,7 @@ func TestTheDaemonKeepsAJobsLogAndHandsOutItsLinesAndItsTerminal(t *testing.T) {
 	n, err := io.ReadAtLeast(terminal, seen, len("ready"))
 	require.NoError(t, err)
 	assert.Contains(t, string(seen[:n]), "ready")
-	_, err = client.Stop(t.Context(), run.Stop{Name: "echo", WorkDir: dir})
+	_, err = client.Stop(t.Context(), run.Stop{Name: "echo", WorkDir: dir}, nil)
 	require.NoError(t, err)
 	for range followed {
 	}
@@ -125,7 +125,7 @@ func TestTheDaemonsProxyServesAServiceUnderItsNameWhileItRuns(t *testing.T) {
 	web, err := client.Start(t.Context(), spec, nil)
 	require.NoError(t, err)
 	body := proxied(t, proxyPort, "web.feat-a.acme.localhost")
-	_, err = client.Stop(t.Context(), run.Stop{Name: "web", WorkDir: spec.WorkDir})
+	_, err = client.Stop(t.Context(), run.Stop{Name: "web", WorkDir: spec.WorkDir}, nil)
 	require.NoError(t, err)
 
 	assert.Equal(t, "http://web.feat-a.acme.localhost:"+strconv.Itoa(proxyPort), web.URL)

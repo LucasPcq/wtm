@@ -214,25 +214,21 @@ func (d *Daemon) runUntil(command run.Command, limit time.Duration) (int, error)
 	return <-exited, errDeadline
 }
 
-// release lets a worktree go of the shared job j (a claim, or the job itself
-// when its main checkout lets go), for the command of correlation: the job
-// stops only once nobody holds it, no claim left and its main checkout not
-// holding it, [run.OutcomeReleased] otherwise. Its namespace stays: stopping
-// is not destroying.
-func (d *Daemon) release(j *job, correlation string) (run.Outcome, error) {
-	return d.letGo(letGoParams{Job: j, CorrelationID: correlation})
-}
-
 // letGoParams is a hold let go of, for the command of CorrelationID; Stands,
 // when set, tells under the lock whether the hold is still the caller's to
-// let go.
+// let go; Out takes the lines of the stop command its last release runs.
 type letGoParams struct {
 	Job           *job
 	CorrelationID string
 	Stands        func() bool
+	Out           func(run.Line)
 }
 
-// letGo lets go of a hold on a shared job, as release says.
+// letGo lets a worktree go of the shared job of params (a claim, or the job
+// itself when its main checkout lets go), for the command of CorrelationID:
+// the job stops only once nobody holds it, no claim left and its main
+// checkout not holding it, [run.OutcomeReleased] otherwise. Its namespace
+// stays: stopping is not destroying.
 func (d *Daemon) letGo(params letGoParams) (run.Outcome, error) {
 	j, correlation := params.Job, params.CorrelationID
 	if j == nil {
@@ -278,7 +274,7 @@ func (d *Daemon) letGo(params letGoParams) (run.Outcome, error) {
 		return run.OutcomeReleased, nil
 	}
 
-	outcome, err := d.halt(service, correlation)
+	outcome, err := d.halt(service, correlation, params.Out)
 	if outcome == run.OutcomeNotRunning {
 		// It ended on its own since it was marked: let go all the same.
 		return run.OutcomeStopped, err

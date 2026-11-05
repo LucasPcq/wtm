@@ -10,16 +10,16 @@ import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
 import { NextButton } from '@/features/worktrees/components/next-button'
 import { ReasonButton } from '@/features/worktrees/components/reason-button'
 import { RunFailure } from '@/features/worktrees/components/run-failure'
+import { RunWorktreesStep } from '@/features/worktrees/components/run-worktrees-step'
 import { Stepper, type StepState } from '@/features/worktrees/components/stepper'
 import type { Start } from '@/features/worktrees/hooks/use-run'
 import type { RunUpAsk, RunUpRan, RunUpStep } from '@/features/worktrees/hooks/use-run-up-dialog'
 import { ConfirmStep } from '@/features/worktrees/run-up/components/confirm-step'
 import { ProfileStep } from '@/features/worktrees/run-up/components/profile-step'
 import { Refusal } from '@/features/worktrees/run-up/components/refusal'
-import { WorktreesStep } from '@/features/worktrees/run-up/components/worktrees-step'
 import { unitsOf } from '@/features/worktrees/run-up/utils/plan'
 import { steps, wizardReducer } from '@/features/worktrees/run-up/utils/wizard-state'
-import { where } from '@/features/worktrees/run-up/utils/words'
+import { where } from '@/features/worktrees/utils/run-words'
 
 const optionsOf = (fields: DomainField[] | undefined, path: string) => {
   const field = fields?.find((one) => one.path === path)
@@ -133,9 +133,10 @@ export function RunUpWizard({
     if (step === 'worktrees') {
       if (all.isPending) return <Skeleton className="h-40 w-full" />
       return (
-        <WorktreesStep
+        <RunWorktreesStep
           options={worktreeOptions}
           checked={chosen}
+          verb="Start in"
           onCheck={(worktrees, on) => dispatch({ type: 'check', worktrees, on })}
         />
       )

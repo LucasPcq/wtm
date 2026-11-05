@@ -888,10 +888,14 @@ func serving(t *testing.T, params daemonParams) string {
 		cancel()
 		<-served
 	})
+	// The socket file exists from its bind, before the daemon listens, and Jobs falls back to the index when none answers: only a connection taken says the daemon serves.
 	require.Eventually(t, func() bool {
-		_, err := daemon.Daemon{SocketPath: socket, Version: version}.Jobs(context.Background())
-		_, statErr := os.Stat(socket)
-		return err == nil && statErr == nil
+		conn, err := net.Dial("unix", socket)
+		if err != nil {
+			return false
+		}
+		_ = conn.Close()
+		return true
 	}, 5*time.Second, 10*time.Millisecond)
 	return socket
 }

@@ -4,11 +4,13 @@ import type { ContextMenuItem } from '@/components/ui/context-menu'
 import type { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 
+// a reason it is disabled takes the second line, else its description
 // aria-disabled, not disabled: the keyboard skips a Radix disabled item, so its reason would be out of reach
 export function MenuEntry({
   Item,
   icon: Icon,
   label,
+  description,
   why,
   destructive = false,
   onSelect,
@@ -17,6 +19,7 @@ export function MenuEntry({
   Item: typeof ContextMenuItem | typeof DropdownMenuItem
   icon: LucideIcon
   label: string
+  description?: string
   why: string | undefined
   destructive?: boolean
   onSelect?: () => void
@@ -35,7 +38,7 @@ export function MenuEntry({
       <Icon />
       <span className="flex min-w-0 flex-1 flex-col">
         {label}
-        {why && <span className="text-xs text-muted-foreground">{why}</span>}
+        {(why ?? description) && <span className="text-xs text-muted-foreground">{why ?? description}</span>}
       </span>
       {children}
     </Item>

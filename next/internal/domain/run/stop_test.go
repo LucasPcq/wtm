@@ -16,6 +16,8 @@ func TestAStopStopsOwnJobsClearsCrashesAndReleasesWhatOthersHold(t *testing.T) {
 	exited := Job{Name: "migrate", WorkDir: "/a", State: Exited, Hold: HoldOwn}
 	mainHeld := db
 	mainHeld.MainHolds = true
+	mainUnknown := db
+	mainUnknown.MainHoldsUnknown = true
 	cases := map[string]struct {
 		jobs  []Job
 		dirs  []string
@@ -29,6 +31,7 @@ func TestAStopStopsOwnJobsClearsCrashesAndReleasesWhatOthersHold(t *testing.T) {
 		"main_holds":    {jobs: []Job{mainHeld, claim("/a")}, dirs: []string{"/a"}, want: []Stopping{{Job: claim("/a"), Fate: FateRelease, KeptBy: []string{"/main"}}}},
 		"main_releases": {jobs: []Job{mainHeld, claim("/a")}, dirs: []string{"/main"}, want: []Stopping{{Job: mainHeld, Fate: FateRelease, KeptBy: []string{"/a"}}}},
 		"main_not_held": {jobs: []Job{db, claim("/a")}, dirs: []string{"/main"}},
+		"main_unknown":  {jobs: []Job{mainUnknown, claim("/a")}, dirs: []string{"/main"}, want: []Stopping{{Job: mainUnknown, Fate: FateRelease, KeptBy: []string{"/a"}}}},
 		"names":         {jobs: []Job{api, crashed, db, claim("/a")}, dirs: []string{"/a"}, names: []string{"db"}, want: []Stopping{{Job: claim("/a"), Fate: FateStop}}},
 		"order":         {jobs: []Job{claim("/a"), api, claim("/b")}, dirs: []string{"/b", "/a"}, want: []Stopping{{Job: claim("/b"), Fate: FateStop}, {Job: claim("/a"), Fate: FateStop}, {Job: api, Fate: FateStop}}},
 	}

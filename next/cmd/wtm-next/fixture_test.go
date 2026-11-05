@@ -221,7 +221,7 @@ func mutations() []mutation {
 			// the job is a stack since, whose launcher left it up: the plan stops it with its stop command
 			stale: func(t *testing.T, main string) {
 				client := daemon.Daemon{SocketPath: events.SocketPath(), Version: version}
-				_, err := client.Stop(t.Context(), run.Stop{Name: "idle", WorkDir: main})
+				_, err := client.Stop(t.Context(), run.Stop{Name: "idle", WorkDir: main}, nil)
 				require.NoError(t, err)
 				_, err = client.Start(t.Context(), run.Spec{Job: project.Job{Name: "idle", Kind: project.Service, Cmd: "true", Stop: "true"}, WorkDir: main}, nil)
 				require.NoError(t, err)

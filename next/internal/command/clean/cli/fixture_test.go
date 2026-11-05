@@ -155,7 +155,7 @@ func (idle) Start(context.Context, run.Spec, func(run.Line)) (run.Job, error) {
 	return run.Job{}, nil
 }
 
-func (idle) Stop(context.Context, run.Stop) (run.Outcome, error) {
+func (idle) Stop(context.Context, run.Stop, func(run.Line)) (run.Outcome, error) {
 	return run.OutcomeNotRunning, nil
 }
 

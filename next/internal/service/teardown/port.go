@@ -32,7 +32,7 @@ type EnvFiles interface {
 type Daemon interface {
 	Jobs(ctx context.Context) ([]run.Job, error)
 	Start(ctx context.Context, spec run.Spec, out func(run.Line)) (run.Job, error)
-	Stop(ctx context.Context, req run.Stop) (run.Outcome, error)
+	Stop(ctx context.Context, req run.Stop, out func(run.Line)) (run.Outcome, error)
 	StopAll(ctx context.Context, req run.StopAll) ([]run.StoppedJob, error)
 }
 

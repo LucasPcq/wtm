@@ -146,7 +146,9 @@ func (d *daemon) Start(_ context.Context, spec run.Spec, out func(run.Line)) (ru
 
 func (d *daemon) StopAll(context.Context, run.StopAll) ([]run.StoppedJob, error) { return nil, nil }
 
-func (d *daemon) Stop(context.Context, run.Stop) (run.Outcome, error) { return run.OutcomeStopped, nil }
+func (d *daemon) Stop(context.Context, run.Stop, func(run.Line)) (run.Outcome, error) {
+	return run.OutcomeStopped, nil
+}
 
 // Attach gives a terminal the job never prints to.
 func (d *daemon) Attach(context.Context, run.Window) (net.Conn, error) {

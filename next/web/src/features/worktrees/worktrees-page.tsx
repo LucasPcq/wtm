@@ -20,6 +20,7 @@ import { rowsOf } from '@/features/worktrees/list/utils/rows'
 import { PruneDialog } from '@/features/worktrees/prune/prune-dialog'
 import { RemoveDialog } from '@/features/worktrees/remove/remove-dialog'
 import { ReparentDialog } from '@/features/worktrees/reparent/reparent-dialog'
+import { RunDownDialog } from '@/features/worktrees/run-down/run-down-dialog'
 import { RunUpDialog } from '@/features/worktrees/run-up/run-up-dialog'
 import { useChoice } from '@/features/worktrees/store/ui-store'
 import { SyncDialog } from '@/features/worktrees/sync/sync-dialog'
@@ -93,6 +94,7 @@ export function WorktreesPage({ repo, search }: { repo: string; search: Worktree
       <ReparentDialog repo={repo} />
       <SyncDialog repo={repo} />
       <RunUpDialog repo={repo} />
+      <RunDownDialog repo={repo} />
       {selected.length > 0 ? (
         <SelectionBar repo={repo} count={selected.length} rows={selectedRows} onClear={selection.clear} />
       ) : (

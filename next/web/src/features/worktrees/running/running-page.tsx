@@ -10,7 +10,9 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ReadFailed } from '@/features/worktrees/components/read-failed'
 import { ReasonButton } from '@/features/worktrees/components/reason-button'
 import { clockEvery, useRun } from '@/features/worktrees/hooks/use-run'
+import { openRunDown } from '@/features/worktrees/hooks/use-run-down-dialog'
 import { openRunUp, useRunUpDialog } from '@/features/worktrees/hooks/use-run-up-dialog'
+import { RunDownDialog } from '@/features/worktrees/run-down/run-down-dialog'
 import { RunUpDialog } from '@/features/worktrees/run-up/run-up-dialog'
 import { JobPanel } from '@/features/worktrees/running/components/job-panel'
 import { JobSwitcher } from '@/features/worktrees/running/components/job-switcher'
@@ -115,7 +117,12 @@ export function RunningPage({ repo, search }: { repo: string; search: RunningSea
         description={description()}
         action={
           <div className="flex gap-2">
-            <ReasonButton disabled why="Not in the web yet" onClick={() => {}} variant="outline">
+            <ReasonButton
+              disabled={groups.length === 0}
+              why={groups.length === 0 ? 'Nothing is running' : undefined}
+              onClick={() => openRunDown(repo)}
+              variant="outline"
+            >
               Stop jobs
             </ReasonButton>
             {start}
@@ -123,6 +130,7 @@ export function RunningPage({ repo, search }: { repo: string; search: RunningSea
         }
       />
       <RunUpDialog repo={repo} />
+      <RunDownDialog repo={repo} />
       <div className="min-h-0 flex-1 overflow-hidden" aria-busy={!list.data}>
         {body()}
       </div>

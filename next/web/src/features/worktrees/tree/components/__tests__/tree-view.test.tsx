@@ -52,7 +52,7 @@ test("the main worktree's menu keeps every action in place, those it can't take 
     'Reparent',
     'Run a command',
     'Start a profile',
-    'Stop the profile',
+    'Stop its jobs',
     'View the logs',
     'Go to the worktree',
     'Open the pull request',

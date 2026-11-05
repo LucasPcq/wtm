@@ -43,3 +43,20 @@ func TestReachRefusesADaemonStartedThatStillCannotTell(t *testing.T) {
 	assert.Equal(t, "run-stop"+runjobs.DaemonUnavailable, refused.Code)
 	assert.True(t, d.ensured)
 }
+
+func TestAStacksStopCommandReportsItsLinesInItsPhase(t *testing.T) {
+	d := &daemon{stopLines: []string{"Container stack Stopping", "Container stack Stopped"}}
+	var events []domain.Event
+	target := runjobs.StopTarget{Worktree: featA, Path: featPath, Jobs: []runjobs.StopJob{{Name: "stack", Hold: run.HoldDetached, Fate: run.FateStop, StopCommand: "docker compose down"}}}
+
+	runjobs.Stop(t.Context(), d, runjobs.StopParams{Command: "run-down", Targets: []runjobs.StopTarget{target}, Report: func(event domain.Event) { events = append(events, event) }})
+
+	assert.Equal(t, []domain.Event{
+		domain.UnitStarted{Subject: featA},
+		domain.PhaseStarted{Subject: featA, Phase: domain.PhaseJob, Job: "stack"},
+		domain.Output{Subject: featA, Job: "stack", Line: "Container stack Stopping"},
+		domain.Output{Subject: featA, Job: "stack", Line: "Container stack Stopped"},
+		domain.PhaseFinished{Subject: featA, Phase: domain.PhaseJob, Job: "stack"},
+		domain.UnitFinished{Subject: featA, Status: domain.StatusDone},
+	}, events)
+}

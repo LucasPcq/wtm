@@ -190,7 +190,7 @@ func (s Service) stopJobs(ctx context.Context, params RemoveParams) ([]domain.Wa
 	}
 	for _, name := range names {
 		// A stop that fails shows in the listing after.
-		_, _ = s.Daemon.Stop(ctx, run.Stop{Name: name, WorkDir: removal.Path, CorrelationID: params.CorrelationID})
+		_, _ = s.Daemon.Stop(ctx, run.Stop{Name: name, WorkDir: removal.Path, CorrelationID: params.CorrelationID}, nil)
 	}
 	jobs, err := s.jobs(ctx)
 	left := run.OwnUpIn(jobs, removal.Path)

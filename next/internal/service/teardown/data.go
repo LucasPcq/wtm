@@ -420,7 +420,7 @@ func (s Service) release(ctx context.Context, params BatchParams, removed []Remo
 		}
 	}
 	for _, job := range lit {
-		if _, err := s.Daemon.Stop(ctx, run.Stop{Name: job, WorkDir: params.Facts.MainPath, CorrelationID: params.CorrelationID}); err != nil {
+		if _, err := s.Daemon.Stop(ctx, run.Stop{Name: job, WorkDir: params.Facts.MainPath, CorrelationID: params.CorrelationID}, nil); err != nil {
 			warnings = append(warnings, domain.Warning{Code: params.Command + ReleaseFailed, Message: "couldn't stop " + job + ", started to drop data (" + err.Error() + "): it runs until stopped", Params: domain.Params{"job": job, "cause": err.Error()}})
 		}
 	}

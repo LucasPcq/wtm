@@ -27,7 +27,7 @@ type Daemon interface {
 	Ensure(ctx context.Context) error
 	Start(ctx context.Context, spec run.Spec, out func(run.Line)) (run.Job, error)
 	StopAll(ctx context.Context, req run.StopAll) ([]run.StoppedJob, error)
-	Stop(ctx context.Context, req run.Stop) (run.Outcome, error)
+	Stop(ctx context.Context, req run.Stop, out func(run.Line)) (run.Outcome, error)
 }
 
 // Lister is the run daemon as a read asks it: the jobs it runs, with a *run.Skewed beside them when it is of another build, run.ErrUnknown when none answers and its index holds a process.
@@ -37,7 +37,7 @@ type Lister interface {
 
 // Stopper is the run daemon as a stop asks it: a job stopped, a daemon woken for it when its index holds the worktree's jobs.
 type Stopper interface {
-	Stop(ctx context.Context, req run.Stop) (run.Outcome, error)
+	Stop(ctx context.Context, req run.Stop, out func(run.Line)) (run.Outcome, error)
 }
 
 // Listening dials each of ports on the loopback until something answers on every one, within, or ctx ends, and reports which answered.

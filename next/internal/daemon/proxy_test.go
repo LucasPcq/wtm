@@ -19,7 +19,7 @@ func TestAServiceUpIsServedUnderItsNameAndListedByItUntilItStops(t *testing.T) {
 	started, err := w.Start(routed(service("web")), nil)
 	require.NoError(t, err)
 	served := w.routes.table()
-	_, err = w.Stop(run.Stop{Name: "web", WorkDir: "/wt/a"})
+	_, err = w.Stop(run.Stop{Name: "web", WorkDir: "/wt/a"}, nil)
 	require.NoError(t, err)
 
 	assert.Equal(t, map[string]int{"web.feat-a.acme.localhost": 3100}, served)
@@ -54,7 +54,7 @@ func TestAStackIsServedOnceLaunchedAndWithdrawnOnceItsStopCommandRan(t *testing.
 	close(up)
 	require.NoError(t, <-launched)
 	served := w.routes.table()
-	_, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"})
+	_, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"}, nil)
 	require.NoError(t, err)
 
 	assert.Empty(t, launching, "nothing answers while its launcher runs")
@@ -67,7 +67,7 @@ func TestAStackWhoseStopCommandFailsStaysServed(t *testing.T) {
 	_, err := w.Start(routed(stack("db")), nil)
 	require.NoError(t, err)
 
-	_, err = w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"})
+	_, err = w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"}, nil)
 
 	require.Error(t, err)
 	assert.Equal(t, map[string]int{"db.feat-a.acme.localhost": 3100}, w.routes.table())
@@ -93,10 +93,10 @@ func TestASharedJobIsServedOnceForEveryWorktreeHoldingIt(t *testing.T) {
 	}
 
 	served := w.routes.table()
-	_, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"})
+	_, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"}, nil)
 	require.NoError(t, err)
 	released := w.routes.table()
-	_, err = w.Stop(run.Stop{Name: "db", WorkDir: "/wt/b"})
+	_, err = w.Stop(run.Stop{Name: "db", WorkDir: "/wt/b"}, nil)
 	require.NoError(t, err)
 
 	assert.Equal(t, map[string]int{"db.acme.localhost": 3100}, served)
@@ -132,7 +132,7 @@ func TestAStopCommandThatHangsIsStoppedAndLeavesTheStackUp(t *testing.T) {
 	_, err := w.Start(stack("db"), nil)
 	require.NoError(t, err)
 
-	_, err = w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"})
+	_, err = w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"}, nil)
 
 	var failure *run.Error
 	require.ErrorAs(t, err, &failure)
@@ -151,7 +151,7 @@ func TestAStopRacingAStackLaunchedAgainLeavesTheNewStackServed(t *testing.T) {
 	require.NoError(t, err)
 	stopped := make(chan error, 1)
 	go func() {
-		_, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"})
+		_, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"}, nil)
 		stopped <- err
 	}()
 	require.Eventually(t, func() bool { return w.spawner.process("down db") != nil }, time.Second, time.Millisecond)
@@ -170,7 +170,7 @@ func TestAStackALauncherStoppedLeftUpIsServedWhenItsStopCommandFails(t *testing.
 	go func() { _, _ = w.Start(routed(stack("db")), nil) }()
 	require.Eventually(t, func() bool { return len(w.spawner.lines()) == 1 }, time.Second, time.Millisecond)
 
-	_, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"})
+	_, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"}, nil)
 
 	require.Error(t, err)
 	assert.True(t, w.job(t, "db").Up)
@@ -183,7 +183,7 @@ func TestAStopCommandAShutdownCutsShortSaysSo(t *testing.T) {
 	require.NoError(t, err)
 	stopped := make(chan error, 1)
 	go func() {
-		_, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"})
+		_, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"}, nil)
 		stopped <- err
 	}()
 	require.Eventually(t, func() bool { return w.spawner.process("down db") != nil }, time.Second, time.Millisecond)
@@ -228,7 +228,7 @@ func TestAStackGivenBackAfterAFailedLaunchIsServed(t *testing.T) {
 	require.Eventually(t, func() bool { return len(w.spawner.lines()) == 1 }, time.Second, time.Millisecond)
 	stopped := make(chan error, 1)
 	go func() {
-		_, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"})
+		_, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"}, nil)
 		stopped <- err
 	}()
 	require.Eventually(t, func() bool { return w.spawner.process("down db") != nil }, time.Second, time.Millisecond)

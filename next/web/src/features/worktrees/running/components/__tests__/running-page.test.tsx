@@ -21,7 +21,7 @@ const startOne = async (user: Awaited<ReturnType<typeof renderApp>>['user'], wor
   return dialog
 }
 
-test('nothing running says so in the header and the page, Stop jobs not offered yet and no count', async () => {
+test('nothing running says so in the header and the page, Stop jobs disabled and no count', async () => {
   await renderApp('/r/r1/running')
 
   expect(await screen.findByText('Nothing is running')).toBeDefined()

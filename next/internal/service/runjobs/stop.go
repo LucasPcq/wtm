@@ -372,7 +372,7 @@ type StopParams struct {
 	Report        domain.Report
 }
 
-// Stop stops the jobs of each of params' targets, the worktrees at once, each between its unit's events: its own jobs one after the other, then its holds on shared services, as the daemon's own stop of a worktree does, each between the events of its phase; a stop sent is let finish whatever ctx, and once ctx is cancelled the stops not sent are not reached. A worktree whose stop fails stops none of the others; one reaching no job is unchanged, with no event. Each job reads what the daemon answered, the holds on one shared service let go of together each stopped once one of them stopped it. The items keep the targets' order.
+// Stop stops the jobs of each of params' targets, the worktrees at once, each between its unit's events: its own jobs one after the other, then its holds on shared services, as the daemon's own stop of a worktree does, each between the events of its phase, the lines a stack's stop command prints reported in it; a stop sent is let finish whatever ctx, and once ctx is cancelled the stops not sent are not reached. A worktree whose stop fails stops none of the others; one reaching no job is unchanged, with no event. Each job reads what the daemon answered, the holds on one shared service let go of together each stopped once one of them stopped it. The items keep the targets' order.
 func Stop(ctx context.Context, daemon Stopper, params StopParams) []Stopped {
 	// The worktrees report from several goroutines; a surface draws one event at a time.
 	var mu sync.Mutex
@@ -437,7 +437,9 @@ func stopJob(ctx context.Context, daemon Stopper, params StopParams, t StopTarge
 
 	params.Report(domain.PhaseStarted{Subject: t.Worktree, Phase: domain.PhaseJob, Job: job.Name})
 	// A stop sent is let finish: a stack stopped half-way is worse than one stopped or not.
-	outcome, err := daemon.Stop(context.WithoutCancel(ctx), run.Stop{Name: job.Name, WorkDir: t.Path, CorrelationID: params.CorrelationID})
+	outcome, err := daemon.Stop(context.WithoutCancel(ctx), run.Stop{Name: job.Name, WorkDir: t.Path, CorrelationID: params.CorrelationID}, func(line run.Line) {
+		params.Report(domain.Output{Subject: t.Worktree, Job: job.Name, Line: line.Text})
+	})
 	params.Report(domain.PhaseFinished{Subject: t.Worktree, Phase: domain.PhaseJob, Job: job.Name, Failed: err != nil})
 	if err != nil {
 		return StopResult{Name: job.Name, Status: StopFailure, Message: err.Error()}

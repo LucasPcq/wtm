@@ -21,6 +21,10 @@
             "lines": [
               {
                 "at": "<TIME>",
+                "text": "[wtm] started"
+              },
+              {
+                "at": "<TIME>",
                 "text": "starting"
               },
               {

@@ -313,12 +313,12 @@ func TestAStopWithNoDaemonStartsOneOnlyForAJobTheIndexHolds(t *testing.T) {
 		return nil
 	}}
 
-	elsewhere, err := d.Stop(t.Context(), run.Stop{Name: "db", WorkDir: "/wt/b"})
+	elsewhere, err := d.Stop(t.Context(), run.Stop{Name: "db", WorkDir: "/wt/b"}, nil)
 	require.NoError(t, err)
 	assert.Equal(t, run.OutcomeNotRunning, elsewhere)
 	assert.Zero(t, launched)
 
-	stopped, err := d.Stop(t.Context(), run.Stop{Name: "db", WorkDir: "/wt/a"})
+	stopped, err := d.Stop(t.Context(), run.Stop{Name: "db", WorkDir: "/wt/a"}, nil)
 	require.NoError(t, err)
 	assert.Equal(t, run.OutcomeStopped, stopped)
 	assert.Equal(t, 1, launched)
@@ -327,7 +327,7 @@ func TestAStopWithNoDaemonStartsOneOnlyForAJobTheIndexHolds(t *testing.T) {
 func TestALegacyDaemonsReleaseIsReadAsReleased(t *testing.T) {
 	socket, _ := serve(t, `{"status":"ok","version":"0.30.1","message":"job db stopped","released":true}`)
 
-	outcome, err := daemon.Daemon{SocketPath: socket}.Stop(t.Context(), run.Stop{Name: "db", WorkDir: "/wt/a"})
+	outcome, err := daemon.Daemon{SocketPath: socket}.Stop(t.Context(), run.Stop{Name: "db", WorkDir: "/wt/a"}, nil)
 
 	require.NoError(t, err)
 	assert.Equal(t, run.OutcomeReleased, outcome)
@@ -346,11 +346,22 @@ func TestALegacyDaemonsStopAllReadsEachReleaseAsReleased(t *testing.T) {
 func TestALegacyDaemonsStopIsReadAsStopped(t *testing.T) {
 	socket, requests := serve(t, `{"status":"ok","version":"0.30.1","message":"job web stopped"}`)
 
-	outcome, err := daemon.Daemon{SocketPath: socket}.Stop(t.Context(), run.Stop{Name: "web", WorkDir: "/wt/a", CorrelationID: "c1"})
+	outcome, err := daemon.Daemon{SocketPath: socket}.Stop(t.Context(), run.Stop{Name: "web", WorkDir: "/wt/a", CorrelationID: "c1"}, nil)
 
 	require.NoError(t, err)
 	assert.Equal(t, run.OutcomeStopped, outcome)
 	assert.Equal(t, map[string]any{"action": "stop", "name": "web", "work_dir": "/wt/a", "correlation_id": "c1"}, <-requests)
+}
+
+func TestAStopHandsOutTheLinesItsStopCommandPrints(t *testing.T) {
+	socket, _ := served(t, &jobs{lines: []string{"Container db Stopping", "Container db Stopped"}, outcome: run.OutcomeStopped}, "1.0")
+	var lines []run.Line
+
+	outcome, err := daemon.Daemon{SocketPath: socket}.Stop(t.Context(), run.Stop{Name: "db", WorkDir: "/wt/a"}, func(line run.Line) { lines = append(lines, line) })
+
+	require.NoError(t, err)
+	assert.Equal(t, run.OutcomeStopped, outcome)
+	assert.Equal(t, []run.Line{{At: started, Text: "Container db Stopping"}, {At: started, Text: "Container db Stopped"}}, lines)
 }
 
 func TestStopAllReturnsEachJobWithWhatTheStopDid(t *testing.T) {

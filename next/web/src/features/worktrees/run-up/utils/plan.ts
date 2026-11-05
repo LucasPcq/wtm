@@ -1,6 +1,7 @@
 import type { RunjobsJobPlan, RunupPlan } from '@/api/types.gen'
 import { jobPlan } from '@/features/worktrees/utils/job-plan'
 import { jobsTodo, type PhaseRun, type Unit } from '@/features/worktrees/utils/progress'
+import { named } from '@/features/worktrees/utils/run-words'
 
 export type Shared = { name: string; holders: number; namespaces: string[] }
 
@@ -42,9 +43,6 @@ export function orderedOf(plan: RunupPlan): { worktree: string; jobs: OrderedJob
 export const firstOf = (plan: RunupPlan) => [
   ...new Set((plan.worktrees ?? []).flatMap((target) => (target.jobs ?? []).flatMap((job) => job.waits_for ?? []))),
 ]
-
-export const named = (names: string[]) =>
-  names.length < 2 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
 
 export type HowItRuns = { kind: 'stops' | 'together' | 'namespace' | 'others' | 'keeps'; text: string }
 

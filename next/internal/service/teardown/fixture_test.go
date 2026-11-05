@@ -142,7 +142,7 @@ func (d *daemon) Start(_ context.Context, spec run.Spec, _ func(run.Line)) (run.
 	return job, nil
 }
 
-func (d *daemon) Stop(_ context.Context, req run.Stop) (run.Outcome, error) {
+func (d *daemon) Stop(_ context.Context, req run.Stop, _ func(run.Line)) (run.Outcome, error) {
 	d.calls = append(d.calls, "stop "+req.Name+" "+req.WorkDir)
 	if slices.Contains(d.stuck, req.Name) {
 		return run.OutcomeStopped, nil

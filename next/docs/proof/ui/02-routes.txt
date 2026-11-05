@@ -26,6 +26,8 @@ $ api $U/api/repos/$A/commands | jq -c ".[] | {name, questions: [.form.fields[]?
 {"name":"run-up","questions":["worktree","profile","exclusive","force","parallel","no_probe","detach"]}
 {"name":"run-logs","questions":["worktree","job","follow","search","regex","match_case","since"]}
 {"name":"run-down","questions":["worktree","profile","all"]}
+{"name":"run-start","questions":["worktree","job","exclusive","force","restart","parallel","no_probe","detach"]}
+{"name":"run-stop","questions":["worktree","job"]}
 
 $ api -X POST $C/questions -d '{"answers":[{"path":"branches","values":["feat/x"]}]}' | jq -c '.fields[] | {path, value, entries}'
 {"path":"branches","value":null,"entries":["feat/x"]}

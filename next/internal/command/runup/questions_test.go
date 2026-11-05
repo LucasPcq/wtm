@@ -127,7 +127,7 @@ func TestAWorktreeShowsTheProfileOfItsOwnJobsAlone(t *testing.T) {
 
 	assert.Empty(t, questions.Worktrees.Options[0].Profile)
 	assert.Empty(t, questions.Worktrees.Options[0].Up, "a shared service main runs for every worktree is not one of its own jobs")
-	assert.Equal(t, []string{"db"}, questions.Worktrees.Options[0].Holds)
+	assert.Empty(t, questions.Worktrees.Options[0].Holds, "main runs db for the others without holding it: no hold of its own")
 }
 
 func TestAWorktreeSaysWhatItRunsAsTheDaemonStartedIt(t *testing.T) {
@@ -142,7 +142,7 @@ func TestAWorktreeSaysWhatItRunsAsTheDaemonStartedIt(t *testing.T) {
 	assert.Empty(t, main.Holds)
 }
 
-func TestAWorktreeCountsItsOwnJobsUpAndCrashedNotItsClaims(t *testing.T) {
+func TestAWorktreeCountsItsOwnJobsUpAndCrashedItsClaimsAsHolds(t *testing.T) {
 	w := newWorld(t)
 	w.up("api", featB, nil)
 	w.up("web", featB, nil)
@@ -154,7 +154,7 @@ func TestAWorktreeCountsItsOwnJobsUpAndCrashedNotItsClaims(t *testing.T) {
 	b := questions.Worktrees.Options[slices.IndexFunc(questions.Worktrees.Options, func(o domain.Option) bool { return o.Value == featB })]
 	assert.Equal(t, []string{"api"}, b.Up)
 	assert.Equal(t, 1, b.Crashed)
-	assert.Empty(t, b.Holds)
+	assert.Equal(t, []string{"db"}, b.Holds, "its claim is its hold, not one of its own jobs")
 }
 
 func TestAProfileSaysWhichOfTheWorktreesPickedRunIt(t *testing.T) {

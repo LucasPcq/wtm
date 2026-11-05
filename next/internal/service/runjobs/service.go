@@ -334,7 +334,7 @@ func (s *starting) job(ctx context.Context, index int) bool {
 	s.report(domain.PhaseStarted{Subject: s.target.Worktree, Phase: domain.PhaseJob, Job: planned.Name, Log: result.Log})
 	if planned.Action == ActionRestart {
 		// A stop sent is let finish, as run stop's: a stack stopped half-way is worse than one stopped or not.
-		if _, err := s.Daemon.Stop(context.WithoutCancel(ctx), run.Stop{Name: planned.Name, WorkDir: s.target.Path, CorrelationID: s.params.CorrelationID}); err != nil {
+		if _, err := s.Daemon.Stop(context.WithoutCancel(ctx), run.Stop{Name: planned.Name, WorkDir: s.target.Path, CorrelationID: s.params.CorrelationID}, nil); err != nil {
 			s.report(domain.PhaseFinished{Subject: s.target.Worktree, Phase: domain.PhaseJob, Job: planned.Name, Failed: true})
 			s.started.Status, s.started.Err = domain.StatusFailed, s.jobFailure(planned.Name, err, nil)
 			result.Status = JobFailed

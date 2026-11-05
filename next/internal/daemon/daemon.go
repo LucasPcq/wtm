@@ -370,9 +370,10 @@ func (d *Daemon) settle(j *job, code int) {
 
 // Stop stops a job: a process of the daemon's has its group stopped, a
 // detached stack runs its stop command (failing with [run.CodeStopFailed] when
-// it exits non-zero), a shared job is let go (see release). A job not up is
-// [run.OutcomeNotRunning], and one that ended leaves the listing.
-func (d *Daemon) Stop(req run.Stop) (run.Outcome, error) {
+// it exits non-zero), a shared job is let go (see letGo). A job not up is
+// [run.OutcomeNotRunning], and one that ended leaves the listing. Each line a
+// stop command prints is handed to out (nil for none) while the stop runs.
+func (d *Daemon) Stop(req run.Stop, out func(run.Line)) (run.Outcome, error) {
 	k := key{workDir: req.WorkDir, name: req.Name}
 	d.mu.Lock()
 	j := d.jobs[k]
@@ -385,14 +386,15 @@ func (d *Daemon) Stop(req run.Stop) (run.Outcome, error) {
 	d.mu.Unlock()
 
 	if shared {
-		return d.release(j, req.CorrelationID)
+		return d.letGo(letGoParams{Job: j, CorrelationID: req.CorrelationID, Out: out})
 	}
-	return d.halt(j, req.CorrelationID)
+	return d.halt(j, req.CorrelationID, out)
 }
 
 // halt stops j itself, for the command of correlation: a process of the
-// daemon's has its group stopped, a detached stack runs its stop command.
-func (d *Daemon) halt(j *job, correlation string) (run.Outcome, error) {
+// daemon's has its group stopped, a detached stack runs its stop command, its
+// lines handed to out.
+func (d *Daemon) halt(j *job, correlation string, out func(run.Line)) (run.Outcome, error) {
 	k := keyOf(j.record.Spec)
 	d.mu.Lock()
 	if !j.up() {
@@ -420,11 +422,11 @@ func (d *Daemon) halt(j *job, correlation string) (run.Outcome, error) {
 		}
 		stack.stopped, stack.stopID = true, correlation
 		d.mu.Unlock()
-		if err := d.stopStack(stack); err != nil {
+		if err := d.stopStack(stack, out); err != nil {
 			return "", err
 		}
 	default:
-		if err := d.stopStack(j); err != nil {
+		if err := d.stopStack(j, out); err != nil {
 			return "", err
 		}
 	}
@@ -432,12 +434,15 @@ func (d *Daemon) halt(j *job, correlation string) (run.Outcome, error) {
 	return run.OutcomeStopped, nil
 }
 
-// stopStack runs a detached stack's stop command, then lists it stopped; a
-// stop command that fails, or still runs after 5 minutes or once the daemon
-// stops, leaves it up and indexed: a start waiting on it never waits forever.
-func (d *Daemon) stopStack(j *job) error {
+// stopStack runs a detached stack's stop command, each line it prints handed
+// to out (nil for none), then lists it stopped; a stop command that fails, or
+// still runs after 5 minutes or once the daemon stops, leaves it up and
+// indexed: a start waiting on it never waits forever.
+func (d *Daemon) stopStack(j *job, out func(run.Line)) error {
 	spec := j.record.Spec
-	code, err := d.runUntil(spec.StopCommand(nil), stopLimit)
+	write, flush := d.linesTo(out)
+	code, err := d.runUntil(spec.StopCommand(write), stopLimit)
+	flush()
 	if err != nil || code != 0 {
 		d.mu.Lock()
 		j.stopped = false
@@ -467,6 +472,33 @@ func (d *Daemon) stopStack(j *job) error {
 	return nil
 }
 
+// linesTo cuts what a command prints into lines, each handed to out as it
+// ends, the last one at flush; with out nil, write is nil: the command's
+// output goes nowhere, as a stop that asks for none had it.
+func (d *Daemon) linesTo(out func(run.Line)) (write func([]byte), flush func()) {
+	if out == nil {
+		return nil, func() {}
+	}
+	var mu sync.Mutex
+	var splitter run.Splitter
+	hand := func(lines []run.Line) {
+		for _, line := range lines {
+			out(line)
+		}
+	}
+	write = func(chunk []byte) {
+		mu.Lock()
+		defer mu.Unlock()
+		hand(splitter.Split(chunk, d.params.Now()))
+	}
+	flush = func() {
+		mu.Lock()
+		defer mu.Unlock()
+		hand(splitter.Flush(d.params.Now()))
+	}
+	return write, flush
+}
+
 // StopAll stops every job up in req's worktree, every job of the machine when
 // it names none, together, its shared jobs released after, and returns each as
 // it stood with what the stop did; it fails with the first stop that failed,
@@ -481,7 +513,7 @@ func (d *Daemon) StopAll(req run.StopAll) ([]run.StoppedJob, error) {
 
 	errs := make([]error, len(reached))
 	stop := func(i int) {
-		reached[i].Outcome, errs[i] = d.Stop(run.Stop{Name: reached[i].Job.Name, WorkDir: reached[i].Job.WorkDir, CorrelationID: req.CorrelationID})
+		reached[i].Outcome, errs[i] = d.Stop(run.Stop{Name: reached[i].Job.Name, WorkDir: reached[i].Job.WorkDir, CorrelationID: req.CorrelationID}, nil)
 	}
 	var stopping sync.WaitGroup
 	var shared []int
@@ -528,7 +560,7 @@ func (d *Daemon) Shutdown() {
 	// Halted, never released: a shared job's claims stay in the index for the next daemon, which drops those its job is gone from.
 	var stopping sync.WaitGroup
 	for _, j := range running {
-		stopping.Go(func() { _, _ = d.halt(j, "") })
+		stopping.Go(func() { _, _ = d.halt(j, "", nil) })
 	}
 	stopping.Wait()
 }

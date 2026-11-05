@@ -160,7 +160,7 @@ func (d *daemon) Ensure(context.Context) error {
 	return d.ensureErr
 }
 
-func (d *daemon) Stop(_ context.Context, req run.Stop) (run.Outcome, error) {
+func (d *daemon) Stop(_ context.Context, req run.Stop, _ func(run.Line)) (run.Outcome, error) {
 	if d.onStop != nil {
 		d.onStop()
 	}

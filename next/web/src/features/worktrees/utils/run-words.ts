@@ -1,5 +1,23 @@
-import type { RunjobsJobPlan } from '@/api/types.gen'
+import type { DomainOption, RunjobsJobPlan } from '@/api/types.gen'
 import type { PhaseRun } from '@/features/worktrees/utils/progress'
+
+// what a stop of it reaches: its own jobs up or crashed, or a shared service it holds
+export const runsSomething = ({ up = [], crashed = 0, holds = [] }: DomainOption) =>
+  up.length > 0 || crashed > 0 || holds.length > 0
+
+export const named = (names: string[]) =>
+  names.length < 2 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
+
+// what a worktree runs now, as the picker's second line: its own jobs, or the shared services it runs for all
+export function runsNow({ up = [], crashed = 0, holds = [], profile }: DomainOption) {
+  if (up.length === 0 && crashed === 0) return holds.length > 0 ? `holds ${named(holds)}` : 'nothing running'
+  return [profile && `running ${profile}`, up.length > 0 && `${up.length} up`, crashed > 0 && `${crashed} crashed`]
+    .filter(Boolean)
+    .join(' · ')
+}
+
+export const where = (worktrees: string[]) =>
+  worktrees.length === 1 ? `in ${worktrees[0]}` : `in ${worktrees.length} worktrees`
 
 // a profile's jobs summed up to three and a count, as a menu row holds them
 export const jobsSummary = (jobs: string[] = []) =>

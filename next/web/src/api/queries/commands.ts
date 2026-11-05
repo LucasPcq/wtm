@@ -22,6 +22,8 @@ import type {
   PrunePlan,
   ReparentDetail,
   ReparentPlan,
+  RundownPlan,
+  RunjobsStopDetail,
   RunlogsDetail,
   RunState,
   RunupDetail,
@@ -50,6 +52,7 @@ type Mutation = {
   reparent: { plan: ReparentPlan; detail: ReparentDetail }
   sync: { plan: SyncPlan; detail: SyncDetail }
   'run-up': { plan: RunupPlan; detail: RunupDetail }
+  'run-down': { plan: RundownPlan; detail: RunjobsStopDetail }
 }
 export type MutationCommand = keyof Mutation
 export type Planned<C extends MutationCommand> = Mutation[C]['plan']

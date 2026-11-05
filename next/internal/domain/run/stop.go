@@ -71,7 +71,8 @@ func StoppingIn(jobs []Job, dirs, names []string) []Stopping {
 				stopping = append(stopping, Stopping{Job: job, Fate: FateStop})
 			case Own(job) && job.State == Crashed:
 				stopping = append(stopping, Stopping{Job: job, Fate: FateClear})
-			case job.Up && (job.Hold == HoldClaim || job.MainHolds):
+			// A daemon of another build that cannot tell whether main holds it: taken as held, as RunningIn offers it (the plan warns fates_approximate).
+			case job.Up && (job.Hold == HoldClaim || job.MainHolds || job.MainHoldsUnknown):
 				kept := slices.DeleteFunc(Holders(jobs, job), func(holder string) bool {
 					return slices.ContainsFunc(jobs, func(j Job) bool { return j.WorkDir == holder && j.Name == job.Name && reached(j) })
 				})

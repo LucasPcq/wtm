@@ -185,13 +185,14 @@ func (d Daemon) start(ctx context.Context, spec run.Spec, out func(run.Line)) (r
 	return job, started.failure()
 }
 
-// Stop stops the job req names. A daemon of another build or of the legacy
+// Stop stops the job req names, handing out each line a stack's stop command
+// prints while it runs (out nil for none). A daemon of another build or of the legacy
 // wtm is asked all the same: stopping what it runs is what a restart needs.
 // With no daemon answering, one is started only when the index holds a job of
 // that worktree, a detached stack outliving its daemon; otherwise nothing was
 // running.
-func (d Daemon) Stop(ctx context.Context, req run.Stop) (run.Outcome, error) {
-	stopped, err := d.reach(ctx, reachParams{WorkDir: req.WorkDir, Request: request{Action: actionStop, Name: req.Name, WorkDir: req.WorkDir, CorrelationID: req.CorrelationID}})
+func (d Daemon) Stop(ctx context.Context, req run.Stop, out func(run.Line)) (run.Outcome, error) {
+	stopped, err := d.reach(ctx, reachParams{WorkDir: req.WorkDir, Request: request{Action: actionStop, Name: req.Name, WorkDir: req.WorkDir, CorrelationID: req.CorrelationID, Lines: out != nil}, Out: out})
 	if errors.Is(err, errNoDaemon) {
 		return run.OutcomeNotRunning, nil
 	}
@@ -235,18 +236,20 @@ func outcomeOf(outcome string, released bool) run.Outcome {
 	return cmp.Or(run.Outcome(outcome), run.OutcomeStopped)
 }
 
-// reachParams is a stop request, and the worktree whose jobs in the index
-// make it worth starting a daemon for, every worktree's when empty.
+// reachParams is a stop request, the worktree whose jobs in the index make it
+// worth starting a daemon for, every worktree's when empty, and where the
+// lines the stop prints go (nil for none).
 type reachParams struct {
 	WorkDir string
 	Request request
+	Out     func(run.Line)
 }
 
 // reach sends a stop request to the daemon. With none answering it starts one
 // when the index holds a job of the worktree, and asks it; else it fails with
 // errNoDaemon: nothing is up.
 func (d Daemon) reach(ctx context.Context, params reachParams) (answer, error) {
-	exchange := exchangeParams{Request: params.Request, Timeout: stopTimeout}
+	exchange := exchangeParams{Request: params.Request, Timeout: stopTimeout, Out: params.Out}
 	answered, err := d.exchange(ctx, exchange)
 	if !errors.Is(err, errNoDaemon) {
 		return answered, err
