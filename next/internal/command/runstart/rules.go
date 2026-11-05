@@ -73,13 +73,24 @@ func (f Facts) holds(targets []runjobs.Target, name string) bool {
 	return slices.ContainsFunc(targets, func(t runjobs.Target) bool { return slices.Contains(f.holders(name, t.Path), t.Path) })
 }
 
-// holders are the worktrees, by path, holding the shared service name that the worktree at dir runs or claims: none when it has none of it up.
+// upAnywhere reports whether the job name is up in some worktree: a shared service up nowhere is started, restart or not.
+func (f Facts) upAnywhere(name string) bool {
+	return slices.ContainsFunc(f.Jobs, func(job run.Job) bool { return job.Name == name && job.Up })
+}
+
+// holders are the worktrees, by path, holding the shared service name that the worktree at dir runs or claims: none when it has none of it up. A daemon of another build that cannot tell whether the main checkout holds it is taken as holding it, as run stop takes it.
 func (f Facts) holders(name, dir string) []string {
 	at := slices.IndexFunc(f.Jobs, func(job run.Job) bool { return job.Name == name && job.WorkDir == dir && job.Up })
 	if at < 0 {
 		return nil
 	}
-	return run.Holders(f.Jobs, f.Jobs[at])
+	held := run.Holders(f.Jobs, f.Jobs[at])
+	service := f.Jobs[at]
+	if service.MainHoldsUnknown && service.WorkDir == service.SharedDir && !slices.Contains(held, dir) {
+		held = append(held, dir)
+		slices.Sort(held)
+	}
+	return held
 }
 
 // heldBy are the worktrees, by name, a restart of the shared service the plan starts again stops for a moment: every one holding it; none for any other start.
@@ -221,8 +232,11 @@ func (p Plan) unchanged() bool {
 // ----------------------------------------------------------------------------
 // The recap
 
-// RecapOwed keys the recap's row of the drops owed the plan pays.
-const RecapOwed = teardown.RecapOwed
+// RecapOwed keys the recap's row of the drops owed the plan pays; RecapHeldBy the worktrees a shared service's restart stops for a moment.
+const (
+	RecapOwed   = teardown.RecapOwed
+	RecapHeldBy = "held_by"
+)
 
 // recap is the plan row by row: the worktree, the job with what the start does to it, the worktrees whose jobs stop first, and the drops owed it pays.
 func (p Plan) recap() []domain.RecapRow {
@@ -245,7 +259,7 @@ func (p Plan) recap() []domain.RecapRow {
 		rows = append(rows, domain.RecapRow{Key: "stops", Label: "Stops first", Path: PathExclusive, Values: domain.RecapValues(stopped)})
 	}
 	if len(p.HeldBy) > 0 {
-		rows = append(rows, domain.RecapRow{Key: "held_by", Label: "Stops for a moment in", Values: domain.RecapValues(p.HeldBy)})
+		rows = append(rows, domain.RecapRow{Key: RecapHeldBy, Label: "Stops for a moment in", Values: domain.RecapValues(p.HeldBy)})
 	}
 	if len(p.Owed) > 0 {
 		rows = append(rows, domain.RecapRow{Key: RecapOwed, Label: "Owed", Values: teardown.RecappedDebts(p.Owed)})

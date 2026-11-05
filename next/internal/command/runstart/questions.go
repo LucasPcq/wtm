@@ -121,7 +121,7 @@ type Questions struct {
 	Errors    []domain.FieldError
 }
 
-// The codes of the problems of a request: a worktree whose directory is gone or whose record does not read, --exclusive beside --parallel, and --restart of a shared service the worktree does not hold.
+// The codes of the problems of a request: a worktree whose directory is gone or whose record does not read, --exclusive beside --parallel, and --restart of a shared service up elsewhere that the worktree does not hold.
 const (
 	CodeWorktreeGone   = Name + runjobs.WorktreeGone
 	CodeMetaUnreadable = Name + domain.MetaUnreadable
@@ -147,7 +147,7 @@ func NewQuestions(f Facts, req Request) Questions {
 		questions.Errors = append(questions.Errors, domain.Required(PathJob))
 	case !declared:
 		questions.Errors = append(questions.Errors, domain.FieldError{Path: PathJob, Code: domain.CodeNotFound, Template: "{value} is no job of run.toml", Params: domain.Params{"value": req.Job}})
-	case req.Restart && job.Scope == project.Shared && !f.holds(targets, req.Job):
+	case req.Restart && job.Scope == project.Shared && f.upAnywhere(req.Job) && !f.holds(targets, req.Job):
 		questions.Errors = append(questions.Errors, domain.FieldError{Path: PathRestart, Code: CodeRestartShared, Template: "{job} is a shared service {worktree} does not hold: only a worktree holding it restarts it", Params: domain.Params{"job": req.Job, "worktree": worktree.Value}})
 	}
 

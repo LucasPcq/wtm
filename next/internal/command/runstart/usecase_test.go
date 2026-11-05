@@ -96,6 +96,11 @@ func TestARestartWhoseStopFailsStartsNothing(t *testing.T) {
 
 func TestARequestsProblemsAreRefusedAsFieldErrors(t *testing.T) {
 	w := newWorld(t)
+	// db up for feat/b, which feat/a does not hold
+	w.daemon.listed = append(w.daemon.listed,
+		run.Job{Name: "db", WorkDir: w.main, SharedDir: w.main, Up: true, State: run.Running, Hold: run.HoldOwn},
+		run.Job{Name: "db", WorkDir: w.at(featB), SharedDir: w.main, Up: true, Hold: run.HoldClaim},
+	)
 	restartShared := starting("db", featA)
 	restartShared.Restart = true
 	cases := map[string]struct {
@@ -355,4 +360,30 @@ func TestTheMainCheckoutRunningASharedServiceForTheOthersJoinsIt(t *testing.T) {
 	assert.False(t, planned.Empty)
 	assert.Equal(t, w.main, w.daemon.specOf(t, w.main, "db").WorkDir, "the daemon is asked: it takes main's own hold")
 	assert.Equal(t, map[string]runjobs.JobStatus{"db": runjobs.JobJoined}, statusesOf(result.Items[0]))
+}
+
+func TestARestartOfASharedServiceUpNowhereStartsIt(t *testing.T) {
+	w := newWorld(t)
+	req := starting("db", featA)
+	req.Restart = true
+
+	planned, _ := w.plan(t, req)
+
+	assert.Equal(t, runjobs.ActionJoin, planned.Worktrees[0].Jobs[0].Action, "joined, as a start of it")
+	assert.Empty(t, planned.HeldBy)
+}
+
+func TestARestartFromAMainCheckoutADaemonOfAnotherBuildCannotTellHoldsIsTakenAsHeld(t *testing.T) {
+	w := newWorld(t)
+	w.daemon.listed = append(w.daemon.listed,
+		run.Job{Name: "db", WorkDir: w.main, SharedDir: w.main, MainHoldsUnknown: true, Up: true, State: run.Running, Hold: run.HoldOwn},
+		run.Job{Name: "db", WorkDir: w.at(featA), SharedDir: w.main, Up: true, Hold: run.HoldClaim},
+	)
+	req := starting("db", "main")
+	req.Restart = true
+
+	planned, _ := w.plan(t, req)
+
+	assert.Equal(t, runjobs.ActionRestart, planned.Worktrees[0].Jobs[0].Action)
+	assert.Equal(t, []string{"main", featA}, planned.HeldBy)
 }
