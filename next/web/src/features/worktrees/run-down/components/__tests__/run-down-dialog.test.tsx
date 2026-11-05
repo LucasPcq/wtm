@@ -122,6 +122,8 @@ test("a stack that doesn't stop fails its worktree alone, said first", async () 
   expect(await within(dialog).findByText('Jobs stopped in 1 of 2 worktrees.')).toBeDefined()
   const failed = within(dialog).getByRole('region', { name: "Couldn't stop" })
   expect(within(failed).getByText("stack didn't stop: exit 1")).toBeDefined()
+  await user.click(within(failed).getByRole('button', { name: /Details of fix\/login/ }))
+  expect(within(failed).getByText(/Container mailpit-1 +Stopped/), "the stack's own lines say why").toBeDefined()
   expect(
     within(within(dialog).getByRole('region', { name: 'Stopped' })).getByText('web, api · worker cleared'),
   ).toBeDefined()

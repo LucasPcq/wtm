@@ -36,7 +36,7 @@ export function RunDownProgress({
   const { done, total } = countOf(progress.units, ran.plan)
   const failed = items.filter((item) => item.status !== 'done').length
   const refused = progress.refused ?? (items.some((item) => item.error) ? undefined : envelope?.error?.message)
-  const { groups, labels, warnings } = recapOf(envelope, ran.plan)
+  const { groups, labels, warnings } = recapOf(envelope, ran.plan, progress.units)
   const shared = sharedOf(ran.plan)
   const isShared = (name: string | undefined) => shared.some((service) => service.name === name)
 

@@ -9,15 +9,18 @@ import {
   type OutcomeRow,
   planWide,
 } from '@/features/worktrees/utils/outcome'
+import type { Unit } from '@/features/worktrees/utils/progress'
 
 type RunDownItem = Applied<'run-down'>['items'][number]
 
 // a worktree's own jobs said by what became of them: what went wrong first, what stopped, then the rest
 const order: RunjobsStopStatus[] = ['failed', 'not_reached', 'stopped', 'cleared', 'not_running']
 
+// units are the stop's progress: a worktree that failed shows the lines of the jobs that would not stop
 export function recapOf(
   envelope: Applied<'run-down'> | undefined,
   plan: RundownPlan | undefined,
+  units: Unit[] = [],
 ): { groups: OutcomeGroup[]; labels: Record<OutcomeKind, string>; warnings: DomainWarning[] } {
   const items = envelope?.items ?? []
   const warnings = envelope?.warnings ?? []
@@ -40,7 +43,11 @@ export function recapOf(
     if (item.status === 'done' && item.reason === 'unchanged')
       return { ...base, tone: 'muted', message: 'nothing was running' }
     if (item.status === 'done') return { ...base, tone: 'ok', message: said(item) }
-    return { ...base, tone: 'failed', message: item.error?.message ?? said(item) }
+    const lines = (units.find((unit) => unit.subject === item.subject)?.phases ?? [])
+      .filter((run) => run.state === 'failed')
+      .flatMap((run) => run.lines ?? [])
+    const output = lines.length > 0 ? { lines } : undefined
+    return { ...base, tone: 'failed', message: item.error?.message ?? said(item), output }
   }
 
   // a shared service says what its holders' stops did to it, once
