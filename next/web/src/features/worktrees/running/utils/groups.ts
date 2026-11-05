@@ -57,9 +57,7 @@ export function groupsOf({
         counts: jobCounts(listed),
         starting: coming.length > 0,
         rows: [...listed.map((job) => ({ name: job.name, job })), ...coming],
-        holds: (detail?.jobs ?? [])
-          .filter((job) => job.hold === 'claim' && job.state === 'running')
-          .map((job) => job.name),
+        holds: (detail?.jobs ?? []).filter((job) => job.hold === 'claim').map((job) => job.name),
       },
     ]
   })

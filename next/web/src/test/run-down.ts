@@ -32,6 +32,12 @@ const own: Record<string, RunjobsStopJob[]> = {
 const profiles: Record<string, string> = { 'feat/billing': 'dev', 'fix/login': 'full' }
 const holders = ['feat/billing', 'fix/login']
 
+// the core lists a claim with no state: its service runs in the main checkout
+const claim = (name: string) => {
+  const { state: _, ...listed } = job(name, { hold: 'claim', profile: '' })
+  return listed
+}
+
 export const runningAcme: ListDetail[] = worktrees.map((w) => {
   if (w.main) return { ...w, jobs: [job('postgres', { profile: '' })] }
   const jobs = own[w.branch]
@@ -43,7 +49,7 @@ export const runningAcme: ListDetail[] = worktrees.map((w) => {
       ...jobs.map(({ name, fate }) =>
         job(name, { profile: profiles[w.branch] ?? '', ...(fate === 'clear' && { state: 'crashed', exit_code: 1 }) }),
       ),
-      job('postgres', { hold: 'claim', profile: '' }),
+      claim('postgres'),
     ],
   }
 })
