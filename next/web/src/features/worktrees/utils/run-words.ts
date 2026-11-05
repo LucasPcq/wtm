@@ -1,6 +1,10 @@
 import type { DomainOption, RunjobsJobPlan } from '@/api/types.gen'
 import type { PhaseRun } from '@/features/worktrees/utils/progress'
 
+// what a stop of it reaches: its own jobs up or crashed, or a shared service it holds
+export const runsSomething = ({ up = [], crashed = 0, holds = [] }: DomainOption) =>
+  up.length > 0 || crashed > 0 || holds.length > 0
+
 export const named = (names: string[]) =>
   names.length < 2 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
 

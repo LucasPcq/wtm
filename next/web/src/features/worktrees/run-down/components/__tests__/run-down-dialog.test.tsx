@@ -177,3 +177,20 @@ test('the detail of a worktree that runs nothing says so on Confirm, nothing to 
   expect(rows(left)).toEqual(['feat/billing-uinothing running'])
   await disabled(dialog, 'Stop jobs')
 })
+
+// main runs postgres for the others only: its group's stop opened a Confirm with nothing to stop.
+test("main's group, running a shared service for the others alone, offers no stop and says why", async () => {
+  server.use(...answeringRunDown())
+  const { user } = await renderApp('/r/r1/running')
+
+  const group = await screen.findByRole('region', { name: 'main' })
+  const button = within(group).getByRole('button', { name: 'Stop its jobs of main' })
+  await waitFor(() => expect(button.getAttribute('aria-disabled')).toBe('true'))
+  await user.click(button)
+  await user.click(within(group).getByRole('button', { name: 'More for main' }))
+
+  const item = await screen.findByRole('menuitem', { name: /Stop its jobs/ })
+  expect(item.textContent).toBe('Stop its jobsRuns postgres for the other worktrees only')
+  expect(item.getAttribute('aria-disabled')).toBe('true')
+  expect(screen.queryByRole('dialog', { name: 'Stop jobs' })).toBeNull()
+})

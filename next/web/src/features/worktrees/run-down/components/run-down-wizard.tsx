@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { dryRunQuery, questionsQuery } from '@/api/queries/commands'
-import type { DomainAnswered, DomainOption } from '@/api/types.gen'
+import type { DomainAnswered } from '@/api/types.gen'
 import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -21,10 +21,7 @@ import type { RunDownAsk, RunDownRan, RunDownStep } from '@/features/worktrees/h
 import { ConfirmStep } from '@/features/worktrees/run-down/components/confirm-step'
 import { unitsOf } from '@/features/worktrees/run-down/utils/plan'
 import { stopLabel } from '@/features/worktrees/run-down/utils/words'
-import { where } from '@/features/worktrees/utils/run-words'
-
-const runsSomething = ({ up = [], crashed = 0, holds = [] }: DomainOption) =>
-  up.length > 0 || crashed > 0 || holds.length > 0
+import { runsSomething, where } from '@/features/worktrees/utils/run-words'
 
 export function RunDownWizard({
   repo,

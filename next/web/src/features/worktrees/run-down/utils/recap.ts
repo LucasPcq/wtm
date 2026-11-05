@@ -31,9 +31,13 @@ export function recapOf(
   // a worktree that held shared services alone says it let them go
   const said = (item: RunDownItem) => {
     const all = item.detail?.jobs ?? []
-    const jobs = all.filter((job) => !isShared(item.subject, job.name))
-    const holds = all.filter((job) => isShared(item.subject, job.name)).map((job) => job.name)
-    if (jobs.length === 0 && holds.length > 0) return `let go of ${holds.join(', ')}`
+    const own = all.filter((job) => !isShared(item.subject, job.name))
+    const letGo = all
+      .filter((job) => isShared(item.subject, job.name) && (job.status === 'released' || job.status === 'stopped'))
+      .map((job) => job.name)
+    if (own.length === 0 && letGo.length > 0) return `let go of ${letGo.join(', ')}`
+    // one that held shared services alone and was cut short says what of them was not reached
+    const jobs = own.length > 0 ? own : all
     return order
       .flatMap((status) => {
         const names = jobs.filter((job) => job.status === status).map((job) => job.name)
@@ -70,8 +74,11 @@ export function recapOf(
         row: { ...row, tone: 'ok' as const, message: `keeps running for ${kept(service.keptBy)}` },
         group: 'released',
       }
-    if (statuses.length === 0) return undefined
-    return { row: { ...row, tone: 'muted' as const, message: 'already stopped' }, group: 'stopped' }
+    if (status('not_running'))
+      return { row: { ...row, tone: 'muted' as const, message: 'already stopped' }, group: 'stopped' }
+    if (status('not_reached'))
+      return { row: { ...row, tone: 'muted' as const, message: 'not reached' }, group: 'failed' }
+    return undefined
   })
   const servicesIn = (group: string) => services.flatMap((service) => (service?.group === group ? [service.row] : []))
 

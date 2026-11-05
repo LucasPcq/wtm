@@ -36,3 +36,22 @@ test("a worktree's own job named like a shared service is its own, said among wh
     ['feat/b', 'let go of cache'],
   ])
 })
+
+test('a stop cut short before a shared service says it was not reached, never among what stopped', () => {
+  const cut = {
+    subject: 'feat/b',
+    status: 'skipped' as const,
+    reason: 'not_reached',
+    detail: { path: '/b', jobs: [{ name: 'cache', status: 'not_reached' }] },
+  }
+  const envelope = { ok: false, items: [done('feat/a', 'stopped'), cut] } as unknown as Applied<'run-down'>
+
+  const [failed, , released, stopped] = recapOf(envelope, plan).groups
+
+  expect(failed?.rows.map((row) => [row.title, row.message])).toEqual([
+    ['feat/b', 'cache not reached'],
+    ['cache', 'not reached'],
+  ])
+  expect(released?.rows).toEqual([])
+  expect(stopped?.rows.map((row) => row.title)).toEqual(['feat/a'])
+})

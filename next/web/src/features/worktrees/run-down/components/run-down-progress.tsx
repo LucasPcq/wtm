@@ -90,7 +90,15 @@ export function RunDownProgress({
                     key={service.name}
                     name={service.name}
                     run={run}
-                    label={sharedStopping(run, service)}
+                    label={sharedStopping(
+                      run,
+                      service,
+                      items.flatMap((item) =>
+                        (item.detail?.jobs ?? [])
+                          .filter((job) => job.name === service.name && isShared(item.subject, job.name))
+                          .map((job) => job.status),
+                      ),
+                    )}
                     lines={lines}
                   />
                 ))}

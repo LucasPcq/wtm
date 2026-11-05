@@ -45,11 +45,14 @@ export function stopping(run: PhaseRun, job: RunjobsStopJob | undefined) {
 }
 
 // a shared service's row while the stop runs, once for all its holders: where the least advanced of them stands
-export function sharedStopping(run: PhaseRun, { holders, keptBy, stops }: Shared) {
+// ended are its statuses once the outcome is known: what the stop did, over what the plan foresaw
+export function sharedStopping(run: PhaseRun, { holders, keptBy, stops }: Shared, ended: RunjobsStopStatus[] = []) {
   const once = holders.length === 1 ? `${holders[0]} stops` : `${who(holders)} worktrees stop`
   if (run.state === 'todo') return `${stops ? 'stops' : 'released'} once ${once}`
   if (run.state === 'now') return stops ? 'stopping' : 'releasing'
   if (run.state === 'failed') return "didn't stop"
+  if (ended.includes('stopped')) return 'stopped'
+  if (ended.includes('released')) return `released: keeps running for ${kept(keptBy)}`
   return stops ? 'stopped' : `released: keeps running for ${kept(keptBy)}`
 }
 

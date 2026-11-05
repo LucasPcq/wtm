@@ -17,7 +17,7 @@ import { ProfilesMenu } from '@/features/worktrees/running/components/profiles-m
 import { RunningJob } from '@/features/worktrees/running/components/running-job'
 import { groupLine, type RunningGroup } from '@/features/worktrees/running/utils/groups'
 import { menu } from '@/features/worktrees/utils/actions'
-import { named } from '@/features/worktrees/utils/run-words'
+import { named, runsSomething } from '@/features/worktrees/utils/run-words'
 
 export function RunGroup({
   repo,
@@ -32,6 +32,15 @@ export function RunGroup({
 }) {
   const line = groupLine(group)
   const stop = () => openRunDown(repo, { worktrees: [group.worktree] })
+  // what a stop of it reaches is run down's to say: its holds (main's own among them), and none of a shared service main
+  // runs for the others alone
+  const form = useQuery(questionsQuery(repo, 'run-down'))
+  const field = form.data?.fields.find((one) => one.path === 'worktree')
+  const option = (field?.kind === 'multi_select' ? field.options : []).find((one) => one.value === group.worktree)
+  const why =
+    option && !runsSomething(option)
+      ? `Runs ${named(group.rows.map((row) => row.name))} for the other worktrees only`
+      : undefined
 
   return (
     <section aria-label={group.worktree} className="flex flex-col gap-1 py-3">
@@ -46,12 +55,14 @@ export function RunGroup({
               variant="ghost"
               size="icon-sm"
               aria-label={`${menu.run_down.label} of ${group.worktree}`}
-              onClick={stop}
+              aria-disabled={why !== undefined}
+              className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+              onClick={() => why === undefined && stop()}
             >
               <Square />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>{menu.run_down.label}</TooltipContent>
+          <TooltipContent>{why ?? menu.run_down.label}</TooltipContent>
         </Tooltip>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -61,7 +72,7 @@ export function RunGroup({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64">
             <DropdownMenuLabel className="truncate text-xs text-muted-foreground">{group.worktree}</DropdownMenuLabel>
-            <StopEntry repo={repo} worktree={group.worktree} onSelect={stop} />
+            <StopEntry holds={option?.holds ?? []} why={why} onSelect={stop} />
             <ProfilesMenu repo={repo} worktree={group.worktree} />
           </DropdownMenuContent>
         </DropdownMenu>
@@ -82,11 +93,7 @@ export function RunGroup({
   )
 }
 
-// what it holds is run down's to say: its claims, and in the main checkout the shared services it holds itself
-function StopEntry({ repo, worktree, onSelect }: { repo: string; worktree: string; onSelect: () => void }) {
-  const form = useQuery(questionsQuery(repo, 'run-down'))
-  const field = form.data?.fields.find((one) => one.path === 'worktree')
-  const holds = (field?.kind === 'multi_select' ? field.options : []).find((one) => one.value === worktree)?.holds ?? []
+function StopEntry({ holds, why, onSelect }: { holds: string[]; why: string | undefined; onSelect: () => void }) {
   const description = ['run down', holds.length > 0 && `releases its hold on ${named(holds)}`]
     .filter(Boolean)
     .join(' · ')
@@ -97,7 +104,7 @@ function StopEntry({ repo, worktree, onSelect }: { repo: string; worktree: strin
       icon={menu.run_down.icon}
       label={menu.run_down.label}
       description={description}
-      why={undefined}
+      why={why}
       onSelect={onSelect}
     />
   )
