@@ -744,3 +744,31 @@ func TestAStartOfASharedJobARestartStoppedWaitsForIt(t *testing.T) {
 	assert.Equal(t, []string{"up db"}, w.spawner.lines(), "joined, not launched again")
 	assert.Contains(t, w.index.names(), "/wt/b:db")
 }
+
+// Review of #275: a shutdown during a shared restart dropped the claims, where a shutdown leaves them to the next daemon.
+func TestAShutdownDuringASharedRestartLeavesTheClaimsToTheIndex(t *testing.T) {
+	w := newWorld(t, map[string]script{"up db": exits(0)})
+	for _, holder := range []string{"/wt/a", "/wt/b"} {
+		_, err := w.Start(shared("db", holder, "down db"), nil)
+		require.NoError(t, err)
+	}
+	// the daemon stops while the restart's stop runs: its start again is refused
+	w.spawner.mu.Lock()
+	w.spawner.scripts["down db"] = func(p *fakeProcess, _ func(string)) {
+		w.mu.Lock()
+		w.stopping = true
+		w.mu.Unlock()
+		p.end(0)
+	}
+	w.spawner.mu.Unlock()
+	again := shared("db", "/wt/a", "down db")
+	again.Restart = true
+
+	_, err := w.Start(again, nil)
+
+	var refusal *run.Error
+	require.ErrorAs(t, err, &refusal)
+	assert.Equal(t, run.CodeStopping, refusal.Code)
+	assert.Contains(t, w.index.names(), "/wt/a:db")
+	assert.Contains(t, w.index.names(), "/wt/b:db")
+}
