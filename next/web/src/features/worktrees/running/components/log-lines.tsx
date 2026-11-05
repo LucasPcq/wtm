@@ -82,6 +82,8 @@ export function LogLines({
             <LogRow
               key={lineKey(line, row.line)}
               line={line}
+              // a mark after any line of the log (its number in the whole log, else its place among the lines held) ends
+              // a run before it; the daemon gives no other sign, so a mark whose run before is gone reads Started
               first={(line.n ?? row.line + 1) === 1}
               on={on}
               onCurrent={on ? onCurrent : undefined}

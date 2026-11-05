@@ -25,7 +25,7 @@ export function JobHeader({
   facts: RunlogsJob | undefined
   now: number
 }) {
-  const { acts, doing } = useJobActions({ repo, worktree, job })
+  const { acts, doing, shared, holders } = useJobActions({ repo, worktree, job })
   const look = jobLook[job.state ?? 'stopped']
   const { icon: Icon, tone } = doing ? { icon: LoaderCircle, tone: 'busy' as const } : look
 
@@ -56,7 +56,14 @@ export function JobHeader({
         </h2>
         <div className="flex shrink-0 items-center gap-1">
           <JobActions acts={acts} job={job.name} />
-          <JobMenu at={{ repo, worktree, job: job.name }} url={job.url} log={facts?.log} acts={acts} />
+          <JobMenu
+            at={{ repo, worktree, job: job.name }}
+            url={job.url}
+            log={facts?.log}
+            acts={acts}
+            shared={shared}
+            holders={holders}
+          />
         </div>
       </div>
       {job.url && (

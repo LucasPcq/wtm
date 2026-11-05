@@ -1,7 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { CircleDashed, LoaderCircle } from 'lucide-react'
 import { toneIcon } from '@/features/worktrees/components/glyph'
-import { useJobRun } from '@/features/worktrees/hooks/use-run'
+import { useJobDoing } from '@/features/worktrees/running/hooks/use-job-doing'
 import type { RunningRow } from '@/features/worktrees/running/utils/groups'
 import { jobLook, jobSince } from '@/features/worktrees/running/utils/job-look'
 import { doingWords } from '@/features/worktrees/running/utils/job-words'
@@ -23,7 +23,7 @@ export function RunningJob({
   now: number
   selected: boolean
 }) {
-  const reached = useJobRun(repo, worktree, row.name)
+  const reached = useJobDoing(repo, worktree, row.name)
 
   if (!('job' in row))
     return (
@@ -36,11 +36,7 @@ export function RunningJob({
 
   const { job } = row
   const { icon: Icon, tone } = reached ? { icon: LoaderCircle, tone: 'busy' as const } : jobLook[job.state ?? 'stopped']
-  const said = () => {
-    if (reached === 'run-start') return doingWords[job.state === 'running' ? 'restarting' : 'starting']
-    if (reached === 'run-stop') return doingWords.stopping
-    return jobSince(job, now)
-  }
+  const said = () => (reached ? doingWords[reached] : jobSince(job, now))
 
   return (
     <li

@@ -19,13 +19,28 @@ export function JobMenu({
   url,
   log,
   acts,
+  shared,
+  holders,
 }: {
   at: JobAt
   url: string | undefined
   log: string | undefined
   acts: JobActs['acts']
+  shared: boolean
+  holders: number
 }) {
   const save = () => downloadLog(at).catch((failed: Error) => toast.error(failed.message))
+
+  const entries = acts.map(({ act, why, keptBy, run }) => (
+    <MenuEntry
+      key={act}
+      Item={DropdownMenuItem}
+      icon={actLook[act].icon}
+      {...actEntry(act, { at, keptBy, holders: shared ? holders : undefined })}
+      why={why}
+      onSelect={run}
+    />
+  ))
 
   return (
     <DropdownMenu>
@@ -35,6 +50,9 @@ export function JobMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
+        {/* a shared service's menu opens on what acts on it, as what it does reaches the others */}
+        {shared && entries}
+        {shared && <DropdownMenuSeparator />}
         <DropdownMenuItem disabled={!url} onSelect={() => url && window.open(url, '_blank', 'noreferrer')}>
           <ExternalLink />
           Open the address
@@ -51,17 +69,8 @@ export function JobMenu({
           <Download />
           Download the log
         </DropdownMenuItem>
-        {acts.length > 0 && <DropdownMenuSeparator />}
-        {acts.map(({ act, why, keptBy, run }) => (
-          <MenuEntry
-            key={act}
-            Item={DropdownMenuItem}
-            icon={actLook[act].icon}
-            {...actEntry(act, at, keptBy)}
-            why={why}
-            onSelect={run}
-          />
-        ))}
+        {!shared && acts.length > 0 && <DropdownMenuSeparator />}
+        {!shared && entries}
       </DropdownMenuContent>
     </DropdownMenu>
   )

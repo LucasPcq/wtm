@@ -7,7 +7,7 @@ import { SearchRow } from '@/features/worktrees/components/search-row'
 import { searched } from '@/features/worktrees/utils/filters'
 import { plural } from '@/lib/plural'
 
-// options are the jobs of run.toml not running in the worktree
+// options are the declared jobs not running in the worktree
 export function JobStep({
   worktree,
   options,
@@ -31,7 +31,7 @@ export function JobStep({
         </h3>
         <p className="text-xs text-muted-foreground">
           In {worktree} ·{' '}
-          {options.length === 0 ? 'every job of run.toml runs already' : `${plural(options.length, 'job')} not running`}
+          {options.length === 0 ? 'every declared job runs already' : `${plural(options.length, 'job')} not running`}
         </p>
       </div>
       <RadioGroup aria-label="Job" value={value} onValueChange={onChange} className="gap-0">

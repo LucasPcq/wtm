@@ -1,9 +1,12 @@
 import { screen, waitFor, within } from '@testing-library/react'
+import { HttpResponse, http } from 'msw'
 import { expect, test } from 'vitest'
 import type { WebCall } from '@/api/types.gen'
+import { envelope } from '@/test/fixtures'
 import { renderApp } from '@/test/render'
-import { answeringRunJobs } from '@/test/run-jobs'
-import { server } from '@/test/server'
+import { answeringRunJobs, runningJobs } from '@/test/run-jobs'
+import { job } from '@/test/run-up'
+import { line, server } from '@/test/server'
 
 const panelOf = (job: string, worktree: string) => screen.findByRole('region', { name: `${job} in ${worktree}` })
 
@@ -53,6 +56,16 @@ test('a shared service main holds is released, the menu and the toast saying wha
 
   await user.click(await within(panel).findByRole('button', { name: 'More for postgres' }))
   const release = await screen.findByRole('menuitem', { name: /Release main’s hold/ })
+  // frame 14: what acts on a shared service first, its restart saying for whom
+  expect(
+    within(screen.getByRole('menu'))
+      .getAllByRole('menuitem')
+      .map((item) => item.textContent)
+      .slice(0, 2),
+  ).toEqual([
+    'Restart postgresfor the 3 worktrees holding it',
+    'Release main’s holdpostgres keeps running for the 2 others',
+  ])
   expect(release.textContent).toContain('postgres keeps running for the 2 others')
   await user.click(release)
 
@@ -118,4 +131,59 @@ test('Start one job… offers the jobs not running in the worktree, then starts 
   await user.click(within(dialog).getByRole('button', { name: 'Start worker' }))
 
   expect(await within(dialog).findByText('worker started.')).toBeDefined()
+})
+
+test('a job restarting is greyed in its row and its header, saying it restarts', async () => {
+  // the restart's stream held open: it has begun, nothing more
+  const held = http.post('/api/repos/r1/commands/run-start', async ({ request }) => {
+    if (((await request.clone().json()) as WebCall).dry_run) return undefined
+    const body = new ReadableStream({
+      start: (controller) =>
+        controller.enqueue(new TextEncoder().encode(line({ type: 'unit.started', subject: 'feat/billing' }))),
+    })
+    return new HttpResponse(body, { headers: { 'Content-Type': 'text/event-stream', 'X-Wtm-Operation': 'op-1' } })
+  })
+  server.use(held, ...answeringRunJobs())
+  const { user } = await renderApp('/r/r1/running?worktree=feat/billing&job=web')
+  const panel = await panelOf('web', 'feat/billing')
+
+  await user.click(await within(panel).findByRole('button', { name: 'Restart web' }))
+
+  const group = screen.getByRole('region', { name: 'feat/billing' })
+  await waitFor(() => expect(within(group).getByRole('listitem', { name: 'web' }).textContent).toContain('restarting…'))
+  expect(within(panel).getByRole('heading').textContent).toContain('restarting…')
+  expect(within(panel).getByRole('button', { name: 'Stop web' }).getAttribute('aria-disabled')).toBe('true')
+})
+
+test('main restarts a shared service it runs for the others alone through a worktree holding it', async () => {
+  const claimed = runningJobs.map((w) =>
+    w.branch === 'feat/billing'
+      ? { ...w, jobs: [...(w.jobs ?? []), job('postgres', { hold: 'claim', profile: '' })] }
+      : w,
+  )
+  server.use(
+    http.post('/api/repos/r1/commands/list', () => HttpResponse.json(envelope('list', claimed))),
+    http.post('/api/repos/r1/commands/run-stop', () =>
+      HttpResponse.json({ ...envelope('run-stop', []), fingerprint: 's1', plan: { job: 'postgres', worktrees: [] } }),
+    ),
+    http.post('/api/repos/r1/commands/run-start/questions', async ({ request }) => {
+      const asked = answers((await request.json()) as WebCall)
+      const problems =
+        asked.worktree?.[0] === 'main' && asked.restart
+          ? [{ path: 'restart', code: 'run-start.restart_shared', flag: '--restart', message: 'not held' }]
+          : []
+      return HttpResponse.json({ fields: [{ kind: 'select', path: 'job', options: [] }], problems })
+    }),
+    ...answeringRunJobs(),
+  )
+  const { user } = await renderApp('/r/r1/running?worktree=main&job=postgres')
+  const panel = await panelOf('postgres', 'main')
+
+  await waitFor(() =>
+    expect(within(panel).getByRole('button', { name: 'Stop postgres' }).getAttribute('aria-disabled')).toBe('true'),
+  )
+  await user.click(within(panel).getByRole('button', { name: 'Restart postgres' }))
+
+  const dialog = await screen.findByRole('dialog', { name: 'Restart postgres' })
+  expect(await within(dialog).findByText('feat/billing')).toBeDefined()
 })

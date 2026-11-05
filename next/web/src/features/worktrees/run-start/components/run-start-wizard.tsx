@@ -130,7 +130,7 @@ export function RunStartWizard({
         <DialogDescription>
           {ask.restart
             ? `Stops ${ask.job} and starts it again, for every worktree holding it.`
-            : `Starts one job of run.toml in ${ask.worktree}.`}
+            : `Starts one job in ${ask.worktree}.`}
         </DialogDescription>
       </DialogHeader>
 

@@ -11,7 +11,12 @@ export const actLook: Record<JobAct, { icon: LucideIcon; label: string }> = {
 }
 
 // the menu says whose hold a release lets go of, and what keeps running
-export function actEntry(act: JobAct, at: JobAt, keptBy: string[]): { label: string; description?: string } {
+export function actEntry(
+  act: JobAct,
+  { at, keptBy, holders }: { at: JobAt; keptBy: string[]; holders: number | undefined },
+): { label: string; description?: string } {
+  if (act === 'restart' && holders !== undefined)
+    return { label: `Restart ${at.job}`, description: `for the ${holders} worktrees holding it` }
   if (act !== 'release') return { label: actLook[act].label }
   return {
     label: `Release ${at.worktree}’s hold`,
