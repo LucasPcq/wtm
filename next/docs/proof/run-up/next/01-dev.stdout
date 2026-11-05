@@ -9,3 +9,5 @@
     api  http://api.feat-a.acme.localhost:24352
     web  http://web.feat-a.acme.localhost:24352
 
+  → wtm run logs feat/a   see feat/a's output
+

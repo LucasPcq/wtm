@@ -1,0 +1,37 @@
+
+  Show what the jobs of the worktrees named printed: each job's last lines (1000 at most), from
+  its log, whether it runs, ended or crashed. --job reads one job alone.
+
+  At a terminal it opens the live view on their jobs, after the worktree picker when none is
+  named (the one you stand in picked; --yes skips the picker for it). Leaving the view stops
+  nothing. Anywhere else (no terminal, --quiet, --output json) it reads the worktree you stand
+  in unless named, prints each job's lines as `[job] text` and ends; --follow (-f) then prints
+  each new line as the jobs print it, until they all ended or Ctrl+C, which exits 0.
+
+  --output json is the read's v2 envelope, each job with its state and its lines; with
+  --follow, one typed JSON object per line instead: line, absent, warning, error.
+  It never starts the run daemon: with none running, the lines come from the logs.
+
+  Usage:
+    wtm-next run logs [worktree...] [flags]
+
+  Examples:
+    # Pick worktrees, then watch their jobs live
+    wtm run logs
+
+    # One job's last lines, for a script or an agent
+    wtm run logs feat/login --job api --output json
+
+    # Follow a job's output without a terminal
+    wtm run logs feat/login --job api --follow | grep ERROR
+
+  Flags:
+    -f, --follow          Print each new line as the jobs print it, until they end or Ctrl+C
+    -h, --help            help for logs
+        --job string      Read this job alone, one of run.toml or one the run daemon runs there (default: every job that ran)
+        --output string   Output format: text or json (default "text")
+    -y, --yes             Ask nothing: read the worktree you stand in unless named
+
+  Global Flags:
+    -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+

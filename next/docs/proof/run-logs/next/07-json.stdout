@@ -1,0 +1,37 @@
+{
+  "v": 2,
+  "command": "run-logs",
+  "ok": true,
+  "items": [
+    {
+      "subject": "feat/b",
+      "status": "done",
+      "detail": {
+        "path": "<SB>/acme.trees/feat-b",
+        "jobs": [
+          {
+            "name": "crashy",
+            "kind": "service",
+            "state": "crashed",
+            "hold": "own",
+            "exit_code": 1,
+            "profile": "logs",
+            "log": "<SB>/acme/.git/wtm/logs/feat%2Fb/crashy.log",
+            "lines": [
+              {
+                "at": "<TIME>",
+                "text": "starting"
+              },
+              {
+                "at": "<TIME>",
+                "text": "boom"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}

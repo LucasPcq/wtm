@@ -40,6 +40,8 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/reparent"
 	reparentcli "github.com/LucasPcq/wtm/next/internal/command/reparent/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/resolve"
+	"github.com/LucasPcq/wtm/next/internal/command/runlogs"
+	runlogscli "github.com/LucasPcq/wtm/next/internal/command/runlogs/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/runup"
 	runupcli "github.com/LucasPcq/wtm/next/internal/command/runup/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/status"
@@ -80,6 +82,7 @@ type app struct {
 	Status      status.UseCase
 	Tree        tree.UseCase
 	RunUp       runup.UseCase
+	RunLogs     runlogs.UseCase
 }
 
 // wire builds each adapter of the repository params locates once and injects it into every use case.
@@ -246,6 +249,13 @@ func wire(params wireParams) app {
 			Provision:  provisions,
 			Teardown:   teardowns,
 		},
+		RunLogs: runlogs.UseCase{
+			Git:        repo,
+			Daemon:     runs,
+			ReadLog:    joblog.Tail,
+			StateDir:   params.StateDir,
+			Repository: facts,
+		},
 	}
 }
 
@@ -357,6 +367,8 @@ func commandLine(followUp domain.FollowUp) []string {
 		return reparentcli.Line(followUp)
 	case runup.Name:
 		return runupcli.Line(followUp)
+	case runlogs.Name:
+		return runlogscli.Line(followUp)
 	case commandRestartDaemon:
 		return []string{cli.Program, "run", "daemon", "restart"}
 	}

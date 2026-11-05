@@ -1,0 +1,30 @@
+{
+  "v": 2,
+  "command": "run-logs",
+  "ok": true,
+  "items": [
+    {
+      "subject": "main",
+      "status": "done",
+      "detail": {
+        "path": "<root>/main",
+        "jobs": [
+          {
+            "name": "seed",
+            "kind": "task",
+            "state": "stopped",
+            "log": "<root>/main/.git/wtm/logs/main/seed.log",
+            "lines": [
+              {
+                "at": "<time>",
+                "text": "seeded"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}

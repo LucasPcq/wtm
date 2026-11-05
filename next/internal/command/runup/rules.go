@@ -46,27 +46,7 @@ func (f Facts) standingWorktrees() []worktree.Worktree {
 // worktreeOptions are the worktrees run up may start in: each one whose directory stands, the main one first, the caller's tagged current, each with the jobs up in it and the profile they were started under, as the daemon says, whatever run.toml says now.
 func (f Facts) worktreeOptions() []domain.Option {
 	worktrees := f.standingWorktrees()
-	options := domain.WorktreeOptions(worktrees, domain.WorktreeQuery{Cwd: f.Cwd})
-	for i, w := range worktrees {
-		var up, holds []string
-		for _, job := range f.Jobs {
-			switch {
-			case job.WorkDir != w.Path || job.Hold == run.HoldClaim:
-			case job.State == run.Crashed && run.Own(job):
-				options[i].Crashed++
-			case !job.Up:
-			case !run.Own(job):
-				holds = append(holds, job.Name)
-			default:
-				up = append(up, job.Name)
-			}
-		}
-		slices.Sort(up)
-		slices.Sort(holds)
-		options[i].Up, options[i].Holds = up, holds
-		options[i].Profile = run.ProfileIn(f.Jobs, w.Path)
-	}
-	return options
+	return domain.RunningIn(domain.WorktreeOptions(worktrees, domain.WorktreeQuery{Cwd: f.Cwd}), worktrees, f.Jobs)
 }
 
 // up are the jobs up in the worktree at path, claims included.
@@ -819,14 +799,14 @@ const (
 	CodeRetry = Name + ".retry"
 )
 
-// The commands the follow-ups of a start name, not migrated yet.
+// The commands the follow-ups of a start name: run logs, migrated, by its catalogue name; run down, not migrated yet.
 const (
-	commandRunLogs = "run logs"
+	commandRunLogs = domain.CommandRunLogs
 	commandRunDown = "run down"
 )
 
-// runs says whether wtm-next runs a command: the legacy run logs and run down act on the legacy daemon's jobs, never on next's, so their follow-ups wait for LUC-343 and LUC-341 to turn them on here.
-var runs = map[string]bool{commandRunLogs: false, commandRunDown: false}
+// runs says whether wtm-next runs a command: the legacy run down acts on the legacy daemon's jobs, never on next's, so its follow-up waits for LUC-341 to turn it on here.
+var runs = map[string]bool{commandRunLogs: true, commandRunDown: false}
 
 // next are the follow-ups of a start: the start again where it did not pass, then each worktree's output and the stop of what it left up.
 func (p Plan) next(items []Item) []domain.FollowUp {
@@ -840,7 +820,7 @@ func (p Plan) next(items []Item) []domain.FollowUp {
 		}
 		on := []domain.Answered{{Path: domain.PathWorktree, Values: []string{item.Subject}}}
 		for _, followUp := range []domain.FollowUp{
-			{Command: commandRunLogs, Answers: on, Code: CodeLogs, Message: "follow " + item.Subject + "'s output"},
+			{Command: commandRunLogs, Answers: on, Code: CodeLogs, Message: "see " + item.Subject + "'s output"},
 			{Command: commandRunDown, Answers: on, Code: CodeDown, Message: "stop " + item.Subject + "'s jobs"},
 		} {
 			if runs[followUp.Command] {

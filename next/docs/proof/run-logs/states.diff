@@ -1,0 +1,22 @@
+=== 00-before: exit legacy , next 
+=== 01-lines: exit legacy 0, next 0
+=== 02-crashed: exit legacy 0, next 0
+=== 03-never-ran: exit legacy 0, next 0
+=== 04-undeclared: exit legacy 14, next 2
+=== 05-nothing-ran: exit legacy 0, next 0
+=== 06-several: exit legacy 0, next 0
+=== 07-json: exit legacy 0, next 0
+=== 08-json-refused: exit legacy 1, next 2
+=== 09-quiet: exit legacy 0, next 0
+=== 10-follow: exit legacy 137, next 0
+=== 11-all: exit legacy 137, next 0
+=== 12-daemon-down: exit legacy 0, next 0
+--- legacy/12-daemon-down
++++ next/12-daemon-down
+@@ -5,4 +5,4 @@
+ ./feat%2Fb/migrate.log
+ ./feat%2Fb/web.log
+ ## a run daemon answers
+-yes
++no
+=== 12-daemon-stopped: exit legacy , next 

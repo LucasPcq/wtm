@@ -1,0 +1,11 @@
+
+  Step 1/1 • Worktrees
+
+  The worktrees whose jobs to read, by branch, or by path on no branch (default: the one you stand
+  in)
+
+▌› [ ] main                                                                                   main
+   [x] feat/a — runs api, web                                                              current
+   [ ] feat/b
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc cancel

@@ -1,0 +1,17 @@
+{
+  "v": 2,
+  "command": "run-logs",
+  "ok": true,
+  "items": [
+    {
+      "subject": "feat/b",
+      "status": "done",
+      "detail": {
+        "path": "/repo/wt-feat-b",
+        "jobs": []
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}

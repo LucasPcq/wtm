@@ -1,0 +1,12 @@
+$ wtm run logs; echo EXIT=$?
+
+  Step 1/1 • Worktrees
+
+  The worktrees whose jobs to read, by branch, or by path on no branch (default: the one you stand in)
+
+▌› [x] main                                                                                                    current
+   [ ] feat/b — runs logs: api, web · 1 crashed
+   [ ] feat/c
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc cancel
+

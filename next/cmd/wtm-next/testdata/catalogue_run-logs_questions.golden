@@ -1,0 +1,42 @@
+{
+  "fields": [
+    {
+      "kind": "multi_select",
+      "path": "worktree",
+      "origin": "default",
+      "picked": [
+        "main"
+      ],
+      "options": [
+        {
+          "value": "main",
+          "tag": "current"
+        }
+      ]
+    },
+    {
+      "kind": "select",
+      "path": "job",
+      "value": "",
+      "options": [
+        {
+          "value": "seed"
+        }
+      ],
+      "rememberable": false,
+      "remember": false,
+      "refreshable": false,
+      "closed": false
+    },
+    {
+      "kind": "confirm",
+      "path": "follow",
+      "skip": "flag_only",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    }
+  ],
+  "problems": []
+}

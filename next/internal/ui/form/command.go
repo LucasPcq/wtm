@@ -452,8 +452,13 @@ func withFlags(argv []string, flags ...string) []string {
 
 // Argv spells command and req word by word, unquoted: the positional field's words, each flag given sorted by name, then --ask, then -- and the trailing field's value.
 func (c *Command[R, Q, O]) Argv(command string, req R) []string {
+	return argvOf(c.schema(), command, req)
+}
+
+// argvOf is req as command runs it, spelled from schema: see [Command.Argv].
+func argvOf[R Request[R]](schema []worded, command string, req R) []string {
 	argv := strings.Fields(command)
-	for _, field := range c.schema() {
+	for _, field := range schema {
 		if positional(field) {
 			argv = append(argv, req.Values(field.Spec().Path)...)
 			break
@@ -465,7 +470,7 @@ func (c *Command[R, Q, O]) Argv(command string, req R) []string {
 		words []string
 	}
 	var flags []given
-	for _, field := range bound(c.schema()) {
+	for _, field := range bound(schema) {
 		flags = append(flags, given{name: flagName(field), words: flagWords(field, req.Values(field.Spec().Path))})
 	}
 
@@ -480,7 +485,7 @@ func (c *Command[R, Q, O]) Argv(command string, req R) []string {
 	if slices.Equal(req.Values(domain.PathAsk), []string{"true"}) {
 		argv = append(argv, "--"+domain.PathAsk)
 	}
-	for _, field := range c.schema() {
+	for _, field := range schema {
 		if values := req.Values(field.Spec().Path); trailing(field) && len(values) > 0 {
 			argv = append(argv, append([]string{dash}, values...)...)
 		}

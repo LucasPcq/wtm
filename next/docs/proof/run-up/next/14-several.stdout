@@ -14,3 +14,6 @@
       api  http://api.feat-b.acme.localhost:24352
       web  http://web.feat-b.acme.localhost:24352
 
+  → wtm run logs feat/a   see feat/a's output
+  → wtm run logs feat/b   see feat/b's output
+

@@ -4,6 +4,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
@@ -159,6 +160,35 @@ func OptionsOf[T ~string](values []T) []Option {
 		options = append(options, Option{Value: string(value)})
 	}
 
+	return options
+}
+
+// RunningIn is options, the options WorktreeOptions gives of worktrees, each, by its name, with what jobs says it runs: the jobs up for itself and the profile they were started under, those it runs for itself that crashed, and the shared services it runs for every worktree; its claims are not its own.
+func RunningIn(options []Option, worktrees []worktree.Worktree, jobs []run.Job) []Option {
+	for i, option := range options {
+		at := slices.IndexFunc(worktrees, func(w worktree.Worktree) bool { return w.Name() == option.Value })
+		if at < 0 {
+			continue
+		}
+		w := worktrees[at]
+		var up, holds []string
+		for _, job := range jobs {
+			switch {
+			case job.WorkDir != w.Path || job.Hold == run.HoldClaim:
+			case job.State == run.Crashed && run.Own(job):
+				options[i].Crashed++
+			case !job.Up:
+			case !run.Own(job):
+				holds = append(holds, job.Name)
+			default:
+				up = append(up, job.Name)
+			}
+		}
+		slices.Sort(up)
+		slices.Sort(holds)
+		options[i].Up, options[i].Holds = up, holds
+		options[i].Profile = run.ProfileIn(jobs, w.Path)
+	}
 	return options
 }
 

@@ -137,6 +137,20 @@
       }
     ]
   },
-  "follow_ups": [],
+  "follow_ups": [
+    {
+      "command": "run-logs",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/a"
+          ]
+        }
+      ],
+      "code": "run-up.logs",
+      "message": "see feat/a's output"
+    }
+  ],
   "warnings": []
 }

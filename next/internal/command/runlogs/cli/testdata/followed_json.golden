@@ -1,0 +1,2 @@
+{"type":"line","worktree":"feat/a","job":"api","at":"2026-11-03T20:17:21Z","text":"api ready"}
+{"type":"line","worktree":"feat/a","job":"api","at":"2026-11-03T20:18:21Z","text":"GET /users 200"}

@@ -9,3 +9,5 @@
     api  http://api.main.acme.localhost:24352
     web  http://web.main.acme.localhost:24352
 
+  → wtm run logs main   see main's output
+

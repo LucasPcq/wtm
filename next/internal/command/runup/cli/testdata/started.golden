@@ -9,3 +9,5 @@
     api  http://api.feat-a.main.localhost:11080
     web  http://web.feat-a.main.localhost:11080
 
+  → wtm run-logs feat/a   see feat/a's output
+

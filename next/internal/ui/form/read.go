@@ -6,6 +6,7 @@ import (
 	"io"
 	"maps"
 	"slices"
+	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
@@ -41,8 +42,11 @@ type Query[R Request[R], Q Questions, O ReadOutcome] struct {
 	// Captured says the read's text is data a shell captures, `cd "$(wtm resolve feat/x)"`: Draw draws it bare on stdout, never framed nor silenced by --quiet, a failure goes to stderr, and its subject is asked on a terminal even while stdout is captured.
 	// shortcut: a captured read's warnings are not drawn; draw them on stderr once a captured read has any.
 	Captured bool
+	// YesUsage, when set, binds --yes (-y), which asks no subject: the read takes the one its use case defaults to, where the caller stands.
+	YesUsage string
 
-	io *uicli.Run
+	io  *uicli.Run
+	yes bool
 }
 
 func (q *Query[R, Q, O]) schema() []worded {
@@ -61,6 +65,20 @@ func (q *Query[R, Q, O]) Bind(cmd *cobra.Command, run *uicli.Run) {
 	run.Formats = slices.Sorted(maps.Keys(q.Formats))
 	bindFields(cmd, q.schema())
 	cmd.Flags().StringVar(&run.Output, "output", uicli.OutputText, run.OutputHelp())
+	if q.YesUsage != "" {
+		cmd.Flags().BoolVarP(&q.yes, "yes", "y", false, q.YesUsage)
+	}
+}
+
+// Spell spells followUp, which names this read, as command (its path on the command line) runs it: its request folded and spelled from the schema, as [Command.Spell] spells a command's; none when its request refuses the answers.
+func (q *Query[R, Q, O]) Spell(command string, followUp domain.FollowUp) []string {
+	var zero R
+	req, err := domain.Fold(zero, followUp.Answers)
+	if err != nil {
+		return nil
+	}
+
+	return argvOf(q.schema(), command, req)
 }
 
 // Launch runs cmd: it refuses an invalid --output or correlation ID, builds the request from the flags and args, asked from where the command line stands, opens the use case on the project's directory, asks the subject the request leaves open and reads, then lets the user pick of the read when Pick is set, each only when the user can see and answer it; it prints how the read ended and returns the failure that sets the exit code.
@@ -98,10 +116,10 @@ func (q *Query[R, Q, O]) Launch(cmd *cobra.Command, args []string) error {
 	return q.conclude(read, req, err)
 }
 
-// ask asks the subject of the read, the positional select its questions leave open, before the read: when the user can see and answer it, and the request neither answers it nor rules it out, or answers the field at refused with a value refused, asked again among the options its questions narrow it to.
+// ask asks the subject of the read, the positional select or multi-select its questions leave open, before the read: when the user can see and answer it, did not say --yes, and the request neither answers it nor rules it out, or answers the field at refused with a value refused, asked again among the options its questions narrow it to.
 func (q *Query[R, Q, O]) ask(ctx context.Context, app Reader[R, Q, O], req R, refused string) (R, error) {
 	// The schema says whether the request leaves a subject to ask before the questions are read.
-	if _, open := subjectOf(q.schema(), req, refused); !open || !q.interactive() {
+	if _, open := subjectOf(q.schema(), req, refused); !open || !q.interactive() || q.yes {
 		return req, nil
 	}
 
@@ -117,7 +135,7 @@ func (q *Query[R, Q, O]) ask(ctx context.Context, app Reader[R, Q, O], req R, re
 	if err := Walk(ctx, SubjectScript(subject), q.io.Streams.In, q.io.Streams.Err); err != nil {
 		return req, err
 	}
-	return req.Answer(subject.Field.Path, []string{subject.Picked()})
+	return req.Answer(subject.path(), subject.values())
 }
 
 // A Skipper is a request that says why it leaves a field unasked, empty when it does not: what the field's Skip says once its questions are read.
@@ -125,16 +143,27 @@ type Skipper interface {
 	Skips(path string) domain.Skip
 }
 
-// subjectOf returns the positional select of form req leaves open, and reports whether there is one: not ruled out, by the form or by req, and not answered, or the field at refused, whose value was refused ("" refuses none).
-func subjectOf(form []worded, req domain.Valued, refused string) (*Subject, bool) {
+// An asked subject is the step that asks it, the path of its field and the values picked.
+type askedSubject interface {
+	Step
+	path() string
+	values() []string
+}
+
+// subjectOf returns the positional select or multi-select of form req leaves open, and reports whether there is one: not ruled out, by the form or by req, and not answered, or the field at refused, whose value was refused ("" refuses none).
+func subjectOf(form []worded, req domain.Valued, refused string) (askedSubject, bool) {
 	skipper, skips := req.(Skipper)
 	for _, field := range form {
-		subject, ok := field.Field.(domain.SelectField)
-		if skips && ok && skipper.Skips(subject.Path) != "" {
+		spec := field.Field.Spec()
+		if !positional(field) || spec.Skip != "" || skips && skipper.Skips(spec.Path) != "" || req.Values(spec.Path) != nil && spec.Path != refused {
 			continue
 		}
-		if ok && positional(field) && subject.Skip == "" && (req.Values(subject.Path) == nil || subject.Path == refused) {
+		switch subject := field.Field.(type) {
+		case domain.SelectField:
 			return &Subject{Field: subject, Words: field.Words}, true
+		case domain.MultiSelectField:
+			return &Subjects{Field: subject, Words: field.Words}, true
+		case domain.ConfirmField, domain.TextField, domain.TextListField:
 		}
 	}
 
@@ -216,7 +245,7 @@ type Subject struct {
 }
 
 // SubjectScript is the walk that asks s alone, with nothing to read: the subject's options are the questions read before it.
-func SubjectScript(s *Subject) Script {
+func SubjectScript(s Step) Script {
 	return Script{
 		Steps:   []Step{s},
 		Observe: func(context.Context) (func(), error) { return func() {}, nil },
@@ -253,3 +282,53 @@ func (s *Subject) Reset() { s.picked = "" }
 
 // Picked is the value of the option picked.
 func (s *Subject) Picked() string { return s.picked }
+
+func (s *Subject) path() string { return s.Field.Path }
+
+func (s *Subject) values() []string { return []string{s.picked} }
+
+// Subjects is the step that asks a read's subjects, its Field in its Words, before the read: a multi-select of its options, those the field picks picked.
+type Subjects struct {
+	Field  domain.MultiSelectField
+	Words  Words
+	picks  *widget.MultiSelect
+	picked []string
+}
+
+// Label is the field's label.
+func (s *Subjects) Label() string { return s.Words.Label }
+
+// Description is the field's help.
+func (s *Subjects) Description() string { return s.Words.Help }
+
+// Standing is the subjects picked, none until they are: the step is always asked.
+func (s *Subjects) Standing() Standing { return Standing{Value: strings.Join(s.picked, ", ")} }
+
+// Open builds the multi-select of the field's options.
+func (s *Subjects) Open() tea.Cmd {
+	picks := make([]widget.Pick, 0, len(s.Field.Options))
+	for _, o := range s.Field.Options {
+		picks = append(picks, widget.Pick{Label: optionLabel(o, s.Words), Value: o.Value, Tag: badgeOf(o), Picked: slices.Contains(s.Field.Picked, o.Value)})
+	}
+	s.picks = widget.NewMultiSelect(picks, s.Words.Empty)
+	return nil
+}
+
+// Widget is the multi-select.
+func (s *Subjects) Widget() widget.Widget { return s.picks }
+
+// Answer records the options picked.
+func (s *Subjects) Answer() string {
+	s.picked = s.picks.Values()
+	return strings.Join(s.picked, ", ")
+}
+
+// Reset forgets the subjects picked.
+func (s *Subjects) Reset() { s.picked = nil }
+
+// Picked are the values of the options picked.
+func (s *Subjects) Picked() []string { return s.picked }
+
+func (s *Subjects) path() string { return s.Field.Path }
+
+func (s *Subjects) values() []string { return s.picked }

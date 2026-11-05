@@ -154,45 +154,61 @@ func (l *Log) Close() {
 // Last returns the last n lines of the log file names, oldest first, read
 // from its backup too when the file holds fewer: a line not stamped as this
 // package stamps it keeps no time. It reads the end of the file first, the
-// whole of it only when that end holds fewer than n lines.
+// whole of it only when that end holds fewer than n lines. A log that cannot
+// be read has none.
 func Last(file run.LogFile, n int) []run.Line {
+	lines, _ := Tail(file, n)
+	return lines
+}
+
+// Tail is [Last], failing when a file of the log exists and cannot be read,
+// with the lines read before it.
+func Tail(file run.LogFile, n int) ([]run.Line, error) {
 	path := Path(file.Dir, file.Job)
 	if path == "" || n <= 0 {
-		return nil
+		return nil, nil
 	}
-	lines, whole := tail(path)
-	if len(lines) < n && !whole {
-		lines, whole = parsed(path, 0)
+	lines, whole, err := tail(path)
+	if err == nil && len(lines) < n && !whole {
+		lines, whole, err = parsed(path, 0)
 	}
-	if len(lines) < n && whole {
-		older, _ := parsed(backup(path, 1), 0)
+	if err == nil && len(lines) < n && whole {
+		var older []run.Line
+		older, _, err = parsed(backup(path, 1), 0)
 		lines = append(older, lines...)
 	}
 
-	return lines[max(0, len(lines)-n):]
+	return lines[max(0, len(lines)-n):], err
 }
 
 // tail returns the lines of the last tailRead bytes of the file at path, and
-// whether they are the whole file.
-func tail(path string) ([]run.Line, bool) {
+// whether they are the whole file; a file that does not exist has none.
+func tail(path string) ([]run.Line, bool, error) {
 	info, err := os.Stat(path)
-	if err != nil {
-		return nil, true
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+		return nil, true, nil
+	case err != nil:
+		return nil, true, err
 	}
 	return parsed(path, max(0, info.Size()-tailRead))
 }
 
 // parsed returns the lines of the file at path from offset on, the line cut
-// at offset left out, and whether they are the whole file.
-func parsed(path string, offset int64) ([]run.Line, bool) {
+// at offset left out, and whether they are the whole file; a file that does
+// not exist has none.
+func parsed(path string, offset int64) ([]run.Line, bool, error) {
 	file, err := os.Open(path)
-	if err != nil {
-		return nil, true
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+		return nil, true, nil
+	case err != nil:
+		return nil, true, err
 	}
 	defer file.Close()
 	data, err := io.ReadAll(io.NewSectionReader(file, offset, math.MaxInt64-offset))
 	if err != nil {
-		return nil, true
+		return nil, true, err
 	}
 	text := string(data)
 	if offset > 0 {
@@ -205,7 +221,7 @@ func parsed(path string, offset int64) ([]run.Line, bool) {
 		lines = append(lines, parse(strings.TrimSuffix(line, "\n")))
 	}
 
-	return lines, offset == 0
+	return lines, offset == 0, nil
 }
 
 func parse(text string) run.Line {

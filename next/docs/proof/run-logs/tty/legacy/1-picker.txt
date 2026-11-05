@@ -1,0 +1,12 @@
+$ wtm run logs; echo EXIT=$?
+
+  Step 1/1 • Select worktrees
+
+  Space to toggle, a to select all, / to filter, enter to confirm, esc to cancel.
+
+▌ [✓] main                                                                                                     current
+  [ ] feat/b                                                                                                 2 running
+  [ ] feat/c
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc cancel
+

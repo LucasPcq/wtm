@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"strconv"
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/command/runup"
@@ -13,7 +12,7 @@ import (
 func words(q runup.Questions, field domain.Field) form.Words {
 	switch field.Spec().Path {
 	case domain.PathWorktree:
-		return form.Words{Flag: "<worktree>", Label: "Worktrees", Help: "The worktrees to start the profile in, by branch, or by path on no branch (default: the one you stand in)", Empty: "Select at least one worktree", Options: worktreeWords(q)}
+		return form.Words{Flag: "<worktree>", Label: "Worktrees", Help: "The worktrees to start the profile in, by branch, or by path on no branch (default: the one you stand in)", Empty: "Select at least one worktree", Options: form.RunningWords(q.Worktrees.Options)}
 	case runup.PathProfile:
 		return form.Words{Flag: "--profile", Label: "Profile", Help: "The profile of run.toml to start (default: the one marked default, or the only one)", Options: profileWords(q)}
 	case runup.PathExclusive:
@@ -35,31 +34,6 @@ func words(q runup.Questions, field domain.Field) form.Words {
 	}
 
 	return form.Words{}
-}
-
-// worktreeWords read each worktree with the jobs it runs, and the profile they were started under.
-func worktreeWords(q runup.Questions) map[string]form.OptionWords {
-	labels := map[string]form.OptionWords{}
-	for _, option := range q.Worktrees.Options {
-		var said []string
-		if len(option.Up) > 0 {
-			running := strings.Join(option.Up, ", ")
-			if option.Profile != "" {
-				running = option.Profile + ": " + running
-			}
-			said = append(said, "runs "+running)
-		}
-		if option.Crashed > 0 {
-			said = append(said, strconv.Itoa(option.Crashed)+" crashed")
-		}
-		if len(option.Holds) > 0 {
-			said = append(said, "holds "+strings.Join(option.Holds, ", "))
-		}
-		if len(said) > 0 {
-			labels[option.Value] = form.OptionWords{Label: option.Value + " — " + strings.Join(said, " · ")}
-		}
-	}
-	return labels
 }
 
 // profileWords read each profile with its jobs, in order, and whether it is the default.

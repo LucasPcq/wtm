@@ -115,7 +115,7 @@
           {
             "action": "logs",
             "follow_up": {
-              "command": "run logs",
+              "command": "run-logs",
               "answers": [
                 {
                   "path": "worktree",
@@ -302,7 +302,7 @@
           {
             "action": "logs",
             "follow_up": {
-              "command": "run logs",
+              "command": "run-logs",
               "answers": [
                 {
                   "path": "worktree",
@@ -514,7 +514,7 @@
           {
             "action": "logs",
             "follow_up": {
-              "command": "run logs",
+              "command": "run-logs",
               "answers": [
                 {
                   "path": "worktree",
