@@ -1,8 +1,8 @@
 import type { Applied } from '@/api/queries/commands'
 import type { DomainOption, RunjobsJobPlan, RunjobsJobStatus } from '@/api/types.gen'
-import { named, type Shared } from '@/features/worktrees/run-up/utils/plan'
+import type { Shared } from '@/features/worktrees/run-up/utils/plan'
 import { owedOf, owedTally } from '@/features/worktrees/utils/owed'
-import { jobsSummary } from '@/features/worktrees/utils/run-words'
+import { jobsSummary, where } from '@/features/worktrees/utils/run-words'
 
 export const resultWords: Record<RunjobsJobStatus, string> = {
   started: 'up',
@@ -13,14 +13,6 @@ export const resultWords: Record<RunjobsJobStatus, string> = {
   crashed: 'crashed',
   not_started: 'not started',
   stopped: 'stopped, not started again',
-}
-
-// what a worktree runs now, as the picker's second line: its own jobs, or the shared services it runs for all
-export function runsNow({ up = [], crashed = 0, holds = [], profile }: DomainOption) {
-  if (up.length === 0 && crashed === 0) return holds.length > 0 ? `holds ${named(holds)}` : 'nothing running'
-  return [profile && `running ${profile}`, up.length > 0 && `${up.length} up`, crashed > 0 && `${crashed} crashed`]
-    .filter(Boolean)
-    .join(' · ')
 }
 
 export function profileLine({ jobs, default: isDefault, running_in }: DomainOption) {
@@ -56,9 +48,6 @@ export const sharedSuffix = ({ holders, namespaces }: Shared) => {
   if (namespaces.length === 0) return ''
   return holders > 1 ? ' · a namespace for each' : ` · ${namespaces[0]}`
 }
-
-export const where = (worktrees: string[]) =>
-  worktrees.length === 1 ? `in ${worktrees[0]}` : `in ${worktrees.length} worktrees`
 
 // what the start's jobs became, counted: the services up, the shared ones joined, the tasks done
 export function startedWords(profile: string, envelope: Applied<'run-up'> | undefined) {

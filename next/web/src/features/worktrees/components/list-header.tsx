@@ -9,6 +9,7 @@ export function ListHeader({
   bulk,
   checked,
   query,
+  note,
   onQuery,
   onCheck,
 }: {
@@ -17,6 +18,7 @@ export function ListHeader({
   bulk: string[]
   checked: string[]
   query: string
+  note?: string | undefined
   onQuery: (query: string) => void
   onCheck: (worktrees: string[], on: boolean) => void
 }) {
@@ -40,6 +42,7 @@ export function ListHeader({
         />
         {checked.length} of {total} selected
         {hidden > 0 && ` · ${hidden} hidden by the search`}
+        {note && ` · ${note}`}
       </div>
     </div>
   )

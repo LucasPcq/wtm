@@ -1,10 +1,10 @@
 import { Clock, Database, GitBranch, Layers, Link2, type LucideIcon, Square, SquareStop } from 'lucide-react'
-import type { ReactNode } from 'react'
 import type { DomainOption, DomainWarning, RunupPlan } from '@/api/types.gen'
 import { ItemList } from '@/features/worktrees/components/item-list'
+import { JobLine } from '@/features/worktrees/components/job-line'
+import { JobSection } from '@/features/worktrees/components/job-section'
 import { type Left, LeftItem } from '@/features/worktrees/components/left-item'
 import { PlanWarnings } from '@/features/worktrees/components/plan-warnings'
-import { JobSection } from '@/features/worktrees/run-up/components/job-section'
 import {
   firstOf,
   type HowItRuns,
@@ -15,7 +15,6 @@ import {
 } from '@/features/worktrees/run-up/utils/plan'
 import { planned, sharedLine } from '@/features/worktrees/run-up/utils/words'
 import { planWide } from '@/features/worktrees/utils/outcome'
-import { cn } from '@/lib/utils'
 
 const howIcon: Record<HowItRuns['kind'], LucideIcon> = {
   stops: SquareStop,
@@ -52,9 +51,9 @@ export function ConfirmStep({
   const idle = options.every(({ up, crashed }) => (up?.length ?? 0) === 0 && !crashed)
 
   const sharedLines = shared.map((service: Shared) => (
-    <Line key={service.name} icon={<Link2 className="size-4 text-muted-foreground" />} name={service.name}>
+    <JobLine key={service.name} icon={<Link2 className="size-4 text-muted-foreground" />} name={service.name}>
       {sharedLine(service, holds.includes(service.name))}
-    </Line>
+    </JobLine>
   ))
 
   return (
@@ -76,9 +75,9 @@ export function ConfirmStep({
           {jobs.map((job) => {
             const { said, mono } = planned(job, first)
             return (
-              <Line key={job.name} icon={job.number && <Ordinal value={job.number} />} name={job.name} mono={mono}>
+              <JobLine key={job.name} icon={job.number && <Ordinal value={job.number} />} name={job.name} mono={mono}>
                 {said}
-              </Line>
+              </JobLine>
             )
           })}
         </JobSection>
@@ -98,26 +97,6 @@ export function ConfirmStep({
         })}
       </JobSection>
     </>
-  )
-}
-
-function Line({
-  icon,
-  name,
-  mono = false,
-  children,
-}: {
-  icon: ReactNode
-  name: string
-  mono?: boolean
-  children: ReactNode
-}) {
-  return (
-    <li aria-label={name} className="flex items-center gap-3 text-sm">
-      <span className="flex size-5 shrink-0 items-center justify-center">{icon}</span>
-      <span className="font-medium">{name}</span>
-      <span className={cn('min-w-0 truncate text-muted-foreground', mono && 'font-mono text-xs')}>{children}</span>
-    </li>
   )
 }
 

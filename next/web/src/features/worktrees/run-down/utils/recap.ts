@@ -1,0 +1,77 @@
+import type { Applied } from '@/api/queries/commands'
+import type { DomainWarning, RundownPlan, RunjobsStopStatus } from '@/api/types.gen'
+import { sharedOf } from '@/features/worktrees/run-down/utils/plan'
+import { kept, statusWords } from '@/features/worktrees/run-down/utils/words'
+import {
+  itemWarnings,
+  type OutcomeGroup,
+  type OutcomeKind,
+  type OutcomeRow,
+  planWide,
+} from '@/features/worktrees/utils/outcome'
+
+type RunDownItem = Applied<'run-down'>['items'][number]
+
+// a worktree's own jobs said by what became of them: what went wrong first, what stopped, then the rest
+const order: RunjobsStopStatus[] = ['failed', 'not_reached', 'stopped', 'cleared', 'not_running']
+
+export function recapOf(
+  envelope: Applied<'run-down'> | undefined,
+  plan: RundownPlan | undefined,
+): { groups: OutcomeGroup[]; labels: Record<OutcomeKind, string>; warnings: DomainWarning[] } {
+  const items = envelope?.items ?? []
+  const warnings = envelope?.warnings ?? []
+  const shared = sharedOf(plan)
+  const isShared = (name: string) => shared.some((service) => service.name === name)
+
+  const said = (item: RunDownItem) => {
+    const jobs = (item.detail?.jobs ?? []).filter((job) => !isShared(job.name))
+    return order
+      .flatMap((status) => {
+        const names = jobs.filter((job) => job.status === status).map((job) => job.name)
+        if (names.length === 0) return []
+        return status === 'stopped' ? [names.join(', ')] : [`${names.join(', ')} ${statusWords[status]}`]
+      })
+      .join(' · ')
+  }
+
+  const rowOf = (item: RunDownItem): OutcomeRow => {
+    const base = { key: item.subject, title: item.subject, path: item.detail?.path }
+    if (item.status === 'done' && item.reason === 'unchanged')
+      return { ...base, tone: 'muted', message: 'nothing was running' }
+    if (item.status === 'done') return { ...base, tone: 'ok', message: said(item) }
+    return { ...base, tone: 'failed', message: item.error?.message ?? said(item) }
+  }
+
+  // a shared service says what its holders' stops did to it, once
+  const services = shared.map((service) => {
+    const statuses = items.flatMap((item) => (item.detail?.jobs ?? []).filter((job) => job.name === service.name))
+    const status = (wanted: RunjobsStopStatus) => statuses.some((job) => job.status === wanted)
+    const row = { key: `shared:${service.name}`, title: service.name }
+    if (status('failed')) return { row: { ...row, tone: 'failed' as const, message: "didn't stop" }, group: 'failed' }
+    if (status('stopped'))
+      return { row: { ...row, tone: 'ok' as const, message: 'stopped: no worktree kept it' }, group: 'stopped' }
+    if (status('released'))
+      return {
+        row: { ...row, tone: 'ok' as const, message: `keeps running for ${kept(service.keptBy)}` },
+        group: 'released',
+      }
+    return undefined
+  })
+  const servicesIn = (group: string) => services.flatMap((service) => (service?.group === group ? [service.row] : []))
+
+  const subjects = warnings
+    .filter((warning) => !planWide(warning))
+    .map((warning) => ({ subject: warning.params?.worktree ?? '', warnings: [warning] }))
+
+  return {
+    groups: [
+      { kind: 'failed', rows: [...items.filter((item) => item.status !== 'done').map(rowOf), ...servicesIn('failed')] },
+      { kind: 'check', rows: itemWarnings([...subjects, ...items]) },
+      { kind: 'done', label: 'Released', rows: servicesIn('released') },
+      { kind: 'done', rows: [...items.filter((item) => item.status === 'done').map(rowOf), ...servicesIn('stopped')] },
+    ],
+    labels: { failed: "Couldn't stop", check: 'To check', done: 'Stopped' },
+    warnings: warnings.filter(planWide),
+  }
+}

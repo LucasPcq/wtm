@@ -15,8 +15,9 @@ import {
 import { RunUpProgress } from '@/features/worktrees/run-up/components/run-up-progress'
 import { RunUpWizard } from '@/features/worktrees/run-up/components/run-up-wizard'
 import { countOf } from '@/features/worktrees/run-up/utils/plan'
-import { startedWords, where } from '@/features/worktrees/run-up/utils/words'
+import { startedWords } from '@/features/worktrees/run-up/utils/words'
 import { owedOf, owedTally } from '@/features/worktrees/utils/owed'
+import { where } from '@/features/worktrees/utils/run-words'
 
 // resolves once the list read lands after at: never while no list is read, the run then kept until the dialog opens
 const listedAfter = (client: QueryClient, repo: string, at: number) =>

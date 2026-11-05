@@ -3,19 +3,19 @@ import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/co
 import { Progress as Bar } from '@/components/ui/progress'
 import { DialogBand } from '@/features/worktrees/components/dialog-band'
 import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
+import { JobSection } from '@/features/worktrees/components/job-section'
 import { PhaseRow } from '@/features/worktrees/components/phase-row'
 import { RunFailure } from '@/features/worktrees/components/run-failure'
 import { RunOutcome } from '@/features/worktrees/components/run-outcome'
 import { RunningFooter } from '@/features/worktrees/components/running-footer'
 import type { RunUpRan } from '@/features/worktrees/hooks/use-run-up-dialog'
-import { JobSection } from '@/features/worktrees/run-up/components/job-section'
 import { countOf, sharedOf } from '@/features/worktrees/run-up/utils/plan'
 import { recapOf } from '@/features/worktrees/run-up/utils/recap'
-import { sharedSuffix, startedWords, where } from '@/features/worktrees/run-up/utils/words'
+import { sharedSuffix, startedWords } from '@/features/worktrees/run-up/utils/words'
 import { jobPlan } from '@/features/worktrees/utils/job-plan'
 import { owedOf } from '@/features/worktrees/utils/owed'
 import { ending, type PhaseRun, type Progress } from '@/features/worktrees/utils/progress'
-import { underWay } from '@/features/worktrees/utils/run-words'
+import { underWay, where } from '@/features/worktrees/utils/run-words'
 
 // a shared service is joined by each worktree: its row says where the least advanced one stands
 const rank: Record<PhaseRun['state'], number> = { failed: 0, now: 1, todo: 2, done: 3 }
