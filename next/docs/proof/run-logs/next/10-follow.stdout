@@ -1,4 +1,4 @@
+  [api] [wtm] started
   [api]   api v1.4.2  ready in 312 ms
   [api]   ➜  Local:   http://localhost:24461/
   [api] 00:00:00 GET /health 200 2ms
-  [api] 00:00:00 POST /session 201 18ms
