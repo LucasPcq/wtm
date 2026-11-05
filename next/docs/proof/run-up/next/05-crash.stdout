@@ -14,4 +14,5 @@
 
   → wtm run up feat/b --profile crash   start it again where it did not pass
   → wtm run logs feat/b                 see feat/b's output
+  → wtm run down feat/b                 stop feat/b's jobs
 

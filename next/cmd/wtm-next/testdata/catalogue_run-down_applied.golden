@@ -1,0 +1,91 @@
+{
+  "v": 2,
+  "command": "run-down",
+  "ok": true,
+  "op": "<id>",
+  "items": [
+    {
+      "subject": "main",
+      "status": "done",
+      "detail": {
+        "path": "<root>/main",
+        "jobs": [
+          {
+            "name": "idle",
+            "status": "stopped"
+          },
+          {
+            "name": "other",
+            "status": "stopped"
+          }
+        ]
+      }
+    }
+  ],
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "main",
+        "branch": "main",
+        "path": "<root>/main",
+        "jobs": [
+          {
+            "name": "idle",
+            "kind": "service",
+            "hold": "own",
+            "fate": "stop"
+          },
+          {
+            "name": "other",
+            "kind": "service",
+            "hold": "own",
+            "fate": "stop"
+          }
+        ]
+      }
+    ],
+    "recap": [
+      {
+        "key": "worktrees",
+        "label": "Worktrees",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "main",
+            "text": "main"
+          }
+        ]
+      },
+      {
+        "key": "jobs",
+        "label": "Stops",
+        "values": [
+          {
+            "value": "idle",
+            "text": "idle"
+          },
+          {
+            "value": "other",
+            "text": "other"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [
+    {
+      "command": "run-up",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "main"
+          ]
+        }
+      ],
+      "code": "run-down.up",
+      "message": "start them again"
+    }
+  ],
+  "warnings": []
+}

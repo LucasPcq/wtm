@@ -1,0 +1,42 @@
+{
+  "fields": [
+    {
+      "kind": "multi_select",
+      "path": "worktree",
+      "origin": "request",
+      "picked": [
+        "main"
+      ],
+      "options": [
+        {
+          "value": "main",
+          "tag": "current",
+          "up": [
+            "idle"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "select",
+      "path": "profile",
+      "skip": "flag_only",
+      "value": "",
+      "options": [],
+      "rememberable": false,
+      "remember": false,
+      "refreshable": false,
+      "closed": false
+    },
+    {
+      "kind": "confirm",
+      "path": "all",
+      "skip": "flag_only",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    }
+  ],
+  "problems": []
+}

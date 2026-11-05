@@ -18,6 +18,7 @@ import (
 	prunecli "github.com/LucasPcq/wtm/next/internal/command/prune/cli"
 	reparentcli "github.com/LucasPcq/wtm/next/internal/command/reparent/cli"
 	resolvecli "github.com/LucasPcq/wtm/next/internal/command/resolve/cli"
+	rundowncli "github.com/LucasPcq/wtm/next/internal/command/rundown/cli"
 	runlogscli "github.com/LucasPcq/wtm/next/internal/command/runlogs/cli"
 	runupcli "github.com/LucasPcq/wtm/next/internal/command/runup/cli"
 	statuscli "github.com/LucasPcq/wtm/next/internal/command/status/cli"
@@ -61,7 +62,7 @@ func commands(streams *output.Streams, env cli.Env) []*cobra.Command {
 		statuscli.New(streams, env, openStatus, commandLine),
 		treecli.New(streams, env, openTree, commandLine),
 		eventscli.New(streams, env, systemStream(), commandLine),
-		runCmd(runupcli.New(streams, env, openRunUp, commandLine, liveView()), runlogscli.New(streams, env, openRunLogs, commandLine, runlogscli.View(liveView())), runDaemonCmd(streams)),
+		runCmd(runupcli.New(streams, env, openRunUp, commandLine, liveView()), runlogscli.New(streams, env, openRunLogs, commandLine, runlogscli.View(liveView())), rundowncli.New(streams, env, openRunDown, commandLine), runDaemonCmd(streams)),
 		uiCmd(env),
 		daemonCmd(),
 	}

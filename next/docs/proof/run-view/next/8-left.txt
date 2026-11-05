@@ -16,6 +16,7 @@ $ wtm run up feat/b --profile view --yes; echo EXIT=$?
 ┃    web  http://web.feat-b.acme.localhost:24392
 ┃
 ┃  → wtm-next run logs feat/b   see feat/b's output
+┃  → wtm-next run down feat/b   stop feat/b's jobs
 
 EXIT=0
 $

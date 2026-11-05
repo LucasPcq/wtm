@@ -1,0 +1,8 @@
+
+  ✓ run down: 1 done
+
+  Worktrees  feat/a
+  Stops      cache
+
+  → wtm run up feat/a   start them again
+

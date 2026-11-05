@@ -228,33 +228,12 @@ func (u UseCase) locate(ctx context.Context, facts Facts, req Request) (map[stri
 		if path == "" {
 			continue
 		}
-		if located[name], err = u.root(ctx, facts.Worktrees, path); err != nil {
+		if located[name], err = repository.Root(ctx, u.Git, facts.Worktrees, path); err != nil {
 			return nil, err
 		}
 	}
 
 	return located, nil
-}
-
-// root is path as git spells the worktree root it is, when it is one under another spelling (a disk that ignores case: git keeps a path as it was given), else path itself; only a path that matches no root as written is asked of the disk.
-func (u UseCase) root(ctx context.Context, worktrees []worktree.Worktree, path string) (string, error) {
-	if slices.ContainsFunc(worktrees, func(w worktree.Worktree) bool { return w.Path == path }) {
-		return path, nil
-	}
-	for _, w := range worktrees {
-		if w.Path == "" || w.Prunable {
-			continue
-		}
-		same, err := u.Git.Same(ctx, path, w.Path)
-		if err != nil {
-			return "", err
-		}
-		if same {
-			return w.Path, nil
-		}
-	}
-
-	return path, nil
 }
 
 // ----------------------------------------------------------------------------

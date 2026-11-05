@@ -1,0 +1,31 @@
+## jobs up (the daemon's index)
+feat-b stuck stack stuck
+## .git/wtm/worktrees/feat%2Fa/meta.json
+  "ordinal": 1,
+  "namespaces": [
+    "db"
+  "isolation": "isolated"
+## .git/wtm/worktrees/feat%2Fb/meta.json
+  "ordinal": 2,
+  "namespaces": [
+    "db"
+  "isolation": "isolated"
+## .git/wtm/worktrees/feat%2Fv/meta.json
+  "isolation": "verbatim"
+## logs
+./feat%2Fa/api.log
+./feat%2Fa/cache.log
+./feat%2Fa/migrate.log
+./feat%2Fa/web.log
+./feat%2Fb/api.log
+./feat%2Fb/cache.log
+./feat%2Fb/migrate.log
+./feat%2Fb/stuck.log
+./feat%2Fb/web.log
+./main/api.log
+./main/db.log
+./main/web.log
+## namespaces made
+acme_feat-a
+acme_feat-b
+## compose containers

@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"path/filepath"
+	"slices"
 	"sync"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -50,19 +51,45 @@ func GoneIn(git Locator) func(ctx context.Context, w worktree.Worktree) (bool, e
 
 // Located is the path a worktree's name stands for, read from where caller stands and resolved through its symbolic links by git; "" when the name is empty or nothing exists there, the name then being a branch or a part of one (worktree.Named).
 func Located(ctx context.Context, git Locator, name string, caller domain.Caller) (string, error) {
+	location, err := Resolved(ctx, git, name, caller)
+	if err != nil || !location.Exists {
+		return "", err
+	}
+	return location.Path, nil
+}
+
+// Resolved is where the path name leads from where caller stands, resolved through its symbolic links by git, whether or not something is there (a worktree removed whose directory is gone); none for an empty name.
+func Resolved(ctx context.Context, git Locator, name string, caller domain.Caller) (worktree.Location, error) {
 	if name == "" {
-		return "", nil
+		return worktree.Location{}, nil
 	}
 
 	path := name
 	if !filepath.IsAbs(path) && caller.Cwd != "" {
 		path = filepath.Join(caller.Cwd, path)
 	}
-	location, err := git.Locate(ctx, path)
-	if err != nil || !location.Exists {
-		return "", err
+	return git.Locate(ctx, path)
+}
+
+// Root is path as git spells the root of the worktree among worktrees it is, when it is one under another spelling (a disk that ignores case: git keeps a path as it was given), else path itself; only a path that matches no root as written is asked of the disk.
+func Root(ctx context.Context, git Matcher, worktrees []worktree.Worktree, path string) (string, error) {
+	if slices.ContainsFunc(worktrees, func(w worktree.Worktree) bool { return w.Path == path }) {
+		return path, nil
 	}
-	return location.Path, nil
+	for _, w := range worktrees {
+		if w.Path == "" || w.Prunable {
+			continue
+		}
+		same, err := git.Same(ctx, path, w.Path)
+		if err != nil {
+			return "", err
+		}
+		if same {
+			return w.Path, nil
+		}
+	}
+
+	return path, nil
 }
 
 // Each returns what read reads of each of worktrees, in their order, a few read at once.

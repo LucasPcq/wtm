@@ -115,3 +115,26 @@ func SkewWarning(params SkewWarningParams) domain.Warning {
 	}
 	return warning
 }
+
+// SkewRefusalParams are the command refused, what it did not do (its message's start), the error the run daemon's client failed on, and the command that hands a skewed daemon's jobs over.
+type SkewRefusalParams struct {
+	Command string
+	Undone  string
+	Err     error
+	Restart *domain.FollowUp
+}
+
+// SkewRefusal is <command>.daemon_skew as a refusal (KindPrecondition), followed by the restart, when the run daemon's client failed on a daemon of another protocol or build, or the legacy wtm's, that it cannot go on with (run.CodeSkew, run.CodeLegacy); nil for any other error.
+func SkewRefusal(params SkewRefusalParams) *domain.Error {
+	refused, ok := errors.AsType[*run.Error](params.Err)
+	if !ok || refused.Code != run.CodeSkew && refused.Code != run.CodeLegacy {
+		return nil
+	}
+
+	skewed := &run.Skewed{Skew: run.SkewBuild}
+	if refused.Code == run.CodeLegacy {
+		skewed.Skew = run.SkewLegacy
+	}
+	warning := SkewWarning(SkewWarningParams{Command: params.Command, Skewed: skewed, Restart: params.Restart})
+	return &domain.Error{Kind: domain.KindPrecondition, Code: warning.Code, Message: params.Undone + ": " + refused.Message, Params: warning.Params, FollowUp: warning.FollowUp, Cause: params.Err}
+}

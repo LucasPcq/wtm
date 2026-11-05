@@ -53,6 +53,7 @@ type answer struct {
 	Jobs     []job  `json:"jobs,omitzero"`
 	Job      *job   `json:"job,omitempty"`
 	Outcome  string `json:"outcome,omitempty"`
+	Released bool   `json:"released,omitempty"`
 	At       stamp  `json:"at,omitzero"`
 	Text     string `json:"text,omitempty"`
 	Proxy    *proxy `json:"proxy,omitempty"`
@@ -87,6 +88,9 @@ type job struct {
 	WorkDir   string         `json:"work_dir"`
 	Profile   string         `json:"profile,omitempty"`
 	SharedDir string         `json:"shared_dir,omitempty"`
+	MainHolds bool           `json:"main_holds,omitempty"`
+	Repo      string         `json:"repo,omitempty"`
+	Stop      string         `json:"stop_command,omitempty"`
 	State     string         `json:"state,omitempty"`
 	Hold      string         `json:"hold,omitempty"`
 	Reaped    bool           `json:"reaped,omitempty"`
@@ -97,6 +101,7 @@ type job struct {
 	Ports     map[string]int `json:"ports,omitempty"`
 	LastLine  *line          `json:"last_line,omitempty"`
 	Outcome   string         `json:"outcome,omitempty"`
+	Released  bool           `json:"released,omitempty"`
 	Status    string         `json:"status,omitempty"`
 }
 
@@ -128,7 +133,7 @@ func (s *stamp) UnmarshalJSON(data []byte) error {
 }
 
 func jobOf(j run.Job) job {
-	wire := job{Name: j.Name, Kind: string(j.Kind), WorkDir: j.WorkDir, Profile: j.Profile, SharedDir: j.SharedDir, State: string(j.State), Hold: string(j.Hold), Reaped: j.Reaped, PID: j.PID, StartedAt: stamp(j.StartedAt), ExitCode: j.ExitCode, URL: j.URL, Ports: j.Ports, Status: legacyStatus(j)}
+	wire := job{Name: j.Name, Kind: string(j.Kind), WorkDir: j.WorkDir, Profile: j.Profile, SharedDir: j.SharedDir, MainHolds: j.MainHolds, Repo: j.Repo, Stop: j.StopCommand, State: string(j.State), Hold: string(j.Hold), Reaped: j.Reaped, PID: j.PID, StartedAt: stamp(j.StartedAt), ExitCode: j.ExitCode, URL: j.URL, Ports: j.Ports, Status: legacyStatus(j)}
 	if j.LastLine != nil {
 		wire.LastLine = &line{At: stamp(j.LastLine.At), Text: j.LastLine.Text}
 	}
@@ -160,7 +165,7 @@ func (j job) runJob(legacy bool) run.Job {
 	}
 
 	hold, state := run.Hold(j.Hold), run.State(j.State)
-	read := run.Job{Name: j.Name, WorkDir: j.WorkDir, Profile: j.Profile, Up: hold == run.HoldClaim || state == run.Running, Kind: project.JobKind(j.Kind), State: state, Hold: hold, Reaped: j.Reaped, PID: j.PID, URL: j.URL, Ports: j.Ports, ExitCode: j.ExitCode, StartedAt: time.Time(j.StartedAt), SharedDir: j.SharedDir}
+	read := run.Job{Name: j.Name, WorkDir: j.WorkDir, Profile: j.Profile, Up: hold == run.HoldClaim || state == run.Running, Kind: project.JobKind(j.Kind), State: state, Hold: hold, Reaped: j.Reaped, PID: j.PID, URL: j.URL, Ports: j.Ports, ExitCode: j.ExitCode, StartedAt: time.Time(j.StartedAt), SharedDir: j.SharedDir, MainHolds: j.MainHolds, Repo: j.Repo, StopCommand: j.Stop}
 	if j.LastLine != nil {
 		read.LastLine = &run.Line{At: time.Time(j.LastLine.At), Text: j.LastLine.Text}
 	}

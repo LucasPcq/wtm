@@ -38,7 +38,7 @@ var byAction = map[worktree.Action]struct{ command, label string }{
 	worktree.ActionOpenPR:      {"", "Open the pull request"},
 	worktree.ActionExec:        {domain.CommandExec, "Run a command"},
 	worktree.ActionRunUp:       {domain.CommandRunUp, "Start the profile"},
-	worktree.ActionRunDown:     {"run down", "Stop the profile"},
+	worktree.ActionRunDown:     {domain.CommandRunDown, "Stop the profile"},
 	worktree.ActionLogs:        {domain.CommandRunLogs, "View the logs"},
 	worktree.ActionFastForward: {domain.CommandFastForward, "Fast-forward from origin"},
 	worktree.ActionSync:        {domain.CommandSync, "Sync onto its parent"},

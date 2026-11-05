@@ -1,0 +1,38 @@
+[
+  {
+    "branch": "feat/b",
+    "path": "<SB>/acme.trees/feat-b",
+    "jobs": [
+      {
+        "name": "cache",
+        "status": "stopped"
+      },
+      {
+        "name": "api",
+        "status": "stopped"
+      },
+      {
+        "name": "web",
+        "status": "stopped"
+      },
+      {
+        "name": "db",
+        "status": "stopped"
+      }
+    ]
+  },
+  {
+    "branch": "main",
+    "path": "<SB>/acme",
+    "jobs": [
+      {
+        "name": "api",
+        "status": "stopped"
+      },
+      {
+        "name": "web",
+        "status": "stopped"
+      }
+    ]
+  }
+]

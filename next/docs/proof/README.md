@@ -31,6 +31,7 @@ other=$(mktemp -d)/wtm-next && (cd ../../.. && go build -ldflags "-X main.versio
 ./run-up.sh "$wtm" "$next" run-up
 ./run-view.sh "$wtm" "$next" run-view
 ./run-logs.sh "$wtm" "$next" run-logs
+./run-down.sh "$wtm" "$next" run-down
 ./clean-data.sh "$wtm" "$next" clean-data
 git diff --stat .
 ```
@@ -671,7 +672,7 @@ The reference is the legacy `wtm run up` of 0.30.1. Its output differs by design
   - **feat/v's ordinal**: legacy numbers a verbatim worktree when it starts its jobs (`ordinal: 3`); next numbers only a worktree whose ports derive from an ordinal (isolated, with a port, a namespace or compose declared), and a verbatim worktree's ports are its source's;
   - **the logs of jobs another profile ran**: legacy removes them before a start (`feat/b/migrate.log` gone at 5); next keeps them (a follow-up).
 - The differences, all deliberate (the spec's departures D1–D16, approved by the owner):
-  - **The uniform human output**: a line per job as it ends on stderr (`✓ feat/a · api (2ms)`), then the tally (`✓ run up: 1 done`, `= run up: 1 unchanged` when every job was up, 2), the recap (worktrees, profile, the jobs with `(up)` or `(joined, in main)`), an `Addresses` block (one job and its URL per line, the URLs in one column, under each worktree's branch when the start ran in several; 14), the anomalies named (a job that failed with its last lines and its log, a port nothing answers on), and the next steps: the start again where it did not pass with its worktree and profile (`run-up.retry`), `run logs` and `run down` of a worktree left with jobs up. Legacy prints each job's step, the task's raw output at column 0, `Where to reach it`, and `→ wtm run up` / `wtm run logs` / `wtm run down` naming no worktree nor profile.
+  - **The uniform human output**: a line per job as it ends on stderr (`✓ feat/a · api (2ms)`), then the tally (`✓ run up: 1 done`, `= run up: 1 unchanged` when every job was up, 2), the recap (worktrees, profile, the jobs with `(up)` or `(joined, in main)`), an `Addresses` block (one job and its URL per line, the URLs in one column, under each worktree's branch when the start ran in several; 14), the anomalies named (a job that failed with its last lines and its log, a port nothing answers on), and the next steps: the start again where it did not pass with its worktree and profile (`run-up.retry`), `run down` of a worktree left with jobs up (`run logs` once wtm-next runs it). Legacy prints each job's step, the task's raw output at column 0, `Where to reach it`, and `→ wtm run up` / `wtm run logs` / `wtm run down` naming no worktree nor profile.
   - **JSON is the v2 envelope**: an item per worktree whose detail lists every job of the profile with its status (`started`, `already_running`, `joined`, `done`, `failed`, `crashed`, `not_started`), URL, log and ports (3); legacy prints an array of `{branch, path, profile, aborted, jobs}` leaving the jobs never reached out, and prints its refusals as text even with `--output json` (11).
   - **A service that ends once launched fails its worktree** (`run-up.crashed`, exit 1, its last line in the detail; 5); legacy reports it `started`, exit 0. A crash past the moment the start checks is the events' and the live view's to show.
   - **The refusals under the shared rules**: a job changing foreign data is refused 23 (`run-up.unsafe`, a `run-up.foreign_data` problem per job, followed by the request forced; 6), a port another worktree holds 23 (`run-up.port_clash`, followed by the start with `--exclusive`; 8), an unknown profile or `--exclusive` beside several worktrees 2 (9, 10), an unknown worktree 2 (11; legacy 1, its names matched as substrings); legacy exits 1, 14 for the profile.
@@ -679,6 +680,31 @@ The reference is the legacy `wtm run up` of 0.30.1. Its output differs by design
   - **The live view opens once every job is started** (Q5): the start is drawn as progress lines first, then the view (`tty/next/5-view.txt`), then, once it is left, the outcome under it (`tty/next/6-outcome.txt`); legacy opens it on the first job and recaps when it is left (`tty/legacy/4-view.txt`). The view itself: `run-view/`, below.
   - **Reads warn of a daemon of another build**: list, tree and status now say `! the run daemon is the legacy wtm's: restart it to start jobs beside its own` (`<command>.daemon_skew`, followed by `run daemon restart`) where their proofs start jobs with the legacy wtm (list 06, 07, 13 to 16, its picker; tree 07, 08, 10, 16 to 18; status 11, 12; daemon 02, 28), and list's and tree's `run_up` action names `run-up`.
   - **Not yet in next**: legacy's notice that main's `.env` still spells ports (`addressing`), its Next.js dev-origins hint, its removal of other profiles' logs, and its offer to silence a port nothing answers on by writing `probe = false` into run.toml (dropped: a silent port is the warning `run-up.port_silent`).
+
+# Proof: `wtm run down` (legacy `flow/run/down`) vs `wtm-next run down`
+
+- `run-down.sh <wtm> <wtm-next> run-down`: two identical sandboxes, one after the other, each with its own HOME (so its own run daemon, socket and index), torn down before the next starts (every job stopped, the compose stacks' `docker compose down` run, the daemon stopped): run-up.sh's "acme" (a shared `db` with a namespace, a compose stack `cache`, profiles `dev` and `full`) with a stack `stuck` whose stop command exits 4 until `$HOME/unstick` exists, and a profile `stuck` (api, stuck). Each side starts its jobs with its own `run up`: `full` in feat/a and feat/b (both holding `db`), `dev` in main. After each scenario the exit code, stdout, stderr and the state (as run-up.sh's); `run-down/states.diff` holds the differences. Then, in a fresh sandbox per side with `dev` up in feat/a and feat/b, the wizard in tmux at 100×40 from feat/a: `run-down/tty/legacy/` (the picker, then the stop) and `run-down/tty/next/` (the picker with feat/a ticked, the recap, the outcome).
+  1. feat/a: its jobs stop, its hold on `db` released, feat/b keeping it; the stack stopped by its stop command
+  2. feat/a again: nothing running
+  3. feat/b and main, JSON: feat/b's hold is the last, `db` stops; main runs `db` for the others without holding it, which is left out
+  4. `--profile dev` in feat/a, which runs `full`: api and web stop, cache and db stay
+  5. an unknown profile
+  6. an unknown worktree, JSON
+  7. `--all` beside a worktree
+  8. `--all`, JSON: every worktree of the repository running something
+  9. the daemon stopped with feat/a's stack in its index: a daemon is started to reach it
+  10. feat/b's `stuck`, whose stop command fails
+  11. the same, JSON
+  12. a dry run (next only)
+- The states differ only by run up's (the profile each job was started under, kept in the index; the logs of jobs another profile ran, kept): `run down` itself leaves the same jobs up and down on both sides.
+- The differences, all deliberate (the spec's departures, approved by the owner):
+  - **The uniform human output**: a line per job as it stops on stderr (`✓ feat/a · cache (2ms)`), then the tally (`✓ run down: 1 done`, `= run down: 1 unchanged` for a worktree running nothing, 2), the recap (`Stops api, cache, db (released, kept by feat/b), web`; `db (stops in main: no worktree keeps it)` for the last hold; `(crashed, cleared)`), the anomalies named, and the next step: `run up` of the worktrees that stopped, with their profile, the one the stop narrowed to included (4). Legacy frames a `Jobs` block per worktree (`Stopped:`, `Released: db — still up elsewhere`) and `→ wtm run up` naming no worktree nor profile, and says `No jobs running in this worktree.` of a worktree named from another.
+  - **JSON is the v2 envelope**: an item per worktree whose detail lists each job reached with its status (`stopped`, `released`, `cleared`, `not_running`, `failed` with the daemon's message, `not_reached`), the plan saying each job's `fate` (`stop`, `release` with `kept_by`, `clear`), a stack's `stop_command` and a shared service's `shared_in` (3, 8, 11); legacy prints a bare array of `{branch, path, jobs}`.
+  - **A stop that fails is its job's** (10, 11): the worktree fails, `run-down.stop_failed` naming the job and the daemon's reason, exit 1, the other jobs stopped and reported; legacy fails the whole worktree with `stop all: stop stuck: cannot stop: exit status 4`, its other jobs unreported, and prints that line, no JSON, under `--output json`.
+  - **The usage problems exit 2** (5, 6; legacy 14 and 1), as field errors of their flag or argument; names are exact (no substring).
+  - **A recap and a confirmation** before anything stops, and `--dry-run` / `--expect-fingerprint` (12; the wizard in `tty/next/2-recap.txt`); legacy stops as soon as the worktrees are picked.
+  - **Several worktrees stop at once**, each one's jobs one after the other, its own first then its holds; legacy stops the worktrees one after the other.
+  - **Not in next**: legacy's warning about run.toml (`job "stuck" declares stop, so its cmd is a launcher…`), which every legacy run command prints before it acts.
 
 # Proof: the live view of `wtm run up` (legacy `surface/tui/runview`) vs `wtm-next`'s `ui/runview`
 

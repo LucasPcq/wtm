@@ -70,10 +70,11 @@ func (s Service) Read(ctx context.Context, params ReadParams) (map[string]Check,
 // ----------------------------------------------------------------------------
 // The removal
 
-// The codes of what becomes of a removal, after the command's name: jobs that would not stop, or left running when forced; an on_clean hook that failed, the hooks skipped or run without the worktree's environment, a worktree git could not remove or whose files stay on disk, a branch or a record that could not be deleted.
+// The codes of what becomes of a removal, after the command's name: jobs that would not stop, or left running when forced, followed by their stop (StopLeft); an on_clean hook that failed, the hooks skipped or run without the worktree's environment, a worktree git could not remove or whose files stay on disk, a branch or a record that could not be deleted.
 const (
 	StopFailed         = ".stop_failed"
 	JobsLeft           = ".jobs_left"
+	StopLeft           = ".down"
 	HookFailed         = ".hook_failed"
 	HooksSkipped       = ".hooks_skipped"
 	HookEnvUnavailable = ".hook_env_unavailable"
@@ -206,7 +207,8 @@ func (s Service) stopJobs(ctx context.Context, params RemoveParams) ([]domain.Wa
 		about["jobs"] = strings.Join(left, ", ")
 	}
 	if params.Force {
-		return []domain.Warning{{Code: params.Command + JobsLeft, Message: removal.Worktree + " is removed all the same: " + still, Params: about}}, nil
+		down := &domain.FollowUp{Command: domain.CommandRunDown, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{removal.Path}}}, Code: params.Command + StopLeft, Message: "stop what it left running"}
+		return []domain.Warning{{Code: params.Command + JobsLeft, Message: removal.Worktree + " is removed all the same: " + still, Params: about, FollowUp: down}}, nil
 	}
 	return nil, &domain.Error{Kind: domain.KindInternal, Code: params.Command + StopFailed, Message: removal.Worktree + " is kept: " + still, Params: about}
 }

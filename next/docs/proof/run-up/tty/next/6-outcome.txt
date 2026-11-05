@@ -13,6 +13,7 @@ $ wtm run up; echo EXIT=$?
 ┃    web  http://web.main.acme.localhost:24372
 ┃
 ┃  → wtm-next run logs main   see main's output
+┃  → wtm-next run down main   stop main's jobs
 
 EXIT=0
 $

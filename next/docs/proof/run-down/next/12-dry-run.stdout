@@ -1,0 +1,7 @@
+
+  run down · dry run, nothing applied
+  Worktrees  feat/a
+  Stops      api, cache, db (released, kept by feat/b), web
+  fingerprint  <FP>
+  → wtm run down feat/a --expect-fingerprint <FP>   apply this plan
+

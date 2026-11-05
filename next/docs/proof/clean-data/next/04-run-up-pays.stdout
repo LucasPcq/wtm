@@ -12,4 +12,5 @@
   ✓ dropped acme_feat-c from db, owed since feat-c was removed
 
   → wtm run logs feat/d   see feat/d's output
+  → wtm run down feat/d   stop feat/d's jobs
 

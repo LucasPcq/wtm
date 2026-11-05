@@ -31,6 +31,29 @@ func TestALegacyDaemonsJobsAreReadAsItSpellsThem(t *testing.T) {
 	assert.Equal(t, map[string]any{"action": "list"}, <-requests)
 }
 
+// Review: a daemon of another build may not list a job's repository, a stack's stop command, nor whether the main checkout holds a shared job; the index says them, and a shared job it has no record of is said unknown.
+func TestASkewedDaemonsJobsTakeWhatItsListingLacksFromTheIndex(t *testing.T) {
+	socket, _ := serve(t, `{"status": "ok", "jobs": [{"name": "cache", "status": "detached", "work_dir": "/wt/a"}, {"name": "web", "status": "running", "work_dir": "/wt/a"}, {"name": "api", "status": "running", "work_dir": "/wt/b"},
+		{"name": "db", "status": "running", "work_dir": "/repo", "shared_dir": "/repo"}, {"name": "db", "status": "joined", "work_dir": "/wt/a", "shared_dir": "/repo"}, {"name": "queue", "status": "running", "work_dir": "/repo", "shared_dir": "/repo"}]}`)
+	require.NoError(t, os.WriteFile(daemon.IndexPath(socket), []byte(`{"version": 2, "jobs": [
+		{"name": "cache", "work_dir": "/wt/a", "attached": false, "config": {"name": "cache", "kind": "service", "cmd": "up -d", "stop": "down"}, "origin": {"repo": {"root": "/repo", "common_dir": "/repo/.git"}}},
+		{"name": "web", "work_dir": "/wt/a", "pid": 7, "config": {"name": "web", "kind": "service", "cmd": "pnpm dev", "stop": "never read"}, "origin": {"repo": {"root": "/repo", "common_dir": "/repo/.git"}}},
+		{"name": "db", "work_dir": "/repo", "pid": 8, "shared_dir": "/repo", "main_holds": true, "config": {"name": "db", "kind": "service", "cmd": "db", "scope": "shared"}},
+		{"name": "db", "work_dir": "/wt/a", "joined": true, "shared_dir": "/repo", "config": {"name": "db", "kind": "service", "cmd": "db", "scope": "shared"}}]}`), 0o600))
+
+	jobs, err := daemon.Daemon{SocketPath: socket, Version: "1.0"}.Jobs(t.Context())
+
+	require.ErrorAs(t, err, new(*run.Skewed))
+	assert.Equal(t, []run.Job{
+		{Name: "cache", WorkDir: "/wt/a", Up: true, State: run.Running, Hold: run.HoldDetached, Repo: "/repo", StopCommand: "down"},
+		{Name: "web", WorkDir: "/wt/a", Up: true, State: run.Running, Hold: run.HoldOwn, Repo: "/repo"},
+		{Name: "api", WorkDir: "/wt/b", Up: true, State: run.Running, Hold: run.HoldOwn},
+		{Name: "db", WorkDir: "/repo", Up: true, State: run.Running, Hold: run.HoldOwn, SharedDir: "/repo", MainHolds: true},
+		{Name: "db", WorkDir: "/wt/a", Up: true, Hold: run.HoldClaim, SharedDir: "/repo"},
+		{Name: "queue", WorkDir: "/repo", Up: true, State: run.Running, Hold: run.HoldOwn, SharedDir: "/repo", MainHoldsUnknown: true},
+	}, jobs)
+}
+
 func TestALegacyJobIsReadWithHowItStandsAndAStateTheDaemonSaysWins(t *testing.T) {
 	socket, _ := serve(t, `{"status": "ok", "jobs": [{"name": "api", "kind": "service", "status": "crashed", "state": "crashed", "work_dir": "/wt/a",
 		"url": "http://api.a.acme.localhost", "exit_code": 1, "started_at": "2026-10-16T12:00:00Z", "shared_dir": "/repo"},
@@ -84,7 +107,7 @@ func TestWithNoDaemonTheStacksAndClaimsOfTheIndexAreUp(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, []run.Job{
-		{Name: "db", WorkDir: "/repo", Up: true, Kind: project.Service, State: run.Running, Hold: run.HoldDetached, StartedAt: started},
+		{Name: "db", WorkDir: "/repo", Up: true, Kind: project.Service, State: run.Running, Hold: run.HoldDetached, StartedAt: started, StopCommand: "docker compose down"},
 		{Name: "db", WorkDir: "/wt/a", Up: true, Kind: project.Service, Hold: run.HoldClaim, SharedDir: "/repo"},
 	}, jobs)
 }
@@ -143,6 +166,16 @@ func TestAJobIsListedWithTheProfileItWasStartedUnder(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, []run.Job{listed}, got)
+}
+
+func TestASharedJobIsListedWithItsMainCheckoutsHoldItsRepositoryAndItsStopCommand(t *testing.T) {
+	held := run.Job{Name: "db", WorkDir: "/repo", Up: true, Kind: project.Service, State: run.Running, Hold: run.HoldOwn, SharedDir: "/repo", MainHolds: true, Repo: "/repo", StopCommand: "docker compose down"}
+	socket, _ := served(t, &jobs{listed: []run.Job{held}}, "1.0")
+
+	got, err := daemon.Daemon{SocketPath: socket, Version: "1.0"}.Jobs(t.Context())
+
+	require.NoError(t, err)
+	assert.Equal(t, []run.Job{held}, got)
 }
 
 func TestAStartTheDaemonRefusesFailsWithItsCodeAndExitCode(t *testing.T) {
@@ -278,6 +311,25 @@ func TestAStopWithNoDaemonStartsOneOnlyForAJobTheIndexHolds(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, run.OutcomeStopped, stopped)
 	assert.Equal(t, 1, launched)
+}
+
+func TestALegacyDaemonsReleaseIsReadAsReleased(t *testing.T) {
+	socket, _ := serve(t, `{"status":"ok","version":"0.30.1","message":"job db stopped","released":true}`)
+
+	outcome, err := daemon.Daemon{SocketPath: socket}.Stop(t.Context(), run.Stop{Name: "db", WorkDir: "/wt/a"})
+
+	require.NoError(t, err)
+	assert.Equal(t, run.OutcomeReleased, outcome)
+}
+
+func TestALegacyDaemonsStopAllReadsEachReleaseAsReleased(t *testing.T) {
+	socket, _ := serve(t, `{"status":"ok","version":"0.30.1","jobs":[{"name":"web","work_dir":"/wt/a","status":"stopped"},{"name":"db","work_dir":"/wt/a","status":"joined","released":true}]}`)
+
+	stopped, err := daemon.Daemon{SocketPath: socket}.StopAll(t.Context(), run.StopAll{WorkDir: "/wt/a"})
+
+	require.NoError(t, err)
+	require.Len(t, stopped, 2)
+	assert.Equal(t, []run.Outcome{run.OutcomeStopped, run.OutcomeReleased}, []run.Outcome{stopped[0].Outcome, stopped[1].Outcome})
 }
 
 func TestALegacyDaemonsStopIsReadAsStopped(t *testing.T) {

@@ -503,6 +503,7 @@ func TestAJobThatWillNotStopKeepsTheWorktreeUnlessForced(t *testing.T) {
 			if force {
 				assert.Equal(t, domain.StatusDone, item.Status)
 				assert.Equal(t, []string{"clean.jobs_left"}, codes(item.Warnings))
+				assert.Equal(t, &domain.FollowUp{Command: domain.CommandRunDown, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{w.at(plain)}}}, Code: "clean.down", Message: "stop what it left running"}, item.Warnings[0].FollowUp)
 				return
 			}
 			assert.Equal(t, domain.StatusFailed, item.Status)

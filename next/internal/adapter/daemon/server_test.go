@@ -64,6 +64,15 @@ func TestAStopAnswersWhatItDid(t *testing.T) {
 	assert.Equal(t, []any{run.Stop{Name: "nope", WorkDir: "/x", CorrelationID: "c2"}}, daemonJobs.seen())
 }
 
+func TestAReleaseAnswersTheLegacyClientsWordForIt(t *testing.T) {
+	socket, _ := served(t, &jobs{outcome: run.OutcomeReleased}, "1.0")
+
+	answers := asked(t, socket, `{"action":"stop","name":"db","work_dir":"/wt/a"}`)
+
+	assert.Equal(t, "released", answers[0]["outcome"])
+	assert.Equal(t, true, answers[0]["released"])
+}
+
 func TestARequestTheDaemonCannotReadIsRefusedWithItsCode(t *testing.T) {
 	cases := map[string]struct {
 		request string

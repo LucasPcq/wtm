@@ -1,0 +1,231 @@
+=== 00-before: exit legacy , next 
+--- legacy/00-before
++++ next/00-before
+@@ -1,15 +1,15 @@
+ ## jobs up (the daemon's index)
+-acme api own -
+-acme db own -
+-acme web own -
+-feat-a api own -
+-feat-a cache stack -
+-feat-a db claim -
+-feat-a web own -
+-feat-b api own -
+-feat-b cache stack -
+-feat-b db claim -
+-feat-b web own -
++acme api own dev
++acme db own full
++acme web own dev
++feat-a api own full
++feat-a cache stack full
++feat-a db claim full
++feat-a web own full
++feat-b api own full
++feat-b cache stack full
++feat-b db claim full
++feat-b web own full
+ ## .git/wtm/worktrees/feat%2Fa/meta.json
+   "ordinal": 1,
+   "namespaces": [
+=== 01-one: exit legacy 0, next 0
+--- legacy/01-one
++++ next/01-one
+@@ -1,11 +1,11 @@
+ ## jobs up (the daemon's index)
+-acme api own -
+-acme db own -
+-acme web own -
+-feat-b api own -
+-feat-b cache stack -
+-feat-b db claim -
+-feat-b web own -
++acme api own dev
++acme db own full
++acme web own dev
++feat-b api own full
++feat-b cache stack full
++feat-b db claim full
++feat-b web own full
+ ## .git/wtm/worktrees/feat%2Fa/meta.json
+   "ordinal": 1,
+   "namespaces": [
+=== 02-again: exit legacy 0, next 0
+--- legacy/02-again
++++ next/02-again
+@@ -1,11 +1,11 @@
+ ## jobs up (the daemon's index)
+-acme api own -
+-acme db own -
+-acme web own -
+-feat-b api own -
+-feat-b cache stack -
+-feat-b db claim -
+-feat-b web own -
++acme api own dev
++acme db own full
++acme web own dev
++feat-b api own full
++feat-b cache stack full
++feat-b db claim full
++feat-b web own full
+ ## .git/wtm/worktrees/feat%2Fa/meta.json
+   "ordinal": 1,
+   "namespaces": [
+=== 03-several-json: exit legacy 0, next 0
+=== 04-profile: exit legacy 0, next 0
+--- legacy/04-profile
++++ next/04-profile
+@@ -1,7 +1,7 @@
+ ## jobs up (the daemon's index)
+-acme db own -
+-feat-a cache stack -
+-feat-a db claim -
++acme db own full
++feat-a cache stack full
++feat-a db claim full
+ ## .git/wtm/worktrees/feat%2Fa/meta.json
+   "ordinal": 1,
+   "namespaces": [
+=== 05-unknown-profile: exit legacy 14, next 2
+--- legacy/05-unknown-profile
++++ next/05-unknown-profile
+@@ -1,7 +1,7 @@
+ ## jobs up (the daemon's index)
+-acme db own -
+-feat-a cache stack -
+-feat-a db claim -
++acme db own full
++feat-a cache stack full
++feat-a db claim full
+ ## .git/wtm/worktrees/feat%2Fa/meta.json
+   "ordinal": 1,
+   "namespaces": [
+=== 06-unknown-json: exit legacy 1, next 2
+--- legacy/06-unknown-json
++++ next/06-unknown-json
+@@ -1,7 +1,7 @@
+ ## jobs up (the daemon's index)
+-acme db own -
+-feat-a cache stack -
+-feat-a db claim -
++acme db own full
++feat-a cache stack full
++feat-a db claim full
+ ## .git/wtm/worktrees/feat%2Fa/meta.json
+   "ordinal": 1,
+   "namespaces": [
+=== 07-all-narrowed: exit legacy 2, next 2
+--- legacy/07-all-narrowed
++++ next/07-all-narrowed
+@@ -1,7 +1,7 @@
+ ## jobs up (the daemon's index)
+-acme db own -
+-feat-a cache stack -
+-feat-a db claim -
++acme db own full
++feat-a cache stack full
++feat-a db claim full
+ ## .git/wtm/worktrees/feat%2Fa/meta.json
+   "ordinal": 1,
+   "namespaces": [
+=== 08-all-json: exit legacy 0, next 0
+--- legacy/08-all-json
++++ next/08-all-json
+@@ -17,6 +17,8 @@
+ ./feat%2Fa/migrate.log
+ ./feat%2Fa/web.log
+ ./feat%2Fb/api.log
++./feat%2Fb/cache.log
++./feat%2Fb/migrate.log
+ ./feat%2Fb/web.log
+ ./main/api.log
+ ./main/db.log
+=== 09-daemon-down: exit legacy 0, next 0
+--- legacy/09-daemon-down
++++ next/09-daemon-down
+@@ -17,6 +17,8 @@
+ ./feat%2Fa/migrate.log
+ ./feat%2Fa/web.log
+ ./feat%2Fb/api.log
++./feat%2Fb/cache.log
++./feat%2Fb/migrate.log
+ ./feat%2Fb/web.log
+ ./main/api.log
+ ./main/db.log
+=== 10-stop-fails: exit legacy 1, next 1
+--- legacy/10-stop-fails
++++ next/10-stop-fails
+@@ -1,5 +1,5 @@
+ ## jobs up (the daemon's index)
+-feat-b stuck stack -
++feat-b stuck stack stuck
+ ## .git/wtm/worktrees/feat%2Fa/meta.json
+   "ordinal": 1,
+   "namespaces": [
+@@ -18,7 +18,10 @@
+ ./feat%2Fa/migrate.log
+ ./feat%2Fa/web.log
+ ./feat%2Fb/api.log
++./feat%2Fb/cache.log
++./feat%2Fb/migrate.log
+ ./feat%2Fb/stuck.log
++./feat%2Fb/web.log
+ ./main/api.log
+ ./main/db.log
+ ./main/web.log
+=== 11-stop-fails-json: exit legacy 1, next 1
+--- legacy/11-stop-fails-json
++++ next/11-stop-fails-json
+@@ -1,5 +1,5 @@
+ ## jobs up (the daemon's index)
+-feat-b stuck stack -
++feat-b stuck stack stuck
+ ## .git/wtm/worktrees/feat%2Fa/meta.json
+   "ordinal": 1,
+   "namespaces": [
+@@ -18,7 +18,10 @@
+ ./feat%2Fa/migrate.log
+ ./feat%2Fa/web.log
+ ./feat%2Fb/api.log
++./feat%2Fb/cache.log
++./feat%2Fb/migrate.log
+ ./feat%2Fb/stuck.log
++./feat%2Fb/web.log
+ ./main/api.log
+ ./main/db.log
+ ./main/web.log
+=== 12-dry-run: exit legacy 2, next 0
+--- legacy/12-dry-run
++++ next/12-dry-run
+@@ -1,13 +1,13 @@
+ ## jobs up (the daemon's index)
+-acme db own -
+-feat-a api own -
+-feat-a cache stack -
+-feat-a db claim -
+-feat-a web own -
+-feat-b api own -
+-feat-b cache stack -
+-feat-b db claim -
+-feat-b web own -
++acme db own full
++feat-a api own full
++feat-a cache stack full
++feat-a db claim full
++feat-a web own full
++feat-b api own full
++feat-b cache stack full
++feat-b db claim full
++feat-b web own full
+ ## .git/wtm/worktrees/feat%2Fa/meta.json
+   "ordinal": 1,
+   "namespaces": [
+@@ -28,6 +28,7 @@
+ ./feat%2Fb/api.log
+ ./feat%2Fb/cache.log
+ ./feat%2Fb/migrate.log
++./feat%2Fb/stuck.log
+ ./feat%2Fb/web.log
+ ./main/api.log
+ ./main/db.log

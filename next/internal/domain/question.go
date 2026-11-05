@@ -37,7 +37,7 @@ const (
 	SkipRunUnread       Skip = "run_unread"       // run.toml could not be read
 	SkipNothingIsolated Skip = "nothing_isolated" // run.toml declares nothing a worktree isolates
 	SkipNoConflict      Skip = "no_conflict"      // nothing conflicts with the target
-	SkipAll             Skip = "all"              // every worktree is read
+	SkipAll             Skip = "all"              // every worktree is taken: none is named
 	SkipNoOrphan        Skip = "no_orphan"        // no worktree removed leaves a child behind
 	SkipSafe            Skip = "safe"             // nothing asked is unsafe: nothing to force
 	SkipNoDataOwed      Skip = "no_data_owed"     // no data a removal holds waits on a service down

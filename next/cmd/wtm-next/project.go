@@ -24,6 +24,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
 	"github.com/LucasPcq/wtm/next/internal/command/reparent"
 	"github.com/LucasPcq/wtm/next/internal/command/resolve"
+	"github.com/LucasPcq/wtm/next/internal/command/rundown"
 	"github.com/LucasPcq/wtm/next/internal/command/runlogs"
 	"github.com/LucasPcq/wtm/next/internal/command/runup"
 	"github.com/LucasPcq/wtm/next/internal/command/status"
@@ -54,6 +55,7 @@ var (
 	openTree        = opener(func(a app) tree.UseCase { return a.Tree })
 	openRunUp       = opener(func(a app) runup.UseCase { return a.RunUp })
 	openRunLogs     = opener(func(a app) runlogs.UseCase { return a.RunLogs })
+	openRunDown     = opener(func(a app) rundown.UseCase { return a.RunDown })
 )
 
 // opener returns the function that opens the use case useCase picks out of the app wired on the repository of a directory.

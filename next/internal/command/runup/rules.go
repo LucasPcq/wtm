@@ -43,7 +43,7 @@ func (f Facts) standingWorktrees() []worktree.Worktree {
 	return slices.DeleteFunc(f.MainFirst(), func(w worktree.Worktree) bool { return f.Gone[w.Path] })
 }
 
-// worktreeOptions are the worktrees run up may start in: each one whose directory stands, the main one first, the caller's tagged current, each with the jobs up in it and the profile they were started under, as the daemon says, whatever run.toml says now.
+// worktreeOptions are the worktrees run up may start in: each one whose directory stands, the main one first, the caller's tagged current, each with what it runs (domain.RunningIn).
 func (f Facts) worktreeOptions() []domain.Option {
 	worktrees := f.standingWorktrees()
 	return domain.RunningIn(domain.WorktreeOptions(worktrees, domain.WorktreeQuery{Cwd: f.Cwd}), worktrees, f.Jobs)
@@ -799,15 +799,6 @@ const (
 	CodeRetry = Name + ".retry"
 )
 
-// The commands the follow-ups of a start name: run logs, migrated, by its catalogue name; run down, not migrated yet.
-const (
-	commandRunLogs = domain.CommandRunLogs
-	commandRunDown = "run down"
-)
-
-// runs says whether wtm-next runs a command: the legacy run down acts on the legacy daemon's jobs, never on next's, so its follow-up waits for LUC-341 to turn it on here.
-var runs = map[string]bool{commandRunLogs: true, commandRunDown: false}
-
 // next are the follow-ups of a start: the start again where it did not pass, then each worktree's output and the stop of what it left up.
 func (p Plan) next(items []Item) []domain.FollowUp {
 	var followUps []domain.FollowUp
@@ -819,14 +810,10 @@ func (p Plan) next(items []Item) []domain.FollowUp {
 			continue
 		}
 		on := []domain.Answered{{Path: domain.PathWorktree, Values: []string{item.Subject}}}
-		for _, followUp := range []domain.FollowUp{
-			{Command: commandRunLogs, Answers: on, Code: CodeLogs, Message: "see " + item.Subject + "'s output"},
-			{Command: commandRunDown, Answers: on, Code: CodeDown, Message: "stop " + item.Subject + "'s jobs"},
-		} {
-			if runs[followUp.Command] {
-				followUps = append(followUps, followUp)
-			}
-		}
+		followUps = append(followUps,
+			domain.FollowUp{Command: domain.CommandRunLogs, Answers: on, Code: CodeLogs, Message: "see " + item.Subject + "'s output"},
+			domain.FollowUp{Command: domain.CommandRunDown, Answers: on, Code: CodeDown, Message: "stop " + item.Subject + "'s jobs"},
+		)
 	}
 	return followUps
 }

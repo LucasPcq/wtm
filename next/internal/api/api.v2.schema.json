@@ -17,7 +17,8 @@
         "status",
         "tree",
         "run-up",
-        "run-logs"
+        "run-logs",
+        "run-down"
       ]
     },
     "checkout.Action": {
@@ -4185,6 +4186,109 @@
       },
       "type": "array"
     },
+    "run-down.envelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/domain.Envelope"
+        }
+      ],
+      "properties": {
+        "command": {
+          "const": "run-down"
+        },
+        "items": {
+          "items": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/rundown.Detail"
+                  },
+                  {
+                    "maxProperties": 0,
+                    "type": "object"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "plan": {
+          "$ref": "#/$defs/rundown.Plan"
+        }
+      }
+    },
+    "run-down.request": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "worktree"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "profile"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "all"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "type": "array"
+    },
     "run-logs.envelope": {
       "allOf": [
         {
@@ -4575,6 +4679,14 @@
       },
       "type": "array"
     },
+    "run.Fate": {
+      "description": "What a stop does to one job: stops it, releases a shared service others keep, or clears a crash.",
+      "enum": [
+        "stop",
+        "release",
+        "clear"
+      ]
+    },
     "run.Hold": {
       "description": "What of a job the run daemon holds: its own process, a stack its launcher left, a claim on a shared job another worktree runs.",
       "enum": [
@@ -4592,6 +4704,182 @@
         "exited",
         "stopped"
       ]
+    },
+    "rundown.Detail": {
+      "additionalProperties": false,
+      "properties": {
+        "jobs": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/rundown.JobResult"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "jobs"
+      ],
+      "type": "object"
+    },
+    "rundown.JobPlan": {
+      "additionalProperties": false,
+      "properties": {
+        "fate": {
+          "$ref": "#/$defs/run.Fate"
+        },
+        "hold": {
+          "$ref": "#/$defs/run.Hold"
+        },
+        "kept_by": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "$ref": "#/$defs/project.JobKind"
+        },
+        "name": {
+          "type": "string"
+        },
+        "shared_in": {
+          "type": "string"
+        },
+        "stop_command": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "hold",
+        "fate"
+      ],
+      "type": "object"
+    },
+    "rundown.JobResult": {
+      "additionalProperties": false,
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/rundown.JobStatus"
+        }
+      },
+      "required": [
+        "name",
+        "status"
+      ],
+      "type": "object"
+    },
+    "rundown.JobStatus": {
+      "description": "What became of one job of a stop.",
+      "enum": [
+        "stopped",
+        "released",
+        "cleared",
+        "not_running",
+        "failed",
+        "not_reached"
+      ]
+    },
+    "rundown.Plan": {
+      "additionalProperties": false,
+      "properties": {
+        "empty": {
+          "type": "boolean"
+        },
+        "profile": {
+          "type": "string"
+        },
+        "recalled": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "recap": {
+          "items": {
+            "$ref": "#/$defs/domain.RecapRow"
+          },
+          "type": "array"
+        },
+        "worktrees": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/rundown.Target"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "worktrees"
+      ],
+      "type": "object"
+    },
+    "rundown.Target": {
+      "additionalProperties": false,
+      "properties": {
+        "branch": {
+          "type": "string"
+        },
+        "jobs": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/rundown.JobPlan"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "not_running": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "path": {
+          "type": "string"
+        },
+        "profile": {
+          "type": "string"
+        },
+        "removed": {
+          "type": "boolean"
+        },
+        "worktree": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "worktree",
+        "path",
+        "jobs"
+      ],
+      "type": "object"
     },
     "runlogs.Detail": {
       "additionalProperties": false,

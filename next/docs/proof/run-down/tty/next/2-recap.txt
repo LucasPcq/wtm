@@ -1,0 +1,19 @@
+$ wtm run down; echo EXIT=$?
+
+  Step 4/4 • Confirm
+
+  ✓ Worktrees: feat/a
+  · Profile — set by its flag only
+  · All — set by its flag only
+
+  ┃  Review & confirm
+  ┃
+  ┃  Worktrees  feat/a
+  ┃  Stops      api, web
+
+▌› Yes, stop the jobs of feat/a
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   No, cancel
+
+  ↑↓ navigate • / filter • enter confirm • esc back
+
