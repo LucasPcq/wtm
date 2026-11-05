@@ -1,0 +1,2 @@
+# a tool run from next/ instead of next/web (vitest, vite) writes its cache here
+node_modules/
