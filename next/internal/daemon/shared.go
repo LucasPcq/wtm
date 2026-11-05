@@ -181,7 +181,10 @@ func (d *Daemon) restartShared(params restartParams) (run.Job, error) {
 	if again := d.realLocked(params.Served); again != nil {
 		again.record.MainHolds, again.mainHold = mainHolds, mainHold
 	}
-	d.dropDanglingClaimsLocked()
+	// A daemon stopping halts, never releases: the claims stay for the next one, as a shutdown leaves them.
+	if !d.stopping {
+		d.dropDanglingClaimsLocked()
+	}
 	hold := d.jobs[params.Own]
 	d.mu.Unlock()
 	d.save()
@@ -192,6 +195,21 @@ func (d *Daemon) restartShared(params restartParams) (run.Job, error) {
 		return run.Job{}, &run.Error{Code: run.CodeLaunchFailed, Message: fmt.Sprintf("job %s was let go of while it restarted", params.Served.name)}
 	}
 	return d.view(hold), nil
+}
+
+// awaitRestart waits while a restart of the shared job k runs: a hold let go
+// of meanwhile is let go of on the job restarted, never on the one it stopped,
+// whose holds the restart puts back.
+func (d *Daemon) awaitRestart(k key) {
+	for {
+		d.mu.Lock()
+		busy := d.restarting[k]
+		d.mu.Unlock()
+		if !busy {
+			return
+		}
+		<-time.After(pendingPoll)
+	}
 }
 
 // createNamespace creates the namespace of spec's job for its worktree, if it
@@ -300,6 +318,7 @@ func (d *Daemon) letGo(params letGoParams) (run.Outcome, error) {
 		return run.OutcomeNotRunning, nil
 	}
 	name := j.record.Spec.Job.Name
+	d.awaitRestart(key{workDir: j.record.SharedDir, name: name})
 	d.mu.Lock()
 	if params.Stands != nil && !params.Stands() {
 		d.mu.Unlock()

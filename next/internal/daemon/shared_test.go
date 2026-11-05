@@ -623,3 +623,124 @@ func TestARestartAskedWhereASharedJobIsNotHeldJoinsIt(t *testing.T) {
 	assert.Equal(t, []string{"up db"}, w.spawner.lines(), "nothing restarted")
 	assert.Equal(t, []string{"/repo:db", "/wt/a:db", "/wt/b:db"}, w.index.names())
 }
+
+// Review of #275: a release during a restart was reported, then undone by the restart putting the holds back.
+func TestAReleaseDuringASharedRestartWaitsForItThenLetsGo(t *testing.T) {
+	served := key{workDir: "/repo", name: "db"}
+	for name, at := range map[string]string{"main": "/repo", "claim": "/wt/a"} {
+		t.Run(name, func(t *testing.T) {
+			w := newWorld(t, map[string]script{"up db": exits(0), "down db": exits(0)})
+			for _, holder := range []string{"/wt/a", "/wt/b", "/repo"} {
+				_, err := w.Start(shared("db", holder, "down db"), nil)
+				require.NoError(t, err)
+			}
+			w.mu.Lock()
+			w.restarting[served] = true
+			w.mu.Unlock()
+			done := make(chan run.Outcome)
+			go func() {
+				outcome, _ := w.Stop(run.Stop{Name: "db", WorkDir: at}, nil)
+				done <- outcome
+			}()
+
+			select {
+			case <-done:
+				t.Fatal("let go while the restart runs")
+			case <-time.After(50 * time.Millisecond):
+			}
+			w.mu.Lock()
+			delete(w.restarting, served)
+			w.mu.Unlock()
+
+			assert.Equal(t, run.OutcomeReleased, <-done)
+			if at == "/repo" {
+				assert.False(t, w.List("/repo")[0].MainHolds, "main let go of once the restart ended")
+				return
+			}
+			assert.NotContains(t, w.index.names(), at+":db", "let go of once the restart ended")
+		})
+	}
+}
+
+func TestASharedRestartWhoseStopFailsKeepsEveryHold(t *testing.T) {
+	w := newWorld(t, map[string]script{"up db": exits(0), "down db": exits(4)})
+	for _, holder := range []string{"/wt/a", "/wt/b"} {
+		_, err := w.Start(shared("db", holder, "down db"), nil)
+		require.NoError(t, err)
+	}
+	again := shared("db", "/wt/a", "down db")
+	again.Restart = true
+
+	_, err := w.Start(again, nil)
+
+	var refusal *run.Error
+	require.ErrorAs(t, err, &refusal)
+	assert.Equal(t, run.CodeStopFailed, refusal.Code)
+	assert.Equal(t, []string{"/repo:db", "/wt/a:db", "/wt/b:db"}, w.index.names(), "left up, held as before")
+	assert.Empty(t, w.restarting)
+}
+
+func TestASharedRestartWhoseStartFailsDropsTheClaimsLeftOnNothing(t *testing.T) {
+	w := newWorld(t, map[string]script{"up db": exits(0), "down db": exits(0)})
+	for _, holder := range []string{"/wt/a", "/wt/b"} {
+		_, err := w.Start(shared("db", holder, "down db"), nil)
+		require.NoError(t, err)
+	}
+	// its stop runs, its launch again fails
+	w.spawner.mu.Lock()
+	w.spawner.scripts["up db"] = exits(1)
+	w.spawner.mu.Unlock()
+	again := shared("db", "/wt/a", "down db")
+	again.Restart = true
+
+	_, err := w.Start(again, nil)
+
+	require.Error(t, err)
+	assert.Empty(t, w.index.names(), "no claim on a job that is not up")
+}
+
+func TestASecondRestartOfASharedJobIsRefusedWhileTheFirstRuns(t *testing.T) {
+	w := newWorld(t, map[string]script{"up db": exits(0)})
+	_, err := w.Start(shared("db", "/wt/a", "down db"), nil)
+	require.NoError(t, err)
+	w.restarting[key{workDir: "/repo", name: "db"}] = true
+	again := shared("db", "/wt/a", "down db")
+	again.Restart = true
+
+	_, err = w.Start(again, nil)
+
+	var refusal *run.Error
+	require.ErrorAs(t, err, &refusal)
+	assert.Equal(t, run.CodeJobRunning, refusal.Code)
+}
+
+func TestAStartOfASharedJobARestartStoppedWaitsForIt(t *testing.T) {
+	w := newWorld(t, map[string]script{"up db": exits(0)})
+	_, err := w.Start(shared("db", "/wt/a", "down db"), nil)
+	require.NoError(t, err)
+	served := key{workDir: "/repo", name: "db"}
+	w.mu.Lock()
+	w.restarting[served] = true
+	w.mu.Unlock()
+	waited := make(chan struct{}, 1)
+	w.waited = func() {
+		select {
+		case waited <- struct{}{}:
+		default:
+		}
+	}
+	done := make(chan error)
+	go func() {
+		_, err := w.Start(shared("db", "/wt/b", "down db"), nil)
+		done <- err
+	}()
+
+	<-waited
+	w.mu.Lock()
+	delete(w.restarting, served)
+	w.mu.Unlock()
+
+	require.NoError(t, <-done)
+	assert.Equal(t, []string{"up db"}, w.spawner.lines(), "joined, not launched again")
+	assert.Contains(t, w.index.names(), "/wt/b:db")
+}

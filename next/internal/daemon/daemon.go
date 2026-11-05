@@ -380,6 +380,8 @@ func (d *Daemon) settle(j *job, code int) {
 // stop command prints is handed to out (nil for none) while the stop runs.
 func (d *Daemon) Stop(req run.Stop, out func(run.Line)) (run.Outcome, error) {
 	k := key{workDir: req.WorkDir, name: req.Name}
+	// The main checkout's shared job a restart stopped is not up for a moment: never dropped as ended meanwhile.
+	d.awaitRestart(k)
 	d.mu.Lock()
 	j := d.jobs[k]
 	if j == nil || !j.up() {
