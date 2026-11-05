@@ -1,0 +1,7 @@
+
+  run down · dry run, nothing applied
+  Worktrees  feat/a
+  Stops      api, cache, db (released, kept by feat/b), web
+  fingerprint  fd1e4963dc0472046e380899
+  → wtm-next run down feat/a --expect-fingerprint fd1e4963dc0472046e380899   apply this plan
+

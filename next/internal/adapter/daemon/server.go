@@ -78,13 +78,14 @@ func (s Server) Serve(conn net.Conn, line []byte) {
 		s.start(req, reply)
 	case actionStop:
 		outcome, err := s.Jobs.Stop(run.Stop{Name: req.Name, WorkDir: req.WorkDir, CorrelationID: req.CorrelationID})
-		_ = reply(answerOf(err, answer{Status: statusOK, Outcome: string(outcome)}))
+		// released is the legacy client's word for a stop that let go of a shared job.
+		_ = reply(answerOf(err, answer{Status: statusOK, Outcome: string(outcome), Released: outcome == run.OutcomeReleased}))
 	case actionStopAll:
 		stopped, err := s.Jobs.StopAll(run.StopAll{WorkDir: req.WorkDir, CorrelationID: req.CorrelationID})
 		jobs := make([]job, 0, len(stopped))
 		for _, each := range stopped {
 			wire := jobOf(each.Job)
-			wire.Outcome = string(each.Outcome)
+			wire.Outcome, wire.Released = string(each.Outcome), each.Outcome == run.OutcomeReleased
 			jobs = append(jobs, wire)
 		}
 		_ = reply(answerOf(err, answer{Status: statusOK, Jobs: jobs}))

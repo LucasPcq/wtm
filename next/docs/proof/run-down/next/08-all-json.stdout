@@ -1,0 +1,203 @@
+{
+  "v": 2,
+  "command": "run-down",
+  "ok": true,
+  "op": "<OP>",
+  "items": [
+    {
+      "subject": "main",
+      "status": "done",
+      "reason": "unchanged",
+      "detail": {
+        "path": "<SB>/acme",
+        "jobs": []
+      }
+    },
+    {
+      "subject": "feat/a",
+      "status": "done",
+      "detail": {
+        "path": "<SB>/acme.trees/feat-a",
+        "jobs": [
+          {
+            "name": "cache",
+            "status": "stopped"
+          },
+          {
+            "name": "db",
+            "status": "stopped"
+          }
+        ]
+      }
+    },
+    {
+      "subject": "feat/b",
+      "status": "done",
+      "detail": {
+        "path": "<SB>/acme.trees/feat-b",
+        "jobs": [
+          {
+            "name": "api",
+            "status": "stopped"
+          },
+          {
+            "name": "web",
+            "status": "stopped"
+          }
+        ]
+      }
+    }
+  ],
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "main",
+        "branch": "main",
+        "path": "<SB>/acme",
+        "jobs": []
+      },
+      {
+        "worktree": "feat/a",
+        "branch": "feat/a",
+        "path": "<SB>/acme.trees/feat-a",
+        "profile": "full",
+        "jobs": [
+          {
+            "name": "cache",
+            "kind": "service",
+            "hold": "detached",
+            "fate": "stop",
+            "stop_command": "docker compose down"
+          },
+          {
+            "name": "db",
+            "kind": "service",
+            "hold": "claim",
+            "fate": "stop",
+            "shared_in": "main"
+          }
+        ]
+      },
+      {
+        "worktree": "feat/b",
+        "branch": "feat/b",
+        "path": "<SB>/acme.trees/feat-b",
+        "profile": "dev",
+        "jobs": [
+          {
+            "name": "api",
+            "kind": "service",
+            "hold": "own",
+            "fate": "stop"
+          },
+          {
+            "name": "web",
+            "kind": "service",
+            "hold": "own",
+            "fate": "stop"
+          }
+        ]
+      }
+    ],
+    "recap": [
+      {
+        "key": "worktrees",
+        "label": "Worktrees",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "main",
+            "text": "main"
+          },
+          {
+            "value": "feat/a",
+            "text": "feat/a"
+          },
+          {
+            "value": "feat/b",
+            "text": "feat/b"
+          }
+        ]
+      },
+      {
+        "key": "jobs:main",
+        "label": "Stops in main",
+        "values": [
+          {
+            "value": "nothing running",
+            "text": "nothing running"
+          }
+        ]
+      },
+      {
+        "key": "jobs:feat/a",
+        "label": "Stops in feat/a",
+        "values": [
+          {
+            "value": "cache",
+            "text": "cache"
+          },
+          {
+            "value": "db (stops in main: no worktree keeps it)",
+            "text": "db (stops in main: no worktree keeps it)"
+          }
+        ]
+      },
+      {
+        "key": "jobs:feat/b",
+        "label": "Stops in feat/b",
+        "values": [
+          {
+            "value": "api",
+            "text": "api"
+          },
+          {
+            "value": "web",
+            "text": "web"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [
+    {
+      "command": "run-up",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/a"
+          ]
+        },
+        {
+          "path": "profile",
+          "values": [
+            "full"
+          ]
+        }
+      ],
+      "code": "run-down.up",
+      "message": "start them again"
+    },
+    {
+      "command": "run-up",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/b"
+          ]
+        },
+        {
+          "path": "profile",
+          "values": [
+            "dev"
+          ]
+        }
+      ],
+      "code": "run-down.up",
+      "message": "start them again"
+    }
+  ],
+  "warnings": []
+}

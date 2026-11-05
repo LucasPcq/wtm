@@ -1,0 +1,12 @@
+
+  ✗ run down: 1 done · 1 failed
+
+  Worktrees        feat/a, feat/b
+  Stops in feat/a  api, cache, db (stops in main: no worktree keeps it), web
+  Stops in feat/b  api, cache, db (stops in main: no worktree keeps it)
+
+  ✗ feat/b  couldn't stop cache: the stop command of cache failed (exit 4)
+
+  → wtm run-up feat/a --profile full   start them again
+  → wtm run-up feat/b --profile dev    start them again
+

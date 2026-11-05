@@ -1,0 +1,131 @@
+{
+  "v": 2,
+  "command": "run-down",
+  "ok": true,
+  "op": "op-1",
+  "items": [
+    {
+      "subject": "feat/a",
+      "status": "done",
+      "detail": {
+        "path": "/repo/wt-feat-a",
+        "jobs": [
+          {
+            "name": "api",
+            "status": "stopped"
+          },
+          {
+            "name": "cache",
+            "status": "stopped"
+          },
+          {
+            "name": "db",
+            "status": "released"
+          },
+          {
+            "name": "web",
+            "status": "stopped"
+          }
+        ]
+      }
+    }
+  ],
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "feat/a",
+        "branch": "feat/a",
+        "path": "/repo/wt-feat-a",
+        "profile": "full",
+        "jobs": [
+          {
+            "name": "api",
+            "kind": "service",
+            "hold": "own",
+            "fate": "stop"
+          },
+          {
+            "name": "cache",
+            "kind": "service",
+            "hold": "detached",
+            "fate": "stop",
+            "stop_command": "docker compose down"
+          },
+          {
+            "name": "db",
+            "kind": "service",
+            "hold": "claim",
+            "fate": "release",
+            "kept_by": [
+              "feat/b"
+            ],
+            "shared_in": "main"
+          },
+          {
+            "name": "web",
+            "kind": "service",
+            "hold": "own",
+            "fate": "stop"
+          }
+        ]
+      }
+    ],
+    "recap": [
+      {
+        "key": "worktrees",
+        "label": "Worktrees",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/a",
+            "text": "feat/a"
+          }
+        ]
+      },
+      {
+        "key": "jobs",
+        "label": "Stops",
+        "values": [
+          {
+            "value": "api",
+            "text": "api"
+          },
+          {
+            "value": "cache",
+            "text": "cache"
+          },
+          {
+            "value": "db (released, kept by feat/b)",
+            "text": "db (released, kept by feat/b)"
+          },
+          {
+            "value": "web",
+            "text": "web"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [
+    {
+      "command": "run-up",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/a"
+          ]
+        },
+        {
+          "path": "profile",
+          "values": [
+            "full"
+          ]
+        }
+      ],
+      "code": "run-down.up",
+      "message": "start them again"
+    }
+  ],
+  "warnings": []
+}

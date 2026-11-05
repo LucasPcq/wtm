@@ -98,7 +98,7 @@
           {
             "action": "run_down",
             "follow_up": {
-              "command": "run down",
+              "command": "run-down",
               "answers": [
                 {
                   "path": "worktree",
@@ -276,7 +276,7 @@
           {
             "action": "run_down",
             "follow_up": {
-              "command": "run down",
+              "command": "run-down",
               "answers": [
                 {
                   "path": "worktree",
@@ -469,7 +469,7 @@
           {
             "action": "run_down",
             "follow_up": {
-              "command": "run down",
+              "command": "run-down",
               "answers": [
                 {
                   "path": "worktree",
@@ -959,7 +959,7 @@
           {
             "action": "run_down",
             "follow_up": {
-              "command": "run down",
+              "command": "run-down",
               "answers": [
                 {
                   "path": "worktree",

@@ -11,4 +11,5 @@
     web  http://web.feat-v.acme.localhost:24352
 
   → wtm run logs feat/v   see feat/v's output
+  → wtm run down feat/v   stop feat/v's jobs
 

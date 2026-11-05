@@ -25,6 +25,11 @@ type Locator interface {
 	Locate(ctx context.Context, path string) (worktree.Location, error)
 }
 
+// Matcher tells whether two paths lead to the same file.
+type Matcher interface {
+	Same(ctx context.Context, a, b string) (bool, error)
+}
+
 // Prober tells whether a worktree's directory is there and whether it holds uncommitted changes.
 type Prober interface {
 	Locator

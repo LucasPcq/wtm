@@ -745,6 +745,13 @@ func (j *job) viewLocked(public int) run.Job {
 		Ports:     spec.Ports(),
 		ExitCode:  j.exitCode,
 		SharedDir: j.record.SharedDir,
+		MainHolds: j.record.MainHolds,
+	}
+	if spec.Origin != nil {
+		view.Repo = spec.Origin.Root
+	}
+	if view.Hold == run.HoldDetached {
+		view.StopCommand = spec.Job.Stop
 	}
 	if view.Up {
 		view.StartedAt = j.record.StartedAt

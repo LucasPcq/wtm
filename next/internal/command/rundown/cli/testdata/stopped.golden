@@ -1,0 +1,8 @@
+
+  ✓ run down: 1 done
+
+  Worktrees  feat/a
+  Stops      api, cache, db (released, kept by feat/b), web
+
+  → wtm run-up feat/a --profile full   start them again
+

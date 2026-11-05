@@ -160,7 +160,7 @@ func TestEveryFollowUpIsSpelledWhole(t *testing.T) {
 		"open_pr":            {followUp: actions[1], argv: []string{"gh", "pr", "view", "12", "--web"}},
 		"exec":               {followUp: actions[2], argv: []string{"wtm-next", "exec", "feat/a"}},
 		"run_up":             {followUp: actions[3], argv: []string{"wtm-next", "run", "up", "feat/a"}},
-		"run_down":           {followUp: actions[4], argv: []string{"wtm", "run", "down", "feat/a"}},
+		"run_down":           {followUp: actions[4], argv: []string{"wtm-next", "run", "down", "feat/a"}},
 		"logs":               {followUp: actions[5], argv: []string{"wtm-next", "run", "logs", "feat/a"}},
 		"sync":               {followUp: actions[6], argv: []string{"wtm-next", "sync", "feat/a"}},
 		"clean":              {followUp: actions[7], argv: []string{"wtm-next", "clean", "feat/a"}},

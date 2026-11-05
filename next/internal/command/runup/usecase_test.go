@@ -59,8 +59,9 @@ func TestATaskThatFailsStopsItsWorktreeAloneAndIsOfferedAgainWithItsProfile(t *t
 	assert.Equal(t, map[string]runup.JobStatus{"migrate": runup.JobFailed, "db": runup.JobNotStarted, "api": runup.JobNotStarted, "web": runup.JobNotStarted}, statusesOf(failed))
 	assert.Equal(t, []string{"migrating", "no such table"}, failed.Detail.Jobs[0].Lines)
 	assert.Equal(t, domain.StatusDone, itemOf(t, result.Items, featB).Status, "one worktree failing stops none of the others")
-	assert.Equal(t, []string{runup.CodeRetry, runup.CodeLogs}, followUpCodes(result.FollowUps), "the output of the worktree left up is offered; run down is the legacy daemon's until next runs it")
+	assert.Equal(t, []string{runup.CodeRetry, runup.CodeLogs, runup.CodeDown}, followUpCodes(result.FollowUps), "the output and the stop of the worktree left up are offered")
 	assert.Equal(t, []domain.Answered{{Path: domain.PathWorktree, Values: []string{featB}}}, result.FollowUps[1].Answers, "run logs names the worktree left up")
+	assert.Equal(t, []domain.Answered{{Path: domain.PathWorktree, Values: []string{featB}}}, result.FollowUps[2].Answers, "run down names the worktree left up")
 	retry := result.FollowUps[0]
 	assert.Equal(t, []domain.Answered{{Path: domain.PathWorktree, Values: []string{featA}}, {Path: runup.PathProfile, Values: []string{"full"}}}, retry.Answers, "the retry names the worktree and the profile")
 }

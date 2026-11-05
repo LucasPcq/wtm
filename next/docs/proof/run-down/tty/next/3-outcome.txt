@@ -1,0 +1,14 @@
+$ wtm run down; echo EXIT=$?
+  ✓ feat/a · api (<DUR>)
+  ✓ feat/a · web (<DUR>)
+
+┃  ✓ run down: 1 done
+┃
+┃  Worktrees  feat/a
+┃  Stops      api, web
+┃
+┃  → wtm-next run up feat/a --profile dev   start them again
+
+EXIT=0
+$
+

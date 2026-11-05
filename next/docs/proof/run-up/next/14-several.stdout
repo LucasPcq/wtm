@@ -15,5 +15,7 @@
       web  http://web.feat-b.acme.localhost:24352
 
   → wtm run logs feat/a   see feat/a's output
+  → wtm run down feat/a   stop feat/a's jobs
   → wtm run logs feat/b   see feat/b's output
+  → wtm run down feat/b   stop feat/b's jobs
 

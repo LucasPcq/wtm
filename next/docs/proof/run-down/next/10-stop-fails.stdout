@@ -1,0 +1,10 @@
+
+  ✗ run down: 1 failed
+
+  Worktrees  feat/b
+  Stops      api, stuck
+
+  ✗ feat/b  couldn't stop stuck: run daemon: the stop command of stuck failed (exit 4)
+
+  → wtm run up feat/b --profile stuck   start them again
+

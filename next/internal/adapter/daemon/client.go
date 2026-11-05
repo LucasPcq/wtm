@@ -95,10 +95,39 @@ func (d Daemon) Jobs(ctx context.Context) ([]run.Job, error) {
 		jobs = append(jobs, j.runJob(skew == run.SkewLegacy))
 	}
 	if skew != run.SkewNone {
-		return jobs, &run.Skewed{Skew: skew, Daemon: listing.Version}
+		return d.recorded(jobs), &run.Skewed{Skew: skew, Daemon: listing.Version}
 	}
 
 	return jobs, nil
+}
+
+// recorded is jobs, as a daemon of another build lists them, with what its
+// listing may lack taken from the index: the repository each was started for,
+// the stop command of a stack, and whether the main checkout holds a shared
+// job, unknown when the index has no record of it.
+func (d Daemon) recorded(jobs []run.Job) []run.Job {
+	records := (&Index{Path: IndexPath(d.SocketPath)}).Load()
+	for i, job := range jobs {
+		at := slices.IndexFunc(records, func(record run.Record) bool {
+			return record.Spec.WorkDir == job.WorkDir && record.Spec.Job.Name == job.Name
+		})
+		shared := job.Up && job.SharedDir != "" && job.Hold != run.HoldClaim
+		if at < 0 {
+			jobs[i].MainHoldsUnknown = shared
+			continue
+		}
+		if shared {
+			jobs[i].MainHolds = job.MainHolds || records[at].MainHolds
+		}
+		spec := records[at].Spec
+		if spec.Origin != nil && job.Repo == "" {
+			jobs[i].Repo = spec.Origin.Root
+		}
+		if job.Hold == run.HoldDetached && job.StopCommand == "" {
+			jobs[i].StopCommand = spec.Job.Stop
+		}
+	}
+	return jobs
 }
 
 // indexed returns the jobs the index says are up with no daemon to ask.
@@ -109,9 +138,12 @@ func (d Daemon) indexed() ([]run.Job, error) {
 		if hold == run.HoldOwn {
 			return nil, run.ErrUnknown
 		}
-		job := run.Job{Name: spec.Job.Name, WorkDir: spec.WorkDir, Up: true, Kind: spec.Job.Kind, Hold: hold, SharedDir: record.SharedDir}
+		job := run.Job{Name: spec.Job.Name, WorkDir: spec.WorkDir, Up: true, Kind: spec.Job.Kind, Hold: hold, SharedDir: record.SharedDir, MainHolds: record.MainHolds}
+		if spec.Origin != nil {
+			job.Repo = spec.Origin.Root
+		}
 		if hold == run.HoldDetached {
-			job.State, job.StartedAt = run.Running, record.StartedAt
+			job.State, job.StartedAt, job.StopCommand = run.Running, record.StartedAt, spec.Job.Stop
 		}
 		jobs = append(jobs, job)
 	}
@@ -170,8 +202,7 @@ func (d Daemon) Stop(ctx context.Context, req run.Stop) (run.Outcome, error) {
 		return "", err
 	}
 
-	// The legacy daemon answers no outcome: it says stopped whatever it did.
-	return cmp.Or(run.Outcome(stopped.Outcome), run.OutcomeStopped), nil
+	return outcomeOf(stopped.Outcome, stopped.Released), nil
 }
 
 // StopAll stops every job up in req's worktree, every job of the machine when
@@ -188,10 +219,20 @@ func (d Daemon) StopAll(ctx context.Context, req run.StopAll) ([]run.StoppedJob,
 	legacy := stopped.Protocol == 0
 	jobs := make([]run.StoppedJob, 0, len(stopped.Jobs))
 	for _, j := range stopped.Jobs {
-		jobs = append(jobs, run.StoppedJob{Job: j.runJob(legacy), Outcome: cmp.Or(run.Outcome(j.Outcome), run.OutcomeStopped)})
+		jobs = append(jobs, run.StoppedJob{Job: j.runJob(legacy), Outcome: outcomeOf(j.Outcome, j.Released)})
 	}
 
 	return jobs, stopped.failure()
+}
+
+// outcomeOf is what a stop did as a daemon answers it: its outcome, or, from
+// the legacy daemon, which answers none, released when it says it let go of a
+// shared job still up, else stopped.
+func outcomeOf(outcome string, released bool) run.Outcome {
+	if released {
+		return run.OutcomeReleased
+	}
+	return cmp.Or(run.Outcome(outcome), run.OutcomeStopped)
 }
 
 // reachParams is a stop request, and the worktree whose jobs in the index

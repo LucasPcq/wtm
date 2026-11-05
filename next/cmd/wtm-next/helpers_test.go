@@ -38,6 +38,8 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/fastforward"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
+	"github.com/LucasPcq/wtm/next/internal/command/rundown"
+	rundowncli "github.com/LucasPcq/wtm/next/internal/command/rundown/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/runlogs"
 	runlogscli "github.com/LucasPcq/wtm/next/internal/command/runlogs/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/runup"
@@ -517,6 +519,8 @@ var enums = map[reflect.Type]struct {
 	reflect.TypeFor[runup.Action]():              {"What a start does to one job of its profile.", runup.Actions()},
 	reflect.TypeFor[runup.JobStatus]():           {"What became of one job of a start.", runup.JobStatuses()},
 	reflect.TypeFor[runlogs.JobState]():          {"Where a job whose output is read stands: the run daemon's state, stopped for a job only its log knows, not_started for one that never ran.", runlogs.JobStates()},
+	reflect.TypeFor[rundown.JobStatus]():         {"What became of one job of a stop.", rundown.JobStatuses()},
+	reflect.TypeFor[run.Fate]():                  {"What a stop does to one job: stops it, releases a shared service others keep, or clears a crash.", run.Fates()},
 	reflect.TypeFor[list.Finished]():             {"How a worktree's pull request has done with it: merged, or closed unmerged.", list.Finisheds()},
 	reflect.TypeFor[prune.Reason]():              {"Why a worktree is done with, as a code each surface words its own way.", prune.Reasons()},
 	reflect.TypeFor[teardown.DataStatus]():       {"What a removal's plan does with a namespace its worktree made in a shared service.", teardown.DataStatuses()},
@@ -932,13 +936,15 @@ func shortDir(t *testing.T) string {
 	return dir
 }
 
-// spelling is how the command line spells a command a follow-up names: run up for the catalogue's run-up.
+// spelling is how the command line spells a command a follow-up names: run up for the catalogue's run-up, run down for its run-down.
 func spelling(command string) string {
 	switch command {
 	case runup.Name:
 		return runupcli.Use
 	case runlogs.Name:
 		return runlogscli.Use
+	case rundown.Name:
+		return rundowncli.Use
 	}
 	return command
 }

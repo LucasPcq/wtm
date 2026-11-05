@@ -1,0 +1,235 @@
+{
+  "v": 2,
+  "command": "run-down",
+  "ok": false,
+  "op": "op-1",
+  "items": [
+    {
+      "subject": "feat/a",
+      "status": "done",
+      "detail": {
+        "path": "/repo/wt-feat-a",
+        "jobs": [
+          {
+            "name": "api",
+            "status": "stopped"
+          },
+          {
+            "name": "cache",
+            "status": "stopped"
+          },
+          {
+            "name": "db",
+            "status": "stopped"
+          },
+          {
+            "name": "web",
+            "status": "stopped"
+          }
+        ]
+      }
+    },
+    {
+      "subject": "feat/b",
+      "status": "failed",
+      "error": {
+        "kind": "internal",
+        "code": "run-down.stop_failed",
+        "message": "couldn't stop cache: the stop command of cache failed (exit 4)",
+        "params": {
+          "jobs": "cache"
+        }
+      },
+      "detail": {
+        "path": "/repo/wt-feat-b",
+        "jobs": [
+          {
+            "name": "api",
+            "status": "stopped"
+          },
+          {
+            "name": "cache",
+            "status": "failed",
+            "message": "the stop command of cache failed (exit 4)"
+          },
+          {
+            "name": "db",
+            "status": "stopped"
+          }
+        ]
+      }
+    }
+  ],
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "feat/a",
+        "branch": "feat/a",
+        "path": "/repo/wt-feat-a",
+        "profile": "full",
+        "jobs": [
+          {
+            "name": "api",
+            "kind": "service",
+            "hold": "own",
+            "fate": "stop"
+          },
+          {
+            "name": "cache",
+            "kind": "service",
+            "hold": "detached",
+            "fate": "stop",
+            "stop_command": "docker compose down"
+          },
+          {
+            "name": "db",
+            "kind": "service",
+            "hold": "claim",
+            "fate": "stop",
+            "shared_in": "main"
+          },
+          {
+            "name": "web",
+            "kind": "service",
+            "hold": "own",
+            "fate": "stop"
+          }
+        ]
+      },
+      {
+        "worktree": "feat/b",
+        "branch": "feat/b",
+        "path": "/repo/wt-feat-b",
+        "profile": "dev",
+        "jobs": [
+          {
+            "name": "api",
+            "kind": "service",
+            "hold": "own",
+            "fate": "stop"
+          },
+          {
+            "name": "cache",
+            "kind": "service",
+            "hold": "detached",
+            "fate": "stop",
+            "stop_command": "docker compose down"
+          },
+          {
+            "name": "db",
+            "kind": "service",
+            "hold": "claim",
+            "fate": "stop",
+            "shared_in": "main"
+          }
+        ]
+      }
+    ],
+    "recap": [
+      {
+        "key": "worktrees",
+        "label": "Worktrees",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/a",
+            "text": "feat/a"
+          },
+          {
+            "value": "feat/b",
+            "text": "feat/b"
+          }
+        ]
+      },
+      {
+        "key": "jobs:feat/a",
+        "label": "Stops in feat/a",
+        "values": [
+          {
+            "value": "api",
+            "text": "api"
+          },
+          {
+            "value": "cache",
+            "text": "cache"
+          },
+          {
+            "value": "db (stops in main: no worktree keeps it)",
+            "text": "db (stops in main: no worktree keeps it)"
+          },
+          {
+            "value": "web",
+            "text": "web"
+          }
+        ]
+      },
+      {
+        "key": "jobs:feat/b",
+        "label": "Stops in feat/b",
+        "values": [
+          {
+            "value": "api",
+            "text": "api"
+          },
+          {
+            "value": "cache",
+            "text": "cache"
+          },
+          {
+            "value": "db (stops in main: no worktree keeps it)",
+            "text": "db (stops in main: no worktree keeps it)"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [
+    {
+      "command": "run-up",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/a"
+          ]
+        },
+        {
+          "path": "profile",
+          "values": [
+            "full"
+          ]
+        }
+      ],
+      "code": "run-down.up",
+      "message": "start them again"
+    },
+    {
+      "command": "run-up",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/b"
+          ]
+        },
+        {
+          "path": "profile",
+          "values": [
+            "dev"
+          ]
+        }
+      ],
+      "code": "run-down.up",
+      "message": "start them again"
+    }
+  ],
+  "warnings": [],
+  "error": {
+    "kind": "internal",
+    "code": "run-down.stop_failed",
+    "message": "couldn't stop cache: the stop command of cache failed (exit 4)",
+    "params": {
+      "jobs": "cache"
+    }
+  }
+}

@@ -11,23 +11,27 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
-// A Job is one job the daemon knows: its name, the worktree it runs in, the profile it was started under (empty for one started alone), whether it is up (running, detached or joined), its kind, its State (empty for a claim, which runs no process), what of it the daemon holds (Hold), whether the daemon Reaped it (an orphan stopped as it started), the PID of a process of the daemon's own, its url, the ports it binds, the code its process exited with (-1 when a signal killed it), when the daemon started it (zero once it is no longer up), the main checkout a shared job runs in, and the last line it printed (nil before any).
+// A Job is one job the daemon knows: its name, the worktree it runs in, the profile it was started under (empty for one started alone), whether it is up (running, detached or joined), its kind, its State (empty for a claim, which runs no process), what of it the daemon holds (Hold), whether the daemon Reaped it (an orphan stopped as it started), the PID of a process of the daemon's own, its url, the ports it binds, the code its process exited with (-1 when a signal killed it), when the daemon started it (zero once it is no longer up), the main checkout a shared job runs in, whether that checkout itself holds the shared job (MainHolds, on the job itself, never on a claim) and whether that cannot be told (MainHoldsUnknown: a daemon of another build listed it, and the index has no record of it), the main checkout of the repository it was started for (Repo, empty when its start named none), the command a stack stops with as it was started (StopCommand), and the last line it printed (nil before any).
 type Job struct {
-	Name      string
-	WorkDir   string
-	Profile   string
-	Up        bool
-	Kind      project.JobKind
-	State     State
-	Hold      Hold
-	Reaped    bool
-	PID       int
-	URL       string
-	Ports     map[string]int
-	ExitCode  *int
-	StartedAt time.Time
-	SharedDir string
-	LastLine  *Line
+	Name             string
+	WorkDir          string
+	Profile          string
+	Up               bool
+	Kind             project.JobKind
+	State            State
+	Hold             Hold
+	Reaped           bool
+	PID              int
+	URL              string
+	Ports            map[string]int
+	ExitCode         *int
+	StartedAt        time.Time
+	SharedDir        string
+	MainHolds        bool
+	MainHoldsUnknown bool
+	Repo             string
+	StopCommand      string
+	LastLine         *Line
 }
 
 // Hold is what of a job the daemon holds.

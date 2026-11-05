@@ -1,0 +1,82 @@
+{
+  "v": 2,
+  "command": "run-down",
+  "ok": false,
+  "op": "<OP>",
+  "items": [
+    {
+      "subject": "feat/b",
+      "status": "failed",
+      "error": {
+        "kind": "internal",
+        "code": "run-down.stop_failed",
+        "message": "couldn't stop stuck: run daemon: the stop command of stuck failed (exit 4)",
+        "params": {
+          "jobs": "stuck"
+        }
+      },
+      "detail": {
+        "path": "<SB>/acme.trees/feat-b",
+        "jobs": [
+          {
+            "name": "stuck",
+            "status": "failed",
+            "message": "run daemon: the stop command of stuck failed (exit 4)"
+          }
+        ]
+      }
+    }
+  ],
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "feat/b",
+        "branch": "feat/b",
+        "path": "<SB>/acme.trees/feat-b",
+        "profile": "stuck",
+        "jobs": [
+          {
+            "name": "stuck",
+            "kind": "service",
+            "hold": "detached",
+            "fate": "stop",
+            "stop_command": "test -f \"<SB>/home/unstick\" || { echo cannot stop; exit 4; }"
+          }
+        ]
+      }
+    ],
+    "recap": [
+      {
+        "key": "worktrees",
+        "label": "Worktrees",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/b",
+            "text": "feat/b"
+          }
+        ]
+      },
+      {
+        "key": "jobs",
+        "label": "Stops",
+        "values": [
+          {
+            "value": "stuck",
+            "text": "stuck"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "internal",
+    "code": "run-down.stop_failed",
+    "message": "couldn't stop stuck: run daemon: the stop command of stuck failed (exit 4)",
+    "params": {
+      "jobs": "stuck"
+    }
+  }
+}

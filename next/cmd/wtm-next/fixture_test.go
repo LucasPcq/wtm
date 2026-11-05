@@ -5,11 +5,14 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/adapter/daemon"
 	"github.com/LucasPcq/wtm/next/internal/adapter/events"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
+	"github.com/LucasPcq/wtm/next/internal/command/rundown"
 	"github.com/LucasPcq/wtm/next/internal/command/runup"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
@@ -157,6 +160,28 @@ func mutations() []mutation {
 			},
 			applied: func(t *testing.T, _ string) {
 				assert.Len(t, daemonJobs(t), 2)
+			},
+		},
+		{
+			name:     rundown.Name,
+			answers:  []domain.Answered{{Path: domain.PathWorktree, Values: []string{"main"}}},
+			complete: true,
+			// a service up in main, under a daemon of the test's own at the socket the commands reach, in a home short enough for it
+			setup: func(t *testing.T, main string) {
+				writeRun(t, main, idleJob("idle"))
+				t.Setenv("HOME", shortDir(t))
+				serving(t, daemonParams{Socket: events.SocketPath()})
+				startIdle(t, main, "idle")
+			},
+			// another job up: the plan stops one more
+			stale: func(t *testing.T, main string) {
+				startIdle(t, main, "other")
+			},
+			untouched: func(t *testing.T, _ string) {
+				assert.True(t, slices.ContainsFunc(daemonJobs(t), func(job run.Job) bool { return job.Up }))
+			},
+			applied: func(t *testing.T, _ string) {
+				assert.False(t, slices.ContainsFunc(daemonJobs(t), func(job run.Job) bool { return job.Up }))
 			},
 		},
 		{
@@ -309,6 +334,18 @@ func eventsOfEachType() []domain.Event {
 		domain.JobCrashed{JobChange: domain.JobChange{Worktree: domain.JobWorktree{Branch: "feat/a", Path: "/repo/.trees/feat-a"}, Job: domain.EventJob{Name: "web", Kind: project.Service, Hold: run.HoldOwn}, ExitCode: new(1), LastLines: []string{"listen EADDRINUSE"}}},
 		domain.JobExited{JobChange: domain.JobChange{Worktree: domain.JobWorktree{Branch: "feat/a", Path: "/repo/.trees/feat-a"}, Job: domain.EventJob{Name: "migrate", Kind: project.Task, Hold: run.HoldOwn}, ExitCode: new(0)}},
 	}
+}
+
+// idleJob is a run.toml of one service of name, which runs until it is stopped.
+func idleJob(name string) string {
+	return "[[job]]\nname = \"" + name + "\"\nkind = \"service\"\ncmd = \"sleep 30\"\n"
+}
+
+// startIdle starts the service of name in main through the run daemon the commands reach: a process of the test's own daemon, which a stop stops.
+func startIdle(t *testing.T, main, name string) {
+	t.Helper()
+	_, err := daemon.Daemon{SocketPath: events.SocketPath(), Version: version}.Start(t.Context(), run.Spec{Job: project.Job{Name: name, Kind: project.Service, Cmd: "sleep 30"}, WorkDir: main}, nil)
+	require.NoError(t, err)
 }
 
 // seedJob is a run.toml of one task, which run up runs to its end.

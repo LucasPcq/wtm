@@ -22,7 +22,7 @@ func TestAServiceIsUpOnceStartedListedIndexedAndAnnounced(t *testing.T) {
 	job, err := w.Start(service("web"), nil)
 
 	require.NoError(t, err)
-	want := run.Job{Name: "web", WorkDir: "/wt/a", Up: true, Kind: project.Service, State: run.Running, Hold: run.HoldOwn, PID: 1000, URL: "http://localhost:3100", Ports: map[string]int{"PORT": 3100}, StartedAt: now}
+	want := run.Job{Name: "web", WorkDir: "/wt/a", Up: true, Kind: project.Service, State: run.Running, Hold: run.HoldOwn, PID: 1000, URL: "http://localhost:3100", Ports: map[string]int{"PORT": 3100}, StartedAt: now, Repo: "/repo"}
 	assert.Equal(t, want, job)
 	assert.Equal(t, []run.Job{want}, w.List(""))
 	assert.Equal(t, []string{"/wt/a:web"}, w.index.names())
@@ -175,7 +175,7 @@ func TestADetachedLauncherLeavesItsStackUpWithNoProcessOfTheDaemons(t *testing.T
 	job, err := w.Start(stack("db"), func(line run.Line) { lines = append(lines, line.Text) })
 
 	require.NoError(t, err)
-	assert.Equal(t, run.Job{Name: "db", WorkDir: "/wt/a", Up: true, Kind: project.Service, State: run.Running, Hold: run.HoldDetached, Ports: map[string]int{}, StartedAt: now, LastLine: &run.Line{At: now, Text: "Container db Started"}}, job)
+	assert.Equal(t, run.Job{Name: "db", WorkDir: "/wt/a", Up: true, Kind: project.Service, State: run.Running, Hold: run.HoldDetached, Ports: map[string]int{}, StartedAt: now, Repo: "/repo", StopCommand: "down db", LastLine: &run.Line{At: now, Text: "Container db Started"}}, job)
 	assert.Equal(t, []string{"Container db Started"}, lines)
 	assert.False(t, w.spawner.commands[0].Terminal)
 	assert.False(t, w.Busy(), "a stack keeps no daemon up")
@@ -301,10 +301,10 @@ func TestAdoptReapsOrphansListsCrashedAndKeepsStacksAndClaims(t *testing.T) {
 
 	assert.Equal(t, []int{100}, w.orphans.reaped, "only a group identified as the job's is reaped")
 	assert.Equal(t, []run.Job{
-		{Name: "api", WorkDir: "/wt/a", Kind: project.Service, State: run.Crashed, Hold: run.HoldOwn, URL: "http://localhost:3100", Ports: map[string]int{"PORT": 3100}},
+		{Name: "api", WorkDir: "/wt/a", Kind: project.Service, State: run.Crashed, Hold: run.HoldOwn, URL: "http://localhost:3100", Ports: map[string]int{"PORT": 3100}, Repo: "/repo"},
 		{Name: "cache", WorkDir: "/wt/a", Up: true, Kind: project.Service, Hold: run.HoldClaim, Ports: map[string]int{}, SharedDir: "/repo"},
-		{Name: "db", WorkDir: "/wt/a", Up: true, Kind: project.Service, State: run.Running, Hold: run.HoldDetached, Ports: map[string]int{}, StartedAt: now},
-		{Name: "web", WorkDir: "/wt/a", Kind: project.Service, State: run.Stopped, Hold: run.HoldOwn, Reaped: true, URL: "http://localhost:3100", Ports: map[string]int{"PORT": 3100}},
+		{Name: "db", WorkDir: "/wt/a", Up: true, Kind: project.Service, State: run.Running, Hold: run.HoldDetached, Ports: map[string]int{}, StartedAt: now, Repo: "/repo", StopCommand: "down db"},
+		{Name: "web", WorkDir: "/wt/a", Kind: project.Service, State: run.Stopped, Hold: run.HoldOwn, Reaped: true, URL: "http://localhost:3100", Ports: map[string]int{"PORT": 3100}, Repo: "/repo"},
 	}, w.List("/wt/a"))
 	assert.Equal(t, []string{"/repo:cache", "/wt/a:cache", "/wt/a:db"}, w.index.names(), "a claim on a shared job not up is dropped")
 }
