@@ -1,0 +1,19 @@
+$ wtm run stop --job api; echo EXIT=$?
+
+  Step 3/3 • Confirm
+
+  ✓ Worktrees: feat/a
+  ✓ Job: api · --job
+
+  ┃  Review & confirm
+  ┃
+  ┃  Worktrees  feat/a
+  ┃  Job        api
+  ┃  Stops      api
+
+▌› Yes, stop api in feat/a
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   No, cancel
+
+  ↑↓ navigate • / filter • enter confirm • esc back
+

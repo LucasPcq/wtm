@@ -1,65 +1,22 @@
 package runup
 
 import (
-	"maps"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
-	"github.com/LucasPcq/wtm/next/internal/domain/env"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
-	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/runjobs"
 	"github.com/LucasPcq/wtm/next/internal/service/teardown"
 )
 
 // ----------------------------------------------------------------------------
 // Facts
 
-// Facts are what run up decides from, as Observe read them: the project's config, its run.toml, the repository's snapshot, the meta record of each worktree on a branch and why one that exists does not read, the worktrees whose directory is gone, where the caller stands, and the jobs the run daemon runs (with why it could not tell, or that one of another build answered).
+// Facts are what run up decides from, as Observe read them: what a start decides from (runjobs.Facts), the profiles of run.toml among them.
 type Facts struct {
-	worktree.Repository
-	Records    map[string]worktree.Meta // by branch
-	RecordErrs map[string]error         // by branch
-	Gone       map[string]bool          // by path
-	Cwd        string                   // where the caller stands, through its symbolic links
-	Jobs       []run.Job
-	JobsErr    error
-	Skewed     *run.Skewed
-	Owed       []env.OwedDrop // the drops removed worktrees owe the shared services
-}
-
-// standing is the worktree the caller stands in, by its name; none when it stands in none.
-func (f Facts) standing() string {
-	worktrees := f.standingWorktrees()
-	if at := worktree.Holding(worktrees, f.Cwd, func(w worktree.Worktree) string { return w.Path }); at >= 0 {
-		return worktrees[at].Name()
-	}
-	return ""
-}
-
-func (f Facts) standingWorktrees() []worktree.Worktree {
-	return slices.DeleteFunc(f.MainFirst(), func(w worktree.Worktree) bool { return f.Gone[w.Path] })
-}
-
-// worktreeOptions are the worktrees run up may start in: each one whose directory stands, the main one first, the caller's tagged current, each with what it runs (domain.RunningIn).
-func (f Facts) worktreeOptions() []domain.Option {
-	worktrees := f.standingWorktrees()
-	return domain.RunningIn(domain.WorktreeOptions(worktrees, domain.WorktreeQuery{Cwd: f.Cwd}), worktrees, f.Jobs)
-}
-
-// up are the jobs up in the worktree at path, claims included.
-func (f Facts) up(path string) []run.Job {
-	return slices.DeleteFunc(slices.Clone(f.Jobs), func(job run.Job) bool { return !job.Up || job.WorkDir != path })
-}
-
-func (f Facts) named(name string) (worktree.Worktree, bool) {
-	at := slices.IndexFunc(f.Worktrees, func(w worktree.Worktree) bool { return w.Name() == name })
-	if at < 0 {
-		return worktree.Worktree{}, false
-	}
-	return f.Worktrees[at], true
+	runjobs.Facts
 }
 
 // defaultProfile is the profile run.toml marks default, else its only one.
@@ -84,415 +41,11 @@ func (f Facts) jobsOf(name string) []project.Job {
 	}
 	var jobs []project.Job
 	for _, job := range f.Run.Profiles[at].Jobs {
-		if declared, ok := f.declared(job); ok {
+		if declared, ok := f.Declared(job); ok {
 			jobs = append(jobs, declared)
 		}
 	}
 	return jobs
-}
-
-func (f Facts) declared(name string) (project.Job, bool) {
-	at := slices.IndexFunc(f.Run.Jobs, func(job project.Job) bool { return job.Name == name })
-	if at < 0 {
-		return project.Job{}, false
-	}
-	return f.Run.Jobs[at], true
-}
-
-// urlOf is the URL the daemon lists for the job of name up in the worktree at path.
-func (f Facts) urlOf(name, path string) string {
-	for _, job := range f.up(path) {
-		if job.Name == name {
-			return job.URL
-		}
-	}
-	return ""
-}
-
-// shared reports whether the job of name runs once for every worktree.
-func (f Facts) shared(name string) bool {
-	job, ok := f.declared(name)
-	return ok && job.Scope == project.Shared
-}
-
-// children are the declared jobs a runner starts itself, its runners' own included, each once.
-func (f Facts) children(runner project.Job) []project.Job {
-	seen := map[string]bool{runner.Name: true}
-	queue := slices.Clone(runner.Runs)
-	var children []project.Job
-	for len(queue) > 0 {
-		name := queue[0]
-		queue = queue[1:]
-		child, ok := f.declared(name)
-		if seen[name] || !ok {
-			continue
-		}
-		seen[name] = true
-		children = append(children, child)
-		queue = append(queue, child.Runs...)
-	}
-	return children
-}
-
-// ----------------------------------------------------------------------------
-// The decision of each worktree
-
-// A Target is a worktree the profile starts in: its name, its branch (none on no branch) and its root as git spells it; whether it is the main one; whether its ports are known (Numbered: one whose ports derive from an ordinal it lacks is numbered first); and its jobs, in the order they start.
-type Target struct {
-	Worktree string    `json:"worktree"`
-	Branch   string    `json:"branch,omitempty"`
-	Path     string    `json:"path"`
-	Main     bool      `json:"main,omitempty"`
-	Numbered bool      `json:"numbered"`
-	Jobs     []JobPlan `json:"jobs"`
-	entry    int
-}
-
-// A JobPlan is how one job of the profile starts in its worktree: what the start does (Action); its Step among the jobs the worktree starts, none for a shared job it joins; the tasks it waits for, which run before it; the main checkout's branch a shared job runs in; the ports it binds, offset for the worktree; and the namespace of its data a shared job makes for the worktree.
-type JobPlan struct {
-	Name      string          `json:"name"`
-	Kind      project.JobKind `json:"kind"`
-	Action    Action          `json:"action"`
-	Step      int             `json:"step,omitempty"`
-	WaitsFor  []string        `json:"waits_for,omitempty"`
-	SharedIn  string          `json:"shared_in,omitempty"`
-	Ports     map[string]int  `json:"ports,omitempty"`
-	Namespace string          `json:"namespace,omitempty"`
-}
-
-// Action is what a start does to one job.
-type Action string
-
-// The actions of a start.
-const (
-	ActionStart Action = "start" // the job starts: a service not up, a task, which runs each time
-	ActionUp    Action = "up"    // a service already up in the worktree, left as it is
-	ActionJoin  Action = "join"  // a shared service the worktree holds, run once in the main checkout, started there when it is not up
-)
-
-// Actions returns every Action.
-func Actions() []Action {
-	return []Action{ActionStart, ActionUp, ActionJoin}
-}
-
-// entries decides each worktree names asks: a Target, or the problem of its entry: blank, given twice, gone, a record that does not read, or naming no worktree.
-func (f Facts) entries(names []string) (targets []Target, problems []domain.FieldError) {
-	for index, name := range names {
-		path := entryPath(index)
-		w, found := f.named(name)
-		switch {
-		case strings.TrimSpace(name) == "":
-			problems = append(problems, domain.Required(path))
-		case slices.Contains(names[:index], name):
-			problems = append(problems, domain.FieldError{Path: path, Code: domain.CodeDistinct, Template: "{path}: {value} is given twice", Params: domain.Params{"value": name}})
-		case found && f.Gone[w.Path]:
-			problems = append(problems, domain.FieldError{Path: path, Code: CodeWorktreeGone, Template: "{value}'s directory is gone: nothing to start in", Params: domain.Params{"value": name, "path": w.Path}})
-		case found && f.RecordErrs[w.Branch()] != nil:
-			problems = append(problems, domain.FieldError{Path: path, Code: CodeMetaUnreadable, Template: "{value}'s record does not read: its ports are unknown", Params: domain.Params{"value": name, "cause": f.RecordErrs[w.Branch()].Error()}})
-		case found:
-			record := f.Records[w.Branch()]
-			numbered := w.Main || record.Ordinal > 0 || record.Isolation.Effective() == project.Verbatim || !f.Run.IsolationApplies()
-			targets = append(targets, Target{Worktree: w.Name(), Branch: w.Branch(), Path: w.Path, Main: w.Main, Numbered: numbered, entry: index})
-		default:
-			problems = append(problems, domain.FieldError{Path: path, Code: domain.CodeNotFound, Template: "{value} names no worktree", Params: domain.Params{"value": name}})
-		}
-	}
-	return targets, problems
-}
-
-// jobParams is what the job environment of t reads, its record's ordinal and isolation; the main worktree's ordinal is 0.
-func (f Facts) jobParams(t Target, ordinal int) env.JobParams {
-	record := f.Records[t.Branch]
-	return env.JobParams{Branch: t.Branch, ProjectDir: f.MainPath, Ordinal: ordinal, Isolation: record.Isolation.Effective(), Run: f.Run}
-}
-
-func (f Facts) ordinalOf(t Target) int {
-	return f.Records[t.Branch].Ordinal
-}
-
-// plan is how t starts jobs: each in order, a shared one joined from a worktree other than the main one, a service up left as it is, the others numbered, each waiting for the tasks before it; the ports and namespaces from the environment ordinal gives, none while t is not numbered.
-func (f Facts) plan(t Target, jobs []project.Job, ordinal int) Target {
-	params := f.jobParams(t, ordinal)
-	jobEnv := env.HookEnv(params, nil)
-	up := run.UpIn(f.Jobs, t.Path)
-	main := f.mainBranch()
-	step := 0
-	var tasks []string
-	t.Jobs = []JobPlan{}
-	for _, job := range jobs {
-		planned := JobPlan{Name: job.Name, Kind: job.Kind, Action: ActionStart, WaitsFor: slices.Clone(tasks)}
-		if t.Numbered {
-			planned.Ports = nonEmpty(params.JobPorts(f.effective(job)))
-		}
-		switch {
-		case job.Scope == project.Shared && !t.Main:
-			planned.Action, planned.SharedIn, planned.Ports = ActionJoin, main, nil
-			if namespace, ok, _ := env.NamespaceFor(job, jobEnv); ok && t.Numbered {
-				planned.Namespace = namespace.Name
-			}
-		case job.Kind != project.Task && slices.Contains(up, job.Name):
-			planned.Action = ActionUp
-		}
-		if planned.Action != ActionJoin {
-			step++
-			planned.Step = step
-		}
-		if job.Kind == project.Task {
-			tasks = append(tasks, job.Name)
-		}
-		t.Jobs = append(t.Jobs, planned)
-	}
-	return t
-}
-
-func (f Facts) mainBranch() string {
-	return f.mainTarget().Worktree
-}
-
-// effective is job as it starts: with the ports of the jobs it runs itself, which it hands their environment.
-func (f Facts) effective(job project.Job) project.Job {
-	children := f.children(job)
-	if len(children) == 0 {
-		return job
-	}
-	job.Ports = maps.Clone(job.Ports)
-	if job.Ports == nil {
-		job.Ports = map[string]int{}
-	}
-	for _, child := range children {
-		for name, base := range child.Ports {
-			if _, own := job.Ports[name]; !own {
-				job.Ports[name] = base
-			}
-		}
-	}
-	return job
-}
-
-// nonEmpty is ports, nil when it holds none.
-func nonEmpty(ports map[string]int) map[string]int {
-	if len(ports) == 0 {
-		return nil
-	}
-	return ports
-}
-
-// ----------------------------------------------------------------------------
-// The other worktrees
-
-// An Other is a worktree outside the request that runs jobs: by its name and root, with the jobs up in it, which an exclusive start stops.
-type Other struct {
-	Worktree string   `json:"worktree"`
-	Path     string   `json:"path"`
-	Jobs     []string `json:"jobs"`
-}
-
-// others are the worktrees outside targets with jobs up, in git's order.
-func (f Facts) others(targets []Target) []Other {
-	var others []Other
-	for _, w := range f.MainFirst() {
-		if slices.ContainsFunc(targets, func(t Target) bool { return t.Path == w.Path }) {
-			continue
-		}
-		if up := run.UpIn(f.Jobs, w.Path); len(up) > 0 {
-			others = append(others, Other{Worktree: w.Name(), Path: w.Path, Jobs: up})
-		}
-	}
-	return others
-}
-
-// ----------------------------------------------------------------------------
-// Foreign data
-
-// A risk is a job a start runs that changes data its worktree does not own: the job (Via, the runner that starts it, if one does), the Service whose data it changes and whose data that is (Owner).
-type risk struct {
-	Worktree string
-	Job      string
-	Via      string
-	Service  string
-	Owner    owner
-	entry    int
-}
-
-// owner is whose data a job's touches reach.
-type owner string
-
-// The owners of foreign data.
-const (
-	ownerSource   owner = "source"   // a verbatim worktree's source's: the two share their data
-	ownerEveryone owner = "everyone" // a shared service's with no namespace: every worktree's
-)
-
-// risks are the jobs the start of jobs in targets runs, those their runners start included, that change data a worktree does not own; the main worktree owns its own.
-func (f Facts) risks(targets []Target, jobs []project.Job) []risk {
-	var risks []risk
-	for _, t := range targets {
-		if t.Main {
-			continue
-		}
-		verbatim := f.Records[t.Branch].Isolation.Effective() == project.Verbatim
-		for _, started := range f.touchers(jobs) {
-			for _, service := range started.job.Touches {
-				declared, _ := f.declared(service)
-				owner := ownerEveryone
-				switch {
-				case verbatim:
-					owner = ownerSource
-				case declared.Scope != project.Shared || declared.Namespace != nil:
-					continue
-				}
-				risks = append(risks, risk{Worktree: t.Worktree, Job: started.job.Name, Via: started.via, Service: service, Owner: owner, entry: t.entry})
-			}
-		}
-	}
-	return risks
-}
-
-type toucher struct {
-	job project.Job
-	via string
-}
-
-// touchers are the jobs a start runs: those it names, then those their runners start, each once.
-func (f Facts) touchers(jobs []project.Job) []toucher {
-	seen := map[string]bool{}
-	var started []toucher
-	for _, job := range jobs {
-		if !seen[job.Name] {
-			seen[job.Name] = true
-			started = append(started, toucher{job: job})
-		}
-	}
-	for _, job := range jobs {
-		for _, child := range f.children(job) {
-			if !seen[child.Name] {
-				seen[child.Name] = true
-				started = append(started, toucher{job: child, via: job.Name})
-			}
-		}
-	}
-	return started
-}
-
-// ----------------------------------------------------------------------------
-// Port clashes
-
-// A clash is a port a worktree's job would bind that a job of another worktree holds already, which only a worktree sharing another's ports meets (a verbatim one, beside its source).
-type clash struct {
-	Port     int
-	Worktree string
-	Job      string
-	HeldBy   string
-	HeldJob  string
-	Started  bool // HeldBy is another worktree of the request, whose start would bind it too: no exclusive start lifts it
-	Foreign  bool // HeldBy is a worktree of another repository, by its path, whose jobs no exclusive start stops
-}
-
-// lifts reports whether stopping the other worktrees' jobs first frees the port.
-func (c clash) lifts() bool {
-	return !c.Started && !c.Foreign
-}
-
-// clashes are the ports the targets would bind that a job holds in another worktree, of this repository or another, or that two targets would both bind; this repository's shared jobs bind theirs once, and clash with nobody.
-func (f Facts) clashes(targets []Target) []clash {
-	type holder struct {
-		worktree, job string
-		foreign       bool
-	}
-	held := map[int]holder{}
-	for _, job := range f.Jobs {
-		_, ours := f.atPath(job.WorkDir)
-		if !job.Up || job.Hold == run.HoldClaim || (ours && f.shared(job.Name)) {
-			continue
-		}
-		if slices.ContainsFunc(targets, func(t Target) bool { return t.Path == job.WorkDir }) {
-			continue
-		}
-		for _, port := range job.Ports {
-			held[port] = holder{worktree: f.worktreeAt(job.WorkDir), job: job.Name, foreign: !ours}
-		}
-	}
-
-	var clashes []clash
-	starting := map[int]holder{}
-	for _, t := range targets {
-		for _, job := range t.Jobs {
-			if job.Action != ActionStart {
-				continue
-			}
-			for _, port := range sortedPorts(job.Ports) {
-				if h, ok := held[port]; ok {
-					clashes = append(clashes, clash{Port: port, Worktree: t.Worktree, Job: job.Name, HeldBy: h.worktree, HeldJob: h.job, Foreign: h.foreign})
-				}
-				if h, ok := starting[port]; ok && h.worktree != t.Worktree {
-					clashes = append(clashes, clash{Port: port, Worktree: t.Worktree, Job: job.Name, HeldBy: h.worktree, HeldJob: h.job, Started: true})
-				}
-				starting[port] = holder{worktree: t.Worktree, job: job.Name}
-			}
-		}
-	}
-	return clashes
-}
-
-func sortedPorts(ports map[string]int) []int {
-	return slices.Sorted(maps.Values(ports))
-}
-
-// worktreeAt is the name of the worktree of this repository at path, the path itself when none is there.
-func (f Facts) worktreeAt(path string) string {
-	if w, ours := f.atPath(path); ours {
-		return w.Name()
-	}
-	return path
-}
-
-// atPath is the worktree of this repository at path, and whether there is one.
-func (f Facts) atPath(path string) (worktree.Worktree, bool) {
-	at := slices.IndexFunc(f.Worktrees, func(w worktree.Worktree) bool { return w.Path == path })
-	if at < 0 {
-		return worktree.Worktree{}, false
-	}
-	return f.Worktrees[at], true
-}
-
-// ----------------------------------------------------------------------------
-// Runners
-
-// A conflict is a job a start would run twice: started by name, and by a Runner the same start runs, which starts it itself.
-type conflict struct {
-	Job    string
-	Runner string
-}
-
-// conflicts are the jobs that would run twice once the start is done, in one of targets: a job of the profile, or up there, that a runner of the profile, or up there, starts too, a pair at least one of which the start starts; a runner and its child both up already, which the profile leaves alone, are not this start's.
-func (f Facts) conflicts(targets []Target, jobs []project.Job) []conflict {
-	profile := map[string]bool{}
-	for _, job := range jobs {
-		profile[job.Name] = true
-	}
-
-	var conflicts []conflict
-	for _, t := range targets {
-		running := map[string]bool{}
-		for name := range profile {
-			running[name] = true
-		}
-		for _, name := range run.UpIn(f.Jobs, t.Path) {
-			running[name] = true
-		}
-		for _, runner := range f.Run.Jobs {
-			if !running[runner.Name] {
-				continue
-			}
-			for _, child := range f.children(runner) {
-				pair := conflict{Job: child.Name, Runner: runner.Name}
-				if running[child.Name] && (profile[runner.Name] || profile[child.Name]) && !slices.Contains(conflicts, pair) {
-					conflicts = append(conflicts, pair)
-				}
-			}
-		}
-	}
-	return conflicts
 }
 
 // ----------------------------------------------------------------------------
@@ -500,12 +53,12 @@ func (f Facts) conflicts(targets []Target, jobs []project.Job) []conflict {
 
 // The codes of the refusals of a request: a job that changes foreign data (CodeUnsafe, followed by CodeForce, the request forced), a port another worktree holds (CodePortClash, followed by CodeExclusive, the request stopping the others first), a job a runner of the same start starts too (CodeRunnerConflict), a run daemon of another build holding jobs (CodeDaemonSkew, followed by the restart), and every job of the request already up as asked is no refusal.
 const (
-	CodeUnsafe         = Name + ".unsafe"
-	CodeForeignData    = Name + ".foreign_data"
-	CodeForce          = Name + ".force"
-	CodePortClash      = Name + ".port_clash"
-	CodeExclusive      = Name + ".exclusive"
-	CodeRunnerConflict = Name + ".runner_conflict"
+	CodeUnsafe         = Name + runjobs.Unsafe
+	CodeForeignData    = Name + runjobs.ForeignData
+	CodeForce          = Name + runjobs.Force
+	CodePortClash      = Name + runjobs.PortClash
+	CodeExclusive      = Name + runjobs.ExclusiveStart
+	CodeRunnerConflict = Name + runjobs.RunnerConflict
 	CodeDaemonSkew     = Name + domain.DaemonSkew
 )
 
@@ -520,34 +73,43 @@ type DecideParams struct {
 	Restart *domain.FollowUp
 }
 
-// Decide turns the facts and the resolved request into the plan and its warnings, or the refusal that stops it: a run daemon of another build holding jobs, a job a runner of the start starts too, a port another worktree holds unless its jobs are stopped first, a job that changes data a worktree does not own unless forced.
+// Decide turns the facts and the resolved request into the plan and its warnings, or the refusal that stops it (runjobs.Facts.Refusal): a run daemon of another build holding jobs, a job a runner of the start starts too, a port another worktree holds unless its jobs are stopped first, a job that changes data a worktree does not own unless forced.
 func Decide(f Facts, req Request, params DecideParams) (Plan, []domain.Warning, error) {
-	targets, _ := f.entries(req.Worktrees)
+	targets, _ := f.Entries(Name, req.Worktrees)
 	jobs := f.jobsOf(req.Profile)
 	exclusive := f.exclusive(req, targets).Value
-	planned := Plan{Profile: req.Profile, Exclusive: exclusive, Worktrees: []Target{}, Others: []Other{}, NoProbe: req.NoProbe, facts: f, asked: req}
+	planned := Plan{Profile: req.Profile, Exclusive: exclusive, Worktrees: []runjobs.Target{}, Others: []runjobs.Other{}, NoProbe: req.NoProbe, facts: f, asked: req}
 	for _, t := range targets {
-		planned.Worktrees = append(planned.Worktrees, f.plan(t, jobs, f.ordinalOf(t)))
+		planned.Worktrees = append(planned.Worktrees, f.Planned(t, jobs, f.OrdinalOf(t)))
 	}
 	if exclusive {
-		planned.Others = append(planned.Others, f.others(targets)...)
+		planned.Others = append(planned.Others, f.Others(targets)...)
 	}
 
-	if f.Skewed != nil && slices.ContainsFunc(f.Jobs, func(job run.Job) bool { return job.Up }) {
-		return Plan{}, nil, skewRefusal(f.Skewed, params.Restart)
+	refusal := runjobs.RefusalParams{Command: Name, Restart: params.Restart, Targets: planned.Worktrees, Jobs: jobs, Exclusive: exclusive, Force: req.Force, JobsPath: PathProfile, Forced: forced(req)}
+	if len(targets) == 1 {
+		// --exclusive starts one worktree only: offered beside several, it would be refused in turn.
+		refusal.Stopping = stopping(req)
 	}
-	if conflicts := f.conflicts(targets, jobs); len(conflicts) > 0 {
-		return Plan{}, nil, conflictRefusal(conflicts)
-	}
-	if clashes := f.clashes(planned.Worktrees); len(clashes) > 0 && !(exclusive && !slices.ContainsFunc(clashes, func(c clash) bool { return !c.lifts() })) {
-		return Plan{}, nil, clashRefusal(clashes, req, len(targets))
-	}
-	if risks := f.risks(targets, jobs); len(risks) > 0 && !req.Force {
-		return Plan{}, nil, foreignRefusal(risks, req)
+	if err := f.Refusal(refusal); err != nil {
+		return Plan{}, nil, err
 	}
 
 	planned.Owed = f.debts(planned)
 	return planned, f.warnings(planned, req), nil
+}
+
+// stopping are the answers of req with the other worktrees' jobs stopped first.
+func stopping(req Request) []domain.Answered {
+	yes := true
+	req.Exclusive, req.Parallel, req.Caller = &yes, false, domain.Caller{}
+	return domain.AnswersOf(Questions{}.Form(), req)
+}
+
+// forced are the answers of req forced.
+func forced(req Request) []domain.Answered {
+	req.Force, req.Caller = true, domain.Caller{}
+	return domain.AnswersOf(Questions{}.Form(), req)
 }
 
 // debts are the drops removed worktrees owe that the start pays once its jobs are up: each whose shared service is up already, or which it starts or joins.
@@ -555,7 +117,7 @@ func (f Facts) debts(p Plan) []teardown.Debt {
 	var starting []string
 	for _, t := range p.Worktrees {
 		for _, job := range t.Jobs {
-			if f.shared(job.Name) {
+			if f.Shared(job.Name) {
 				starting = append(starting, job.Name)
 			}
 		}
@@ -573,81 +135,10 @@ func (f Facts) warnings(p Plan, req Request) []domain.Warning {
 	if f.JobsErr != nil {
 		warnings = append(warnings, domain.Warning{Code: CodeJobsUnknown, Message: run.UnknownMessage(f.JobsErr) + " — the start leaves the other worktrees' jobs alone"})
 	}
-	if req.Exclusive == nil && f.Run.Concurrency == project.Exclusive && len(p.Worktrees) > 1 && len(f.others(p.Worktrees)) > 0 {
+	if req.Exclusive == nil && f.Run.Concurrency == project.Exclusive && len(p.Worktrees) > 1 && len(f.Others(p.Worktrees)) > 0 {
 		warnings = append(warnings, domain.Warning{Code: CodeExclusiveIgnored, Message: "run.toml stops the other worktrees' jobs first, which cannot start several: they keep running"})
 	}
 	return warnings
-}
-
-func skewRefusal(skewed *run.Skewed, restart *domain.FollowUp) *domain.Error {
-	refusal := &domain.Error{Kind: domain.KindPrecondition, Code: CodeDaemonSkew, Message: "nothing started: " + skewed.Error(), Params: domain.Params{"skew": string(skewed.Skew), "daemon": skewed.Daemon}}
-	if restart != nil {
-		followUp := *restart
-		followUp.Code, followUp.Message = Name+".restart_daemon", "restart it: its services stop, its stacks are kept"
-		refusal.FollowUp = &followUp
-	}
-	return refusal
-}
-
-func conflictRefusal(conflicts []conflict) *domain.Error {
-	fields := make([]domain.FieldError, 0, len(conflicts))
-	for _, c := range conflicts {
-		fields = append(fields, domain.FieldError{Path: PathProfile, Code: CodeRunnerConflict, Template: "{job} would run twice: {runner} starts it too", Params: domain.Params{"job": c.Job, "runner": c.Runner}})
-	}
-	return domain.Invalid(fields)
-}
-
-// clashRefusal names each port held; it offers the start with --exclusive when stopping the other worktrees frees every one, a start in one worktree only, as --exclusive refuses several.
-func clashRefusal(clashes []clash, req Request, targets int) *domain.Error {
-	var lines []string
-	fields := make([]domain.FieldError, 0, len(clashes))
-	lifted := targets == 1
-	for _, c := range clashes {
-		port := strconv.Itoa(c.Port)
-		template, holder := "{worktree}'s {job} would bind {port}, which {held_by}'s {held_job} holds", c.HeldBy+"'s "+c.HeldJob
-		if c.Foreign {
-			template, holder = "{worktree}'s {job} would bind {port}, which {held_job}, a job outside this repository's worktrees, holds in {held_by}", c.HeldJob+", a job outside this repository's worktrees, in "+c.HeldBy
-		}
-		lines = append(lines, port+" ("+holder+")")
-		fields = append(fields, domain.FieldError{Path: domain.PathWorktree, Code: CodePortClash, Template: template, Params: domain.Params{"worktree": c.Worktree, "job": c.Job, "port": port, "held_by": c.HeldBy, "held_job": c.HeldJob}})
-		lifted = lifted && c.lifts()
-	}
-	refusal := &domain.Error{Kind: domain.KindRefused, Code: CodePortClash, Message: "nothing started: ports another worktree holds: " + strings.Join(lines, ", "), Fields: fields}
-	if lifted {
-		stopping := req
-		yes := true
-		stopping.Exclusive, stopping.Parallel, stopping.Caller = &yes, false, domain.Caller{}
-		refusal.FollowUp = &domain.FollowUp{Command: Name, Answers: domain.AnswersOf(Questions{}.Form(), stopping), Code: CodeExclusive, Message: "stop the other worktrees' jobs first"}
-	}
-	return refusal
-}
-
-// ownerWords say whose data an owner's is, after "changes".
-var ownerWords = map[owner]string{ownerSource: "its source's data: it is verbatim", ownerEveryone: "every worktree's data: it has no namespace"}
-
-func foreignRefusal(risks []risk, req Request) *domain.Error {
-	fields := make([]domain.FieldError, 0, len(risks))
-	var worktrees []string
-	for _, r := range risks {
-		job := r.Job
-		if r.Via != "" {
-			job += " (run by " + r.Via + ")"
-		}
-		fields = append(fields, domain.FieldError{Path: entryPath(r.entry), Code: CodeForeignData, Template: "{value}: {job} changes {service}, " + ownerWords[r.Owner], Params: domain.Params{"value": r.Worktree, "job": job, "service": r.Service, "owner": string(r.Owner)}})
-		if !slices.Contains(worktrees, r.Worktree) {
-			worktrees = append(worktrees, r.Worktree)
-		}
-	}
-	forced := req
-	forced.Force, forced.Caller = true, domain.Caller{}
-	return &domain.Error{
-		Kind:     domain.KindRefused,
-		Code:     CodeUnsafe,
-		Message:  "nothing started: a job changes data " + strings.Join(worktrees, ", ") + " does not own",
-		Params:   domain.Params{"worktrees": strings.Join(worktrees, ", ")},
-		Fields:   fields,
-		FollowUp: &domain.FollowUp{Command: Name, Answers: domain.AnswersOf(Questions{}.Form(), forced), Code: CodeForce, Message: "start them anyway"},
-	}
 }
 
 // ----------------------------------------------------------------------------
@@ -655,12 +146,12 @@ func foreignRefusal(risks []risk, req Request) *domain.Error {
 
 // A Plan is what Apply will do, as the dry run and the JSON envelope show it and the fingerprint covers it: the profile started (none when run.toml declares none: every job), in each worktree, in order; whether the other worktrees' jobs are stopped first, and those worktrees; whether the ports go unchecked; then the recap, which the fingerprint leaves out.
 type Plan struct {
-	Profile   string          `json:"profile"`
-	Worktrees []Target        `json:"worktrees"`
-	Exclusive bool            `json:"exclusive"`
-	Others    []Other         `json:"others"`
-	NoProbe   bool            `json:"no_probe"`
-	Owed      []teardown.Debt `json:"owed,omitempty"`
+	Profile   string           `json:"profile"`
+	Worktrees []runjobs.Target `json:"worktrees"`
+	Exclusive bool             `json:"exclusive"`
+	Others    []runjobs.Other  `json:"others"`
+	NoProbe   bool             `json:"no_probe"`
+	Owed      []teardown.Debt  `json:"owed,omitempty"`
 	domain.Recapped
 	correlationID string
 	facts         Facts
@@ -741,18 +232,14 @@ func (p Plan) recap() []domain.RecapRow {
 }
 
 // notStarted is the detail of t before its start: each job of its plan, none started.
-func (p Plan) notStarted(t Target) *Detail {
-	detail := &Detail{Path: t.Path, Profile: p.Profile, Jobs: make([]JobResult, 0, len(t.Jobs))}
-	for _, job := range t.Jobs {
-		detail.Jobs = append(detail.Jobs, JobResult{Name: job.Name, Kind: job.Kind, Status: JobNotStarted, Namespace: job.Namespace})
-	}
-	return detail
+func (p Plan) notStarted(t runjobs.Target) *Detail {
+	return &Detail{Path: t.Path, Profile: p.Profile, Jobs: t.NotStarted()}
 }
 
 // unchanged reports whether the plan starts nothing and stops nothing: every job is up already.
 func (p Plan) unchanged() bool {
 	for _, t := range p.Worktrees {
-		if slices.ContainsFunc(t.Jobs, func(job JobPlan) bool { return job.Action != ActionUp }) {
+		if slices.ContainsFunc(t.Jobs, func(job runjobs.JobPlan) bool { return job.Action != runjobs.ActionUp }) {
 			return false
 		}
 	}
@@ -760,11 +247,11 @@ func (p Plan) unchanged() bool {
 }
 
 // jobWords is how the recap names one job: its name, and what it does unless it starts.
-func jobWords(job JobPlan) string {
+func jobWords(job runjobs.JobPlan) string {
 	switch job.Action {
-	case ActionUp:
+	case runjobs.ActionUp:
 		return job.Name + " (up)"
-	case ActionJoin:
+	case runjobs.ActionJoin:
 		return job.Name + " (joined, in " + job.SharedIn + ")"
 	}
 	return job.Name
@@ -772,25 +259,6 @@ func jobWords(job JobPlan) string {
 
 // ----------------------------------------------------------------------------
 // The outcome
-
-// JobStatus is what became of one job of the start.
-type JobStatus string
-
-// The statuses of a job of the start.
-const (
-	JobStarted        JobStatus = "started"         // a service launched, or a stack its launcher brought up
-	JobAlreadyRunning JobStatus = "already_running" // a service already up, left as it is
-	JobJoined         JobStatus = "joined"          // a shared service the worktree holds
-	JobDone           JobStatus = "done"            // a task that ran to its end
-	JobFailed         JobStatus = "failed"          // a task that exited other than 0, or a job that could not start: the start of its worktree stops there
-	JobCrashed        JobStatus = "crashed"         // a service that started then ended before the start did
-	JobNotStarted     JobStatus = "not_started"     // a job the start of its worktree never reached
-)
-
-// JobStatuses returns every JobStatus.
-func JobStatuses() []JobStatus {
-	return []JobStatus{JobStarted, JobAlreadyRunning, JobJoined, JobDone, JobFailed, JobCrashed, JobNotStarted}
-}
 
 // The codes of the follow-ups of a start: its jobs' output, the stop of what it left up, and the start again where it did not pass.
 const (

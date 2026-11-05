@@ -1,2 +1,3 @@
+<T>  [wtm] started
 <T>  ready
 <T>  typed into its terminal

@@ -1,28 +1,15 @@
-// Package runup starts a profile of run.toml in worktrees of a repository, several at once: which worktrees and which profile the request settles on, what the other worktrees' jobs become, then each job in order through the run daemon, and what each became.
+// Package runup starts a profile of run.toml in worktrees of a repository, several at once: which worktrees and which profile the request settles on, what the other worktrees' jobs become, then each job in order through the run daemon (service/runjobs), and what each became.
 package runup
 
 import (
-	"cmp"
 	"context"
-	"errors"
-	"io/fs"
-	"maps"
-	"path/filepath"
-	"reflect"
 	"slices"
-	"strconv"
-	"strings"
 	"sync"
-	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
-	"github.com/LucasPcq/wtm/next/internal/domain/env"
-	"github.com/LucasPcq/wtm/next/internal/domain/project"
-	"github.com/LucasPcq/wtm/next/internal/domain/run"
-	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
-	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
+	"github.com/LucasPcq/wtm/next/internal/service/runjobs"
 	"github.com/LucasPcq/wtm/next/internal/service/teardown"
 )
 
@@ -38,20 +25,13 @@ const CodeConfigNotFound = Name + domain.ConfigNotFound
 // CodeConfigInvalid refuses a repository whose config.toml does not parse or validate.
 const CodeConfigInvalid = Name + domain.ConfigInvalid
 
-// A UseCase starts a profile in worktrees of one repository: the ports it reaches the repository, the run daemon and the loopback through, wtm's state (where each worktree's logs go), the repository's common directory (which the jobs' events name), how long it waits for a service to fail once launched when no port check waits, and the services it shares with the other commands.
+// A UseCase starts a profile in worktrees of one repository: the meta records it reads the ordinal a start numbered with from, and the services it shares with the other commands, the start of jobs among them.
 type UseCase struct {
-	Git        Git
 	Meta       Meta
-	EnvFiles   EnvFiles
-	Daemon     Daemon
-	Listening  Listening
-	StateDir   string
-	CommonDir  string
-	Settle     time.Duration
 	Repository repository.Service
 	Operations operation.Service
-	Provision  provision.Service
 	Teardown   teardown.Service
+	Jobs       runjobs.Service
 }
 
 // An Outcome is what Run did: the operation it ran under, the plan and its fingerprint, the warnings, and the Result of the apply, nil when nothing was applied (a dry run, or a refusal before the apply).
@@ -71,25 +51,22 @@ type Detail struct {
 	Owed    *teardown.Debt `json:"owed,omitempty"`
 }
 
-// A JobResult is what became of one job: its status, its URL, its log, the ports it binds and whether each answered, the namespace of a shared service's data the worktree holds, and for one that failed or crashed its exit code and last lines.
-type JobResult struct {
-	Name      string          `json:"name"`
-	Kind      project.JobKind `json:"kind"`
-	Status    JobStatus       `json:"status"`
-	URL       string          `json:"url,omitempty"`
-	Log       string          `json:"log,omitempty"`
-	Ports     []Port          `json:"ports,omitempty"`
-	Namespace string          `json:"namespace,omitempty"`
-	ExitCode  *int            `json:"exit_code,omitempty"`
-	Lines     []string        `json:"lines,omitempty"`
-}
+// A JobResult is what became of one job of the start (runjobs.JobResult), named here for run up's cli.
+type JobResult = runjobs.JobResult
 
-// A Port is a port a job declares, by its name, the number it binds, and whether something answered on it (nil when it was not checked).
-type Port struct {
-	Name      string `json:"name"`
-	Port      int    `json:"port"`
-	Listening *bool  `json:"listening"`
-}
+// JobStatus is what became of one job of the start (runjobs.JobStatus), named here for run up's cli.
+type JobStatus = runjobs.JobStatus
+
+// The statuses of a job of the start, as runjobs gives them.
+const (
+	JobStarted        = runjobs.JobStarted
+	JobAlreadyRunning = runjobs.JobAlreadyRunning
+	JobJoined         = runjobs.JobJoined
+	JobDone           = runjobs.JobDone
+	JobFailed         = runjobs.JobFailed
+	JobCrashed        = runjobs.JobCrashed
+	JobNotStarted     = runjobs.JobNotStarted
+)
 
 // Reached are the jobs of the start that answer at a URL: those it started or found running.
 func (d Detail) Reached() []JobResult {
@@ -177,7 +154,7 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 // Apply
 
 // CodeDaemonUnavailable fails a start that could not begin: the run daemon of this build could not be made sure of.
-const CodeDaemonUnavailable = Name + ".daemon_unavailable"
+const CodeDaemonUnavailable = Name + runjobs.DaemonUnavailable
 
 // The codes of the drops removed worktrees owed, paid by a start: one withdrawn (a worktree reaches its namespace again), one that failed, one the queue could not give up or take back.
 const (
@@ -188,9 +165,23 @@ const (
 )
 
 // CodeStopFailed warns of a worktree whose jobs an exclusive start could not stop.
-const CodeStopFailed = Name + ".stop_failed"
+const CodeStopFailed = Name + runjobs.StopFailed
 
-// Apply makes sure of a run daemon of this build, stops the other worktrees' jobs when the plan says so, then starts each worktree's jobs, the worktrees at once, each one's in order; a worktree that fails stops none of the others. Then the drops owed the plan pays are made (teardown.Service.Pay). Once ctx is cancelled, the jobs the daemon took keep running and the jobs not reached are not started. The items keep the plan's order.
+// The codes of what becomes of a worktree: it could not be numbered, its environment could not be read, a job failed to start or a task failed, a service crashed once started.
+const (
+	CodeUnnumbered     = Name + runjobs.Unnumbered
+	CodeEnvUnavailable = Name + runjobs.EnvUnavailable
+	CodeJobFailed      = Name + runjobs.JobFailure
+	CodeCrashed        = Name + runjobs.Crashed
+)
+
+// The codes of the warnings of a worktree: a port nothing answered on, a namespace its record could not keep.
+const (
+	CodePortSilent          = Name + runjobs.PortSilent
+	CodeNamespaceUnrecorded = Name + runjobs.NamespaceUnrecorded
+)
+
+// Apply makes sure of a run daemon of this build, stops the other worktrees' jobs when the plan says so, then starts each worktree's jobs (runjobs.Service.Start), the worktrees at once, each one's in order; a worktree that fails stops none of the others. Then the drops owed the plan pays are made (teardown.Service.Pay). Once ctx is cancelled, the jobs the daemon took keep running and the jobs not reached are not started. The items keep the plan's order.
 func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Result {
 	// The worktrees report from several goroutines; a surface draws one event at a time.
 	var mu sync.Mutex
@@ -201,21 +192,14 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 	}
 
 	items := make([]Item, len(plan.Worktrees))
-	if err := u.Daemon.Ensure(ctx); err != nil {
-		failure := u.daemonFailure(err)
+	if failure := u.Jobs.Ensure(ctx, Name, u.Repository.Restart); failure != nil {
 		for i, t := range plan.Worktrees {
 			items[i] = Item{Subject: t.Worktree, Status: domain.StatusFailed, Err: failure, Detail: plan.notStarted(t)}
 		}
-		unpaid, _ := u.Teardown.Pay(canceled(ctx), teardown.PayParams{Command: Name, Facts: plan.facts.teardown(), Debts: plan.Owed})
-		return Result{Items: append(items, paidItems(unpaid)...)}
+		return Result{Items: append(items, paidItems(teardown.Unpaid(plan.Owed))...)}
 	}
 
-	var warnings []domain.Warning
-	for _, other := range plan.Others {
-		if _, err := u.Daemon.StopAll(ctx, run.StopAll{WorkDir: other.Path, CorrelationID: plan.correlationID}); err != nil {
-			warnings = append(warnings, domain.Warning{Code: CodeStopFailed, Message: "couldn't stop the jobs of " + other.Worktree + ": " + err.Error(), Params: domain.Params{"worktree": other.Worktree}})
-		}
-	}
+	warnings := u.Jobs.StopOthers(ctx, runjobs.StopOthersParams{Command: Name, Others: plan.Others, CorrelationID: plan.correlationID})
 
 	var wg sync.WaitGroup
 	for i, t := range plan.Worktrees {
@@ -229,6 +213,12 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 	return Result{Items: append(items, paidItems(paid)...), Warnings: append(warnings, withdrawn...), FollowUps: plan.next(items)}
 }
 
+// start starts the profile's jobs in t, its item what became of them.
+func (u UseCase) start(ctx context.Context, plan Plan, t runjobs.Target, report domain.Report) Item {
+	started := u.Jobs.Start(ctx, runjobs.StartParams{Command: Name, Facts: plan.facts.Facts, Target: t, Profile: plan.Profile, NoProbe: plan.NoProbe, CorrelationID: plan.correlationID, Report: report})
+	return Item{Subject: t.Worktree, Status: started.Status, Reason: started.Reason, Err: started.Err, Warnings: started.Warnings, Detail: &Detail{Path: t.Path, Profile: plan.Profile, Jobs: started.Jobs}}
+}
+
 // paidItems are the drops owed a start paid, an item each, its subject the namespace.
 func paidItems(paid []teardown.Paid) []Item {
 	items := make([]Item, 0, len(paid))
@@ -236,13 +226,6 @@ func paidItems(paid []teardown.Paid) []Item {
 		items = append(items, Item{Subject: p.Debt.Name, Status: p.Status, Reason: p.Reason, Err: p.Err, Warnings: p.Warnings, Detail: &Detail{Jobs: []JobResult{}, Owed: &p.Debt}})
 	}
 	return items
-}
-
-// canceled is a context already done, under which Pay reaches no debt: no job started, so none is paid.
-func canceled(ctx context.Context) context.Context {
-	done, cancel := context.WithCancel(ctx)
-	cancel()
-	return done
 }
 
 // renumbered is plan with each worktree the start numbered planned again from the ordinal it now records, so the outcome's plan names the ports and namespaces its detail reports.
@@ -257,24 +240,10 @@ func (u UseCase) renumbered(plan Plan) Plan {
 			continue
 		}
 		t.Numbered = true
-		worktrees[i] = plan.facts.plan(t, plan.facts.jobsOf(plan.Profile), record.Ordinal)
+		worktrees[i] = plan.facts.Planned(t, plan.facts.jobsOf(plan.Profile), record.Ordinal)
 	}
 	plan.Worktrees = worktrees
 	return plan
-}
-
-// daemonFailure is why no job could start: a daemon of another build holding jobs, followed by its restart, or the daemon not starting.
-func (u UseCase) daemonFailure(err error) *domain.Error {
-	if refused, ok := errors.AsType[*run.Error](err); ok && (refused.Code == run.CodeSkew || refused.Code == run.CodeLegacy) {
-		skew := run.SkewBuild
-		if refused.Code == run.CodeLegacy {
-			skew = run.SkewLegacy
-		}
-		failure := skewRefusal(&run.Skewed{Skew: skew}, u.Repository.Restart)
-		failure.Message, failure.Cause = "nothing started: "+refused.Message, err
-		return failure
-	}
-	return domain.AsError(domain.AsErrorParams{Err: err, Code: CodeDaemonUnavailable, Message: "couldn't reach the run daemon"})
 }
 
 // ----------------------------------------------------------------------------
@@ -295,462 +264,18 @@ func (u UseCase) Questions(ctx context.Context, req Request) (Questions, error) 
 
 // The codes of a repository run up cannot start in: run.toml does not exist (followed by run init), or does not load.
 const (
-	CodeNotInitialized = Name + ".not_initialized"
-	CodeInit           = Name + ".init"
-	CodeRunInvalid     = Name + ".run_invalid"
+	CodeNotInitialized = Name + runjobs.NotInitialized
+	CodeInit           = Name + runjobs.RunInit
+	CodeRunInvalid     = Name + runjobs.RunInvalid
 )
 
-// commandRunInit sets the run module up in a repository: not migrated yet.
-const commandRunInit = "run init"
-
-// Observe reads what run up decides from: the project's config and its run.toml, the repository's snapshot, the meta record of each worktree, which worktrees' directory is gone, where the caller stands, and the jobs the run daemon runs, never starting it. A repository with no wtm config is refused with CodeConfigNotFound, one with no run.toml with CodeNotInitialized.
+// Observe reads what run up decides from: the project's config and its run.toml, the repository's snapshot, and what a start decides from besides (runjobs.Service.Observe), never starting the run daemon. A repository with no wtm config is refused with CodeConfigNotFound, one with no run.toml with CodeNotInitialized.
 func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	repo, err := u.Repository.Observe(ctx, Name)
 	if err != nil {
 		return Facts{}, err
 	}
-	if repo.RunErr != nil {
-		return Facts{}, &domain.Error{Kind: domain.KindPrecondition, Code: CodeRunInvalid, Message: "invalid run.toml: " + repo.RunErr.Error()}
-	}
-	if !repo.Run.Declared {
-		return Facts{}, &domain.Error{Kind: domain.KindPrecondition, Code: CodeNotInitialized, Message: "no run.toml: nothing to start", FollowUp: &domain.FollowUp{Command: commandRunInit, Code: CodeInit, Message: "declare the jobs"}}
-	}
 
-	facts := Facts{Repository: repo, Records: map[string]worktree.Meta{}, RecordErrs: map[string]error{}, Gone: map[string]bool{}}
-	for _, w := range repo.Checkouts() {
-		if facts.Gone[w.Path], err = repository.Gone(ctx, u.Git, w); err != nil {
-			return Facts{}, repository.Interrupted(ctx, err)
-		}
-		if w.Branch() == "" {
-			continue
-		}
-		record, err := u.Meta.Load(w.Branch())
-		switch {
-		case err == nil:
-			facts.Records[w.Branch()] = record
-		case !errors.Is(err, fs.ErrNotExist):
-			facts.RecordErrs[w.Branch()] = err
-		}
-	}
-
-	cwd, err := repository.Located(ctx, u.Git, req.Caller.Cwd, domain.Caller{})
-	if err != nil {
-		return Facts{}, err
-	}
-	facts.Cwd = cmp.Or(cwd, req.Caller.Cwd)
-
-	facts.Jobs, facts.JobsErr = u.Daemon.Jobs(ctx)
-	facts.Owed = u.Teardown.Owing()
-	if skewed, ok := errors.AsType[*run.Skewed](facts.JobsErr); ok {
-		facts.Skewed, facts.JobsErr = skewed, nil
-	}
-	return facts, ctx.Err()
-}
-
-// ----------------------------------------------------------------------------
-// The steps of Apply
-
-// The codes of what becomes of a worktree: it could not be numbered, its environment could not be read, a job failed to start or a task failed, a service crashed once started.
-const (
-	CodeUnnumbered     = Name + ".unnumbered"
-	CodeEnvUnavailable = Name + ".env_unavailable"
-	CodeJobFailed      = Name + ".job_failed"
-	CodeCrashed        = Name + ".crashed"
-)
-
-// The codes of the warnings of a worktree: a port nothing answered on, a namespace its record could not keep.
-const (
-	CodePortSilent          = Name + ".port_silent"
-	CodeNamespaceUnrecorded = Name + ".namespace_unrecorded"
-)
-
-// defaultProbe is how long a start waits for the ports its services declare when run.toml does not say.
-const defaultProbe = 15 * time.Second
-
-// starting is one worktree's start under way: what it starts from, and its item.
-type starting struct {
-	UseCase
-	plan     Plan
-	target   Target
-	report   domain.Report
-	item     Item
-	launched time.Time // when the last job was launched
-	ordinal  int
-	env      map[string]string
-	shared   *run.Shared
-}
-
-// start starts the jobs of t, in order, between its unit's events: it numbers the worktree first when it has no ordinal, reads its environment, starts each job (a task to its end), stops at the first that fails, then checks the ports its services declare and that none of them ended since.
-func (u UseCase) start(ctx context.Context, plan Plan, t Target, report domain.Report) Item {
-	s := &starting{UseCase: u, plan: plan, target: t, report: report, item: Item{Subject: t.Worktree, Detail: plan.notStarted(t)}}
-	if ctx.Err() != nil {
-		s.item.Status, s.item.Reason = domain.StatusSkipped, domain.ReasonNotReached
-		return s.item
-	}
-
-	report(domain.UnitStarted{Subject: t.Worktree})
-	defer func() { report(domain.UnitFinished{Subject: s.item.Subject, Status: s.item.Status}) }()
-
-	if err := s.prepare(ctx); err != nil {
-		s.item.Status, s.item.Err = domain.StatusFailed, err
-		return s.item
-	}
-	for i := range t.Jobs {
-		if ctx.Err() != nil {
-			s.item.Status, s.item.Reason = domain.StatusCancelled, domain.ReasonInterrupted
-			return s.item
-		}
-		if !s.job(ctx, i) {
-			return s.item
-		}
-	}
-
-	s.check(ctx)
-	switch {
-	case s.item.Status != "":
-	case ctx.Err() != nil:
-		s.item.Status, s.item.Reason = domain.StatusCancelled, domain.ReasonInterrupted
-	default:
-		s.item.Status = domain.StatusDone
-	}
-	if s.item.Status == domain.StatusDone && !slices.ContainsFunc(s.item.Detail.Jobs, func(job JobResult) bool { return job.Status != JobAlreadyRunning }) {
-		s.item.Reason = domain.ReasonUnchanged
-	}
-	return s.item
-}
-
-// prepare numbers the worktree when it has none, then reads its environment and, for a shared job, the main checkout's.
-func (s *starting) prepare(ctx context.Context) *domain.Error {
-	ordinal := s.plan.facts.ordinalOf(s.target)
-	if !s.target.Numbered {
-		numbered, err := s.Provision.Number(ctx, s.target.Branch)
-		if err != nil {
-			return domain.AsError(domain.AsErrorParams{Err: err, Code: CodeUnnumbered, Message: "couldn't number " + s.target.Worktree + ": its ports are unknown"})
-		}
-		ordinal = numbered
-		// Its ports and namespaces were unknown to the plan: they are the ordinal's now.
-		s.target.Numbered = true
-		s.target = s.plan.facts.plan(s.target, s.plan.facts.jobsOf(s.plan.Profile), ordinal)
-		for i, job := range s.target.Jobs {
-			s.item.Detail.Jobs[i].Namespace = job.Namespace
-		}
-	}
-	s.ordinal = ordinal
-
-	var err error
-	if s.env, err = env.ReadHookEnv(s.plan.facts.jobParams(s.target, ordinal), s.target.Path, s.EnvFiles.Read); err != nil {
-		return domain.AsError(domain.AsErrorParams{Err: err, Code: CodeEnvUnavailable, Message: "couldn't read " + s.target.Worktree + "'s environment"})
-	}
-	if !slices.ContainsFunc(s.target.Jobs, func(job JobPlan) bool { return s.plan.facts.shared(job.Name) }) {
-		return nil
-	}
-	main := s.plan.facts.mainTarget()
-	mainEnv, err := env.ReadHookEnv(s.plan.facts.jobParams(main, 0), main.Path, s.EnvFiles.Read)
-	if err != nil {
-		return domain.AsError(domain.AsErrorParams{Err: err, Code: CodeEnvUnavailable, Message: "couldn't read the main checkout's environment"})
-	}
-	s.shared = &run.Shared{WorkDir: main.Path, Env: mainEnv, LogDir: run.LogDir(s.StateDir, main.Branch)}
-	return nil
-}
-
-// job starts the job at index of the worktree between its phase's events, its lines reported as they come, and reports whether the start goes on: a failure, or a cancel, stops it.
-func (s *starting) job(ctx context.Context, index int) bool {
-	planned, result := s.target.Jobs[index], &s.item.Detail.Jobs[index]
-	declared, _ := s.plan.facts.declared(planned.Name)
-	spec := s.spec(s.plan.facts.effective(declared))
-
-	var lines tail
-	result.Log = s.logFile(spec)
-	s.report(domain.PhaseStarted{Subject: s.target.Worktree, Phase: domain.PhaseJob, Job: planned.Name, Log: result.Log})
-	started, err := s.Daemon.Start(ctx, spec, func(line run.Line) {
-		lines.add(line.Text)
-		s.report(domain.Output{Subject: s.target.Worktree, Job: planned.Name, Line: line.Text})
-	})
-	s.launched = time.Now()
-	refused, _ := errors.AsType[*run.Error](err)
-	up := refused != nil && refused.Code == run.CodeJobRunning && declared.Kind != project.Task
-	s.report(domain.PhaseFinished{Subject: s.target.Worktree, Phase: domain.PhaseJob, Job: planned.Name, Failed: err != nil && !up})
-
-	result.URL, result.Ports = started.URL, resultPorts(planned.Ports)
-	switch {
-	case up:
-		result.Status, result.URL = JobAlreadyRunning, s.plan.facts.urlOf(planned.Name, s.target.Path)
-	case err != nil && ctx.Err() != nil:
-		// The start was cut short: the daemon says whether it took it, and what it took keeps running.
-		s.item.Status, s.item.Reason = domain.StatusCancelled, domain.ReasonInterrupted
-		if now, ran := s.ran(planned.Name); ran {
-			s.became(result, now, declared)
-			if result.Status == JobJoined {
-				s.recordNamespace(ctx, declared)
-			}
-		}
-		return false
-	case err != nil:
-		result.Status, result.Lines = JobFailed, lines
-		if refused != nil {
-			result.ExitCode = refused.ExitCode
-		}
-		s.item.Status, s.item.Err = domain.StatusFailed, jobFailure(planned.Name, err, result.ExitCode)
-		return false
-	case declared.Kind == project.Task:
-		result.Status = JobDone
-	case planned.Action == ActionJoin:
-		result.Status = JobJoined
-		s.recordNamespace(ctx, declared)
-	default:
-		result.Status = JobStarted
-	}
-	return true
-}
-
-// ranWithin bounds how long a start cut short asks the daemon whether it ran the job.
-const ranWithin = 2 * time.Second
-
-// ran returns the job of name as the daemon now lists it in the worktree, and whether this start ran it: listed, and not as it stood when the start was planned (a task that ran to its end within the start is listed ended, no longer up).
-func (s *starting) ran(name string) (run.Job, bool) {
-	ctx, cancel := context.WithTimeout(context.Background(), ranWithin)
-	defer cancel()
-	jobs, err := s.Daemon.Jobs(ctx)
-	if _, skewed := errors.AsType[*run.Skewed](err); err != nil && !skewed {
-		return run.Job{}, false
-	}
-	now, listed := s.listing(jobs, name)
-	before, was := s.listing(s.plan.facts.Jobs, name)
-	return now, listed && (!was || !reflect.DeepEqual(now, before))
-}
-
-// listing is the job of name jobs list in the worktree, and whether they list it.
-func (s *starting) listing(jobs []run.Job, name string) (run.Job, bool) {
-	at := slices.IndexFunc(jobs, func(job run.Job) bool { return job.Name == name && job.WorkDir == s.target.Path })
-	if at < 0 {
-		return run.Job{}, false
-	}
-	return jobs[at], true
-}
-
-// became is what the job the start ran became, as the daemon lists it now: up, started or joined; a task ended, done or failed by its exit code; a service ended, crashed.
-func (s *starting) became(result *JobResult, now run.Job, declared project.Job) {
-	result.ExitCode = now.ExitCode
-	switch {
-	case now.Up && declared.Scope == project.Shared && !s.target.Main:
-		result.Status = JobJoined
-	case now.Up:
-		result.Status, result.ExitCode = JobStarted, nil
-	case declared.Kind == project.Task && (now.ExitCode == nil || *now.ExitCode == 0):
-		result.Status = JobDone
-	case declared.Kind == project.Task:
-		result.Status = JobFailed
-	default:
-		result.Status = JobCrashed
-	}
-}
-
-func jobFailure(job string, err error, exitCode *int) *domain.Error {
-	params := domain.Params{"job": job}
-	if exitCode != nil {
-		params["exit_code"] = strconv.Itoa(*exitCode)
-	}
-	return &domain.Error{Kind: domain.KindInternal, Code: CodeJobFailed, Message: job + " failed: " + err.Error(), Params: params}
-}
-
-// spec is what the daemon is asked to start job with: the worktree's environment, its log directory, the names the proxy serves it under, the main checkout of a shared job, and the origin its events name.
-func (s *starting) spec(job project.Job) run.Spec {
-	spec := run.Spec{
-		Job:     job,
-		Profile: s.plan.Profile,
-		WorkDir: s.target.Path,
-		Env:     withPorts(s.env, s.plan.facts.jobParams(s.target, s.ordinal).JobPorts(job)),
-		Unset:   env.NotInherited(s.plan.facts.Run),
-		LogDir:  run.LogDir(s.StateDir, s.target.Branch),
-		Origin:  &run.Origin{Root: s.plan.facts.MainPath, CommonDir: s.CommonDir, Branch: s.target.Branch, CorrelationID: s.plan.correlationID},
-		Routes:  s.routes(job),
-	}
-	if job.Scope == project.Shared && s.shared != nil {
-		shared := *s.shared
-		shared.Env = withPorts(shared.Env, s.plan.facts.jobParams(s.plan.facts.mainTarget(), 0).JobPorts(job))
-		spec.Shared = &shared
-	}
-	return spec
-}
-
-// withPorts is jobEnv with each of ports spelled, a copy.
-func withPorts(jobEnv map[string]string, ports map[string]int) map[string]string {
-	spelled := maps.Clone(jobEnv)
-	for name, port := range ports {
-		spelled[name] = strconv.Itoa(port)
-	}
-	return spelled
-}
-
-// routes are the names the proxy serves job under: its own and those of the jobs it runs, each that publishes a url.
-func (s *starting) routes(job project.Job) []run.Route {
-	var routes []run.Route
-	repo := filepath.Base(s.plan.facts.MainPath)
-	for _, routed := range append([]project.Job{job}, s.plan.facts.children(job)...) {
-		host := env.RouteHost(env.RouteHostParams{Job: routed, Slug: s.env[env.WorktreeKey], Project: repo})
-		if host != "" {
-			routes = append(routes, run.Route{Job: routed.Name, Host: host, Port: routed.URL.Port})
-		}
-	}
-	return routes
-}
-
-// logFile is the log the job spec starts writes to, none when it keeps none.
-func (s *starting) logFile(spec run.Spec) string {
-	dir := spec.LogDir
-	if spec.Shared != nil {
-		dir = spec.Shared.LogDir
-	}
-	if dir == "" {
-		return ""
-	}
-	return filepath.Join(dir, spec.Job.Name+".log")
-}
-
-// recordNamespace records in the worktree's meta record that it holds a namespace of job's data, which clean drops with it, a cancel notwithstanding: the daemon made it; a record it cannot keep is a warning.
-func (s *starting) recordNamespace(ctx context.Context, job project.Job) {
-	ctx = context.WithoutCancel(ctx)
-	if _, made, _ := env.NamespaceFor(job, s.env); !made || s.target.Branch == "" {
-		return
-	}
-	_, err := s.Meta.Update(ctx, worktree.MetaUpdate{Branch: s.target.Branch, Change: func(meta *worktree.Meta) error {
-		if !slices.Contains(meta.Namespaces, job.Name) {
-			meta.Namespaces = append(meta.Namespaces, job.Name)
-		}
-		return nil
-	}})
-	if err != nil {
-		s.item.Warnings = append(s.item.Warnings, domain.Warning{Code: CodeNamespaceUnrecorded, Message: s.target.Worktree + "'s record does not keep its namespace of " + job.Name + ", which clean will not drop: " + err.Error(), Params: domain.Params{"worktree": s.target.Worktree, "job": job.Name}})
-	}
-}
-
-// check waits for the ports the services started declare to answer, the check run.toml and the request allow, and at least a moment since the last launch for a service that fails at once to end, then asks the daemon which of them ended since: each fails the worktree, crashed; each port nothing answered on is a warning.
-func (s *starting) check(ctx context.Context) {
-	var probed []int
-	for i, job := range s.target.Jobs {
-		result := s.item.Detail.Jobs[i]
-		declared, _ := s.plan.facts.declared(job.Name)
-		if result.Status == JobStarted && declared.Kind != project.Task && !declared.NoProbe && !declared.BindsNoPort {
-			probed = append(probed, sortedPorts(job.Ports)...)
-		}
-	}
-	if within := s.probeBudget(); len(probed) > 0 && within > 0 {
-		answered := s.Listening(ctx, probed, within)
-		// A check cut short says nothing of the ports it did not reach.
-		if ctx.Err() != nil {
-			return
-		}
-		s.markPorts(answered)
-	}
-	sleep(ctx, s.Settle-time.Since(s.launched))
-	if ctx.Err() != nil {
-		return
-	}
-
-	jobs, err := s.Daemon.Jobs(ctx)
-	if _, skewed := errors.AsType[*run.Skewed](err); err != nil && !skewed {
-		return
-	}
-	for i := range s.item.Detail.Jobs {
-		result := &s.item.Detail.Jobs[i]
-		if result.Status != JobStarted {
-			continue
-		}
-		at := slices.IndexFunc(jobs, func(job run.Job) bool { return job.Name == result.Name && job.WorkDir == s.target.Path })
-		if at < 0 || jobs[at].Up || jobs[at].State != run.Crashed {
-			continue
-		}
-		result.Status, result.ExitCode = JobCrashed, jobs[at].ExitCode
-		if last := jobs[at].LastLine; last != nil {
-			result.Lines = []string{last.Text}
-		}
-		if s.item.Err == nil {
-			s.item.Status, s.item.Err = domain.StatusFailed, &domain.Error{Kind: domain.KindInternal, Code: CodeCrashed, Message: result.Name + " crashed once started", Params: domain.Params{"job": result.Name}}
-		}
-	}
-}
-
-// probeBudget is how long the ports are waited for: run.toml's port_probe_timeout, 15 seconds when it says none, none when it is below 0 or the request skips the check.
-func (s *starting) probeBudget() time.Duration {
-	switch timeout := s.plan.facts.Run.PortProbeTimeout; {
-	case s.plan.NoProbe, timeout < 0:
-		return 0
-	case timeout == 0:
-		return defaultProbe
-	default:
-		return time.Duration(timeout) * time.Second
-	}
-}
-
-// markPorts records which ports of the services started answered, and warns of each job one of whose ports none did; a job run.toml keeps out of the check (probe = false, binds_no_port) is left unchecked.
-func (s *starting) markPorts(answered map[int]bool) {
-	for i := range s.item.Detail.Jobs {
-		result := &s.item.Detail.Jobs[i]
-		if declared, _ := s.plan.facts.declared(result.Name); declared.NoProbe || declared.BindsNoPort {
-			continue
-		}
-		var silent []string
-		for p := range result.Ports {
-			port := &result.Ports[p]
-			listening := answered[port.Port]
-			if result.Status != JobStarted {
-				continue
-			}
-			port.Listening = &listening
-			if !listening {
-				silent = append(silent, port.Name+" "+strconv.Itoa(port.Port))
-			}
-		}
-		if len(silent) > 0 {
-			s.item.Warnings = append(s.item.Warnings, domain.Warning{Code: CodePortSilent, Message: result.Name + " started, but nothing answers on " + strings.Join(silent, ", "), Params: domain.Params{"worktree": s.target.Worktree, "job": result.Name, "ports": strings.Join(silent, ", ")}})
-		}
-	}
-}
-
-// ----------------------------------------------------------------------------
-// Helpers
-
-// mainTarget is the main worktree, as a start in it would be planned.
-func (f Facts) mainTarget() Target {
-	for _, w := range f.Worktrees {
-		if w.Main {
-			return Target{Worktree: w.Name(), Branch: w.Branch(), Path: w.Path, Main: true, Numbered: true}
-		}
-	}
-	return Target{Path: f.MainPath, Main: true, Numbered: true}
-}
-
-// resultPorts are the ports of a job's plan as its result reports them, by name, not yet checked.
-func resultPorts(ports map[string]int) []Port {
-	if len(ports) == 0 {
-		return nil
-	}
-	found := make([]Port, 0, len(ports))
-	for _, name := range slices.Sorted(maps.Keys(ports)) {
-		found = append(found, Port{Name: name, Port: ports[name]})
-	}
-	return found
-}
-
-func sleep(ctx context.Context, d time.Duration) {
-	if d <= 0 {
-		return
-	}
-	select {
-	case <-ctx.Done():
-	case <-time.After(d):
-	}
-}
-
-// tailLines is how many of its last lines a job that failed keeps.
-const tailLines = 20
-
-// A tail keeps the last lines a job printed.
-type tail []string
-
-func (t *tail) add(line string) {
-	*t = append(*t, line)
-	if len(*t) > tailLines {
-		*t = (*t)[len(*t)-tailLines:]
-	}
+	facts, err := u.Jobs.Observe(ctx, runjobs.ObserveParams{Command: Name, Repository: repo, Cwd: req.Caller.Cwd})
+	return Facts{Facts: facts}, err
 }

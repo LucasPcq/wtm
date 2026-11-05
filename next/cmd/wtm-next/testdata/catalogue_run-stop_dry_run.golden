@@ -1,0 +1,61 @@
+{
+  "v": 2,
+  "command": "run-stop",
+  "ok": true,
+  "op": "<id>",
+  "plan": {
+    "job": "idle",
+    "worktrees": [
+      {
+        "worktree": "main",
+        "branch": "main",
+        "path": "<root>/main",
+        "jobs": [
+          {
+            "name": "idle",
+            "kind": "service",
+            "hold": "own",
+            "fate": "stop"
+          }
+        ]
+      }
+    ],
+    "recap": [
+      {
+        "key": "worktrees",
+        "label": "Worktrees",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "main",
+            "text": "main"
+          }
+        ]
+      },
+      {
+        "key": "job",
+        "label": "Job",
+        "path": "job",
+        "values": [
+          {
+            "value": "idle",
+            "text": "idle"
+          }
+        ]
+      },
+      {
+        "key": "stop",
+        "label": "Stops",
+        "values": [
+          {
+            "value": "idle",
+            "text": "idle"
+          }
+        ]
+      }
+    ]
+  },
+  "fingerprint": "<id>",
+  "follow_ups": [],
+  "warnings": []
+}

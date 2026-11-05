@@ -223,7 +223,7 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	}
 	facts.JobsErr, facts.PRsErr, facts.PullRequests = answered.JobsErr, answered.PRsErr, answered.PullRequests
 	if answered.Skewed != nil {
-		skew := repository.SkewWarning(repository.SkewWarningParams{Command: Name, Skewed: answered.Skewed, Restart: u.Repository.Restart})
+		skew := domain.SkewWarning(domain.SkewWarningParams{Command: Name, Skewed: answered.Skewed, Restart: u.Repository.Restart})
 		facts.Skew = &skew
 	}
 	facts.Behind = repository.Behind(ctx, u.Git, repo, facts.PullRequests, linked)

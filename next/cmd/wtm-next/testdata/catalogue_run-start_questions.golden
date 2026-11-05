@@ -1,0 +1,92 @@
+{
+  "fields": [
+    {
+      "kind": "select",
+      "path": "worktree",
+      "origin": "request",
+      "value": "main",
+      "options": [
+        {
+          "value": "main",
+          "tag": "current"
+        }
+      ],
+      "rememberable": false,
+      "remember": false,
+      "refreshable": false,
+      "closed": false
+    },
+    {
+      "kind": "select",
+      "path": "job",
+      "value": "seed",
+      "options": [
+        {
+          "value": "seed",
+          "kind": "task"
+        }
+      ],
+      "rememberable": false,
+      "remember": false,
+      "refreshable": false,
+      "closed": false
+    },
+    {
+      "kind": "confirm",
+      "path": "exclusive",
+      "origin": "default",
+      "skip": "task",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "force",
+      "origin": "default",
+      "skip": "safe",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "restart",
+      "skip": "flag_only",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "parallel",
+      "skip": "flag_only",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "no_probe",
+      "skip": "flag_only",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "detach",
+      "skip": "flag_only",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    }
+  ],
+  "problems": []
+}

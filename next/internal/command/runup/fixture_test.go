@@ -23,6 +23,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/service/operationtest"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
+	"github.com/LucasPcq/wtm/next/internal/service/runjobs"
 	"github.com/LucasPcq/wtm/next/internal/service/teardown"
 )
 
@@ -144,23 +145,12 @@ func newWorld(t *testing.T) *world {
 	w.record(t, verbatim, worktree.Meta{SourceBranch: "main", Isolation: project.Verbatim})
 
 	ids := 0
+	teardowns := teardown.Service{EnvFiles: store.EnvFiles{}, Daemon: w.daemon, Owed: store.Owed{StateDir: stateDir}, RunHooks: func(_ context.Context, chain env.HookChain) error {
+		*w.drops = append(*w.drops, chain)
+		return nil
+	}}
 	w.usecase = runup.UseCase{
-		Git:      repo,
-		Meta:     meta,
-		EnvFiles: store.EnvFiles{},
-		Daemon:   w.daemon,
-		Listening: func(_ context.Context, ports []int, _ time.Duration) map[int]bool {
-			if w.onListen != nil {
-				w.onListen()
-			}
-			answered := map[int]bool{}
-			for _, port := range ports {
-				answered[port] = !slices.Contains(w.silent, port)
-			}
-			return answered
-		},
-		StateDir:   stateDir,
-		CommonDir:  filepath.Join(main, ".git"),
+		Meta:       meta,
 		Repository: repository.Service{Config: config.Project{StateDir: stateDir, GlobalPath: filepath.Join(root, "no-global.toml")}, Git: repo, MainPath: main, Restart: &domain.FollowUp{Command: "run daemon restart"}},
 		Operations: operation.Service{
 			Locker:    locks{oplock.Locks{StateDir: stateDir}},
@@ -171,11 +161,28 @@ func newWorld(t *testing.T) *world {
 			},
 			Now: func() time.Time { return startedAt },
 		},
-		Provision: provision.Service{Git: repo, Meta: meta},
-		Teardown: teardown.Service{EnvFiles: store.EnvFiles{}, Daemon: w.daemon, Owed: store.Owed{StateDir: stateDir}, RunHooks: func(_ context.Context, chain env.HookChain) error {
-			*w.drops = append(*w.drops, chain)
-			return nil
-		}},
+		Teardown: teardowns,
+		Jobs: runjobs.Service{
+			Meta:     meta,
+			EnvFiles: store.EnvFiles{},
+			Daemon:   w.daemon,
+			Listening: func(_ context.Context, ports []int, _ time.Duration) map[int]bool {
+				if w.onListen != nil {
+					w.onListen()
+				}
+				answered := map[int]bool{}
+				for _, port := range ports {
+					answered[port] = !slices.Contains(w.silent, port)
+				}
+				return answered
+			},
+			StateDir:  stateDir,
+			CommonDir: filepath.Join(main, ".git"),
+			Gone:      repository.GoneIn(repo),
+			Located:   repository.LocatedIn(repo),
+			Number:    provision.Service{Git: repo, Meta: meta}.Number,
+			Owing:     teardowns.Owing,
+		},
 	}
 	return w
 }

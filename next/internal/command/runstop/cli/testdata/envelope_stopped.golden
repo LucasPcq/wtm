@@ -1,0 +1,95 @@
+{
+  "v": 2,
+  "command": "run-stop",
+  "ok": true,
+  "op": "op-1",
+  "items": [
+    {
+      "subject": "feat/a",
+      "status": "done",
+      "detail": {
+        "path": "/repo/wt-feat-a",
+        "jobs": [
+          {
+            "name": "api",
+            "status": "stopped"
+          }
+        ]
+      }
+    }
+  ],
+  "plan": {
+    "job": "api",
+    "worktrees": [
+      {
+        "worktree": "feat/a",
+        "branch": "feat/a",
+        "path": "/repo/wt-feat-a",
+        "jobs": [
+          {
+            "name": "api",
+            "kind": "service",
+            "hold": "own",
+            "fate": "stop"
+          }
+        ]
+      }
+    ],
+    "recap": [
+      {
+        "key": "worktrees",
+        "label": "Worktrees",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/a",
+            "text": "feat/a"
+          }
+        ]
+      },
+      {
+        "key": "job",
+        "label": "Job",
+        "path": "job",
+        "values": [
+          {
+            "value": "api",
+            "text": "api"
+          }
+        ]
+      },
+      {
+        "key": "stop",
+        "label": "Stops",
+        "values": [
+          {
+            "value": "api",
+            "text": "api"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [
+    {
+      "command": "run-start",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/a"
+          ]
+        },
+        {
+          "path": "job",
+          "values": [
+            "api"
+          ]
+        }
+      ],
+      "code": "run-stop.start",
+      "message": "start it again"
+    }
+  ],
+  "warnings": []
+}

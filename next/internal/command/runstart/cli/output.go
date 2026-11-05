@@ -1,0 +1,114 @@
+package cli
+
+import (
+	"fmt"
+	"io"
+	"slices"
+
+	"github.com/LucasPcq/wtm/next/internal/command/runstart"
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/ui/output"
+)
+
+const addressesTitle = "Addresses"
+
+// drawOutcome draws the conclusion of the start: the tally, the plan but the drops owed it planned, where the job answers, each drop owed made, and for a start that failed the last lines and the log of the job.
+func drawOutcome(w io.Writer, outcome runstart.Outcome, view output.View) {
+	outcome.Plan.Recap = slices.DeleteFunc(slices.Clone(outcome.Plan.Recap), func(row domain.RecapRow) bool { return row.Key == runstart.RecapOwed })
+	block := func(w io.Writer) {
+		addresses(outcome)(w)
+		drawPaid(w, outcome.Result.Items)
+	}
+	output.DrawApplied(w, outcome, output.AppliedParams{Command: Use, View: view, Noun: owedNoun(outcome.Result.Items), Block: block, Excerpt: excerpt(outcome)})
+}
+
+// owedNoun counts the drops owed the start paid by their noun, apart from the worktrees it started in.
+func owedNoun(items []runstart.Item) func(subject string) string {
+	return func(subject string) string {
+		at := slices.IndexFunc(items, func(item runstart.Item) bool { return item.Subject == subject })
+		if at < 0 || items[at].Detail == nil || items[at].Detail.Owed == nil {
+			return ""
+		}
+		return owedDrop
+	}
+}
+
+// owedDrop is how the tally counts a drop owed.
+const owedDrop = "owed drop"
+
+// drawPaid draws a line for each drop owed the start made.
+func drawPaid(w io.Writer, items []runstart.Item) {
+	first := true
+	for _, item := range items {
+		if item.Detail == nil || item.Detail.Owed == nil || item.Status != domain.StatusDone {
+			continue
+		}
+		if first {
+			output.Blank(w)
+			first = false
+		}
+		debt := item.Detail.Owed
+		output.SuccessLine(w, "dropped "+debt.Name+" from "+debt.Job+", owed since "+debt.Worktree+" was removed")
+	}
+}
+
+// addresses draws where the job is reached when it answers at a URL.
+func addresses(outcome runstart.Outcome) func(io.Writer) {
+	type reached struct {
+		subject string
+		jobs    []runstart.JobResult
+	}
+
+	return func(w io.Writer) {
+		var all []reached
+		width := 0
+		for _, item := range outcome.Result.Items {
+			if item.Detail == nil {
+				continue
+			}
+			if jobs := item.Detail.Reached(); len(jobs) > 0 {
+				all = append(all, reached{subject: item.Subject, jobs: jobs})
+				for _, job := range jobs {
+					width = max(width, len(job.Name))
+				}
+			}
+		}
+		if len(all) == 0 {
+			return
+		}
+
+		output.Blank(w)
+		output.SectionTitle(w, addressesTitle)
+		for _, r := range all {
+			indent := output.Indent
+			if len(outcome.Plan.Worktrees) > 1 {
+				output.Message(w, output.Indent+r.subject)
+				indent += output.Indent
+			}
+			for _, job := range r.jobs {
+				output.Message(w, fmt.Sprintf("%s%-*s  %s", indent, width, job.Name, job.URL))
+			}
+		}
+	}
+}
+
+// excerpt is the last lines and the log of the job each worktree's start failed on, by its name.
+func excerpt(outcome runstart.Outcome) func(subject string) ([]string, string) {
+	failed := map[string]runstart.JobResult{}
+	for _, item := range outcome.Result.Items {
+		if item.Detail == nil {
+			continue
+		}
+		for _, job := range item.Detail.Jobs {
+			if job.Status == runstart.JobFailed || job.Status == runstart.JobCrashed {
+				failed[item.Subject] = job
+				break
+			}
+		}
+	}
+
+	return func(subject string) ([]string, string) {
+		job := failed[subject]
+		return job.Lines, job.Log
+	}
+}

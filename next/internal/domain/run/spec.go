@@ -17,8 +17,9 @@ import (
 // log is kept in (none keeps none), the Origin its events are published
 // under, none publishing none, the Routes its proxy serves it under while it
 // is up, for a job of shared scope the Shared context of the main checkout it
-// runs in once for every worktree, and the Profile of run.toml it was started
-// under (empty for a job started alone).
+// runs in once for every worktree, the Profile of run.toml it was started
+// under (empty for a job started alone), and whether it is the start of a
+// Restart, whose log continues the run before instead of emptying it.
 type Spec struct {
 	Job     project.Job
 	Profile string
@@ -29,6 +30,7 @@ type Spec struct {
 	Origin  *Origin
 	Routes  []Route
 	Shared  *Shared
+	Restart bool
 }
 
 // Shared is where a shared job really runs, as its client resolves it: the

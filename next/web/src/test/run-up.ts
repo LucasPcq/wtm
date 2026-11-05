@@ -4,9 +4,9 @@ import type {
   DomainField,
   ListDetail,
   ListJob,
-  RunupJobPlan,
+  RunjobsJobPlan,
+  RunjobsTarget,
   RunupPlan,
-  RunupTarget,
   WebCall,
 } from '@/api/types.gen'
 import { worktrees } from '@/test/acme'
@@ -60,9 +60,9 @@ export function runUpQuestionsOf(answers: DomainAnswered[] = []) {
 const slug = (worktree: string) => worktree.replace(/\W/g, '_')
 
 // each worktree's ports sit 10 above the one before it
-const targetOf = (worktree: string, index: number, profile: string): RunupTarget => {
+const targetOf = (worktree: string, index: number, profile: string): RunjobsTarget => {
   const up = running[worktree]?.up ?? []
-  const own = (name: string, step: number, ports?: Record<string, number>): RunupJobPlan => ({
+  const own = (name: string, step: number, ports?: Record<string, number>): RunjobsJobPlan => ({
     name,
     kind: 'service',
     action: up.includes(name) ? 'up' : 'start',
@@ -70,7 +70,7 @@ const targetOf = (worktree: string, index: number, profile: string): RunupTarget
     waits_for: ['migrate'],
     ...(ports && { ports }),
   })
-  const jobs: RunupJobPlan[] = [
+  const jobs: RunjobsJobPlan[] = [
     { name: 'migrate', kind: 'task', action: 'start', step: 1 },
     {
       name: 'postgres',
@@ -107,11 +107,16 @@ export const runUpPlan = (call: WebCall) => {
   })
 }
 
-const resultOf = (job: RunupJobPlan, failing: boolean) => {
+const resultOf = (job: RunjobsJobPlan, failing: boolean) => {
   if (failing && job.name === 'migrate')
     return { name: job.name, kind: job.kind, status: 'failed', exit_code: 1, lines: ['P1001: database unreachable'] }
   if (failing) return { name: job.name, kind: job.kind, status: 'not_started' }
-  const status = { join: 'joined', up: 'already_running', start: job.kind === 'task' ? 'done' : 'started' }[job.action]
+  const status = {
+    join: 'joined',
+    up: 'already_running',
+    restart: 'started',
+    start: job.kind === 'task' ? 'done' : 'started',
+  }[job.action]
   return { name: job.name, kind: job.kind, status, ...(job.ports && { url: `http://${job.name}.acme.localhost` }) }
 }
 
@@ -123,7 +128,7 @@ export const runUpRun =
     const [profile = 'dev'] = asked(call.answers, 'profile')
     const plan = runUpPlanOf(picked, profile)
     const targets = plan.worktrees ?? []
-    const jobsRun = (target: RunupTarget) => {
+    const jobsRun = (target: RunjobsTarget) => {
       const jobs = target.jobs ?? []
       return failing.includes(target.worktree) ? jobs.slice(0, 1) : jobs
     }

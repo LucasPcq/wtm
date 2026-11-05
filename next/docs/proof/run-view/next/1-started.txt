@@ -5,7 +5,7 @@
   │ shared                 │ │  api v1.4.2  ready in 312 ms                                                          │
   │  • db               0s │ │  ➜  Local:   http://localhost:24401/                                                  │
   │                        │ │                                                                                       │
-  │ feat/b                 │ │00:00:00 GET /health 200 2ms                                                           │
+  │ feat/b                 │ │                                                                                       │
   │  ✓ migrate             │ │                                                                                       │
   │ ›• api              0s │ │                                                                                       │
   │  • web              0s │ │                                                                                       │
@@ -37,4 +37,4 @@
   │                        │ │                                                                                       │
   ╰────────────────────────╯ ╰───────────────────────────────────────────────────────────────────────────────────────╯
 
-  ↑↓ job · / filter · pgup/pgdn scroll · enter focus · o open · a addresses · q detach                     4/5 running
+  ↑↓ job · enter focus · s stop · r restart · o open · q detach · / filter · a addresses                   4/5 running

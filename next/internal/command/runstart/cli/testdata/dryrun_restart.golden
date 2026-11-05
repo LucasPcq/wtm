@@ -1,0 +1,7 @@
+
+  run start · dry run, nothing applied
+  Worktree  feat/a
+  Job       api (stopped, then started again)
+  fingerprint  7e22ac39afe6d1b315f55337
+  → wtm-next run start feat/a --job api --restart --expect-fingerprint 7e22ac39afe6d1b315f55337   apply this plan
+

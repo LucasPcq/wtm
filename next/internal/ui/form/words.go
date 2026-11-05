@@ -194,3 +194,16 @@ func RunningWords(options []domain.Option) map[string]OptionWords {
 	}
 	return labels
 }
+
+// JobWords are how the CLI words a job option: its name, its kind, and the worktrees it is up in among those picked.
+func JobWords(options []domain.Option) map[string]OptionWords {
+	labels := map[string]OptionWords{}
+	for _, option := range options {
+		said := []string{string(option.Kind)}
+		if len(option.RunningIn) > 0 {
+			said = append(said, "up in "+strings.Join(option.RunningIn, ", "))
+		}
+		labels[option.Value] = OptionWords{Label: option.Value + " — " + strings.Join(said, " · ")}
+	}
+	return labels
+}

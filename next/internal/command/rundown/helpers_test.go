@@ -12,6 +12,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/service/operationtest"
+	"github.com/LucasPcq/wtm/next/internal/service/runjobs"
 
 	"github.com/stretchr/testify/require"
 )
@@ -81,8 +82,8 @@ func writeFile(t *testing.T, path, content string) {
 	require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
 }
 
-func statuses(item rundown.Item) map[string]rundown.JobStatus {
-	got := map[string]rundown.JobStatus{}
+func statuses(item rundown.Item) map[string]runjobs.StopStatus {
+	got := map[string]runjobs.StopStatus{}
 	for _, job := range item.Detail.Jobs {
 		got[job.Name] = job.Status
 	}

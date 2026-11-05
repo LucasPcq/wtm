@@ -151,3 +151,21 @@ func piped(d *daemon) *terminal {
 	}
 	return t
 }
+
+// acts records each act the view's s and r asked, answering with err.
+type acts struct {
+	asked []Act
+	acted Acted
+	err   error
+	// cut, when set, is a restart cut short once ctx is: it waits for that, then says the job is stopped.
+	cut bool
+}
+
+func (a *acts) do(ctx context.Context, act Act) (Acted, error) {
+	a.asked = append(a.asked, act)
+	if a.cut {
+		<-ctx.Done()
+		return Acted{CutShort: true}, nil
+	}
+	return a.acted, a.err
+}

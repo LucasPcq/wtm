@@ -21,7 +21,7 @@ const (
 	separator      = " · "
 	filterPrompt   = "filter: "
 	filterHintFmt  = "filter %q · esc clears"
-	helpBrowse     = "↑↓ job · / filter · pgup/pgdn scroll · enter focus · o open · a addresses · q detach"
+	helpBrowse     = "↑↓ job · enter focus · s stop · r restart · o open · q detach · / filter · a addresses · pgup/pgdn scroll"
 	helpFilter     = "type to filter · enter apply · esc clear"
 	focusHintFmt   = "focus %s · %s — every key goes to the job · esc twice gives them back"
 	bandDismiss    = "esc dismisses this report"
@@ -41,6 +41,16 @@ const (
 	noTerminalFmt     = "%s runs under no terminal: nothing to type into."
 	sharedReadOnlyFmt = "%s runs in %s: its output is read-only here."
 	noStreamFmt       = "%s has no live stream to type into."
+
+	actingFmt        = "%s %s…"
+	actedFmt         = "%s %s"
+	actFailedFmt     = "could not %s %s: %v"
+	underWayFmt      = "%s is under way: wait for it"
+	restartSharedFmt = "%s runs for every worktree holding it: stop it, then run start"
+	notActedFmt      = "%s: nothing to %s here"
+	cutShortFmt      = "restart of %s cut short: %s is stopped — %s starts it again"
+	unendedFmt       = "%s still under way when the view was left: check it with %s"
+	leavingFmt       = "leaving once %s ends · Ctrl+C again leaves now"
 )
 
 // The marks of a job's state, runes every monospace font draws in one column:

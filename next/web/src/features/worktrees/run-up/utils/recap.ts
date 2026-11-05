@@ -1,5 +1,5 @@
 import type { Applied } from '@/api/queries/commands'
-import type { DomainWarning, RunupJobStatus } from '@/api/types.gen'
+import type { DomainWarning, RunjobsJobStatus } from '@/api/types.gen'
 import { resultWords } from '@/features/worktrees/run-up/utils/words'
 import {
   itemWarnings,
@@ -13,7 +13,7 @@ import { owedOf, owedRow } from '@/features/worktrees/utils/owed'
 type RunUpItem = Applied<'run-up'>['items'][number]
 
 // a worktree's jobs said by what became of them, in the order the screen reads them: up, joined, done
-const order: RunupJobStatus[] = ['failed', 'crashed', 'started', 'already_running', 'joined', 'done', 'not_started']
+const order: RunjobsJobStatus[] = ['failed', 'crashed', 'started', 'already_running', 'joined', 'done', 'not_started']
 
 export const jobsSaid = (item: RunUpItem) => {
   const jobs = item.detail?.jobs ?? []

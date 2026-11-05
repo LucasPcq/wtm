@@ -8,6 +8,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
+	"github.com/LucasPcq/wtm/next/internal/ui/runview"
 
 	"github.com/spf13/cobra"
 )
@@ -45,11 +46,11 @@ const (
 type upCommand struct {
 	io   uicli.Run
 	form *upForm
-	view View
+	view runview.View
 }
 
 // New returns run up's command, a subcommand of run: its flags and arguments become a runup.Request, answered in the wizard when the user can see and answer it, else run unattended; it draws the outcome on streams, or the v2 JSON envelope with --output json, its follow-ups spelled by commandLine; at a terminal, the jobs it left up are shown live in view first.
-func New(streams *output.Streams, env uicli.Env, open func(ctx context.Context, dir string) (runup.UseCase, error), commandLine output.CommandLine, view View) *cobra.Command {
+func New(streams *output.Streams, env uicli.Env, open func(ctx context.Context, dir string) (runup.UseCase, error), commandLine output.CommandLine, view runview.View) *cobra.Command {
 	c := &upCommand{io: uicli.Run{Command: runup.Name, Streams: streams, Env: env, CommandLine: commandLine, Flags: upFlags}, form: newForm(open), view: view}
 	cmd := &cobra.Command{Use: "up [worktree...]", Short: upShort, Long: upLong, Example: upExample, Args: cobra.ArbitraryArgs, RunE: c.run}
 	c.form.Bind(cmd, &c.io)

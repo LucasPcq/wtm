@@ -225,6 +225,7 @@ type spec struct {
 	Origin  *origin           `json:"origin,omitempty"`
 	Routes  []route           `json:"routes,omitempty"`
 	Shared  *shared           `json:"shared,omitempty"`
+	Restart bool              `json:"restart,omitempty"`
 }
 
 // shared is the main checkout a shared job runs in, on the wire.
@@ -242,7 +243,7 @@ type origin struct {
 }
 
 func specOf(s run.Spec) *spec {
-	wire := &spec{Job: configOf(s.Job), Profile: s.Profile, WorkDir: s.WorkDir, Env: s.Env, Unset: s.Unset, LogDir: s.LogDir, Routes: routesOf(s.Routes)}
+	wire := &spec{Job: configOf(s.Job), Profile: s.Profile, WorkDir: s.WorkDir, Env: s.Env, Unset: s.Unset, LogDir: s.LogDir, Routes: routesOf(s.Routes), Restart: s.Restart}
 	if s.Origin != nil {
 		wire.Origin = &origin{Root: s.Origin.Root, CommonDir: s.Origin.CommonDir, Branch: s.Origin.Branch, CorrelationID: s.Origin.CorrelationID}
 	}
@@ -254,7 +255,7 @@ func specOf(s run.Spec) *spec {
 }
 
 func (s spec) runSpec() run.Spec {
-	runSpec := run.Spec{Job: s.Job.job(), Profile: s.Profile, WorkDir: s.WorkDir, Env: s.Env, Unset: s.Unset, LogDir: s.LogDir, Routes: runRoutes(s.Routes)}
+	runSpec := run.Spec{Job: s.Job.job(), Profile: s.Profile, WorkDir: s.WorkDir, Env: s.Env, Unset: s.Unset, LogDir: s.LogDir, Routes: runRoutes(s.Routes), Restart: s.Restart}
 	if s.Origin != nil {
 		runSpec.Origin = &run.Origin{Root: s.Origin.Root, CommonDir: s.Origin.CommonDir, Branch: s.Origin.Branch, CorrelationID: s.Origin.CorrelationID}
 	}

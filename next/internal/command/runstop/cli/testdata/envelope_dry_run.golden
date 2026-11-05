@@ -1,0 +1,65 @@
+{
+  "v": 2,
+  "command": "run-stop",
+  "ok": true,
+  "op": "op-1",
+  "plan": {
+    "job": "db",
+    "worktrees": [
+      {
+        "worktree": "feat/a",
+        "branch": "feat/a",
+        "path": "/repo/wt-feat-a",
+        "jobs": [
+          {
+            "name": "db",
+            "kind": "service",
+            "hold": "claim",
+            "fate": "release",
+            "kept_by": [
+              "feat/b"
+            ],
+            "shared_in": "main"
+          }
+        ]
+      }
+    ],
+    "recap": [
+      {
+        "key": "worktrees",
+        "label": "Worktrees",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/a",
+            "text": "feat/a"
+          }
+        ]
+      },
+      {
+        "key": "job",
+        "label": "Job",
+        "path": "job",
+        "values": [
+          {
+            "value": "db",
+            "text": "db"
+          }
+        ]
+      },
+      {
+        "key": "stop",
+        "label": "Stops",
+        "values": [
+          {
+            "value": "db (released, kept by feat/b)",
+            "text": "db (released, kept by feat/b)"
+          }
+        ]
+      }
+    ]
+  },
+  "fingerprint": "a88144112b60b662ff002b91",
+  "follow_ups": [],
+  "warnings": []
+}

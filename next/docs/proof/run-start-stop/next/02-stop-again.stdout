@@ -1,0 +1,7 @@
+
+  = run stop: 1 unchanged
+
+  Worktrees  feat/a
+  Job        api
+  Stops      api (not running)
+

@@ -92,6 +92,7 @@ export const skipWords: Record<DomainSkip, string | null> = {
   one_profile: 'run.toml declares one profile or none',
   alone: 'no other worktree runs jobs',
   configured: 'run.toml answers it',
+  task: 'a task binds no port and is gone once done',
 }
 
 export const actionWords: Record<CreateAction, string> = {

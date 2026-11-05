@@ -44,6 +44,10 @@ import (
 	rundowncli "github.com/LucasPcq/wtm/next/internal/command/rundown/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/runlogs"
 	runlogscli "github.com/LucasPcq/wtm/next/internal/command/runlogs/cli"
+	"github.com/LucasPcq/wtm/next/internal/command/runstart"
+	runstartcli "github.com/LucasPcq/wtm/next/internal/command/runstart/cli"
+	"github.com/LucasPcq/wtm/next/internal/command/runstop"
+	runstopcli "github.com/LucasPcq/wtm/next/internal/command/runstop/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/runup"
 	runupcli "github.com/LucasPcq/wtm/next/internal/command/runup/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/status"
@@ -55,6 +59,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	"github.com/LucasPcq/wtm/next/internal/service/registry"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
+	"github.com/LucasPcq/wtm/next/internal/service/runjobs"
 	"github.com/LucasPcq/wtm/next/internal/service/teardown"
 	"github.com/LucasPcq/wtm/next/internal/ui/cli"
 )
@@ -86,6 +91,8 @@ type app struct {
 	RunUp       runup.UseCase
 	RunLogs     runlogs.UseCase
 	RunDown     rundown.UseCase
+	RunStart    runstart.UseCase
+	RunStop     runstop.UseCase
 }
 
 // wire builds each adapter of the repository params locates once and injects it into every use case.
@@ -135,6 +142,21 @@ func wire(params wireParams) app {
 		PurgeLogs: joblog.Purge,
 		Shield:    shell.Shield,
 	}
+
+	starts := runjobs.Service{
+		Meta:      meta,
+		EnvFiles:  store.EnvFiles{},
+		Daemon:    runs,
+		Listening: portprobe.Listening,
+		StateDir:  params.StateDir,
+		CommonDir: bus.Resolved(params.CommonDir),
+		Settle:    runSettle,
+		Gone:      repository.GoneIn(repo),
+		Located:   repository.LocatedIn(repo),
+		Number:    provisions.Number,
+		Owing:     teardowns.Owing,
+	}
+	stops := runjobs.Stops{Daemon: runs, Gone: repository.GoneIn(repo), Located: repository.LocatedIn(repo), Locate: repository.LocateIn(repo)}
 
 	return app{
 		Create: create.UseCase{
@@ -239,18 +261,11 @@ func wire(params wireParams) app {
 			Repository:   facts,
 		},
 		RunUp: runup.UseCase{
-			Git:        repo,
 			Meta:       meta,
-			EnvFiles:   store.EnvFiles{},
-			Daemon:     runs,
-			Listening:  portprobe.Listening,
-			StateDir:   params.StateDir,
-			CommonDir:  bus.Resolved(params.CommonDir),
-			Settle:     runSettle,
 			Repository: facts,
 			Operations: operations,
-			Provision:  provisions,
 			Teardown:   teardowns,
+			Jobs:       starts,
 		},
 		RunLogs: runlogs.UseCase{
 			Git:        repo,
@@ -263,15 +278,26 @@ func wire(params wireParams) app {
 			Repository: facts,
 		},
 		RunDown: rundown.UseCase{
-			Git:        repo,
-			Daemon:     runs,
 			Repository: facts,
 			Operations: operations,
+			Stops:      stops,
+		},
+		RunStart: runstart.UseCase{
+			Meta:       meta,
+			Repository: facts,
+			Operations: operations,
+			Teardown:   teardowns,
+			Jobs:       starts,
+		},
+		RunStop: runstop.UseCase{
+			Repository: facts,
+			Operations: operations,
+			Stops:      stops,
 		},
 	}
 }
 
-// runSettle is how long run up waits, once its services are launched and no port check waits, for one that fails at once to end: a process that cannot bind its port exits within instants of its spawn, after the start that spawned it returned.
+// runSettle is how long a start waits, once its services are launched and no port check waits, for one that fails at once to end: a process that cannot bind its port exits within instants of its spawn, after the start that spawned it returned.
 const runSettle = time.Second
 
 // fetchedOnce is the repository as prune reads it, origin fetched once however often one opened command plans: the wizard plans at each of its steps, and a request naming no worktree plans again under the locks it finds.
@@ -383,6 +409,10 @@ func commandLine(followUp domain.FollowUp) []string {
 		return runlogscli.Line(followUp)
 	case rundown.Name:
 		return rundowncli.Line(followUp)
+	case runstart.Name:
+		return runstartcli.Line(followUp)
+	case runstop.Name:
+		return runstopcli.Line(followUp)
 	case commandRestartDaemon:
 		return []string{cli.Program, "run", "daemon", "restart"}
 	}

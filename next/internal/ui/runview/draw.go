@@ -352,6 +352,8 @@ func (m *model) status(width int) string {
 		return m.st.Danger.Render(truncate(m.failed.Error(), width))
 	case m.said != "":
 		return m.st.Warning.Render(truncate(m.said, width))
+	case m.acting != "":
+		return m.st.Muted.Render(truncate(m.acting, width))
 	}
 	list := entries(m.params, m.jobs, "")
 	running := 0

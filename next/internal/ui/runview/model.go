@@ -57,7 +57,12 @@ type model struct {
 	reaching  bool
 	focused   bool
 	lastEsc   time.Time
-	said      string // what the view answers a key with, until the next key
+	said      string             // what the view answers a key with, until the next key
+	acting    string             // the stop or restart under way, said while it runs
+	cancelAct context.CancelFunc // cuts the action under way short
+	leaving   bool               // Ctrl+C came while an action ran: the view leaves once it ends
+	unended   string             // what is said once the view is left before the action under way ended
+	left      string             // what is said once the view is left: an action that failed, a restart cut short or still under way
 
 	notices   []string
 	dismissed bool
@@ -96,6 +101,11 @@ type (
 		jobs []run.Job
 		err  error
 	}
+	actedMsg struct {
+		text string
+		left string
+	}
+	leaveMsg    struct{}
 	attachedMsg struct {
 		bound binding
 		at    size // the size the job's terminal was given, which the frame may have left since
@@ -143,6 +153,14 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case saidMsg:
 		m.said = msg.text
 		return m, nil
+	case actedMsg:
+		return m, m.acted(msg)
+	case leaveMsg:
+		// The action outlived the wait: the view leaves saying it still runs.
+		if m.acting != "" {
+			m.left = m.unended
+		}
+		return m, tea.Quit
 	case pollMsg:
 		return m, tea.Batch(m.list(), poll())
 	case frameMsg:

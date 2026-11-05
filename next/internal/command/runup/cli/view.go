@@ -12,14 +12,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// View is where run up shows the jobs it started: the run daemon its live
-// view asks, and how it opens an address in the browser (nil opens none). A
-// zero View shows none.
-type View struct {
-	Daemon runview.Daemon
-	Open   func(url string) error
-}
-
 type ran = form.Ran[runup.Request, runup.Outcome]
 
 // conclude opens the live view on the jobs a start left up, once every one is
@@ -58,7 +50,10 @@ func (c *upCommand) watches(ctx context.Context, r ran) bool {
 // services run in, the job the start launched first selected, and as notices
 // the failures and the warnings of the start.
 func (c *upCommand) viewOf(outcome runup.Outcome) runview.Params {
-	params := runview.Params{Daemon: c.view.Daemon, Open: c.view.Open, Job: firstStarted(outcome), In: c.io.Streams.In, Out: c.io.Streams.Err}
+	params := c.view.Params()
+	params.Job = firstStarted(outcome)
+	params.In = c.io.Streams.In
+	params.Out = c.io.Streams.Err
 	for _, target := range outcome.Plan.Worktrees {
 		wt := runview.Worktree{Branch: target.Worktree, Path: target.Path, Namespaces: map[string]string{}}
 		for _, job := range target.Jobs {

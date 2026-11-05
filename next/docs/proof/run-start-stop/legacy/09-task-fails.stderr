@@ -1,0 +1,10 @@
+
+  ! job "stuck" declares stop, so its cmd is a launcher wtm waits on until it exits (like `docker compose up -d`) — if it keeps running, drop stop to run it in the foreground
+
+  ✗ task fail failed (exit 3)
+
+  ! Profile aborted at step 1/1 (fail).
+
+  → wtm run up   re-run once fixed
+  → wtm run down   stop what did start
+

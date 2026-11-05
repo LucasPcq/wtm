@@ -1,0 +1,94 @@
+{
+  "v": 2,
+  "command": "run-start",
+  "ok": false,
+  "op": "op-1",
+  "items": [
+    {
+      "subject": "feat/b",
+      "status": "failed",
+      "error": {
+        "kind": "internal",
+        "code": "run-start.job_failed",
+        "message": "migrate failed: run daemon: task migrate exited with code 3",
+        "params": {
+          "exit_code": "3",
+          "job": "migrate"
+        }
+      },
+      "detail": {
+        "path": "/repo/wt-feat-b",
+        "jobs": [
+          {
+            "name": "migrate",
+            "kind": "task",
+            "status": "failed",
+            "log": "/repo/main/.git/wtm/logs/feat%2Fb/migrate.log",
+            "exit_code": 3,
+            "lines": [
+              "error: relation users does not exist"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "plan": {
+    "job": "migrate",
+    "restart": false,
+    "worktrees": [
+      {
+        "worktree": "feat/b",
+        "branch": "feat/b",
+        "path": "/repo/wt-feat-b",
+        "numbered": true,
+        "jobs": [
+          {
+            "name": "migrate",
+            "kind": "task",
+            "action": "start",
+            "step": 1
+          }
+        ]
+      }
+    ],
+    "exclusive": false,
+    "others": [],
+    "no_probe": false,
+    "recap": [
+      {
+        "key": "worktree",
+        "label": "Worktree",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/b",
+            "text": "feat/b"
+          }
+        ]
+      },
+      {
+        "key": "job",
+        "label": "Job",
+        "path": "job",
+        "values": [
+          {
+            "value": "migrate",
+            "text": "migrate"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "internal",
+    "code": "run-start.job_failed",
+    "message": "migrate failed: run daemon: task migrate exited with code 3",
+    "params": {
+      "exit_code": "3",
+      "job": "migrate"
+    }
+  }
+}

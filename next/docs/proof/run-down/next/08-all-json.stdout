@@ -60,7 +60,6 @@
         "worktree": "feat/a",
         "branch": "feat/a",
         "path": "<SB>/acme.trees/feat-a",
-        "profile": "full",
         "jobs": [
           {
             "name": "cache",
@@ -76,13 +75,13 @@
             "fate": "stop",
             "shared_in": "main"
           }
-        ]
+        ],
+        "profile": "full"
       },
       {
         "worktree": "feat/b",
         "branch": "feat/b",
         "path": "<SB>/acme.trees/feat-b",
-        "profile": "dev",
         "jobs": [
           {
             "name": "api",
@@ -96,7 +95,8 @@
             "hold": "own",
             "fate": "stop"
           }
-        ]
+        ],
+        "profile": "dev"
       }
     ],
     "recap": [

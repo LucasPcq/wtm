@@ -1,0 +1,110 @@
+{
+  "v": 2,
+  "command": "run-start",
+  "ok": true,
+  "op": "op-1",
+  "items": [
+    {
+      "subject": "feat/a",
+      "status": "done",
+      "detail": {
+        "path": "/repo/wt-feat-a",
+        "jobs": [
+          {
+            "name": "api",
+            "kind": "service",
+            "status": "started",
+            "url": "http://api.feat-a.main.localhost:11080",
+            "log": "/repo/main/.git/wtm/logs/feat%2Fa/api.log",
+            "ports": [
+              {
+                "name": "PORT",
+                "port": 4010,
+                "listening": true
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "plan": {
+    "job": "api",
+    "restart": false,
+    "worktrees": [
+      {
+        "worktree": "feat/a",
+        "branch": "feat/a",
+        "path": "/repo/wt-feat-a",
+        "numbered": true,
+        "jobs": [
+          {
+            "name": "api",
+            "kind": "service",
+            "action": "start",
+            "step": 1,
+            "ports": {
+              "PORT": 4010
+            }
+          }
+        ]
+      }
+    ],
+    "exclusive": false,
+    "others": [],
+    "no_probe": false,
+    "recap": [
+      {
+        "key": "worktree",
+        "label": "Worktree",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/a",
+            "text": "feat/a"
+          }
+        ]
+      },
+      {
+        "key": "job",
+        "label": "Job",
+        "path": "job",
+        "values": [
+          {
+            "value": "api",
+            "text": "api"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [
+    {
+      "command": "run-logs",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/a"
+          ]
+        }
+      ],
+      "code": "run-start.logs",
+      "message": "see feat/a's output"
+    },
+    {
+      "command": "run-down",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/a"
+          ]
+        }
+      ],
+      "code": "run-start.down",
+      "message": "stop feat/a's jobs"
+    }
+  ],
+  "warnings": []
+}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/command/runup"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/service/runjobs"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
@@ -162,7 +163,7 @@ func TestTheViewOpensOnTheFirstJobTheStartLaunched(t *testing.T) {
 
 func TestTheViewKnowsTheNamespacesThePlanGivesEachWorktree(t *testing.T) {
 	outcome := runup.Outcome{
-		Plan: runup.Plan{Worktrees: []runup.Target{{Worktree: featB, Path: pathOf(featB), Jobs: []runup.JobPlan{
+		Plan: runup.Plan{Worktrees: []runjobs.Target{{Worktree: featB, Path: pathOf(featB), Jobs: []runjobs.JobPlan{
 			{Name: "db", SharedIn: "main", Namespace: "acme_feat-b"},
 			{Name: "api"},
 		}}}},

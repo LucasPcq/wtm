@@ -53,7 +53,6 @@
         "worktree": "feat/b",
         "branch": "feat/b",
         "path": "<SB>/acme.trees/feat-b",
-        "profile": "full",
         "jobs": [
           {
             "name": "api",
@@ -81,13 +80,13 @@
             "hold": "own",
             "fate": "stop"
           }
-        ]
+        ],
+        "profile": "full"
       },
       {
         "worktree": "main",
         "branch": "main",
         "path": "<SB>/acme",
-        "profile": "dev",
         "jobs": [
           {
             "name": "api",
@@ -101,7 +100,8 @@
             "hold": "own",
             "fate": "stop"
           }
-        ]
+        ],
+        "profile": "dev"
       }
     ],
     "recap": [

@@ -1,0 +1,12 @@
+
+  ✗ run stop: 1 done · 1 failed
+
+  Worktrees        feat/a, feat/b
+  Job              cache
+  Stops in feat/a  cache
+  Stops in feat/b  cache
+
+  ✗ feat/b  couldn't stop cache: the stop command of cache failed (exit 4)
+
+  → wtm run-start feat/a --job cache   start it again
+

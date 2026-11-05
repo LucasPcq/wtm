@@ -1,4 +1,4 @@
-import type { RunupJobPlan, RunupPlan } from '@/api/types.gen'
+import type { RunjobsJobPlan, RunupPlan } from '@/api/types.gen'
 import { jobPlan } from '@/features/worktrees/utils/job-plan'
 import { jobsTodo, type PhaseRun, type Unit } from '@/features/worktrees/utils/progress'
 
@@ -17,7 +17,7 @@ export function sharedOf(plan: RunupPlan): Shared[] {
   return [...shared.values()]
 }
 
-export type OrderedJob = RunupJobPlan & { number: number | undefined }
+export type OrderedJob = RunjobsJobPlan & { number: number | undefined }
 
 // the jobs a worktree runs itself, in the order they start; those that start are numbered across the run, those up
 // already are not

@@ -13,6 +13,8 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/events"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/command/rundown"
+	"github.com/LucasPcq/wtm/next/internal/command/runstart"
+	"github.com/LucasPcq/wtm/next/internal/command/runstop"
 	"github.com/LucasPcq/wtm/next/internal/command/runup"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
@@ -176,6 +178,53 @@ func mutations() []mutation {
 			// another job up: the plan stops one more
 			stale: func(t *testing.T, main string) {
 				startIdle(t, main, "other")
+			},
+			untouched: func(t *testing.T, _ string) {
+				assert.True(t, slices.ContainsFunc(daemonJobs(t), func(job run.Job) bool { return job.Up }))
+			},
+			applied: func(t *testing.T, _ string) {
+				assert.False(t, slices.ContainsFunc(daemonJobs(t), func(job run.Job) bool { return job.Up }))
+			},
+		},
+		{
+			name:     runstart.Name,
+			answers:  []domain.Answered{{Path: domain.PathWorktree, Values: []string{"main"}}, {Path: runstart.PathJob, Values: []string{"seed"}}},
+			complete: true,
+			// a run.toml of a task, under a daemon of the test's own at the socket the commands reach, in a home short enough for it
+			setup: func(t *testing.T, main string) {
+				writeRun(t, main, seedJob)
+				t.Setenv("HOME", shortDir(t))
+				serving(t, daemonParams{Socket: events.SocketPath()})
+			},
+			// the task runs another command since
+			stale: func(t *testing.T, main string) {
+				writeRun(t, main, strings.Replace(seedJob, `cmd = "true"`, `cmd = "true || true"`, 1))
+			},
+			untouched: func(t *testing.T, _ string) {
+				assert.Empty(t, daemonJobs(t))
+			},
+			applied: func(t *testing.T, _ string) {
+				assert.Len(t, daemonJobs(t), 1)
+			},
+		},
+		{
+			name:     runstop.Name,
+			answers:  []domain.Answered{{Path: domain.PathWorktree, Values: []string{"main"}}, {Path: runstop.PathJob, Values: []string{"idle"}}},
+			complete: true,
+			// a service up in main, under a daemon of the test's own at the socket the commands reach, in a home short enough for it
+			setup: func(t *testing.T, main string) {
+				writeRun(t, main, idleJob("idle"))
+				t.Setenv("HOME", shortDir(t))
+				serving(t, daemonParams{Socket: events.SocketPath()})
+				startIdle(t, main, "idle")
+			},
+			// the job is a stack since, whose launcher left it up: the plan stops it with its stop command
+			stale: func(t *testing.T, main string) {
+				client := daemon.Daemon{SocketPath: events.SocketPath(), Version: version}
+				_, err := client.Stop(t.Context(), run.Stop{Name: "idle", WorkDir: main})
+				require.NoError(t, err)
+				_, err = client.Start(t.Context(), run.Spec{Job: project.Job{Name: "idle", Kind: project.Service, Cmd: "true", Stop: "true"}, WorkDir: main}, nil)
+				require.NoError(t, err)
 			},
 			untouched: func(t *testing.T, _ string) {
 				assert.True(t, slices.ContainsFunc(daemonJobs(t), func(job run.Job) bool { return job.Up }))

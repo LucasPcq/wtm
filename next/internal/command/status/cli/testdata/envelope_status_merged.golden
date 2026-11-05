@@ -170,7 +170,7 @@
             "code": "status.job_crashed",
             "message": "api crashed (exit 1)",
             "fix": {
-              "command": "run start",
+              "command": "run-start",
               "answers": [
                 {
                   "path": "worktree",

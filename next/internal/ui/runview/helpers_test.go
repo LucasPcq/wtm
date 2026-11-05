@@ -143,3 +143,23 @@ func locate(t *testing.T, view, text string) (int, int) {
 	t.Fatalf("%q is not drawn:\n%s", text, view)
 	return 0, 0
 }
+
+// actable is the board's view whose s and r go to stops and restarts.
+func actable(t *testing.T, stops, restarts *acts) *driver {
+	t.Helper()
+	d := &daemon{}
+	piped(d)
+	worktrees, jobs := board()
+	d.set(jobs)
+	return open(t, d, Params{Worktrees: worktrees, Main: "main", Stop: stops.do, Restart: restarts.do, Again: again, Show: show}, 120, 30)
+}
+
+// show spells the read that shows how act's job stands, as the command line does.
+func show(act Act) string {
+	return "wtm status " + act.Worktree
+}
+
+// again spells the start again of act's job as the command line does.
+func again(act Act) string {
+	return "wtm run start " + act.Worktree + " --job " + act.Job
+}

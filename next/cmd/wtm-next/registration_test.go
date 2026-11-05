@@ -11,6 +11,8 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
 	"github.com/LucasPcq/wtm/next/internal/command/rundown"
 	"github.com/LucasPcq/wtm/next/internal/command/runlogs"
+	"github.com/LucasPcq/wtm/next/internal/command/runstart"
+	"github.com/LucasPcq/wtm/next/internal/command/runstop"
 	"github.com/LucasPcq/wtm/next/internal/command/runup"
 
 	"github.com/LucasPcq/wtm/next/internal/command/events"
@@ -108,7 +110,7 @@ func TestEachFollowUpOfAMigratedCommandIsSpelledFromItsSchema(t *testing.T) {
 			continue
 		}
 
-		require.Contains(t, []string{clean.Name, prune.Name, exec.Name, domain.CommandSync, runup.Name, runlogs.Name, rundown.Name, commandRestartDaemon}, followUp.Command, "%s has migrated: spell its follow-ups from its schema in commandLine", followUp.Command)
+		require.Contains(t, []string{clean.Name, prune.Name, exec.Name, domain.CommandSync, runup.Name, runlogs.Name, rundown.Name, runstart.Name, runstop.Name, commandRestartDaemon}, followUp.Command, "%s has migrated: spell its follow-ups from its schema in commandLine", followUp.Command)
 		argv := commandLine(followUp)
 		assert.Equal(t, append([]string{cli.Program}, strings.Fields(spelling(followUp.Command))...), argv[:min(1+len(strings.Fields(spelling(followUp.Command))), len(argv))], "%s's follow-up %v does not fold into its request", followUp.Command, followUp.Answers)
 	}

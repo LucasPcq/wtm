@@ -97,7 +97,10 @@ func (o *output) end() []string {
 	o.out = nil
 	last := []string{}
 	for _, line := range o.lines[max(0, len(o.lines)-lastLines):] {
-		last = append(last, line.Text)
+		// A crash's last lines are the job's: the run mark is wtm's.
+		if line.Text != RunMark {
+			last = append(last, line.Text)
+		}
 	}
 	o.mu.Unlock()
 
@@ -176,6 +179,36 @@ func (o *output) note(text string) {
 	o.keep(lines)
 	o.mu.Unlock()
 	o.hand(lines)
+}
+
+// beginParams are how a run of the job begins: its process spawned, its log opened, and the mark written first.
+type beginParams struct {
+	Spawn func() error
+	Open  func() Log
+	Mark  string
+}
+
+// begin spawns the job's process with the lock held, so nothing it prints
+// lands before the mark, then opens its log and writes the mark into it and
+// the lines its readers follow, never as the job's last line, nor handed to
+// the start's client: it is the log's, not the job's. A spawn that fails opens
+// no log.
+func (o *output) begin(params beginParams) error {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if err := params.Spawn(); err != nil {
+		return err
+	}
+
+	o.log = params.Open()
+	mark := []run.Line{{At: o.now(), Text: params.Mark}}
+	last := o.last.Load()
+	o.keep(mark)
+	o.last.Store(last)
+	if o.log != nil {
+		o.log.Write(mark)
+	}
+	return nil
 }
 
 func (o *output) lastLine() *run.Line {

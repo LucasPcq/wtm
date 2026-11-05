@@ -4,6 +4,7 @@ import (
 	"context"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -71,6 +72,40 @@ func Resolved(ctx context.Context, git Locator, name string, caller domain.Calle
 	return git.Locate(ctx, path)
 }
 
+// LocateParams are the worktrees of the repository, the names asked, and where the caller stands.
+type LocateParams struct {
+	Worktrees []worktree.Worktree
+	Names     []string
+	Caller    domain.Caller
+}
+
+// Locate is where each of params' names that is no worktree's name leads, as the path it stands for from where the caller stands (Resolved), whether or not something is there (a worktree removed), spelled as git spells the root of the worktree it is (Root).
+func Locate(ctx context.Context, git Resolver, params LocateParams) (map[string]string, error) {
+	located := map[string]string{}
+	for _, name := range params.Names {
+		if strings.TrimSpace(name) == "" || slices.ContainsFunc(params.Worktrees, func(w worktree.Worktree) bool { return w.Name() == name }) {
+			continue
+		}
+
+		location, err := Resolved(ctx, git, name, params.Caller)
+		if err != nil {
+			return nil, err
+		}
+		if located[name], err = Root(ctx, git, params.Worktrees, location.Path); err != nil {
+			return nil, err
+		}
+	}
+
+	return located, nil
+}
+
+// LocateIn is Locate through git, for a service handed it as a function of the worktrees, the names asked and where the caller stands.
+func LocateIn(git Resolver) func(ctx context.Context, worktrees []worktree.Worktree, names []string, caller domain.Caller) (map[string]string, error) {
+	return func(ctx context.Context, worktrees []worktree.Worktree, names []string, caller domain.Caller) (map[string]string, error) {
+		return Locate(ctx, git, LocateParams{Worktrees: worktrees, Names: names, Caller: caller})
+	}
+}
+
 // Root is path as git spells the root of the worktree among worktrees it is, when it is one under another spelling (a disk that ignores case: git keeps a path as it was given), else path itself; only a path that matches no root as written is asked of the disk.
 func Root(ctx context.Context, git Matcher, worktrees []worktree.Worktree, path string) (string, error) {
 	if slices.ContainsFunc(worktrees, func(w worktree.Worktree) bool { return w.Path == path }) {
@@ -90,6 +125,13 @@ func Root(ctx context.Context, git Matcher, worktrees []worktree.Worktree, path 
 	}
 
 	return path, nil
+}
+
+// LocatedIn is Located through git, for a service handed it as a function.
+func LocatedIn(git Locator) func(ctx context.Context, name string, caller domain.Caller) (string, error) {
+	return func(ctx context.Context, name string, caller domain.Caller) (string, error) {
+		return Located(ctx, git, name, caller)
+	}
 }
 
 // Each returns what read reads of each of worktrees, in their order, a few read at once.

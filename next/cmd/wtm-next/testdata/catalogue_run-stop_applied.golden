@@ -1,0 +1,96 @@
+{
+  "v": 2,
+  "command": "run-stop",
+  "ok": true,
+  "op": "<id>",
+  "items": [
+    {
+      "subject": "main",
+      "status": "done",
+      "detail": {
+        "path": "<root>/main",
+        "jobs": [
+          {
+            "name": "idle",
+            "status": "stopped"
+          }
+        ]
+      }
+    }
+  ],
+  "plan": {
+    "job": "idle",
+    "worktrees": [
+      {
+        "worktree": "main",
+        "branch": "main",
+        "path": "<root>/main",
+        "jobs": [
+          {
+            "name": "idle",
+            "kind": "service",
+            "hold": "detached",
+            "fate": "stop",
+            "stop_command": "true"
+          }
+        ]
+      }
+    ],
+    "recap": [
+      {
+        "key": "worktrees",
+        "label": "Worktrees",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "main",
+            "text": "main"
+          }
+        ]
+      },
+      {
+        "key": "job",
+        "label": "Job",
+        "path": "job",
+        "values": [
+          {
+            "value": "idle",
+            "text": "idle"
+          }
+        ]
+      },
+      {
+        "key": "stop",
+        "label": "Stops",
+        "values": [
+          {
+            "value": "idle",
+            "text": "idle"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [
+    {
+      "command": "run-start",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "main"
+          ]
+        },
+        {
+          "path": "job",
+          "values": [
+            "idle"
+          ]
+        }
+      ],
+      "code": "run-stop.start",
+      "message": "start it again"
+    }
+  ],
+  "warnings": []
+}

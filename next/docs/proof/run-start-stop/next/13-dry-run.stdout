@@ -1,0 +1,8 @@
+
+  run stop · dry run, nothing applied
+  Worktrees  feat/a
+  Job        api
+  Stops      api
+  fingerprint  <FP>
+  → wtm run stop feat/a --job api --expect-fingerprint <FP>   apply this plan
+

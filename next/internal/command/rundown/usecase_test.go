@@ -11,6 +11,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
+	"github.com/LucasPcq/wtm/next/internal/service/runjobs"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,12 +27,12 @@ func TestAStopPlansEachJobsFateAndTheSharedServicesKeptForOthers(t *testing.T) {
 	planned, _ := w.plan(t, w.stopping(featA))
 
 	require.Len(t, planned.Worktrees, 1)
-	assert.Equal(t, rundown.Target{Worktree: featA, Branch: featA, Path: w.at(featA), Profile: "full", Jobs: []rundown.JobPlan{
+	assert.Equal(t, rundown.Target{Profile: "full", StopTarget: runjobs.StopTarget{Worktree: featA, Branch: featA, Path: w.at(featA), Jobs: []runjobs.StopJob{
 		{Name: "api", Kind: project.Service, Hold: run.HoldOwn, Fate: run.FateStop},
 		{Name: "cache", Kind: project.Service, Hold: run.HoldDetached, Fate: run.FateStop, StopCommand: "docker compose down --volumes"},
 		{Name: "web", Kind: project.Service, Hold: run.HoldOwn, Fate: run.FateClear},
 		{Name: "db", Kind: project.Service, Hold: run.HoldClaim, Fate: run.FateRelease, KeptBy: []string{featB}, SharedIn: "main"},
-	}}, planned.Worktrees[0])
+	}}}, planned.Worktrees[0])
 	assert.False(t, planned.Empty)
 }
 
@@ -42,7 +43,7 @@ func TestTheLastHoldsOnASharedServiceStopIt(t *testing.T) {
 	planned, _ := w.plan(t, w.stopping(featA, featB))
 
 	for _, target := range planned.Worktrees {
-		assert.Equal(t, []rundown.JobPlan{{Name: "db", Kind: project.Service, Hold: run.HoldClaim, Fate: run.FateStop, SharedIn: "main"}}, target.Jobs, target.Worktree)
+		assert.Equal(t, []runjobs.StopJob{{Name: "db", Kind: project.Service, Hold: run.HoldClaim, Fate: run.FateStop, SharedIn: "main"}}, target.Jobs, target.Worktree)
 	}
 }
 
@@ -53,7 +54,7 @@ func TestAProfileNarrowsTheStopAndNamesItsJobsNotRunning(t *testing.T) {
 
 	planned, _ := w.plan(t, rundown.Request{Worktrees: []string{featA}, Profile: "dev"})
 
-	assert.Equal(t, []rundown.JobPlan{{Name: "api", Kind: project.Service, Hold: run.HoldOwn, Fate: run.FateStop}}, planned.Worktrees[0].Jobs)
+	assert.Equal(t, []runjobs.StopJob{{Name: "api", Kind: project.Service, Hold: run.HoldOwn, Fate: run.FateStop}}, planned.Worktrees[0].Jobs)
 	assert.Equal(t, []string{"web"}, planned.Worktrees[0].NotRunning)
 }
 
@@ -63,7 +64,7 @@ func TestNothingRunningIsAnEmptyPlan(t *testing.T) {
 	planned, _ := w.plan(t, w.stopping(featA))
 
 	assert.True(t, planned.Empty)
-	assert.Equal(t, []rundown.JobPlan{}, planned.Worktrees[0].Jobs)
+	assert.Equal(t, []runjobs.StopJob{}, planned.Worktrees[0].Jobs)
 }
 
 func TestAllStopsEveryWorktreeOfTheRepositoryRunningSomething(t *testing.T) {
@@ -143,7 +144,7 @@ func TestAStopThatFailsIsThatJobsAndTheOthersAreReported(t *testing.T) {
 	assert.Equal(t, domain.StatusFailed, failed.Status)
 	assert.Equal(t, rundown.CodeStopFailed, failed.Err.Code)
 	assert.Equal(t, "cache", failed.Err.Params["jobs"])
-	assert.Equal(t, map[string]rundown.JobStatus{"api": rundown.JobStopped, "cache": rundown.JobFailed}, statuses(failed))
+	assert.Equal(t, map[string]runjobs.StopStatus{"api": runjobs.StopStopped, "cache": runjobs.StopFailure}, statuses(failed))
 	assert.Equal(t, domain.StatusDone, result.Items[1].Status)
 }
 
@@ -169,7 +170,7 @@ func TestAReleaseACrashClearedAndAWorktreeRunningNothingAreReported(t *testing.T
 
 	result, report := w.apply(t, w.stopping(featA, "main"))
 
-	assert.Equal(t, map[string]rundown.JobStatus{"db": rundown.JobReleased, "web": rundown.JobCleared}, statuses(result.Items[0]))
+	assert.Equal(t, map[string]runjobs.StopStatus{"db": runjobs.StopReleased, "web": runjobs.StopCleared}, statuses(result.Items[0]))
 	unchanged := result.Items[1]
 	assert.Equal(t, domain.StatusDone, unchanged.Status)
 	assert.Equal(t, domain.ReasonUnchanged, unchanged.Reason)
@@ -198,7 +199,7 @@ func TestAStopCancelledLeavesTheStopsNotSentNotReached(t *testing.T) {
 
 	item := result.Items[0]
 	assert.Equal(t, domain.StatusCancelled, item.Status)
-	assert.Equal(t, map[string]rundown.JobStatus{"api": rundown.JobStopped, "db": rundown.JobNotReached}, statuses(item))
+	assert.Equal(t, map[string]runjobs.StopStatus{"api": runjobs.StopStopped, "db": runjobs.StopNotReached}, statuses(item))
 }
 
 func TestTheFollowUpStartsAgainWhatStoppedWithTheProfileItRan(t *testing.T) {
@@ -323,8 +324,8 @@ func TestHoldsLetGoOfTogetherReportThePlannedStop(t *testing.T) {
 
 	result, _ := w.apply(t, w.stopping(featA, featB))
 
-	assert.Equal(t, map[string]rundown.JobStatus{"db": rundown.JobStopped}, statuses(result.Items[0]))
-	assert.Equal(t, map[string]rundown.JobStatus{"db": rundown.JobStopped}, statuses(result.Items[1]))
+	assert.Equal(t, map[string]runjobs.StopStatus{"db": runjobs.StopStopped}, statuses(result.Items[0]))
+	assert.Equal(t, map[string]runjobs.StopStatus{"db": runjobs.StopStopped}, statuses(result.Items[1]))
 }
 
 func TestMainLetsGoOfASharedServiceItHoldsForTheOthersToKeep(t *testing.T) {
@@ -335,8 +336,8 @@ func TestMainLetsGoOfASharedServiceItHoldsForTheOthersToKeep(t *testing.T) {
 	planned, _ := w.plan(t, w.stopping("main"))
 	result, _ := w.apply(t, w.stopping("main"))
 
-	assert.Equal(t, []rundown.JobPlan{{Name: "db", Kind: project.Service, Hold: run.HoldOwn, Fate: run.FateRelease, KeptBy: []string{featA}, SharedIn: "main"}}, planned.Worktrees[0].Jobs)
-	assert.Equal(t, map[string]rundown.JobStatus{"db": rundown.JobReleased}, statuses(result.Items[0]))
+	assert.Equal(t, []runjobs.StopJob{{Name: "db", Kind: project.Service, Hold: run.HoldOwn, Fate: run.FateRelease, KeptBy: []string{featA}, SharedIn: "main"}}, planned.Worktrees[0].Jobs)
+	assert.Equal(t, map[string]runjobs.StopStatus{"db": runjobs.StopReleased}, statuses(result.Items[0]))
 }
 
 // Review: a daemon of another build may not say whether main holds a shared service: the fates are warned approximate when a worktree stopped holds one the index has no record of, one the plan leaves out included; its stop's outcome is taken as it answered.
@@ -353,7 +354,7 @@ func TestASkewedDaemonsSharedFatesAreWarnedApproximateAndItsOutcomesRead(t *test
 
 	assert.Equal(t, []string{rundown.CodeDaemonSkew, rundown.CodeFatesApproximate}, []string{warnings[0].Code, warnings[1].Code})
 	assert.Equal(t, []string{rundown.CodeDaemonSkew, rundown.CodeFatesApproximate}, []string{leftOut[0].Code, leftOut[1].Code})
-	assert.Equal(t, map[string]rundown.JobStatus{"db": rundown.JobReleased}, statuses(result.Items[0]))
+	assert.Equal(t, map[string]runjobs.StopStatus{"db": runjobs.StopReleased}, statuses(result.Items[0]))
 }
 
 // Review: holds let go of together whose service another worktree came to hold meanwhile were each released.
@@ -364,8 +365,8 @@ func TestHoldsLetGoOfTogetherWhileAnotherCameToHoldItReportReleased(t *testing.T
 
 	result, _ := w.apply(t, w.stopping(featA, featB))
 
-	assert.Equal(t, map[string]rundown.JobStatus{"db": rundown.JobReleased}, statuses(result.Items[0]))
-	assert.Equal(t, map[string]rundown.JobStatus{"db": rundown.JobReleased}, statuses(result.Items[1]))
+	assert.Equal(t, map[string]runjobs.StopStatus{"db": runjobs.StopReleased}, statuses(result.Items[0]))
+	assert.Equal(t, map[string]runjobs.StopStatus{"db": runjobs.StopReleased}, statuses(result.Items[1]))
 }
 
 // Review: a release planned whose others let go meanwhile stopped the service: it says so.
@@ -375,7 +376,7 @@ func TestAReleaseThatStoppedTheServiceSaysStopped(t *testing.T) {
 
 	result, _ := w.apply(t, w.stopping(featA))
 
-	assert.Equal(t, map[string]rundown.JobStatus{"db": rundown.JobStopped}, statuses(result.Items[0]))
+	assert.Equal(t, map[string]runjobs.StopStatus{"db": runjobs.StopStopped}, statuses(result.Items[0]))
 }
 
 // Review: a daemon started that still cannot tell which jobs of its index are up is refused, not planned as though none were.
@@ -431,7 +432,7 @@ func TestARemovedWorktreesPathIsResolvedThroughItsLinks(t *testing.T) {
 	planned, _ := w.plan(t, w.stopping(filepath.Join(alias, "wt-removed")))
 
 	require.Len(t, planned.Worktrees, 1)
-	assert.Equal(t, rundown.Target{Worktree: removed, Path: removed, Removed: true, Profile: "dev", Jobs: []rundown.JobPlan{{Name: "api", Kind: project.Service, Hold: run.HoldOwn, Fate: run.FateStop}}}, planned.Worktrees[0])
+	assert.Equal(t, rundown.Target{StopTarget: runjobs.StopTarget{Worktree: removed, Path: removed, Removed: true, Jobs: []runjobs.StopJob{{Name: "api", Kind: project.Service, Hold: run.HoldOwn, Fate: run.FateStop}}}, Profile: "dev"}, planned.Worktrees[0])
 	assert.Equal(t, domain.WorktreeLocks([]string{removed}), planned.Locks())
 }
 
@@ -484,7 +485,7 @@ func TestAllStopsTheRemovedWorktreesJobsToo(t *testing.T) {
 
 	require.Len(t, planned.Worktrees, 2)
 	assert.Equal(t, featA, planned.Worktrees[0].Worktree)
-	assert.Equal(t, rundown.Target{Worktree: removed, Path: removed, Removed: true, Profile: "dev", Jobs: []rundown.JobPlan{{Name: "api", Kind: project.Service, Hold: run.HoldOwn, Fate: run.FateStop}}}, planned.Worktrees[1])
+	assert.Equal(t, rundown.Target{StopTarget: runjobs.StopTarget{Worktree: removed, Path: removed, Removed: true, Jobs: []runjobs.StopJob{{Name: "api", Kind: project.Service, Hold: run.HoldOwn, Fate: run.FateStop}}}, Profile: "dev"}, planned.Worktrees[1])
 }
 
 // Review: a crashed job that started again before the stop was stopped, not cleared.
@@ -494,7 +495,7 @@ func TestACrashThatStartedAgainIsReportedStopped(t *testing.T) {
 
 	result, _ := w.apply(t, w.stopping(featA))
 
-	assert.Equal(t, map[string]rundown.JobStatus{"web": rundown.JobStopped}, statuses(result.Items[0]))
+	assert.Equal(t, map[string]runjobs.StopStatus{"web": runjobs.StopStopped}, statuses(result.Items[0]))
 }
 
 // Review: a worktree whose only jobs stopped are holds on shared services is started again under their profile.
@@ -535,4 +536,18 @@ func TestAPathOfJobsOfNoKnownRepositoryIsRefusedSayingSo(t *testing.T) {
 
 	assert.Equal(t, domain.CodeNotFound, refused.Fields[0].Code)
 	assert.Contains(t, refused.Fields[0].Template, "without saying which repository")
+}
+
+// Review: a shared service main runs for the others alone gives main no profile to start again.
+func TestASharedServiceRunForTheOthersGivesItsCheckoutNoProfile(t *testing.T) {
+	w := newWorld(t)
+	w.shared(false, featA)
+	w.daemon.listed[0].Profile = "full"
+
+	planned, _ := w.plan(t, rundown.Request{All: true})
+
+	require.Len(t, planned.Worktrees, 2)
+	assert.Equal(t, "main", planned.Worktrees[0].Worktree)
+	assert.Empty(t, planned.Worktrees[0].Profile)
+	assert.Equal(t, "full", planned.Worktrees[1].Profile)
 }

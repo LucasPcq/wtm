@@ -1,0 +1,156 @@
+{
+  "v": 2,
+  "command": "run-stop",
+  "ok": true,
+  "op": "<OP>",
+  "items": [
+    {
+      "subject": "feat/a",
+      "status": "done",
+      "detail": {
+        "path": "<SB>/acme.trees/feat-a",
+        "jobs": [
+          {
+            "name": "db",
+            "status": "stopped"
+          }
+        ]
+      }
+    },
+    {
+      "subject": "feat/b",
+      "status": "done",
+      "detail": {
+        "path": "<SB>/acme.trees/feat-b",
+        "jobs": [
+          {
+            "name": "db",
+            "status": "stopped"
+          }
+        ]
+      }
+    }
+  ],
+  "plan": {
+    "job": "db",
+    "worktrees": [
+      {
+        "worktree": "feat/a",
+        "branch": "feat/a",
+        "path": "<SB>/acme.trees/feat-a",
+        "jobs": [
+          {
+            "name": "db",
+            "kind": "service",
+            "hold": "claim",
+            "fate": "stop",
+            "shared_in": "main"
+          }
+        ]
+      },
+      {
+        "worktree": "feat/b",
+        "branch": "feat/b",
+        "path": "<SB>/acme.trees/feat-b",
+        "jobs": [
+          {
+            "name": "db",
+            "kind": "service",
+            "hold": "claim",
+            "fate": "stop",
+            "shared_in": "main"
+          }
+        ]
+      }
+    ],
+    "recap": [
+      {
+        "key": "worktrees",
+        "label": "Worktrees",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/a",
+            "text": "feat/a"
+          },
+          {
+            "value": "feat/b",
+            "text": "feat/b"
+          }
+        ]
+      },
+      {
+        "key": "job",
+        "label": "Job",
+        "path": "job",
+        "values": [
+          {
+            "value": "db",
+            "text": "db"
+          }
+        ]
+      },
+      {
+        "key": "stop:feat/a",
+        "label": "Stops in feat/a",
+        "values": [
+          {
+            "value": "db (stops in main: no worktree keeps it)",
+            "text": "db (stops in main: no worktree keeps it)"
+          }
+        ]
+      },
+      {
+        "key": "stop:feat/b",
+        "label": "Stops in feat/b",
+        "values": [
+          {
+            "value": "db (stops in main: no worktree keeps it)",
+            "text": "db (stops in main: no worktree keeps it)"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [
+    {
+      "command": "run-start",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/a"
+          ]
+        },
+        {
+          "path": "job",
+          "values": [
+            "db"
+          ]
+        }
+      ],
+      "code": "run-stop.start",
+      "message": "start it again"
+    },
+    {
+      "command": "run-start",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/b"
+          ]
+        },
+        {
+          "path": "job",
+          "values": [
+            "db"
+          ]
+        }
+      ],
+      "code": "run-stop.start",
+      "message": "start it again"
+    }
+  ],
+  "warnings": []
+}

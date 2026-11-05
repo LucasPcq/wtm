@@ -2,7 +2,6 @@ package rundown
 
 import (
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -86,8 +85,8 @@ type Questions struct {
 // NewQuestions builds the questions for the request on the facts.
 func NewQuestions(f Facts, req Request) Questions {
 	picked, origin := f.picked(req)
-	_, problems := f.entries(picked)
-	questions := Questions{Picked: picked, Origin: origin, Options: f.worktreeOptions(), Profiles: f.profileOptions(), Request: req, Errors: problems}
+	_, problems := f.Entries(picked)
+	questions := Questions{Picked: picked, Origin: origin, Options: f.WorktreeOptions(), Profiles: f.profileOptions(), Request: req, Errors: problems}
 	if len(picked) == 0 && !req.All {
 		questions.Errors = append(questions.Errors, domain.Required(domain.PathWorktree))
 	}
@@ -135,7 +134,7 @@ func (f Facts) picked(req Request) ([]string, domain.Origin) {
 	case req.All:
 		return nil, domain.OriginRequest
 	}
-	if standing := f.standing(); standing != "" {
+	if standing := f.Standing(); standing != "" {
 		return []string{standing}, domain.OriginDefault
 	}
 
@@ -163,8 +162,4 @@ func Resolve(f Facts, req Request) (Request, error) {
 
 	req.Worktrees = questions.Picked
 	return req, nil
-}
-
-func entryPath(index int) string {
-	return domain.PathWorktree + "[" + strconv.Itoa(index) + "]"
 }

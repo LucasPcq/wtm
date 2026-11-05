@@ -1,14 +1,19 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/adapter/events"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/ui/cli"
+	"github.com/LucasPcq/wtm/next/internal/ui/runview"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -71,4 +76,50 @@ func TestANamedProjectDirOutsideAnyRepositoryIsRefusedByItsResolvedPath(t *testi
 	require.True(t, ok, "%v", err)
 	assert.Equal(t, domain.CodeNotARepository, failure.Code)
 	assert.Equal(t, gittest.Resolved(t, named)+" is not a git repository", failure.Message)
+}
+
+// Q5: the live view's s and r are run stop and run start --restart of the job selected, unattended, failing with why.
+func TestTheLiveViewsKeysStopAJobAndStartItAgain(t *testing.T) {
+	main := configured(t)
+	writeRun(t, main, idleJob("idle"))
+	t.Setenv("HOME", shortDir(t))
+	serving(t, daemonParams{Socket: events.SocketPath()})
+	startIdle(t, main, "idle")
+	idle := runview.Act{Worktree: "main", Dir: main, Job: "idle"}
+	up := func() bool {
+		return slices.ContainsFunc(daemonJobs(t), func(job run.Job) bool { return job.Name == "idle" && job.Up })
+	}
+
+	restarted, err := restartJob(t.Context(), idle)
+	require.NoError(t, err)
+	assert.Equal(t, runview.Acted{}, restarted)
+	assert.True(t, up())
+	stopped, err := stopJob(t.Context(), idle)
+	require.NoError(t, err)
+	assert.Equal(t, runview.Acted{}, stopped)
+	assert.False(t, up())
+
+	again, err := stopJob(t.Context(), idle)
+	require.NoError(t, err)
+	assert.Equal(t, runview.Acted{Unchanged: true}, again, "a job not up: nothing to stop")
+	_, err = stopJob(t.Context(), runview.Act{Worktree: "main", Dir: main, Job: "ghost"})
+	assert.ErrorContains(t, err, "ghost")
+}
+
+// Review: a restart a refusal stops says why and the command line that does it anyway.
+func TestARefusedRestartOfTheLiveViewSaysHowToForceIt(t *testing.T) {
+	refused := failed[struct{}](nil, &domain.Error{Kind: domain.KindRefused, Code: "run-start.unsafe", Message: "nothing started: a job changes data feat/v does not own", FollowUp: &domain.FollowUp{Command: "run-start", Answers: []domain.Answered{{Path: "worktree", Values: []string{"feat/v"}}, {Path: "job", Values: []string{"migrate"}}, {Path: "restart", Values: []string{"true"}}, {Path: "force", Values: []string{"true"}}}, Message: "start them anyway"}})
+
+	assert.EqualError(t, refused, "nothing started: a job changes data feat/v does not own; wtm-next run start feat/v --force --job migrate --restart start them anyway")
+}
+
+// Review: an action cut short before it did anything is context.Canceled, which the view says nothing of once left; a request refused with nothing to say still says its message.
+func TestTheLiveViewsFailuresAreCancelledOrSaid(t *testing.T) {
+	cancelled := failed[struct{}](nil, &domain.Error{Kind: domain.KindCancelled, Code: domain.CodeInterrupted, Message: "interrupted"})
+	bare := failed[struct{}](nil, &domain.Error{Kind: domain.KindInvalid, Code: "request.invalid", Message: "the request is invalid"})
+
+	assert.ErrorIs(t, cancelled, context.Canceled)
+	assert.EqualError(t, bare, "the request is invalid")
+	assert.Equal(t, "wtm-next run start feat/a --job api", startAgain(runview.Act{Worktree: "feat/a", Job: "api"}))
+	assert.Equal(t, "wtm-next status feat/a", showJob(runview.Act{Worktree: "feat/a", Job: "api"}))
 }

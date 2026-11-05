@@ -1,0 +1,24 @@
+{
+  "v": 2,
+  "command": "run-stop",
+  "ok": false,
+  "op": "op-1",
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "invalid",
+    "code": "request.invalid",
+    "message": "the request is invalid",
+    "fields": [
+      {
+        "path": "job",
+        "code": "not_found",
+        "params": {
+          "value": "ghost"
+        },
+        "flag": "--job",
+        "message": "ghost is neither a job of run.toml nor one the run daemon runs in the worktrees picked"
+      }
+    ]
+  }
+}

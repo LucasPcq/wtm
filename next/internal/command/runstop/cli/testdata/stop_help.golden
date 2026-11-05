@@ -1,0 +1,33 @@
+
+  Stop one job the run daemon runs in each worktree named, or in the one you stand in;
+  a worktree it is not up in is left as it is. Several worktrees stop at once.
+
+  A shared service a worktree holds is released: it runs on for the worktrees still holding it, and
+  stops with its last hold. A stack stops by its stop command. A job that crashed is cleared.
+  A worktree removed while its jobs ran is named by its path.
+
+  Usage:
+    wtm-next run stop [worktree...] [flags]
+
+  Examples:
+    # The api of the worktree you stand in
+    wtm run stop --job api
+
+    # The shared database's hold of two worktrees
+    wtm run stop feat/login fix/typo --job db
+
+    # For a script or an agent
+    wtm run stop feat/login --job api --yes --output json
+
+  Flags:
+        --ask                         Ask again the questions this repository remembers an answer to, to change or forget it
+    -n, --dry-run                     Show the plan and its fingerprint, apply nothing
+        --expect-fingerprint string   Apply only if the facts still have this fingerprint, the one --dry-run printed
+    -h, --help                        help for stop
+        --job string                  The job to stop, a job of run.toml or one the run daemon runs there
+        --output string               Output format: text or json (default "text")
+    -y, --yes                         Run unattended: no question, no confirmation (the worktree you stand in unless given; --job is required)
+
+  Global Flags:
+    -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+

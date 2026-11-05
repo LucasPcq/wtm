@@ -1,0 +1,59 @@
+{
+  "v": 2,
+  "command": "run-start",
+  "ok": true,
+  "op": "op-1",
+  "plan": {
+    "job": "api",
+    "restart": false,
+    "worktrees": [
+      {
+        "worktree": "feat/a",
+        "branch": "feat/a",
+        "path": "/repo/wt-feat-a",
+        "numbered": true,
+        "jobs": [
+          {
+            "name": "api",
+            "kind": "service",
+            "action": "start",
+            "step": 1,
+            "ports": {
+              "PORT": 4010
+            }
+          }
+        ]
+      }
+    ],
+    "exclusive": false,
+    "others": [],
+    "no_probe": false,
+    "recap": [
+      {
+        "key": "worktree",
+        "label": "Worktree",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/a",
+            "text": "feat/a"
+          }
+        ]
+      },
+      {
+        "key": "job",
+        "label": "Job",
+        "path": "job",
+        "values": [
+          {
+            "value": "api",
+            "text": "api"
+          }
+        ]
+      }
+    ]
+  },
+  "fingerprint": "fe47c3f2d126f3e2b6616a75",
+  "follow_ups": [],
+  "warnings": []
+}

@@ -145,6 +145,17 @@ func TestAStartHandsOutTheLinesAndReturnsTheJobStarted(t *testing.T) {
 	assert.Equal(t, []run.Line{{At: started, Text: "ready"}}, lines)
 }
 
+func TestARestartsStartReachesTheDaemonAsOne(t *testing.T) {
+	fake := &jobs{}
+	socket, _ := served(t, fake, "1.0")
+	spec := run.Spec{Job: project.Job{Name: "web"}, WorkDir: "/wt/a", Restart: true}
+
+	_, err := daemon.Daemon{SocketPath: socket, Version: "1.0"}.Start(t.Context(), spec, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, []any{spec}, starts(fake))
+}
+
 func TestAStartThatMeetsADaemonStoppingIsMadeAgainOnce(t *testing.T) {
 	fake := &jobs{once: &run.Error{Code: run.CodeStopping, Message: "the run daemon is stopping"}}
 	socket, _ := served(t, fake, "1.0")
