@@ -37,6 +37,7 @@ type daemon struct {
 	ensured      bool
 	calls        []string
 	started      []run.Spec
+	stopLines    []string
 }
 
 func (d *daemon) Jobs(context.Context) ([]run.Job, error) {
@@ -66,10 +67,13 @@ func (d *daemon) Start(_ context.Context, spec run.Spec, _ func(run.Line)) (run.
 	return job, nil
 }
 
-func (d *daemon) Stop(_ context.Context, req run.Stop) (run.Outcome, error) {
+func (d *daemon) Stop(_ context.Context, req run.Stop, out func(run.Line)) (run.Outcome, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.calls = append(d.calls, "stop "+req.Name)
+	for _, line := range d.stopLines {
+		out(run.Line{Text: line})
+	}
 	for i, job := range d.listed {
 		if job.Name == req.Name && job.WorkDir == req.WorkDir {
 			d.listed[i].Up, d.listed[i].State = false, run.Stopped

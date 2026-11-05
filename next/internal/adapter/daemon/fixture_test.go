@@ -87,8 +87,11 @@ func (j *jobs) Start(spec run.Spec, out func(run.Line)) (run.Job, error) {
 	return web, j.err
 }
 
-func (j *jobs) Stop(req run.Stop) (run.Outcome, error) {
+func (j *jobs) Stop(req run.Stop, out func(run.Line)) (run.Outcome, error) {
 	j.record(req)
+	for _, line := range j.lines {
+		out(run.Line{At: started, Text: line})
+	}
 	return j.outcome, j.err
 }
 

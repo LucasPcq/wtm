@@ -121,7 +121,7 @@ func (d *daemon) Jobs(context.Context) ([]run.Job, error) {
 
 func (d *daemon) Ensure(context.Context) error { return nil }
 
-func (d *daemon) Stop(_ context.Context, req run.Stop) (run.Outcome, error) {
+func (d *daemon) Stop(_ context.Context, req run.Stop, _ func(run.Line)) (run.Outcome, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	if req.Name == "cache" && req.WorkDir == pathOf(featB) {

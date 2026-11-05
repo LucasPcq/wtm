@@ -275,7 +275,7 @@ func (d *daemon) Start(_ context.Context, spec run.Spec, out func(run.Line)) (ru
 	return job, nil
 }
 
-func (d *daemon) Stop(_ context.Context, req run.Stop) (run.Outcome, error) {
+func (d *daemon) Stop(_ context.Context, req run.Stop, _ func(run.Line)) (run.Outcome, error) {
 	if d.onStop != nil {
 		d.onStop()
 	}

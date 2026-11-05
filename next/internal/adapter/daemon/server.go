@@ -24,7 +24,7 @@ type Jobs interface {
 	List(workDir string) []run.Job
 	Proxy() run.Proxy
 	Start(spec run.Spec, out func(run.Line)) (run.Job, error)
-	Stop(req run.Stop) (run.Outcome, error)
+	Stop(req run.Stop, out func(run.Line)) (run.Outcome, error)
 	StopAll(req run.StopAll) ([]run.StoppedJob, error)
 	Lines(ctx context.Context, req run.Tail, out func(run.Line)) (run.Job, error)
 	Attach(req run.Window) (run.Session, error)
@@ -77,7 +77,10 @@ func (s Server) Serve(conn net.Conn, line []byte) {
 	case actionStart:
 		s.start(req, reply)
 	case actionStop:
-		outcome, err := s.Jobs.Stop(run.Stop{Name: req.Name, WorkDir: req.WorkDir, CorrelationID: req.CorrelationID})
+		// A stack's stop command prints as a start does: each line goes to the client before the outcome.
+		outcome, err := s.Jobs.Stop(run.Stop{Name: req.Name, WorkDir: req.WorkDir, CorrelationID: req.CorrelationID}, func(line run.Line) {
+			_ = reply(answer{Status: statusLine, At: stamp(line.At), Text: line.Text})
+		})
 		// released is the legacy client's word for a stop that let go of a shared job.
 		_ = reply(answerOf(err, answer{Status: statusOK, Outcome: string(outcome), Released: outcome == run.OutcomeReleased}))
 	case actionStopAll:

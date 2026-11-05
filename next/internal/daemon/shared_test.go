@@ -40,9 +40,9 @@ func TestASharedJobStopsOnceItsLastHolderLetsGo(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	first, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"})
+	first, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"}, nil)
 	require.NoError(t, err)
-	last, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/b"})
+	last, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/b"}, nil)
 	require.NoError(t, err)
 
 	assert.Equal(t, run.OutcomeReleased, first)
@@ -58,12 +58,12 @@ func TestTheMainCheckoutHoldingASharedJobKeepsItUpPastItsLastClaim(t *testing.T)
 
 	_, err = w.Start(shared("db", "/repo", "down db"), nil)
 	require.NoError(t, err)
-	released, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"})
+	released, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"}, nil)
 	require.NoError(t, err)
 
 	assert.Equal(t, run.OutcomeReleased, released, "main joined the job a worktree started, and holds it")
 	assert.Equal(t, []string{"up db"}, w.spawner.lines())
-	stopped, err := w.Stop(run.Stop{Name: "db", WorkDir: "/repo"})
+	stopped, err := w.Stop(run.Stop{Name: "db", WorkDir: "/repo"}, nil)
 	require.NoError(t, err)
 	assert.Equal(t, run.OutcomeStopped, stopped)
 	assert.Equal(t, []string{"up db", "down db"}, w.spawner.lines())
@@ -200,7 +200,7 @@ func TestAClaimDuringTheLastHoldsReleaseWaitsAndStartsTheJobAgain(t *testing.T) 
 	resume := w.index.stalling()
 	stopped := make(chan run.Outcome, 1)
 	go func() {
-		outcome, _ := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"})
+		outcome, _ := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"}, nil)
 		stopped <- outcome
 	}()
 	// Held between the release that found nobody holding the job and its stop.
@@ -266,10 +266,10 @@ func TestAHoldLetGoOfTwiceIsLetGoOfOnce(t *testing.T) {
 	}
 	a, b := w.jobOf(key{workDir: "/wt/a", name: "db"}), w.jobOf(key{workDir: "/wt/b", name: "db"})
 
-	released, err := w.release(a, "")
+	released, err := w.letGo(letGoParams{Job: a})
 	require.NoError(t, err)
 	assert.Equal(t, run.OutcomeReleased, released, "the other claim still holds it")
-	again, err := w.release(a, "")
+	again, err := w.letGo(letGoParams{Job: a})
 	require.NoError(t, err)
 	assert.Equal(t, run.OutcomeNotRunning, again)
 	stops := 0
@@ -283,7 +283,7 @@ func TestAHoldLetGoOfTwiceIsLetGoOfOnce(t *testing.T) {
 	var releasing sync.WaitGroup
 	release := func() {
 		releasing.Go(func() {
-			_, err := w.release(b, "")
+			_, err := w.letGo(letGoParams{Job: b})
 			assert.NoError(t, err)
 		})
 	}
@@ -307,12 +307,12 @@ func TestAStaleReleaseLeavesTheWorktreesNewerClaim(t *testing.T) {
 		require.NoError(t, err)
 	}
 	old := w.jobOf(key{workDir: "/wt/a", name: "db"})
-	_, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"})
+	_, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"}, nil)
 	require.NoError(t, err)
 	_, err = w.Start(shared("db", "/wt/a", "down db"), nil)
 	require.NoError(t, err)
 
-	_, err = w.release(old, "")
+	_, err = w.letGo(letGoParams{Job: old})
 
 	require.NoError(t, err)
 	require.Len(t, w.List("/wt/a"), 1)
@@ -397,7 +397,7 @@ func TestAStartWaitingOnAStacksStopPollsIt(t *testing.T) {
 	w.waited = func() { waits.Add(1) }
 	_, err := w.Start(shared("db", "/wt/a", "down db"), nil)
 	require.NoError(t, err)
-	go func() { _, _ = w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"}) }()
+	go func() { _, _ = w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"}, nil) }()
 	require.Eventually(t, func() bool { return slices.Contains(w.spawner.lines(), "down db") }, time.Second, time.Millisecond)
 
 	claim := w.claimed("/wt/b")
@@ -458,7 +458,7 @@ func TestAHoldGoneWhileItsNamespaceIsMadeFailsTheStart(t *testing.T) {
 		name string
 		do   func(t *testing.T, w *world)
 	}{
-		{"stopped", func(_ *testing.T, w *world) { _, _ = w.Stop(run.Stop{Name: "db", WorkDir: "/wt/b"}) }},
+		{"stopped", func(_ *testing.T, w *world) { _, _ = w.Stop(run.Stop{Name: "db", WorkDir: "/wt/b"}, nil) }},
 		{"crashed", func(t *testing.T, w *world) {
 			w.spawner.process("up db").end(1)
 			require.Eventually(t, func() bool { return len(w.List("/wt/b")) == 0 }, time.Second, time.Millisecond)
@@ -536,7 +536,7 @@ func TestAFailedNamespaceOfTheMainCheckoutLeavesItsNewerHold(t *testing.T) {
 		stale <- err
 	}()
 	require.Eventually(t, func() bool { return slices.Contains(w.spawner.lines(), "createdb") }, time.Second, time.Millisecond)
-	released, err := w.Stop(run.Stop{Name: "db", WorkDir: "/repo"})
+	released, err := w.Stop(run.Stop{Name: "db", WorkDir: "/repo"}, nil)
 	require.NoError(t, err)
 	require.Equal(t, run.OutcomeReleased, released)
 	_, err = w.Start(main, nil)
@@ -545,7 +545,7 @@ func TestAFailedNamespaceOfTheMainCheckoutLeavesItsNewerHold(t *testing.T) {
 	close(first)
 
 	require.Error(t, <-stale)
-	last, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"})
+	last, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"}, nil)
 	require.NoError(t, err)
 	assert.Equal(t, run.OutcomeReleased, last, "the main checkout's newer hold stands")
 	assert.NotContains(t, w.spawner.lines(), "down db")

@@ -141,7 +141,7 @@ func TestStopStopsTheServicesGroupAndAnnouncesItForTheStoppingCommand(t *testing
 	_, err := w.Start(service("web"), nil)
 	require.NoError(t, err)
 
-	outcome, err := w.Stop(run.Stop{Name: "web", WorkDir: "/wt/a", CorrelationID: "stop-1"})
+	outcome, err := w.Stop(run.Stop{Name: "web", WorkDir: "/wt/a", CorrelationID: "stop-1"}, nil)
 
 	require.NoError(t, err)
 	assert.Equal(t, run.OutcomeStopped, outcome)
@@ -158,9 +158,9 @@ func TestStoppingAJobThatIsNotUpSaysNothingWasRunning(t *testing.T) {
 	require.NoError(t, err)
 	w.settled(t, "web", run.Crashed)
 
-	unknown, err := w.Stop(run.Stop{Name: "nope", WorkDir: "/x"})
+	unknown, err := w.Stop(run.Stop{Name: "nope", WorkDir: "/x"}, nil)
 	require.NoError(t, err)
-	ended, err := w.Stop(run.Stop{Name: "web", WorkDir: "/wt/a"})
+	ended, err := w.Stop(run.Stop{Name: "web", WorkDir: "/wt/a"}, nil)
 	require.NoError(t, err)
 
 	assert.Equal(t, run.OutcomeNotRunning, unknown)
@@ -187,7 +187,7 @@ func TestADetachedStackStopsWithItsStopCommand(t *testing.T) {
 	_, err := w.Start(stack("db"), nil)
 	require.NoError(t, err)
 
-	outcome, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"})
+	outcome, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"}, nil)
 
 	require.NoError(t, err)
 	assert.Equal(t, run.OutcomeStopped, outcome)
@@ -196,12 +196,24 @@ func TestADetachedStackStopsWithItsStopCommand(t *testing.T) {
 	assert.Empty(t, w.index.names())
 }
 
+func TestAStackHandsTheLinesOfItsStopCommandToTheStop(t *testing.T) {
+	w := newWorld(t, map[string]script{"up db": exits(0), "down db": exits(0, "Container db Stopping", "Container db Stopped")})
+	_, err := w.Start(stack("db"), nil)
+	require.NoError(t, err)
+	var lines []string
+
+	_, err = w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"}, func(line run.Line) { lines = append(lines, line.Text) })
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"Container db Stopping", "Container db Stopped"}, lines)
+}
+
 func TestAStopCommandThatFailsLeavesTheStackUp(t *testing.T) {
 	w := newWorld(t, map[string]script{"up db": exits(0), "down db": exits(2)})
 	_, err := w.Start(stack("db"), nil)
 	require.NoError(t, err)
 
-	_, err = w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"})
+	_, err = w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"}, nil)
 
 	var failure *run.Error
 	require.ErrorAs(t, err, &failure)
@@ -348,7 +360,7 @@ func TestAStopDuringARelaunchStopsTheStackItself(t *testing.T) {
 	go func() { _, _ = w.Start(stack("db"), nil) }()
 	require.Eventually(t, func() bool { return len(w.spawner.lines()) == 2 }, time.Second, time.Millisecond)
 
-	outcome, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"})
+	outcome, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"}, nil)
 
 	require.NoError(t, err)
 	assert.Equal(t, run.OutcomeStopped, outcome)
@@ -365,7 +377,7 @@ func TestAStopCommandThatFailsDuringARelaunchLeavesTheStackUpAndIndexed(t *testi
 	go func() { _, _ = w.Start(stack("db"), nil) }()
 	require.Eventually(t, func() bool { return len(w.spawner.lines()) == 2 }, time.Second, time.Millisecond)
 
-	outcome, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"})
+	outcome, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"}, nil)
 
 	var failure *run.Error
 	require.ErrorAs(t, err, &failure)
@@ -374,7 +386,7 @@ func TestAStopCommandThatFailsDuringARelaunchLeavesTheStackUpAndIndexed(t *testi
 	assert.True(t, w.job(t, "db").Up)
 	assert.Equal(t, []string{"/wt/a:db"}, w.index.names())
 	w.spawner.scripts["down db"] = exits(0)
-	retried, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"})
+	retried, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"}, nil)
 	require.NoError(t, err)
 	assert.Equal(t, run.OutcomeStopped, retried, "a stop tried again still reaches the stack")
 }
@@ -414,13 +426,13 @@ func TestAStopWhoseStackOthersTookDownMeanwhileEndsQuietly(t *testing.T) {
 	launcher := w.spawner.process("up db")
 	launcher.afterStop = func() {
 		w.given(t, first)
-		_, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"})
+		_, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"}, nil)
 		require.NoError(t, err)
-		_, err = w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"})
+		_, err = w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"}, nil)
 		require.NoError(t, err)
 	}
 
-	outcome, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"})
+	outcome, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"}, nil)
 
 	require.NoError(t, err)
 	assert.Equal(t, run.OutcomeStopped, outcome)
@@ -437,7 +449,7 @@ func TestAStopNeverRunsTheStopCommandOnALaunchStartedMeanwhile(t *testing.T) {
 		require.Eventually(t, func() bool { return len(w.spawner.lines()) == 3 }, time.Second, time.Millisecond)
 	}
 
-	outcome, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"})
+	outcome, err := w.Stop(run.Stop{Name: "db", WorkDir: "/wt/a"}, nil)
 
 	require.NoError(t, err)
 	assert.Equal(t, run.OutcomeStopped, outcome)
@@ -520,7 +532,7 @@ func TestARestartsLogContinuesTheRunBeforeBehindItsMark(t *testing.T) {
 	_, err := w.Start(spec, nil)
 	require.NoError(t, err)
 	require.Eventually(t, func() bool { return len(w.logs.texts(spec.LogDir, "web")) == 2 }, time.Second, time.Millisecond)
-	_, err = w.Stop(run.Stop{Name: "web", WorkDir: "/wt/a"})
+	_, err = w.Stop(run.Stop{Name: "web", WorkDir: "/wt/a"}, nil)
 	require.NoError(t, err)
 
 	spec.Restart = true
@@ -541,7 +553,7 @@ func TestAStartWhoseSpawnFailsLeavesTheLogOfTheRunBefore(t *testing.T) {
 	_, err := w.Start(spec, nil)
 	require.NoError(t, err)
 	require.Eventually(t, func() bool { return len(w.logs.texts(spec.LogDir, "web")) == 2 }, time.Second, time.Millisecond)
-	_, err = w.Stop(run.Stop{Name: "web", WorkDir: "/wt/a"})
+	_, err = w.Stop(run.Stop{Name: "web", WorkDir: "/wt/a"}, nil)
 	require.NoError(t, err)
 	w.spawner.mu.Lock()
 	w.spawner.fail = true
