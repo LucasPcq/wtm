@@ -2,12 +2,12 @@ package runup
 
 import (
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
+	"github.com/LucasPcq/wtm/next/internal/service/runjobs"
 )
 
 // ----------------------------------------------------------------------------
@@ -34,8 +34,8 @@ func (r Request) From(caller domain.Caller) Request {
 // The paths of run up's own fields, by which each surface words them; the worktrees' is domain.PathWorktree.
 const (
 	PathProfile   = "profile"
-	PathExclusive = "exclusive"
-	PathParallel  = "parallel"
+	PathExclusive = runjobs.PathExclusive
+	PathParallel  = runjobs.PathParallel
 	PathForce     = "force"
 	PathNoProbe   = "no_probe"
 	PathDetach    = "detach"
@@ -121,9 +121,9 @@ type Worktrees struct {
 // NewQuestions builds the questions for the request on the facts.
 func NewQuestions(f Facts, req Request) Questions {
 	picked, origin := f.picked(req)
-	targets, problems := f.entries(picked)
+	targets, problems := f.Entries(Name, picked)
 	questions := Questions{
-		Worktrees: Worktrees{Picked: picked, Origin: origin, Options: f.worktreeOptions()},
+		Worktrees: Worktrees{Picked: picked, Origin: origin, Options: f.WorktreeOptions()},
 		Profile:   f.profile(req),
 		Profiles:  f.profileOptions(targets),
 		Request:   req,
@@ -136,9 +136,9 @@ func NewQuestions(f Facts, req Request) Questions {
 
 	exclusive := f.exclusive(req, targets)
 	questions.Exclusive = exclusive.Confirm
-	questions.Errors = append(questions.Errors, exclusive.problems...)
+	questions.Errors = append(questions.Errors, exclusive.Problems...)
 
-	risky := len(f.risks(targets, f.jobsOf(questions.Profile.Value))) > 0
+	risky := f.Risky(targets, f.jobsOf(questions.Profile.Value))
 	questions.Force = domain.Confirm{Answer: domain.Answer[bool]{Value: req.Force, Origin: originOf(req.Force)}}
 	if !risky {
 		questions.Force.Skip = domain.SkipSafe
@@ -178,7 +178,7 @@ func (f Facts) picked(req Request) ([]string, domain.Origin) {
 	if len(req.Worktrees) > 0 {
 		return req.Worktrees, domain.OriginRequest
 	}
-	if standing := f.standing(); standing != "" {
+	if standing := f.Standing(); standing != "" {
 		return []string{standing}, domain.OriginDefault
 	}
 
@@ -206,7 +206,7 @@ func (f Facts) profile(req Request) domain.Choice[string] {
 }
 
 // profileOptions are the profiles run.toml declares, in its order, each with its jobs, whether it is the default and which of the targets run it now.
-func (f Facts) profileOptions(targets []Target) []domain.Option {
+func (f Facts) profileOptions(targets []runjobs.Target) []domain.Option {
 	options := make([]domain.Option, 0, len(f.Run.Profiles))
 	for _, profile := range f.Run.Profiles {
 		option := domain.Option{Value: profile.Name, Default: profile.Default, Jobs: profile.Jobs}
@@ -222,10 +222,10 @@ func (f Facts) profileOptions(targets []Target) []domain.Option {
 
 // The codes of the problems of a request: a profile run.toml does not declare, a worktree whose directory is gone or whose record does not read, and --exclusive beside several worktrees or beside --parallel.
 const (
-	CodeWorktreeGone   = Name + ".worktree_gone"
+	CodeWorktreeGone   = Name + runjobs.WorktreeGone
 	CodeMetaUnreadable = Name + domain.MetaUnreadable
-	CodeExclusiveMany  = Name + ".exclusive_several"
-	CodeBothWays       = Name + ".exclusive_and_parallel"
+	CodeExclusiveMany  = Name + runjobs.ExclusiveSeveral
+	CodeBothWays       = Name + runjobs.ExclusiveAndParallel
 )
 
 // profileProblems are the problems of the profile asked: one run.toml does not declare, or none when it declares several and none is the default.
@@ -242,37 +242,9 @@ func (f Facts) profileProblems(req Request) []domain.FieldError {
 	return nil
 }
 
-// exclusion is the question of whether the other worktrees' jobs are stopped first, and its problems.
-type exclusion struct {
-	domain.Confirm
-	problems []domain.FieldError
-}
-
-// exclusive settles whether the other worktrees' jobs are stopped first: --exclusive or --parallel, else run.toml's concurrency, else asked when another worktree runs jobs, keeping them by default. run.toml's exclusive cannot stop all but one of several worktrees: it is set aside for them, with a warning the plan gives.
-func (f Facts) exclusive(req Request, targets []Target) exclusion {
-	switch {
-	case req.Parallel && req.Exclusive != nil && *req.Exclusive:
-		return exclusion{Confirm: given(true), problems: []domain.FieldError{{Path: PathExclusive, Code: CodeBothWays, Template: "{path} stops the others' jobs, which --parallel keeps", With: []string{PathParallel}}}}
-	case req.Parallel:
-		return exclusion{Confirm: given(false)}
-	case req.Exclusive != nil && *req.Exclusive && len(targets) > 1:
-		return exclusion{Confirm: given(true), problems: []domain.FieldError{{Path: PathExclusive, Code: CodeExclusiveMany, Template: "{path} stops all but one worktree: it cannot start several"}}}
-	case req.Exclusive != nil:
-		return exclusion{Confirm: given(*req.Exclusive)}
-	}
-
-	question := domain.Confirm{Answer: domain.Answer[bool]{Origin: domain.OriginDefault}}
-	switch {
-	case len(f.others(targets)) == 0:
-		question.Skip = domain.SkipAlone
-	case f.Run.Concurrency != "":
-		question.Value, question.Origin, question.Skip = f.Run.Concurrency == project.Exclusive && len(targets) <= 1, domain.OriginConfig, domain.SkipConfigured
-	}
-	return exclusion{Confirm: question}
-}
-
-func given(yes bool) domain.Confirm {
-	return domain.Confirm{Answer: domain.Answer[bool]{Value: yes, Origin: domain.OriginRequest}}
+// exclusive settles whether the other worktrees' jobs are stopped first (runjobs.Facts.Exclusive): --exclusive or --parallel, else run.toml's concurrency, else asked when another worktree runs jobs.
+func (f Facts) exclusive(req Request, targets []runjobs.Target) runjobs.Exclusion {
+	return f.Exclusive(runjobs.ExclusiveParams{Command: Name, Exclusive: req.Exclusive, Parallel: req.Parallel, Targets: targets})
 }
 
 // ----------------------------------------------------------------------------
@@ -287,8 +259,4 @@ func Resolve(f Facts, req Request) (Request, error) {
 
 	req.Worktrees, req.Profile = questions.Worktrees.Picked, questions.Profile.Value
 	return req, nil
-}
-
-func entryPath(index int) string {
-	return domain.PathWorktree + "[" + strconv.Itoa(index) + "]"
 }

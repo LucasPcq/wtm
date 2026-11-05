@@ -16,6 +16,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/service/operationtest"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
+	"github.com/LucasPcq/wtm/next/internal/service/runjobs"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 )
 
@@ -93,8 +94,7 @@ func (w world) env() uicli.Env {
 
 func (w world) open(context.Context, string) (rundown.UseCase, error) {
 	return rundown.UseCase{
-		Git:        w.git,
-		Daemon:     w.daemon,
+		Stops:      runjobs.Stops{Daemon: w.daemon, Gone: repository.GoneIn(w.git), Located: repository.LocatedIn(w.git), Locate: repository.LocateIn(w.git)},
 		Repository: repository.Service{Config: w.config, Git: w.git, MainPath: mainPath, Init: &domain.FollowUp{Command: "init"}, Restart: &domain.FollowUp{Command: "run daemon restart"}},
 		Operations: operation.Service{
 			Locker:    w.locks,

@@ -1,0 +1,734 @@
+=== 00-before: exit legacy , next 
+--- legacy/00-before
++++ next/00-before
+@@ -1,13 +1,13 @@
+ ## jobs up (the daemon's index)
+-acme db own -
+-feat-a api own -
+-feat-a cache stack -
+-feat-a db claim -
+-feat-a web own -
+-feat-b api own -
+-feat-b cache stack -
+-feat-b db claim -
+-feat-b web own -
++acme db own full
++feat-a api own full
++feat-a cache stack full
++feat-a db claim full
++feat-a web own full
++feat-b api own full
++feat-b cache stack full
++feat-b db claim full
++feat-b web own full
+ ## .git/wtm/worktrees/feat%2Fa/meta.json
+   "ordinal": 1,
+   "namespaces": [
+@@ -31,15 +31,15 @@
+ ./feat%2Fb/web.log
+ ./main/db.log
+ ## run marks per log
+-./feat%2Fa/api.log 0
+-./feat%2Fa/cache.log 0
+-./feat%2Fa/migrate.log 0
+-./feat%2Fa/web.log 0
+-./feat%2Fb/api.log 0
+-./feat%2Fb/cache.log 0
+-./feat%2Fb/migrate.log 0
+-./feat%2Fb/web.log 0
+-./main/db.log 0
++./feat%2Fa/api.log 1
++./feat%2Fa/cache.log 1
++./feat%2Fa/migrate.log 1
++./feat%2Fa/web.log 1
++./feat%2Fb/api.log 1
++./feat%2Fb/cache.log 1
++./feat%2Fb/migrate.log 1
++./feat%2Fb/web.log 1
++./main/db.log 1
+ ## namespaces made
+ acme_feat-a
+ acme_feat-b
+=== 01-stop: exit legacy 0, next 0
+--- legacy/01-stop
++++ next/01-stop
+@@ -1,12 +1,12 @@
+ ## jobs up (the daemon's index)
+-acme db own -
+-feat-a cache stack -
+-feat-a db claim -
+-feat-a web own -
+-feat-b api own -
+-feat-b cache stack -
+-feat-b db claim -
+-feat-b web own -
++acme db own full
++feat-a cache stack full
++feat-a db claim full
++feat-a web own full
++feat-b api own full
++feat-b cache stack full
++feat-b db claim full
++feat-b web own full
+ ## .git/wtm/worktrees/feat%2Fa/meta.json
+   "ordinal": 1,
+   "namespaces": [
+@@ -30,15 +30,15 @@
+ ./feat%2Fb/web.log
+ ./main/db.log
+ ## run marks per log
+-./feat%2Fa/api.log 0
+-./feat%2Fa/cache.log 0
+-./feat%2Fa/migrate.log 0
+-./feat%2Fa/web.log 0
+-./feat%2Fb/api.log 0
+-./feat%2Fb/cache.log 0
+-./feat%2Fb/migrate.log 0
+-./feat%2Fb/web.log 0
+-./main/db.log 0
++./feat%2Fa/api.log 1
++./feat%2Fa/cache.log 1
++./feat%2Fa/migrate.log 1
++./feat%2Fa/web.log 1
++./feat%2Fb/api.log 1
++./feat%2Fb/cache.log 1
++./feat%2Fb/migrate.log 1
++./feat%2Fb/web.log 1
++./main/db.log 1
+ ## namespaces made
+ acme_feat-a
+ acme_feat-b
+=== 02-stop-again: exit legacy 0, next 0
+--- legacy/02-stop-again
++++ next/02-stop-again
+@@ -1,12 +1,12 @@
+ ## jobs up (the daemon's index)
+-acme db own -
+-feat-a cache stack -
+-feat-a db claim -
+-feat-a web own -
+-feat-b api own -
+-feat-b cache stack -
+-feat-b db claim -
+-feat-b web own -
++acme db own full
++feat-a cache stack full
++feat-a db claim full
++feat-a web own full
++feat-b api own full
++feat-b cache stack full
++feat-b db claim full
++feat-b web own full
+ ## .git/wtm/worktrees/feat%2Fa/meta.json
+   "ordinal": 1,
+   "namespaces": [
+@@ -30,15 +30,15 @@
+ ./feat%2Fb/web.log
+ ./main/db.log
+ ## run marks per log
+-./feat%2Fa/api.log 0
+-./feat%2Fa/cache.log 0
+-./feat%2Fa/migrate.log 0
+-./feat%2Fa/web.log 0
+-./feat%2Fb/api.log 0
+-./feat%2Fb/cache.log 0
+-./feat%2Fb/migrate.log 0
+-./feat%2Fb/web.log 0
+-./main/db.log 0
++./feat%2Fa/api.log 1
++./feat%2Fa/cache.log 1
++./feat%2Fa/migrate.log 1
++./feat%2Fa/web.log 1
++./feat%2Fb/api.log 1
++./feat%2Fb/cache.log 1
++./feat%2Fb/migrate.log 1
++./feat%2Fb/web.log 1
++./main/db.log 1
+ ## namespaces made
+ acme_feat-a
+ acme_feat-b
+=== 03-release-json: exit legacy 0, next 0
+--- legacy/03-release-json
++++ next/03-release-json
+@@ -1,9 +1,9 @@
+ ## jobs up (the daemon's index)
+-feat-a cache stack -
+-feat-a web own -
+-feat-b api own -
+-feat-b cache stack -
+-feat-b web own -
++feat-a cache stack full
++feat-a web own full
++feat-b api own full
++feat-b cache stack full
++feat-b web own full
+ ## .git/wtm/worktrees/feat%2Fa/meta.json
+   "ordinal": 1,
+   "namespaces": [
+@@ -27,15 +27,15 @@
+ ./feat%2Fb/web.log
+ ./main/db.log
+ ## run marks per log
+-./feat%2Fa/api.log 0
+-./feat%2Fa/cache.log 0
+-./feat%2Fa/migrate.log 0
+-./feat%2Fa/web.log 0
+-./feat%2Fb/api.log 0
+-./feat%2Fb/cache.log 0
+-./feat%2Fb/migrate.log 0
+-./feat%2Fb/web.log 0
+-./main/db.log 0
++./feat%2Fa/api.log 1
++./feat%2Fa/cache.log 1
++./feat%2Fa/migrate.log 1
++./feat%2Fa/web.log 1
++./feat%2Fb/api.log 1
++./feat%2Fb/cache.log 1
++./feat%2Fb/migrate.log 1
++./feat%2Fb/web.log 1
++./main/db.log 1
+ ## namespaces made
+ acme_feat-a
+ acme_feat-b
+=== 04-unknown-job: exit legacy 14, next 2
+--- legacy/04-unknown-job
++++ next/04-unknown-job
+@@ -1,9 +1,9 @@
+ ## jobs up (the daemon's index)
+-feat-a cache stack -
+-feat-a web own -
+-feat-b api own -
+-feat-b cache stack -
+-feat-b web own -
++feat-a cache stack full
++feat-a web own full
++feat-b api own full
++feat-b cache stack full
++feat-b web own full
+ ## .git/wtm/worktrees/feat%2Fa/meta.json
+   "ordinal": 1,
+   "namespaces": [
+@@ -27,15 +27,15 @@
+ ./feat%2Fb/web.log
+ ./main/db.log
+ ## run marks per log
+-./feat%2Fa/api.log 0
+-./feat%2Fa/cache.log 0
+-./feat%2Fa/migrate.log 0
+-./feat%2Fa/web.log 0
+-./feat%2Fb/api.log 0
+-./feat%2Fb/cache.log 0
+-./feat%2Fb/migrate.log 0
+-./feat%2Fb/web.log 0
+-./main/db.log 0
++./feat%2Fa/api.log 1
++./feat%2Fa/cache.log 1
++./feat%2Fa/migrate.log 1
++./feat%2Fa/web.log 1
++./feat%2Fb/api.log 1
++./feat%2Fb/cache.log 1
++./feat%2Fb/migrate.log 1
++./feat%2Fb/web.log 1
++./main/db.log 1
+ ## namespaces made
+ acme_feat-a
+ acme_feat-b
+=== 05-job-missing: exit legacy 1, next 2
+--- legacy/05-job-missing
++++ next/05-job-missing
+@@ -1,9 +1,9 @@
+ ## jobs up (the daemon's index)
+-feat-a cache stack -
+-feat-a web own -
+-feat-b api own -
+-feat-b cache stack -
+-feat-b web own -
++feat-a cache stack full
++feat-a web own full
++feat-b api own full
++feat-b cache stack full
++feat-b web own full
+ ## .git/wtm/worktrees/feat%2Fa/meta.json
+   "ordinal": 1,
+   "namespaces": [
+@@ -27,15 +27,15 @@
+ ./feat%2Fb/web.log
+ ./main/db.log
+ ## run marks per log
+-./feat%2Fa/api.log 0
+-./feat%2Fa/cache.log 0
+-./feat%2Fa/migrate.log 0
+-./feat%2Fa/web.log 0
+-./feat%2Fb/api.log 0
+-./feat%2Fb/cache.log 0
+-./feat%2Fb/migrate.log 0
+-./feat%2Fb/web.log 0
+-./main/db.log 0
++./feat%2Fa/api.log 1
++./feat%2Fa/cache.log 1
++./feat%2Fa/migrate.log 1
++./feat%2Fa/web.log 1
++./feat%2Fb/api.log 1
++./feat%2Fb/cache.log 1
++./feat%2Fb/migrate.log 1
++./feat%2Fb/web.log 1
++./main/db.log 1
+ ## namespaces made
+ acme_feat-a
+ acme_feat-b
+=== 06-start: exit legacy 0, next 0
+--- legacy/06-start
++++ next/06-start
+@@ -1,10 +1,10 @@
+ ## jobs up (the daemon's index)
+ feat-a api own -
+-feat-a cache stack -
+-feat-a web own -
+-feat-b api own -
+-feat-b cache stack -
+-feat-b web own -
++feat-a cache stack full
++feat-a web own full
++feat-b api own full
++feat-b cache stack full
++feat-b web own full
+ ## .git/wtm/worktrees/feat%2Fa/meta.json
+   "ordinal": 1,
+   "namespaces": [
+@@ -28,15 +28,15 @@
+ ./feat%2Fb/web.log
+ ./main/db.log
+ ## run marks per log
+-./feat%2Fa/api.log 0
+-./feat%2Fa/cache.log 0
+-./feat%2Fa/migrate.log 0
+-./feat%2Fa/web.log 0
+-./feat%2Fb/api.log 0
+-./feat%2Fb/cache.log 0
+-./feat%2Fb/migrate.log 0
+-./feat%2Fb/web.log 0
+-./main/db.log 0
++./feat%2Fa/api.log 1
++./feat%2Fa/cache.log 1
++./feat%2Fa/migrate.log 1
++./feat%2Fa/web.log 1
++./feat%2Fb/api.log 1
++./feat%2Fb/cache.log 1
++./feat%2Fb/migrate.log 1
++./feat%2Fb/web.log 1
++./main/db.log 1
+ ## namespaces made
+ acme_feat-a
+ acme_feat-b
+=== 07-start-again: exit legacy 0, next 0
+--- legacy/07-start-again
++++ next/07-start-again
+@@ -1,10 +1,10 @@
+ ## jobs up (the daemon's index)
+ feat-a api own -
+-feat-a cache stack -
+-feat-a web own -
+-feat-b api own -
+-feat-b cache stack -
+-feat-b web own -
++feat-a cache stack full
++feat-a web own full
++feat-b api own full
++feat-b cache stack full
++feat-b web own full
+ ## .git/wtm/worktrees/feat%2Fa/meta.json
+   "ordinal": 1,
+   "namespaces": [
+@@ -28,15 +28,15 @@
+ ./feat%2Fb/web.log
+ ./main/db.log
+ ## run marks per log
+-./feat%2Fa/api.log 0
+-./feat%2Fa/cache.log 0
+-./feat%2Fa/migrate.log 0
+-./feat%2Fa/web.log 0
+-./feat%2Fb/api.log 0
+-./feat%2Fb/cache.log 0
+-./feat%2Fb/migrate.log 0
+-./feat%2Fb/web.log 0
+-./main/db.log 0
++./feat%2Fa/api.log 1
++./feat%2Fa/cache.log 1
++./feat%2Fa/migrate.log 1
++./feat%2Fa/web.log 1
++./feat%2Fb/api.log 1
++./feat%2Fb/cache.log 1
++./feat%2Fb/migrate.log 1
++./feat%2Fb/web.log 1
++./main/db.log 1
+ ## namespaces made
+ acme_feat-a
+ acme_feat-b
+=== 08-task: exit legacy 0, next 0
+--- legacy/08-task
++++ next/08-task
+@@ -1,10 +1,10 @@
+ ## jobs up (the daemon's index)
+ feat-a api own -
+-feat-a cache stack -
+-feat-a web own -
+-feat-b api own -
+-feat-b cache stack -
+-feat-b web own -
++feat-a cache stack full
++feat-a web own full
++feat-b api own full
++feat-b cache stack full
++feat-b web own full
+ ## .git/wtm/worktrees/feat%2Fa/meta.json
+   "ordinal": 1,
+   "namespaces": [
+@@ -28,15 +28,15 @@
+ ./feat%2Fb/web.log
+ ./main/db.log
+ ## run marks per log
+-./feat%2Fa/api.log 0
+-./feat%2Fa/cache.log 0
+-./feat%2Fa/migrate.log 0
+-./feat%2Fa/web.log 0
+-./feat%2Fb/api.log 0
+-./feat%2Fb/cache.log 0
+-./feat%2Fb/migrate.log 0
+-./feat%2Fb/web.log 0
+-./main/db.log 0
++./feat%2Fa/api.log 1
++./feat%2Fa/cache.log 1
++./feat%2Fa/migrate.log 1
++./feat%2Fa/web.log 1
++./feat%2Fb/api.log 1
++./feat%2Fb/cache.log 1
++./feat%2Fb/migrate.log 1
++./feat%2Fb/web.log 1
++./main/db.log 1
+ ## namespaces made
+ acme_feat-a
+ acme_feat-b
+=== 09-task-fails: exit legacy 1, next 1
+--- legacy/09-task-fails
++++ next/09-task-fails
+@@ -1,10 +1,10 @@
+ ## jobs up (the daemon's index)
+ feat-a api own -
+-feat-a cache stack -
+-feat-a web own -
+-feat-b api own -
+-feat-b cache stack -
+-feat-b web own -
++feat-a cache stack full
++feat-a web own full
++feat-b api own full
++feat-b cache stack full
++feat-b web own full
+ ## .git/wtm/worktrees/feat%2Fa/meta.json
+   "ordinal": 1,
+   "namespaces": [
+@@ -29,16 +29,16 @@
+ ./feat%2Fb/web.log
+ ./main/db.log
+ ## run marks per log
+-./feat%2Fa/api.log 0
+-./feat%2Fa/cache.log 0
+-./feat%2Fa/fail.log 0
+-./feat%2Fa/migrate.log 0
+-./feat%2Fa/web.log 0
+-./feat%2Fb/api.log 0
+-./feat%2Fb/cache.log 0
+-./feat%2Fb/migrate.log 0
+-./feat%2Fb/web.log 0
+-./main/db.log 0
++./feat%2Fa/api.log 1
++./feat%2Fa/cache.log 1
++./feat%2Fa/fail.log 1
++./feat%2Fa/migrate.log 1
++./feat%2Fa/web.log 1
++./feat%2Fb/api.log 1
++./feat%2Fb/cache.log 1
++./feat%2Fb/migrate.log 1
++./feat%2Fb/web.log 1
++./main/db.log 1
+ ## namespaces made
+ acme_feat-a
+ acme_feat-b
+=== 10-foreign: exit legacy 1, next 23
+--- legacy/10-foreign
++++ next/10-foreign
+@@ -1,10 +1,10 @@
+ ## jobs up (the daemon's index)
+ feat-a api own -
+-feat-a cache stack -
+-feat-a web own -
+-feat-b api own -
+-feat-b cache stack -
+-feat-b web own -
++feat-a cache stack full
++feat-a web own full
++feat-b api own full
++feat-b cache stack full
++feat-b web own full
+ ## .git/wtm/worktrees/feat%2Fa/meta.json
+   "ordinal": 1,
+   "namespaces": [
+@@ -16,7 +16,6 @@
+     "db"
+   "isolation": "isolated"
+ ## .git/wtm/worktrees/feat%2Fv/meta.json
+-  "ordinal": 3,
+   "isolation": "verbatim"
+ ## logs
+ ./feat%2Fa/api.log
+@@ -30,16 +29,16 @@
+ ./feat%2Fb/web.log
+ ./main/db.log
+ ## run marks per log
+-./feat%2Fa/api.log 0
+-./feat%2Fa/cache.log 0
+-./feat%2Fa/fail.log 0
+-./feat%2Fa/migrate.log 0
+-./feat%2Fa/web.log 0
+-./feat%2Fb/api.log 0
+-./feat%2Fb/cache.log 0
+-./feat%2Fb/migrate.log 0
+-./feat%2Fb/web.log 0
+-./main/db.log 0
++./feat%2Fa/api.log 1
++./feat%2Fa/cache.log 1
++./feat%2Fa/fail.log 1
++./feat%2Fa/migrate.log 1
++./feat%2Fa/web.log 1
++./feat%2Fb/api.log 1
++./feat%2Fb/cache.log 1
++./feat%2Fb/migrate.log 1
++./feat%2Fb/web.log 1
++./main/db.log 1
+ ## namespaces made
+ acme_feat-a
+ acme_feat-b
+=== 11-start-json: exit legacy 0, next 0
+--- legacy/11-start-json
++++ next/11-start-json
+@@ -1,10 +1,10 @@
+ ## jobs up (the daemon's index)
+ feat-a api own -
+-feat-a cache stack -
+-feat-a web own -
+-feat-b api own -
+-feat-b cache stack -
+-feat-b web own -
++feat-a cache stack full
++feat-a web own full
++feat-b api own full
++feat-b cache stack full
++feat-b web own full
+ ## .git/wtm/worktrees/feat%2Fa/meta.json
+   "ordinal": 1,
+   "namespaces": [
+@@ -16,7 +16,6 @@
+     "db"
+   "isolation": "isolated"
+ ## .git/wtm/worktrees/feat%2Fv/meta.json
+-  "ordinal": 3,
+   "isolation": "verbatim"
+ ## logs
+ ./feat%2Fa/api.log
+@@ -30,16 +29,16 @@
+ ./feat%2Fb/web.log
+ ./main/db.log
+ ## run marks per log
+-./feat%2Fa/api.log 0
+-./feat%2Fa/cache.log 0
+-./feat%2Fa/fail.log 0
+-./feat%2Fa/migrate.log 0
+-./feat%2Fa/web.log 0
+-./feat%2Fb/api.log 0
+-./feat%2Fb/cache.log 0
+-./feat%2Fb/migrate.log 0
+-./feat%2Fb/web.log 0
+-./main/db.log 0
++./feat%2Fa/api.log 1
++./feat%2Fa/cache.log 1
++./feat%2Fa/fail.log 1
++./feat%2Fa/migrate.log 1
++./feat%2Fa/web.log 1
++./feat%2Fb/api.log 1
++./feat%2Fb/cache.log 1
++./feat%2Fb/migrate.log 1
++./feat%2Fb/web.log 1
++./main/db.log 1
+ ## namespaces made
+ acme_feat-a
+ acme_feat-b
+=== 12-restart: exit legacy 2, next 0
+--- legacy/12-restart
++++ next/12-restart
+@@ -1,10 +1,10 @@
+ ## jobs up (the daemon's index)
+ feat-a api own -
+-feat-a cache stack -
+-feat-a web own -
+-feat-b api own -
+-feat-b cache stack -
+-feat-b web own -
++feat-a cache stack full
++feat-a web own full
++feat-b api own full
++feat-b cache stack full
++feat-b web own full
+ ## .git/wtm/worktrees/feat%2Fa/meta.json
+   "ordinal": 1,
+   "namespaces": [
+@@ -16,7 +16,6 @@
+     "db"
+   "isolation": "isolated"
+ ## .git/wtm/worktrees/feat%2Fv/meta.json
+-  "ordinal": 3,
+   "isolation": "verbatim"
+ ## logs
+ ./feat%2Fa/api.log
+@@ -30,16 +29,16 @@
+ ./feat%2Fb/web.log
+ ./main/db.log
+ ## run marks per log
+-./feat%2Fa/api.log 0
+-./feat%2Fa/cache.log 0
+-./feat%2Fa/fail.log 0
+-./feat%2Fa/migrate.log 0
+-./feat%2Fa/web.log 0
+-./feat%2Fb/api.log 0
+-./feat%2Fb/cache.log 0
+-./feat%2Fb/migrate.log 0
+-./feat%2Fb/web.log 0
+-./main/db.log 0
++./feat%2Fa/api.log 2
++./feat%2Fa/cache.log 1
++./feat%2Fa/fail.log 1
++./feat%2Fa/migrate.log 1
++./feat%2Fa/web.log 1
++./feat%2Fb/api.log 1
++./feat%2Fb/cache.log 1
++./feat%2Fb/migrate.log 1
++./feat%2Fb/web.log 1
++./main/db.log 1
+ ## namespaces made
+ acme_feat-a
+ acme_feat-b
+=== 13-dry-run: exit legacy 2, next 0
+--- legacy/13-dry-run
++++ next/13-dry-run
+@@ -1,10 +1,10 @@
+ ## jobs up (the daemon's index)
+ feat-a api own -
+-feat-a cache stack -
+-feat-a web own -
+-feat-b api own -
+-feat-b cache stack -
+-feat-b web own -
++feat-a cache stack full
++feat-a web own full
++feat-b api own full
++feat-b cache stack full
++feat-b web own full
+ ## .git/wtm/worktrees/feat%2Fa/meta.json
+   "ordinal": 1,
+   "namespaces": [
+@@ -16,7 +16,6 @@
+     "db"
+   "isolation": "isolated"
+ ## .git/wtm/worktrees/feat%2Fv/meta.json
+-  "ordinal": 3,
+   "isolation": "verbatim"
+ ## logs
+ ./feat%2Fa/api.log
+@@ -30,16 +29,16 @@
+ ./feat%2Fb/web.log
+ ./main/db.log
+ ## run marks per log
+-./feat%2Fa/api.log 0
+-./feat%2Fa/cache.log 0
+-./feat%2Fa/fail.log 0
+-./feat%2Fa/migrate.log 0
+-./feat%2Fa/web.log 0
+-./feat%2Fb/api.log 0
+-./feat%2Fb/cache.log 0
+-./feat%2Fb/migrate.log 0
+-./feat%2Fb/web.log 0
+-./main/db.log 0
++./feat%2Fa/api.log 2
++./feat%2Fa/cache.log 1
++./feat%2Fa/fail.log 1
++./feat%2Fa/migrate.log 1
++./feat%2Fa/web.log 1
++./feat%2Fb/api.log 1
++./feat%2Fb/cache.log 1
++./feat%2Fb/migrate.log 1
++./feat%2Fb/web.log 1
++./main/db.log 1
+ ## namespaces made
+ acme_feat-a
+ acme_feat-b
+=== 14-stop-fails: exit legacy 1, next 1
+--- legacy/14-stop-fails
++++ next/14-stop-fails
+@@ -1,11 +1,11 @@
+ ## jobs up (the daemon's index)
+ feat-a api own -
+-feat-a cache stack -
+-feat-a web own -
+-feat-b api own -
+-feat-b cache stack -
+-feat-b stuck stack -
+-feat-b web own -
++feat-a cache stack full
++feat-a web own full
++feat-b api own full
++feat-b cache stack full
++feat-b stuck stack stuck
++feat-b web own full
+ ## .git/wtm/worktrees/feat%2Fa/meta.json
+   "ordinal": 1,
+   "namespaces": [
+@@ -17,7 +17,6 @@
+     "db"
+   "isolation": "isolated"
+ ## .git/wtm/worktrees/feat%2Fv/meta.json
+-  "ordinal": 3,
+   "isolation": "verbatim"
+ ## logs
+ ./feat%2Fa/api.log
+@@ -27,20 +26,22 @@
+ ./feat%2Fa/web.log
+ ./feat%2Fb/api.log
+ ./feat%2Fb/cache.log
++./feat%2Fb/migrate.log
+ ./feat%2Fb/stuck.log
+ ./feat%2Fb/web.log
+ ./main/db.log
+ ## run marks per log
+-./feat%2Fa/api.log 0
+-./feat%2Fa/cache.log 0
+-./feat%2Fa/fail.log 0
+-./feat%2Fa/migrate.log 0
+-./feat%2Fa/web.log 0
+-./feat%2Fb/api.log 0
+-./feat%2Fb/cache.log 0
+-./feat%2Fb/stuck.log 0
+-./feat%2Fb/web.log 0
+-./main/db.log 0
++./feat%2Fa/api.log 2
++./feat%2Fa/cache.log 1
++./feat%2Fa/fail.log 1
++./feat%2Fa/migrate.log 1
++./feat%2Fa/web.log 1
++./feat%2Fb/api.log 1
++./feat%2Fb/cache.log 1
++./feat%2Fb/migrate.log 1
++./feat%2Fb/stuck.log 1
++./feat%2Fb/web.log 1
++./main/db.log 1
+ ## namespaces made
+ acme_feat-a
+ acme_feat-b

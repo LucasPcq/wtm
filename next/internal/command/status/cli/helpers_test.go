@@ -4,7 +4,9 @@ import (
 	"testing"
 	"time"
 
+	runstartcli "github.com/LucasPcq/wtm/next/internal/command/runstart/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/status"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 
@@ -26,7 +28,7 @@ func runOn(t *testing.T, setup func(*output.Streams), w world, words ...string) 
 
 	return formtest.Run(t.Context(), func(streams *output.Streams) *cobra.Command {
 		setup(streams)
-		return New(streams, w.env(), w.open, formtest.CommandLine)
+		return New(streams, w.env(), w.open, commandLine)
 	}, append([]string{status.Name}, words...)...)
 }
 
@@ -36,4 +38,12 @@ func terminal(streams *output.Streams) {
 	streams.SetStdinTerminal(true)
 	streams.Err.SetTerminal(true)
 	streams.Out.SetTerminal(true)
+}
+
+// commandLine spells a follow-up as wtm-next does for run start, the one migrated command status's fixes name, else as the harness reads it.
+func commandLine(followUp domain.FollowUp) []string {
+	if followUp.Command == domain.CommandRunStart {
+		return runstartcli.Line(followUp)
+	}
+	return formtest.CommandLine(followUp)
 }

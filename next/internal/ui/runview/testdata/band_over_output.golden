@@ -27,4 +27,4 @@
   │                        │ │                                                                                       │
   ╰────────────────────────╯ ╰───────────────────────────────────────────────────────────────────────────────────────╯
 
-  ↑↓ job · / filter · pgup/pgdn scroll · enter focus · o open · a addresses · q detach       2 worktrees · 3/6 running
+  ↑↓ job · enter focus · s stop · r restart · o open · q detach · / filter · a addresses     2 worktrees · 3/6 running

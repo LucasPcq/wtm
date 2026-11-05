@@ -205,7 +205,7 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 
 	facts.JobsErr, facts.PRsErr = answered.JobsErr, answered.PRsErr
 	if answered.Skewed != nil {
-		skew := repository.SkewWarning(repository.SkewWarningParams{Command: Name, Skewed: answered.Skewed, Restart: u.Repository.Restart})
+		skew := domain.SkewWarning(domain.SkewWarningParams{Command: Name, Skewed: answered.Skewed, Restart: u.Repository.Restart})
 		facts.Skew = &skew
 	}
 	facts.Envs = u.Teardown.Envs(facts.Facts, asked)

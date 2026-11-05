@@ -513,15 +513,21 @@ const (
 	OwedLost = ".owed_lost"
 )
 
+// Unpaid is each of debts, not reached: what a run that started no job reports of the drops it planned to pay.
+func Unpaid(debts []Debt) []Paid {
+	paid := make([]Paid, 0, len(debts))
+	for _, debt := range debts {
+		paid = append(paid, Paid{Debt: debt, Status: domain.StatusSkipped, Reason: domain.ReasonNotReached})
+	}
+	return paid
+}
+
 // Pay withdraws each drop owed a worktree reaches again under its name (its data that worktree's now), then pays each of the debts, in order, while its service is up: it is taken out of the queue, under its lock, then dropped from the main checkout with the variables kept for it. One another run took out first is paid already; one whose drop fails goes back in the queue. It returns what became of each debt, and the warnings of the withdrawals.
 func (s Service) Pay(ctx context.Context, params PayParams) ([]Paid, []domain.Warning) {
-	paid := make([]Paid, 0, len(params.Debts))
 	if ctx.Err() != nil {
-		for _, debt := range params.Debts {
-			paid = append(paid, Paid{Debt: debt, Status: domain.StatusSkipped, Reason: domain.ReasonNotReached})
-		}
-		return paid, nil
+		return Unpaid(params.Debts), nil
 	}
+	paid := make([]Paid, 0, len(params.Debts))
 
 	warnings := s.withdraw(ctx, params)
 	if len(params.Debts) == 0 {

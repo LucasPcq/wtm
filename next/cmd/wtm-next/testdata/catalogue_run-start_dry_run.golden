@@ -1,0 +1,57 @@
+{
+  "v": 2,
+  "command": "run-start",
+  "ok": true,
+  "op": "<id>",
+  "plan": {
+    "job": "seed",
+    "restart": false,
+    "worktrees": [
+      {
+        "worktree": "main",
+        "branch": "main",
+        "path": "<root>/main",
+        "main": true,
+        "numbered": true,
+        "jobs": [
+          {
+            "name": "seed",
+            "kind": "task",
+            "action": "start",
+            "step": 1
+          }
+        ]
+      }
+    ],
+    "exclusive": false,
+    "others": [],
+    "no_probe": false,
+    "recap": [
+      {
+        "key": "worktree",
+        "label": "Worktree",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "main",
+            "text": "main"
+          }
+        ]
+      },
+      {
+        "key": "job",
+        "label": "Job",
+        "path": "job",
+        "values": [
+          {
+            "value": "seed",
+            "text": "seed"
+          }
+        ]
+      }
+    ]
+  },
+  "fingerprint": "<id>",
+  "follow_ups": [],
+  "warnings": []
+}

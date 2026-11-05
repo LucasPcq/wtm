@@ -15,7 +15,7 @@
   ! web/.env is missing
   → wtm env feat/a   rebuild it
   ! api crashed (exit 1)
-  → wtm run start feat/a --job api --detach   start it again
+  → wtm-next run start feat/a --detach --job api   start it again
 
   feat/old
   ! main has 1 commit it lacks

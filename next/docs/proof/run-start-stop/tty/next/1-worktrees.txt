@@ -1,0 +1,14 @@
+$ wtm run stop --job api; echo EXIT=$?
+
+  Step 1/3 • Worktrees
+
+  The worktrees to stop the job in, by branch, or by path on no branch or once removed (default:
+  the one you stand in)
+
+▌› [ ] main                                                                                   main
+   [x] feat/a — runs dev: api, web                                                         current
+   [ ] feat/b — runs dev: api, web
+   [ ] feat/v
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc cancel
+

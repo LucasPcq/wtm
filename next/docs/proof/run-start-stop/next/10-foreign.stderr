@@ -1,0 +1,5 @@
+
+  ✗ nothing started: a job changes data feat/v does not own
+    feat/v: migrate changes db, its source's data: it is verbatim
+  → wtm run start feat/v --detach --force --job migrate   start them anyway
+

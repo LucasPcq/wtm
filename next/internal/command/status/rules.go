@@ -623,7 +623,7 @@ type ProblemsParams struct {
 const (
 	commandEnv        = domain.CommandEnv
 	commandConfigEdit = "config edit"
-	commandRunStart   = "run start"
+	commandRunStart   = domain.CommandRunStart
 	pathFrom          = "from"
 	pathJob           = "job"
 	pathDetach        = "detach"

@@ -191,6 +191,9 @@ func (d *Daemon) Start(spec run.Spec, out func(run.Line)) (run.Job, error) {
 	return d.start(spec, out)
 }
 
+// RunMark is the line the daemon writes into a job's log, and hands its readers, each time it starts a process for it: a restart's log, which continues the run before, reads where the new run begins.
+const RunMark = "[wtm] started"
+
 // start starts the process of the job spec asks for, in the worktree it names.
 func (d *Daemon) start(spec run.Spec, out func(run.Line)) (run.Job, error) {
 	if strings.TrimSpace(spec.Job.Cmd) == "" {
@@ -199,9 +202,6 @@ func (d *Daemon) start(spec run.Spec, out func(run.Line)) (run.Job, error) {
 
 	k := keyOf(spec)
 	output := newOutput(d.params.Now)
-	if spec.Job.Kind == project.Task || spec.Detached() {
-		output.out = out
-	}
 	d.mu.Lock()
 	if d.stopping {
 		d.mu.Unlock()
@@ -212,9 +212,21 @@ func (d *Daemon) start(spec run.Spec, out func(run.Line)) (run.Job, error) {
 		d.mu.Unlock()
 		return run.Job{}, &run.Error{Code: run.CodeJobRunning, Message: fmt.Sprintf("job %s is already running in %s", spec.Job.Name, spec.WorkDir)}
 	}
-	// Opened only past the refusal: opening a log empties it, the log of the job a refused start would name included.
-	output.log = d.openLog(run.LogFile{Dir: spec.LogDir, Job: spec.Job.Name, Append: previous != nil && previous.up()})
-	process, err := d.params.Spawn(spec.Command(output.write))
+	if spec.Job.Kind == project.Task || spec.Detached() {
+		output.out = out
+	}
+	// The log is opened, which empties it, only once the process runs: a refused start or a spawn that fails leaves the log of the run before as it was.
+	var process Process
+	err := output.begin(beginParams{
+		Spawn: func() (err error) {
+			process, err = d.params.Spawn(spec.Command(output.write))
+			return err
+		},
+		Open: func() Log {
+			return d.openLog(run.LogFile{Dir: spec.LogDir, Job: spec.Job.Name, Append: previous != nil && previous.up() || spec.Restart})
+		},
+		Mark: RunMark,
+	})
 	if err != nil {
 		d.mu.Unlock()
 		output.end()

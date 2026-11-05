@@ -448,7 +448,7 @@ func TestAStartOfTheSharedServicePaysWhatIsOwedToIt(t *testing.T) {
 
 func TestANamespaceTheRecordCannotKeepIsAWarning(t *testing.T) {
 	w := newWorld(t)
-	w.usecase.Meta = unwritable{w.meta}
+	w.usecase.Jobs.Meta = unwritable{w.meta}
 
 	result, _ := w.apply(t, starting("full", featA))
 
@@ -467,7 +467,7 @@ func TestTheSettleCatchesACrashWithinItAndLeavesOneAfterIt(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			w := newWorld(t)
-			w.usecase.Settle = c.settle
+			w.usecase.Jobs.Settle = c.settle
 			w.daemon.late = map[string]time.Duration{key(w.at(featA), "api"): c.crash}
 
 			result, _ := w.apply(t, runup.Request{Worktrees: []string{featA}, Profile: "alone", NoProbe: true})

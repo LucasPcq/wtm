@@ -18,7 +18,9 @@
         "tree",
         "run-up",
         "run-logs",
-        "run-down"
+        "run-down",
+        "run-start",
+        "run-stop"
       ]
     },
     "checkout.Action": {
@@ -1473,6 +1475,9 @@
           },
           "type": "array"
         },
+        "kind": {
+          "$ref": "#/$defs/project.JobKind"
+        },
         "operation": {
           "$ref": "#/$defs/worktree.Operation"
         },
@@ -1681,7 +1686,8 @@
         "nothing_to_push",
         "one_profile",
         "alone",
-        "configured"
+        "configured",
+        "task"
       ]
     },
     "domain.TextField": {
@@ -4202,7 +4208,7 @@
               "detail": {
                 "anyOf": [
                   {
-                    "$ref": "#/$defs/rundown.Detail"
+                    "$ref": "#/$defs/runjobs.StopDetail"
                   },
                   {
                     "maxProperties": 0,
@@ -4480,6 +4486,310 @@
       },
       "type": "array"
     },
+    "run-start.envelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/domain.Envelope"
+        }
+      ],
+      "properties": {
+        "command": {
+          "const": "run-start"
+        },
+        "items": {
+          "items": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/runstart.Detail"
+                  },
+                  {
+                    "maxProperties": 0,
+                    "type": "object"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "plan": {
+          "$ref": "#/$defs/runstart.Plan"
+        }
+      }
+    },
+    "run-start.request": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "worktree"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "job"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "exclusive"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "force"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "restart"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "parallel"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "no_probe"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "detach"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "type": "array"
+    },
+    "run-stop.envelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/domain.Envelope"
+        }
+      ],
+      "properties": {
+        "command": {
+          "const": "run-stop"
+        },
+        "items": {
+          "items": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/runjobs.StopDetail"
+                  },
+                  {
+                    "maxProperties": 0,
+                    "type": "object"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "plan": {
+          "$ref": "#/$defs/runstop.Plan"
+        }
+      }
+    },
+    "run-stop.request": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "worktree"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "job"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "type": "array"
+    },
     "run-up.envelope": {
       "allOf": [
         {
@@ -4705,97 +5015,6 @@
         "stopped"
       ]
     },
-    "rundown.Detail": {
-      "additionalProperties": false,
-      "properties": {
-        "jobs": {
-          "anyOf": [
-            {
-              "items": {
-                "$ref": "#/$defs/rundown.JobResult"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "path": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "path",
-        "jobs"
-      ],
-      "type": "object"
-    },
-    "rundown.JobPlan": {
-      "additionalProperties": false,
-      "properties": {
-        "fate": {
-          "$ref": "#/$defs/run.Fate"
-        },
-        "hold": {
-          "$ref": "#/$defs/run.Hold"
-        },
-        "kept_by": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "kind": {
-          "$ref": "#/$defs/project.JobKind"
-        },
-        "name": {
-          "type": "string"
-        },
-        "shared_in": {
-          "type": "string"
-        },
-        "stop_command": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "name",
-        "hold",
-        "fate"
-      ],
-      "type": "object"
-    },
-    "rundown.JobResult": {
-      "additionalProperties": false,
-      "properties": {
-        "message": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "status": {
-          "$ref": "#/$defs/rundown.JobStatus"
-        }
-      },
-      "required": [
-        "name",
-        "status"
-      ],
-      "type": "object"
-    },
-    "rundown.JobStatus": {
-      "description": "What became of one job of a stop.",
-      "enum": [
-        "stopped",
-        "released",
-        "cleared",
-        "not_running",
-        "failed",
-        "not_reached"
-      ]
-    },
     "rundown.Plan": {
       "additionalProperties": false,
       "properties": {
@@ -4846,7 +5065,7 @@
           "anyOf": [
             {
               "items": {
-                "$ref": "#/$defs/rundown.JobPlan"
+                "$ref": "#/$defs/runjobs.StopJob"
               },
               "type": "array"
             },
@@ -4877,6 +5096,337 @@
       "required": [
         "worktree",
         "path",
+        "jobs"
+      ],
+      "type": "object"
+    },
+    "runjobs.Action": {
+      "description": "What a start does to one job of its profile.",
+      "enum": [
+        "start",
+        "up",
+        "join",
+        "restart"
+      ]
+    },
+    "runjobs.JobPlan": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/runjobs.Action"
+        },
+        "kind": {
+          "$ref": "#/$defs/project.JobKind"
+        },
+        "name": {
+          "type": "string"
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "ports": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "type": "object"
+        },
+        "shared_in": {
+          "type": "string"
+        },
+        "step": {
+          "type": "integer"
+        },
+        "waits_for": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "action"
+      ],
+      "type": "object"
+    },
+    "runjobs.JobResult": {
+      "additionalProperties": false,
+      "properties": {
+        "exit_code": {
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/$defs/project.JobKind"
+        },
+        "lines": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "log": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "ports": {
+          "items": {
+            "$ref": "#/$defs/runjobs.Port"
+          },
+          "type": "array"
+        },
+        "status": {
+          "$ref": "#/$defs/runjobs.JobStatus"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "status"
+      ],
+      "type": "object"
+    },
+    "runjobs.JobStatus": {
+      "description": "What became of one job of a start.",
+      "enum": [
+        "started",
+        "already_running",
+        "joined",
+        "done",
+        "failed",
+        "crashed",
+        "not_started",
+        "stopped"
+      ]
+    },
+    "runjobs.Other": {
+      "additionalProperties": false,
+      "properties": {
+        "jobs": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "worktree": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "worktree",
+        "path",
+        "jobs"
+      ],
+      "type": "object"
+    },
+    "runjobs.Port": {
+      "additionalProperties": false,
+      "properties": {
+        "listening": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "port",
+        "listening"
+      ],
+      "type": "object"
+    },
+    "runjobs.StopDetail": {
+      "additionalProperties": false,
+      "properties": {
+        "jobs": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runjobs.StopResult"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "jobs"
+      ],
+      "type": "object"
+    },
+    "runjobs.StopJob": {
+      "additionalProperties": false,
+      "properties": {
+        "fate": {
+          "$ref": "#/$defs/run.Fate"
+        },
+        "hold": {
+          "$ref": "#/$defs/run.Hold"
+        },
+        "kept_by": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "$ref": "#/$defs/project.JobKind"
+        },
+        "name": {
+          "type": "string"
+        },
+        "shared_in": {
+          "type": "string"
+        },
+        "stop_command": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "hold",
+        "fate"
+      ],
+      "type": "object"
+    },
+    "runjobs.StopResult": {
+      "additionalProperties": false,
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/runjobs.StopStatus"
+        }
+      },
+      "required": [
+        "name",
+        "status"
+      ],
+      "type": "object"
+    },
+    "runjobs.StopStatus": {
+      "description": "What became of one job of a stop.",
+      "enum": [
+        "stopped",
+        "released",
+        "cleared",
+        "not_running",
+        "failed",
+        "not_reached"
+      ]
+    },
+    "runjobs.StopTarget": {
+      "additionalProperties": false,
+      "properties": {
+        "branch": {
+          "type": "string"
+        },
+        "jobs": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runjobs.StopJob"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "removed": {
+          "type": "boolean"
+        },
+        "worktree": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "worktree",
+        "path",
+        "jobs"
+      ],
+      "type": "object"
+    },
+    "runjobs.Target": {
+      "additionalProperties": false,
+      "properties": {
+        "branch": {
+          "type": "string"
+        },
+        "jobs": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runjobs.JobPlan"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "main": {
+          "type": "boolean"
+        },
+        "numbered": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string"
+        },
+        "worktree": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "worktree",
+        "path",
+        "numbered",
         "jobs"
       ],
       "type": "object"
@@ -5000,13 +5550,147 @@
       ],
       "type": "object"
     },
-    "runup.Action": {
-      "description": "What a start does to one job of its profile.",
-      "enum": [
-        "start",
-        "up",
-        "join"
-      ]
+    "runstart.Detail": {
+      "additionalProperties": false,
+      "properties": {
+        "jobs": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runjobs.JobResult"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "owed": {
+          "$ref": "#/$defs/teardown.Debt"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "jobs"
+      ],
+      "type": "object"
+    },
+    "runstart.Plan": {
+      "additionalProperties": false,
+      "properties": {
+        "empty": {
+          "type": "boolean"
+        },
+        "exclusive": {
+          "type": "boolean"
+        },
+        "job": {
+          "type": "string"
+        },
+        "no_probe": {
+          "type": "boolean"
+        },
+        "others": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runjobs.Other"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "owed": {
+          "items": {
+            "$ref": "#/$defs/teardown.Debt"
+          },
+          "type": "array"
+        },
+        "recalled": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "recap": {
+          "items": {
+            "$ref": "#/$defs/domain.RecapRow"
+          },
+          "type": "array"
+        },
+        "restart": {
+          "type": "boolean"
+        },
+        "worktrees": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runjobs.Target"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "job",
+        "restart",
+        "worktrees",
+        "exclusive",
+        "others",
+        "no_probe"
+      ],
+      "type": "object"
+    },
+    "runstop.Plan": {
+      "additionalProperties": false,
+      "properties": {
+        "empty": {
+          "type": "boolean"
+        },
+        "job": {
+          "type": "string"
+        },
+        "recalled": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "recap": {
+          "items": {
+            "$ref": "#/$defs/domain.RecapRow"
+          },
+          "type": "array"
+        },
+        "worktrees": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runjobs.StopTarget"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "job",
+        "worktrees"
+      ],
+      "type": "object"
     },
     "runup.Detail": {
       "additionalProperties": false,
@@ -5015,7 +5699,7 @@
           "anyOf": [
             {
               "items": {
-                "$ref": "#/$defs/runup.JobResult"
+                "$ref": "#/$defs/runjobs.JobResult"
               },
               "type": "array"
             },
@@ -5040,133 +5724,6 @@
       ],
       "type": "object"
     },
-    "runup.JobPlan": {
-      "additionalProperties": false,
-      "properties": {
-        "action": {
-          "$ref": "#/$defs/runup.Action"
-        },
-        "kind": {
-          "$ref": "#/$defs/project.JobKind"
-        },
-        "name": {
-          "type": "string"
-        },
-        "namespace": {
-          "type": "string"
-        },
-        "ports": {
-          "additionalProperties": {
-            "type": "integer"
-          },
-          "type": "object"
-        },
-        "shared_in": {
-          "type": "string"
-        },
-        "step": {
-          "type": "integer"
-        },
-        "waits_for": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        }
-      },
-      "required": [
-        "name",
-        "kind",
-        "action"
-      ],
-      "type": "object"
-    },
-    "runup.JobResult": {
-      "additionalProperties": false,
-      "properties": {
-        "exit_code": {
-          "type": "integer"
-        },
-        "kind": {
-          "$ref": "#/$defs/project.JobKind"
-        },
-        "lines": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "log": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "namespace": {
-          "type": "string"
-        },
-        "ports": {
-          "items": {
-            "$ref": "#/$defs/runup.Port"
-          },
-          "type": "array"
-        },
-        "status": {
-          "$ref": "#/$defs/runup.JobStatus"
-        },
-        "url": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "name",
-        "kind",
-        "status"
-      ],
-      "type": "object"
-    },
-    "runup.JobStatus": {
-      "description": "What became of one job of a start.",
-      "enum": [
-        "started",
-        "already_running",
-        "joined",
-        "done",
-        "failed",
-        "crashed",
-        "not_started"
-      ]
-    },
-    "runup.Other": {
-      "additionalProperties": false,
-      "properties": {
-        "jobs": {
-          "anyOf": [
-            {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "path": {
-          "type": "string"
-        },
-        "worktree": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "worktree",
-        "path",
-        "jobs"
-      ],
-      "type": "object"
-    },
     "runup.Plan": {
       "additionalProperties": false,
       "properties": {
@@ -5183,7 +5740,7 @@
           "anyOf": [
             {
               "items": {
-                "$ref": "#/$defs/runup.Other"
+                "$ref": "#/$defs/runjobs.Other"
               },
               "type": "array"
             },
@@ -5217,7 +5774,7 @@
           "anyOf": [
             {
               "items": {
-                "$ref": "#/$defs/runup.Target"
+                "$ref": "#/$defs/runjobs.Target"
               },
               "type": "array"
             },
@@ -5233,73 +5790,6 @@
         "exclusive",
         "others",
         "no_probe"
-      ],
-      "type": "object"
-    },
-    "runup.Port": {
-      "additionalProperties": false,
-      "properties": {
-        "listening": {
-          "anyOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "name": {
-          "type": "string"
-        },
-        "port": {
-          "type": "integer"
-        }
-      },
-      "required": [
-        "name",
-        "port",
-        "listening"
-      ],
-      "type": "object"
-    },
-    "runup.Target": {
-      "additionalProperties": false,
-      "properties": {
-        "branch": {
-          "type": "string"
-        },
-        "jobs": {
-          "anyOf": [
-            {
-              "items": {
-                "$ref": "#/$defs/runup.JobPlan"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "main": {
-          "type": "boolean"
-        },
-        "numbered": {
-          "type": "boolean"
-        },
-        "path": {
-          "type": "string"
-        },
-        "worktree": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "worktree",
-        "path",
-        "numbered",
-        "jobs"
       ],
       "type": "object"
     },

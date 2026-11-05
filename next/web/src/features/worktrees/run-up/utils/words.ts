@@ -1,10 +1,10 @@
 import type { Applied } from '@/api/queries/commands'
-import type { DomainOption, RunupJobPlan, RunupJobStatus } from '@/api/types.gen'
+import type { DomainOption, RunjobsJobPlan, RunjobsJobStatus } from '@/api/types.gen'
 import { named, type Shared } from '@/features/worktrees/run-up/utils/plan'
 import { owedOf, owedTally } from '@/features/worktrees/utils/owed'
 import { jobsSummary } from '@/features/worktrees/utils/run-words'
 
-export const resultWords: Record<RunupJobStatus, string> = {
+export const resultWords: Record<RunjobsJobStatus, string> = {
   started: 'up',
   already_running: 'already up',
   joined: 'joined',
@@ -12,6 +12,7 @@ export const resultWords: Record<RunupJobStatus, string> = {
   failed: 'failed',
   crashed: 'crashed',
   not_started: 'not started',
+  stopped: 'stopped, not started again',
 }
 
 // what a worktree runs now, as the picker's second line: its own jobs, or the shared services it runs for all
@@ -28,7 +29,7 @@ export function profileLine({ jobs, default: isDefault, running_in }: DomainOpti
 }
 
 // what Confirm says a job does, from its plan: a port in mono, as the screen spells what a machine reads
-export function planned(job: RunupJobPlan, first: string[]): { said: string; mono: boolean } {
+export function planned(job: RunjobsJobPlan, first: string[]): { said: string; mono: boolean } {
   if (job.action === 'up') return { said: 'already up: left as it is', mono: false }
   if (job.kind === 'task')
     return { said: first.includes(job.name) ? 'a task: runs first, the others wait for it' : 'a task', mono: false }
@@ -64,7 +65,7 @@ export function startedWords(profile: string, envelope: Applied<'run-up'> | unde
   const items = envelope?.items ?? []
   const worktrees = items.filter((item) => !owedOf(item))
   const jobs = worktrees.flatMap((item) => item.detail?.jobs ?? [])
-  const count = (statuses: RunupJobStatus[]) => jobs.filter((job) => statuses.includes(job.status)).length
+  const count = (statuses: RunjobsJobStatus[]) => jobs.filter((job) => statuses.includes(job.status)).length
   const said = [
     [count(['started', 'already_running']), 'up'],
     [count(['joined']), 'joined'],

@@ -37,4 +37,4 @@
   │                        │ │                                                                                       │
   ╰────────────────────────╯ ╰───────────────────────────────────────────────────────────────────────────────────────╯
 
-  ↑↓ job · / filter · pgup/pgdn scroll · enter focus · o open           db runs in main: its output is read-only here.
+  ↑↓ job · enter focus · s stop · r restart · o open · q detach         db runs in main: its output is read-only here.

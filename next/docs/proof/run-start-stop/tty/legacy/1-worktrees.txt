@@ -1,0 +1,16 @@
+$ wtm run stop --job api; echo EXIT=$?
+
+┃  ! job "stuck" declares stop, so its cmd is a launcher wtm waits on until it exits (like `docker c
+ompose up -d`) — if it keeps running, drop stop to run it in the foreground
+
+  Step 1/2 • Select worktrees
+
+  Space to toggle, a to select all, / to filter, enter to confirm, esc to cancel.
+
+  [ ] main
+▌ [✓] feat/a                                                                    2 running  current
+  [ ] feat/b                                                                             2 running
+  [ ] feat/v
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc cancel
+

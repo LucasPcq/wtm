@@ -32,6 +32,7 @@ other=$(mktemp -d)/wtm-next && (cd ../../.. && go build -ldflags "-X main.versio
 ./run-view.sh "$wtm" "$next" run-view
 ./run-logs.sh "$wtm" "$next" run-logs
 ./run-down.sh "$wtm" "$next" run-down
+./run-start-stop.sh "$wtm" "$next" run-start-stop
 ./clean-data.sh "$wtm" "$next" clean-data
 git diff --stat .
 ```
@@ -705,6 +706,32 @@ The reference is the legacy `wtm run up` of 0.30.1. Its output differs by design
   - **A recap and a confirmation** before anything stops, and `--dry-run` / `--expect-fingerprint` (12; the wizard in `tty/next/2-recap.txt`); legacy stops as soon as the worktrees are picked.
   - **Several worktrees stop at once**, each one's jobs one after the other, its own first then its holds; legacy stops the worktrees one after the other.
   - **Not in next**: legacy's warning about run.toml (`job "stuck" declares stop, so its cmd is a launcher…`), which every legacy run command prints before it acts.
+
+# Proof: `wtm run stop` and `wtm run start` (legacy `flow/run/stop`, `flow/run/start`) vs `wtm-next run stop`, `wtm-next run start`
+
+- `run-start-stop.sh <wtm> <wtm-next> run-start-stop`: run-down.sh's two sandboxes (each its own HOME, run daemon and compose stack, torn down before the next starts), `full` started in feat/a and feat/b by each side's own `run up`. After each scenario the exit code, stdout, stderr and the state (run-down.sh's, and the number of `[wtm] started` marks in each job's log); `run-start-stop/states.diff` holds the differences. Then, in a fresh sandbox per side, `run stop --job api` in tmux at 100×40 from feat/a: `run-start-stop/tty/legacy/` (the picker, then the stop) and `run-start-stop/tty/next/` (the picker with feat/a ticked, the recap, the outcome).
+  1. `run stop feat/a --job api`: api stops, the rest runs on
+  2. the same again: not running
+  3. `--job db` in feat/a and feat/b, JSON: the two last holds on `db`, which stops
+  4. an unknown job
+  5. no `--job`, no terminal
+  6. `run start feat/a --job api -d`
+  7. the same again: already running, left as it is
+  8. `--job migrate`, a task, run to its end
+  9. `--job fail`, a task that exits 3
+  10. `--job migrate` in feat/v, verbatim: foreign data refused
+  11. `--job web` in feat/b, JSON
+  12. `--restart` of feat/a's api (next only: legacy refuses the flag)
+  13. a dry run of run stop (next only)
+  14. feat/b's `stuck`, whose stop command fails
+- The states differ by run up's (the profile each job was started under; a job started alone by run start records none on both sides), by the run mark (each start of a process writes `[wtm] started` in its log: one per log, two in feat/a's api log after the restart, which appended to it; legacy writes none), and by one fixed quirk: legacy numbers feat/v (`"ordinal": 3`) before refusing its start (10), next refuses before anything is written.
+- The differences, all deliberate (the spec's departures, approved by the owner):
+  - **The uniform human output**, run up's and run down's: the tally (`✓ run stop: 1 done`, `= run stop: 1 unchanged` where the job is not up), the recap (`Stops db (released, kept by feat/b)`, `api (not running)`, `api (stopped, then started again)`), the anomalies named, and the next step: `run start <worktree> --job <job>` of each worktree that stopped or released it (the web's undo), `run down <worktree>` once run start leaves its job up, none after a task that failed. Legacy prints `✓ api stopped` or `= api not running`, and after a failing task `! Profile aborted at step 1/1 (fail).` with `→ wtm run down stop what did start` when nothing did.
+  - **JSON is the v2 envelope** (3, 11): an item per worktree, each job's status, the plan's fates and actions; legacy prints a bare array for stop and a bare object for start.
+  - **The usage problems exit 2** (4, 5; legacy 14 and 1), `--job` a required field; the foreign-data refusal exits 23 as run up's, followed by the start forced (10; legacy exit 1, `wtm env <branch>` spelled literally).
+  - **A recap and a confirmation** before anything stops or starts (`tty/next/2-recap.txt`), `--dry-run` / `--expect-fingerprint` (13); legacy acts as soon as it is answered.
+  - **New in next**: `run start --restart` (12): the job stopped then started again within its phase, its log appended behind the run mark; refused for a shared service. The live view's `s` (stop, a shared service released) and `r` (restart), refresh on `ctrl+r`, which `ui/runview`'s and `cmd/wtm-next`'s tests show.
+  - **Several worktrees stop at once** and a stop that fails is its worktree's (14), the others reported; legacy ends the run at its first failure.
 
 # Proof: the live view of `wtm run up` (legacy `surface/tui/runview`) vs `wtm-next`'s `ui/runview`
 

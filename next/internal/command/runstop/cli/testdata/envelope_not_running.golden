@@ -1,0 +1,70 @@
+{
+  "v": 2,
+  "command": "run-stop",
+  "ok": true,
+  "op": "op-1",
+  "items": [
+    {
+      "subject": "feat/a",
+      "status": "done",
+      "reason": "unchanged",
+      "detail": {
+        "path": "/repo/wt-feat-a",
+        "jobs": [
+          {
+            "name": "web",
+            "status": "not_running"
+          }
+        ]
+      }
+    }
+  ],
+  "plan": {
+    "job": "web",
+    "worktrees": [
+      {
+        "worktree": "feat/a",
+        "branch": "feat/a",
+        "path": "/repo/wt-feat-a",
+        "jobs": []
+      }
+    ],
+    "recap": [
+      {
+        "key": "worktrees",
+        "label": "Worktrees",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/a",
+            "text": "feat/a"
+          }
+        ]
+      },
+      {
+        "key": "job",
+        "label": "Job",
+        "path": "job",
+        "values": [
+          {
+            "value": "web",
+            "text": "web"
+          }
+        ]
+      },
+      {
+        "key": "stop",
+        "label": "Stops",
+        "values": [
+          {
+            "value": "web (not running)",
+            "text": "web (not running)"
+          }
+        ]
+      }
+    ],
+    "empty": true
+  },
+  "follow_ups": [],
+  "warnings": []
+}

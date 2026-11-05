@@ -20,6 +20,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/service/operationtest"
 	"github.com/LucasPcq/wtm/next/internal/service/provision"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
+	"github.com/LucasPcq/wtm/next/internal/service/runjobs"
 	"github.com/LucasPcq/wtm/next/internal/service/teardown"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 )
@@ -83,14 +84,9 @@ func (w world) env() uicli.Env {
 }
 
 func (w world) open(context.Context, string) (runup.UseCase, error) {
+	teardowns := teardown.Service{Owed: owing{}}
 	return runup.UseCase{
-		Git:        w.git,
 		Meta:       w.store,
-		EnvFiles:   w.store,
-		Daemon:     w.daemon,
-		Listening:  answering,
-		StateDir:   "/repo/main/.git/wtm",
-		CommonDir:  "/repo/main/.git",
 		Repository: repository.Service{Config: w.config, Git: w.git, MainPath: mainPath, Init: &domain.FollowUp{Command: "init"}, Restart: &domain.FollowUp{Command: "run daemon restart"}},
 		Operations: operation.Service{
 			Locker:    w.locks,
@@ -98,8 +94,19 @@ func (w world) open(context.Context, string) (runup.UseCase, error) {
 			NewOpID:   func() string { return "op-1" },
 			Now:       func() time.Time { return startedAt },
 		},
-		Teardown:  teardown.Service{Owed: owing{}},
-		Provision: provision.Service{Git: w.git, Meta: w.store},
+		Teardown: teardowns,
+		Jobs: runjobs.Service{
+			Meta:      w.store,
+			EnvFiles:  w.store,
+			Daemon:    w.daemon,
+			Listening: answering,
+			StateDir:  "/repo/main/.git/wtm",
+			CommonDir: "/repo/main/.git",
+			Gone:      repository.GoneIn(w.git),
+			Located:   repository.LocatedIn(w.git),
+			Number:    provision.Service{Git: w.git, Meta: w.store}.Number,
+			Owing:     teardowns.Owing,
+		},
 	}, nil
 }
 
@@ -136,6 +143,8 @@ func (d *daemon) Start(_ context.Context, spec run.Spec, out func(run.Line)) (ru
 }
 
 func (d *daemon) StopAll(context.Context, run.StopAll) ([]run.StoppedJob, error) { return nil, nil }
+
+func (d *daemon) Stop(context.Context, run.Stop) (run.Outcome, error) { return run.OutcomeStopped, nil }
 
 // Attach gives a terminal the job never prints to.
 func (d *daemon) Attach(context.Context, run.Window) (net.Conn, error) {

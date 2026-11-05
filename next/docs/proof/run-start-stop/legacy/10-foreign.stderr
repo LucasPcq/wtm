@@ -1,0 +1,8 @@
+
+  ! job "stuck" declares stop, so its cmd is a launcher wtm waits on until it exits (like `docker compose up -d`) — if it keeps running, drop stop to run it in the foreground
+
+
+  ✗ Jobs that change foreign data — data this worktree does not own:
+    migrate changes db — its source's data: this worktree is verbatim
+    pass --force to run them anyway, or give this worktree its own data: wtm env <branch> --isolation isolated
+

@@ -36,7 +36,6 @@
         "worktree": "feat/a",
         "branch": "feat/a",
         "path": "/repo/wt-feat-a",
-        "profile": "full",
         "jobs": [
           {
             "name": "api",
@@ -67,7 +66,8 @@
             "hold": "own",
             "fate": "stop"
           }
-        ]
+        ],
+        "profile": "full"
       }
     ],
     "recap": [

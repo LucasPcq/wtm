@@ -1,6 +1,8 @@
 package runview
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -22,8 +24,15 @@ func (m *model) key(msg tea.KeyMsg) tea.Cmd {
 
 	m.said = ""
 	switch msg.String() {
-	case "q", "ctrl+c":
+	case "q":
+		// Leaving under a restart would cut it between its stop and its start: q waits, Ctrl+C does not.
+		if m.acting != "" {
+			m.said = fmt.Sprintf(underWayFmt, m.acting)
+			return nil
+		}
 		return tea.Quit
+	case "ctrl+c":
+		return m.leave()
 	case "enter":
 		return m.focus()
 	case "esc":
@@ -40,7 +49,11 @@ func (m *model) key(msg tea.KeyMsg) tea.Cmd {
 		m.reaching = !m.reaching
 	case "/":
 		m.filtering = true
+	case "s":
+		return m.act(stopping)
 	case "r":
+		return m.act(restarting)
+	case "ctrl+r":
 		return m.list()
 	case "up", "k":
 		return m.move(-1)
@@ -62,6 +75,111 @@ func (m *model) key(msg tea.KeyMsg) tea.Cmd {
 		return m.open(m.selectedURL())
 	}
 	return nil
+}
+
+// An action is what s and r do to the job selected.
+type action int
+
+const (
+	stopping action = iota
+	restarting
+)
+
+// act stops the job selected, or starts it again, through the view's
+// params, one at a time: a shared service is released, never restarted for
+// one worktree. What became of it is a notice, and the jobs are listed again.
+func (m *model) act(a action) tea.Cmd {
+	e, found := m.selectedEntry()
+	if !found {
+		return nil
+	}
+	do, verb, doing, done := m.params.Stop, "stop", "stopping", "stopped"
+	if e.shared {
+		verb, doing, done = "release", "releasing", "released"
+	}
+	if a == restarting {
+		do, verb, doing, done = m.params.Restart, "restart", "restarting", "restarted"
+	}
+	switch {
+	case do == nil:
+		m.said = fmt.Sprintf(notActedFmt, e.name, verb)
+		return nil
+	case m.acting != "":
+		m.said = fmt.Sprintf(underWayFmt, m.acting)
+		return nil
+	case a == restarting && e.shared:
+		m.said = fmt.Sprintf(restartSharedFmt, e.name)
+		return nil
+	}
+
+	act := Act{Worktree: e.branch, Dir: e.dir, Job: e.name}
+	again, check := "", ""
+	if m.params.Again != nil {
+		again = m.params.Again(act)
+	}
+	// A stop left under way is checked with a read: starting the job again is what its user did not want.
+	check = again
+	if a == stopping {
+		check = ""
+		if m.params.Show != nil {
+			check = m.params.Show(act)
+		}
+	}
+	m.acting = fmt.Sprintf(actingFmt, doing, e.name)
+	m.unended = fmt.Sprintf(unendedFmt, m.acting, check)
+	ctx, cancel := context.WithCancel(m.ctx)
+	m.cancelAct = cancel
+	return func() tea.Msg {
+		defer cancel()
+		acted, err := do(ctx, act)
+		switch {
+		// Cut short before it did anything: nothing to say once the view is left.
+		case errors.Is(err, context.Canceled):
+			return actedMsg{text: fmt.Sprintf(actFailedFmt, verb, e.name, err)}
+		case err != nil:
+			failed := fmt.Sprintf(actFailedFmt, verb, e.name, err)
+			return actedMsg{text: failed, left: failed}
+		case acted.CutShort:
+			cut := fmt.Sprintf(cutShortFmt, e.name, e.name, again)
+			return actedMsg{text: cut, left: cut}
+		case acted.Unchanged:
+			return actedMsg{text: fmt.Sprintf(notActedFmt, e.name, verb)}
+		}
+		return actedMsg{text: fmt.Sprintf(actedFmt, e.name, done)}
+	}
+}
+
+// acted takes in the end of an action: said as a notice, the jobs listed again; the view left once Ctrl+C asked it, a restart cut short said after it.
+func (m *model) acted(msg actedMsg) tea.Cmd {
+	m.acting, m.cancelAct = "", nil
+	if m.leaving {
+		m.left = msg.left
+		return tea.Quit
+	}
+	m.say(msg.text)
+	return tea.Batch(m.resize(), m.list())
+}
+
+// actWait bounds how long Ctrl+C waits for the action it cut short to end:
+// a stop sent is let finish.
+const actWait = 30 * time.Second
+
+// leave leaves the view; with an action under way, it cuts the action short
+// first, and leaves once it ended, or once actWait passed or Ctrl+C came again,
+// saying then that it still runs.
+func (m *model) leave() tea.Cmd {
+	switch {
+	case m.acting == "":
+		return tea.Quit
+	// A second Ctrl+C leaves at once, saying the action still runs.
+	case m.leaving:
+		m.left = m.unended
+		return tea.Quit
+	}
+	m.leaving = true
+	m.said = fmt.Sprintf(leavingFmt, m.acting)
+	m.cancelAct()
+	return tea.Tick(actWait, func(time.Time) tea.Msg { return leaveMsg{} })
 }
 
 // focus hands the keyboard to the job selected, when it is attached and reads

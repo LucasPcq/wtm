@@ -11,7 +11,6 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestAReadAsksTheDaemonAndTheForgeOfItsBranchesBesideReadingTheWorktrees(t *testing.T) {
@@ -132,28 +131,4 @@ func TestACountCutShortCancelsItsWorktreeAnyOtherFailureLeavesItNotCounted(t *te
 			assert.ErrorIs(t, repository.Interrupted(c.ctx, c.err), c.want)
 		})
 	}
-}
-
-func TestASkewedDaemonTheClientCannotGoOnWithIsRefusedFollowedByItsRestart(t *testing.T) {
-	restart := &domain.FollowUp{Command: "run daemon restart"}
-	cases := map[string]struct {
-		err  error
-		skew run.Skew
-	}{
-		"protocol": {err: &run.Error{Code: run.CodeSkew, Message: "the run daemon speaks protocol 1, this wtm 2"}, skew: run.SkewBuild},
-		"legacy":   {err: &run.Error{Code: run.CodeLegacy, Message: "the run daemon is the legacy wtm"}, skew: run.SkewLegacy},
-	}
-	for name, c := range cases {
-		t.Run(name, func(t *testing.T) {
-			refusal := repository.SkewRefusal(repository.SkewRefusalParams{Command: "run-down", Undone: "nothing stopped", Err: c.err, Restart: restart})
-
-			require.NotNil(t, refusal)
-			assert.Equal(t, domain.KindPrecondition, refusal.Kind)
-			assert.Equal(t, "run-down.daemon_skew", refusal.Code)
-			assert.Equal(t, string(c.skew), refusal.Params["skew"])
-			require.NotNil(t, refusal.FollowUp)
-			assert.Equal(t, "run-down.restart_daemon", refusal.FollowUp.Code)
-		})
-	}
-	assert.Nil(t, repository.SkewRefusal(repository.SkewRefusalParams{Command: "run-down", Err: errors.New("boom")}))
 }

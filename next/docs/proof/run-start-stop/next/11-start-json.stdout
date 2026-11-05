@@ -1,0 +1,112 @@
+{
+  "v": 2,
+  "command": "run-start",
+  "ok": true,
+  "op": "<OP>",
+  "items": [
+    {
+      "subject": "feat/b",
+      "status": "done",
+      "reason": "unchanged",
+      "detail": {
+        "path": "<SB>/acme.trees/feat-b",
+        "jobs": [
+          {
+            "name": "web",
+            "kind": "service",
+            "status": "already_running",
+            "url": "http://web.feat-b.acme.localhost:24812",
+            "log": "<SB>/acme/.git/wtm/logs/feat%2Fb/web.log",
+            "ports": [
+              {
+                "name": "PORT",
+                "port": 24830,
+                "listening": null
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "plan": {
+    "job": "web",
+    "restart": false,
+    "worktrees": [
+      {
+        "worktree": "feat/b",
+        "branch": "feat/b",
+        "path": "<SB>/acme.trees/feat-b",
+        "numbered": true,
+        "jobs": [
+          {
+            "name": "web",
+            "kind": "service",
+            "action": "up",
+            "step": 1,
+            "ports": {
+              "PORT": 24830
+            }
+          }
+        ]
+      }
+    ],
+    "exclusive": false,
+    "others": [],
+    "no_probe": false,
+    "recap": [
+      {
+        "key": "worktree",
+        "label": "Worktree",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/b",
+            "text": "feat/b"
+          }
+        ]
+      },
+      {
+        "key": "job",
+        "label": "Job",
+        "path": "job",
+        "values": [
+          {
+            "value": "web (up, left as it is)",
+            "text": "web (up, left as it is)"
+          }
+        ]
+      }
+    ],
+    "empty": true
+  },
+  "follow_ups": [
+    {
+      "command": "run-logs",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/b"
+          ]
+        }
+      ],
+      "code": "run-start.logs",
+      "message": "see feat/b's output"
+    },
+    {
+      "command": "run-down",
+      "answers": [
+        {
+          "path": "worktree",
+          "values": [
+            "feat/b"
+          ]
+        }
+      ],
+      "code": "run-start.down",
+      "message": "stop feat/b's jobs"
+    }
+  ],
+  "warnings": []
+}

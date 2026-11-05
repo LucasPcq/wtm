@@ -80,7 +80,7 @@ func (a Asked) Warnings(command string) []domain.Warning {
 		warnings = append(warnings, domain.Warning{Code: command + domain.JobsUnknown, Message: run.UnknownMessage(a.JobsErr)})
 	}
 	if a.Skewed != nil {
-		warnings = append(warnings, SkewWarning(SkewWarningParams{Command: command, Skewed: a.Skewed, Restart: a.restart}))
+		warnings = append(warnings, domain.SkewWarning(domain.SkewWarningParams{Command: command, Skewed: a.Skewed, Restart: a.restart}))
 	}
 	if a.PRsErr != nil {
 		warnings = append(warnings, domain.Warning{Code: command + domain.PRsUnavailable, Message: a.PRsErr.Error(), Params: worktree.UnavailableParams(a.PRsErr)})
@@ -96,45 +96,4 @@ func Interrupted(ctx context.Context, err error) error {
 	}
 
 	return ctx.Err()
-}
-
-// SkewWarningParams are a daemon of another build that answered the command named Command, and the follow-up that restarts it.
-type SkewWarningParams struct {
-	Command string
-	Skewed  *run.Skewed
-	Restart *domain.FollowUp
-}
-
-// SkewWarning is <command>.daemon_skew: the daemon that answered is of another build, or the legacy wtm's, its skew and build in its params.
-func SkewWarning(params SkewWarningParams) domain.Warning {
-	warning := domain.Warning{Code: params.Command + domain.DaemonSkew, Message: params.Skewed.Error(), Params: domain.Params{"skew": string(params.Skewed.Skew), "daemon": params.Skewed.Daemon}}
-	if params.Restart != nil {
-		restart := *params.Restart
-		restart.Code, restart.Message = params.Command+".restart_daemon", "restart it: its services stop, its stacks are kept"
-		warning.FollowUp = &restart
-	}
-	return warning
-}
-
-// SkewRefusalParams are the command refused, what it did not do (its message's start), the error the run daemon's client failed on, and the command that hands a skewed daemon's jobs over.
-type SkewRefusalParams struct {
-	Command string
-	Undone  string
-	Err     error
-	Restart *domain.FollowUp
-}
-
-// SkewRefusal is <command>.daemon_skew as a refusal (KindPrecondition), followed by the restart, when the run daemon's client failed on a daemon of another protocol or build, or the legacy wtm's, that it cannot go on with (run.CodeSkew, run.CodeLegacy); nil for any other error.
-func SkewRefusal(params SkewRefusalParams) *domain.Error {
-	refused, ok := errors.AsType[*run.Error](params.Err)
-	if !ok || refused.Code != run.CodeSkew && refused.Code != run.CodeLegacy {
-		return nil
-	}
-
-	skewed := &run.Skewed{Skew: run.SkewBuild}
-	if refused.Code == run.CodeLegacy {
-		skewed.Skew = run.SkewLegacy
-	}
-	warning := SkewWarning(SkewWarningParams{Command: params.Command, Skewed: skewed, Restart: params.Restart})
-	return &domain.Error{Kind: domain.KindPrecondition, Code: warning.Code, Message: params.Undone + ": " + refused.Message, Params: warning.Params, FollowUp: warning.FollowUp, Cause: params.Err}
 }

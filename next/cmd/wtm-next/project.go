@@ -8,6 +8,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 
 	bus "github.com/LucasPcq/wtm/next/internal/adapter/events"
 	"github.com/LucasPcq/wtm/next/internal/adapter/git"
@@ -26,11 +28,16 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/resolve"
 	"github.com/LucasPcq/wtm/next/internal/command/rundown"
 	"github.com/LucasPcq/wtm/next/internal/command/runlogs"
+	"github.com/LucasPcq/wtm/next/internal/command/runstart"
+	"github.com/LucasPcq/wtm/next/internal/command/runstop"
 	"github.com/LucasPcq/wtm/next/internal/command/runup"
 	"github.com/LucasPcq/wtm/next/internal/command/status"
 	synccommand "github.com/LucasPcq/wtm/next/internal/command/sync"
 	"github.com/LucasPcq/wtm/next/internal/command/tree"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/service/runjobs"
+	"github.com/LucasPcq/wtm/next/internal/ui/cli"
+	"github.com/LucasPcq/wtm/next/internal/ui/runview"
 )
 
 const (
@@ -56,6 +63,8 @@ var (
 	openRunUp       = opener(func(a app) runup.UseCase { return a.RunUp })
 	openRunLogs     = opener(func(a app) runlogs.UseCase { return a.RunLogs })
 	openRunDown     = opener(func(a app) rundown.UseCase { return a.RunDown })
+	openRunStart    = opener(func(a app) runstart.UseCase { return a.RunStart })
+	openRunStop     = opener(func(a app) runstop.UseCase { return a.RunStop })
 )
 
 // opener returns the function that opens the use case useCase picks out of the app wired on the repository of a directory.
@@ -134,4 +143,73 @@ func mainWorktree(ctx context.Context, dir string) (string, error) {
 	}
 
 	return git.RealPath(main.Path)
+}
+
+// stopJob is the live view's s: run stop of the job in its worktree, unattended, saying when there was nothing to stop, failing with why it did not stop.
+func stopJob(ctx context.Context, act runview.Act) (runview.Acted, error) {
+	usecase, err := openRunStop(ctx, act.Dir)
+	if err != nil {
+		return runview.Acted{}, err
+	}
+	outcome, err := usecase.Run(ctx, runstop.Request{Worktrees: []string{act.Worktree}, Job: act.Job}.From(domain.Caller{Cwd: act.Dir}), domain.RunOptions{})
+	if err := failed(outcome.Result, err); err != nil || outcome.Result == nil {
+		return runview.Acted{}, err
+	}
+	// Not up there, or a shared service its worktree does not hold: the stop left everything as it was.
+	unchanged := !slices.ContainsFunc(outcome.Result.Items, runjobs.StoppedOrReleased)
+	return runview.Acted{Unchanged: unchanged}, nil
+}
+
+// restartJob is the live view's r: run start --restart of the job in its worktree, unattended, leaving the other worktrees' jobs running; a restart cut short once it stopped the job says so; it fails with why it did not start again.
+func restartJob(ctx context.Context, act runview.Act) (runview.Acted, error) {
+	usecase, err := openRunStart(ctx, act.Dir)
+	if err != nil {
+		return runview.Acted{}, err
+	}
+	outcome, err := usecase.Run(ctx, runstart.Request{Worktree: act.Worktree, Job: act.Job, Restart: true, Parallel: true}.From(domain.Caller{Cwd: act.Dir}), domain.RunOptions{})
+	if outcome.Result != nil && slices.ContainsFunc(outcome.Result.FollowUps, func(f domain.FollowUp) bool { return f.Code == runstart.CodeStart }) {
+		return runview.Acted{CutShort: true}, nil
+	}
+	return runview.Acted{}, failed(outcome.Result, err)
+}
+
+// failed is why an action of the live view did not do what it asked: context.Canceled when it was cut short before it did anything; a request refused, its problems said; another refusal, its words and the command line that does it anyway (a start forced, its daemon restarted); else the failure of its item.
+func failed[D any](result *domain.Result[D], err error) error {
+	if err == nil && result != nil {
+		if failure := result.Failure(); failure != nil {
+			err = failure
+		}
+	}
+	refused, ok := errors.AsType[*domain.Error](err)
+	switch {
+	case !ok:
+		return err
+	case refused.Kind == domain.KindCancelled:
+		return context.Canceled
+	}
+
+	var said []string
+	if refused.Kind != domain.KindInvalid {
+		said = append(said, refused.Message)
+	}
+	for _, field := range refused.Fields {
+		said = append(said, field.Message(field.Path))
+	}
+	if refused.FollowUp != nil {
+		said = append(said, strings.Join(commandLine(*refused.FollowUp), " ")+" "+refused.FollowUp.Message)
+	}
+	if len(said) == 0 {
+		return refused
+	}
+	return errors.New(strings.Join(said, "; "))
+}
+
+// showJob spells, for the live view, the read that shows how act's job stands: status of its worktree.
+func showJob(act runview.Act) string {
+	return cli.Program + " " + status.Name + " " + act.Worktree
+}
+
+// startAgain spells, for the live view, the command line that starts act's job again in its worktree.
+func startAgain(act runview.Act) string {
+	return strings.Join(commandLine(domain.FollowUp{Command: runstart.Name, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{act.Worktree}}, {Path: runstart.PathJob, Values: []string{act.Job}}}}), " ")
 }

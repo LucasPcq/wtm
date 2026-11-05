@@ -1,0 +1,21 @@
+{
+  "fields": [
+    {
+      "kind": "multi_select",
+      "path": "worktree",
+      "picked": [],
+      "options": []
+    },
+    {
+      "kind": "select",
+      "path": "job",
+      "value": "",
+      "options": [],
+      "rememberable": false,
+      "remember": false,
+      "refreshable": false,
+      "closed": false
+    }
+  ],
+  "problems": []
+}

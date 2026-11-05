@@ -1,0 +1,10 @@
+
+  ✗ run start: 1 failed
+
+  Worktree  feat/b
+  Job       migrate
+
+  ✗ feat/b  migrate failed: run daemon: task migrate exited with code 3
+      error: relation users does not exist
+  full output:  /repo/main/.git/wtm/logs/feat%2Fb/migrate.log
+

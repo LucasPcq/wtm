@@ -9,7 +9,6 @@
         "worktree": "feat/a",
         "branch": "feat/a",
         "path": "/repo/wt-feat-a",
-        "profile": "full",
         "jobs": [
           {
             "name": "api",
@@ -40,7 +39,8 @@
             "hold": "own",
             "fate": "stop"
           }
-        ]
+        ],
+        "profile": "full"
       }
     ],
     "recap": [
@@ -79,7 +79,7 @@
       }
     ]
   },
-  "fingerprint": "fd1e4963dc0472046e380899",
+  "fingerprint": "78e4a01f9194b48a3594cdc4",
   "follow_ups": [],
   "warnings": []
 }

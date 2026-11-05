@@ -19,6 +19,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/service/operationtest"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
+	"github.com/LucasPcq/wtm/next/internal/service/runjobs"
 )
 
 const (
@@ -89,8 +90,7 @@ func newWorld(t *testing.T) *world {
 
 	ids := 0
 	w.usecase = rundown.UseCase{
-		Git:        repo,
-		Daemon:     w.daemon,
+		Stops:      runjobs.Stops{Daemon: w.daemon, Gone: repository.GoneIn(repo), Located: repository.LocatedIn(repo), Locate: repository.LocateIn(repo)},
 		Repository: repository.Service{Config: config.Project{StateDir: stateDir, GlobalPath: filepath.Join(root, "no-global.toml")}, Git: repo, MainPath: main, Restart: &domain.FollowUp{Command: "run daemon restart"}},
 		Operations: operation.Service{
 			Locker:    locks{oplock.Locks{StateDir: stateDir}},

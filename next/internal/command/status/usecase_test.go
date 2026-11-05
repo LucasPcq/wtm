@@ -60,7 +60,7 @@ func TestAWorktreeIsReadWholeGitAndIsolation(t *testing.T) {
 		Jobs:      []status.Job{{Name: "web", State: run.Crashed, URL: "http://web.feat-a.main.localhost:11080", Port: &port, ExitCode: &exit}},
 		Env:       status.Env{Files: []status.EnvFile{}},
 		Problems: []status.Problem{{Code: status.CodeBehind, Message: "main has 1 commit it lacks", Fix: &domain.FollowUp{Command: "sync", Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}}, Code: string(status.CodeBehind), Message: "sync it onto main"}}, {Code: status.CodeJobCrashed, Message: "web crashed (exit 1)", Fix: &domain.FollowUp{
-			Command: "run start", Code: string(status.CodeJobCrashed), Message: "start it again",
+			Command: domain.CommandRunStart, Code: string(status.CodeJobCrashed), Message: "start it again",
 			Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/a"}}, {Path: "job", Values: []string{"web"}}, {Path: "detach", Values: []string{"true"}}},
 		}}},
 		Condition: worktree.ConditionChanged,

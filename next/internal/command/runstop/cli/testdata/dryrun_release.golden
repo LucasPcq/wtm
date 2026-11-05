@@ -1,0 +1,8 @@
+
+  run stop · dry run, nothing applied
+  Worktrees  feat/a
+  Job        db
+  Stops      db (released, kept by feat/b)
+  fingerprint  a88144112b60b662ff002b91
+  → wtm-next run stop feat/a --job db --expect-fingerprint a88144112b60b662ff002b91   apply this plan
+

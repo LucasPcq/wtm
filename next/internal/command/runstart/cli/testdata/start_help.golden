@@ -1,0 +1,42 @@
+
+  Start one job of run.toml in the worktree named, or in the one you stand in. A service up
+  there is left as it is, unless --restart stops it and starts it again, its log continuing
+  behind a [wtm] started line. A shared service runs once, in the main checkout, and the
+  worktree holds it; it is never restarted for one worktree (run stop, then run start).
+
+  A task runs to its end; a service is launched and its ports checked (--no-probe skips it).
+  When other worktrees run jobs, it asks whether to stop them first, unless --exclusive,
+  --parallel or run.toml's concurrency answers, never for a task; --yes keeps them. A job
+  whose touches reach data the worktree does not own is refused unless --force.
+
+  Usage:
+    wtm-next run start [worktree] [flags]
+
+  Examples:
+    # The api of the worktree you stand in
+    wtm run start --job api
+
+    # Restart it in another worktree
+    wtm run start feat/login --job api --restart
+
+    # For a script or an agent, with the v2 JSON envelope
+    wtm run start feat/login --job migrate --yes --output json
+
+  Flags:
+        --ask                         Ask again the questions this repository remembers an answer to, to change or forget it
+    -d, --detach                      Return once the job is started rather than show it live
+    -n, --dry-run                     Show the plan and its fingerprint, apply nothing
+        --exclusive                   Stop the jobs the other worktrees run before starting
+        --expect-fingerprint string   Apply only if the facts still have this fingerprint, the one --dry-run printed
+        --force                       Start a job whose touches reach data the worktree does not own (its source's, or a shared service's with no namespace)
+    -h, --help                        help for start
+        --job string                  The job of run.toml to start
+        --no-probe                    Skip the check that each declared port answers
+        --output string               Output format: text or json (default "text")
+        --parallel                    Keep the other worktrees' jobs running, whatever run.toml's concurrency says
+        --restart                     Stop the job and start it again when it is up (its log continues behind a [wtm] started line)
+    -y, --yes                         Run unattended: no question, no confirmation (the worktree you stand in unless given; --job is required; the other worktrees' jobs keep running unless --exclusive)
+
+  Global Flags:
+    -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+

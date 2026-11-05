@@ -1,0 +1,9 @@
+
+  ✓ run stop: 1 done
+
+  Worktrees  feat/a
+  Job        api
+  Stops      api
+
+  → wtm run start feat/a --job api   start it again
+

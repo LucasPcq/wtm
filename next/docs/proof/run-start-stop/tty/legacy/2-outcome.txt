@@ -1,0 +1,10 @@
+$ wtm run stop --job api; echo EXIT=$?
+
+┃  ! job "stuck" declares stop, so its cmd is a launcher wtm waits on until it exits (like `docker c
+ompose up -d`) — if it keeps running, drop stop to run it in the foreground
+
+┃  ✓ api stopped
+
+EXIT=0
+$
+

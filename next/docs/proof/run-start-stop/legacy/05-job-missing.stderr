@@ -1,0 +1,6 @@
+
+  ! job "stuck" declares stop, so its cmd is a launcher wtm waits on until it exits (like `docker compose up -d`) — if it keeps running, drop stop to run it in the foreground
+
+
+  ✗ the job is required and cannot be asked in this mode: pass --job
+

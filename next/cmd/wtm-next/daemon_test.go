@@ -89,6 +89,7 @@ func TestTheDaemonKeepsAJobsLogAndHandsOutItsLinesAndItsTerminal(t *testing.T) {
 	_, err = terminal.Write([]byte("typed\n"))
 	require.NoError(t, err)
 
+	assert.Equal(t, "[wtm] started", <-followed)
 	assert.Equal(t, "ready", <-followed)
 	assert.Equal(t, "typed", <-followed)
 	seen := make([]byte, 64)

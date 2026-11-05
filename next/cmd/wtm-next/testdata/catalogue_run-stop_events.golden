@@ -1,0 +1,35 @@
+[
+  {
+    "type": "operation.started",
+    "command": "run-stop",
+    "surface": "api"
+  },
+  {
+    "type": "unit.started",
+    "subject": "main"
+  },
+  {
+    "type": "phase.started",
+    "subject": "main",
+    "phase": "job",
+    "job": "idle"
+  },
+  {
+    "type": "phase.finished",
+    "subject": "main",
+    "phase": "job",
+    "job": "idle",
+    "failed": false
+  },
+  {
+    "type": "unit.finished",
+    "subject": "main",
+    "status": "done"
+  },
+  {
+    "type": "operation.finished",
+    "command": "run-stop",
+    "surface": "api",
+    "ok": true
+  }
+]

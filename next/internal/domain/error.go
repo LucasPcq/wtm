@@ -113,6 +113,8 @@ const (
 	CommandRunUp       = "run-up"
 	CommandRunLogs     = "run-logs"
 	CommandRunDown     = "run-down"
+	CommandRunStart    = "run-start"
+	CommandRunStop     = "run-stop"
 	PathWorktree       = "worktree" // the worktree a follow-up acts on: its branch or, on no branch, its path
 	PathTo             = "to"       // the branch reparent moves a worktree onto
 )

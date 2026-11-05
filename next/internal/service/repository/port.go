@@ -30,6 +30,12 @@ type Matcher interface {
 	Same(ctx context.Context, a, b string) (bool, error)
 }
 
+// Resolver resolves a path to where it really is and tells whether two lead to the same file.
+type Resolver interface {
+	Locator
+	Matcher
+}
+
 // Prober tells whether a worktree's directory is there and whether it holds uncommitted changes.
 type Prober interface {
 	Locator

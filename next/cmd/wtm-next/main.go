@@ -20,12 +20,15 @@ import (
 	resolvecli "github.com/LucasPcq/wtm/next/internal/command/resolve/cli"
 	rundowncli "github.com/LucasPcq/wtm/next/internal/command/rundown/cli"
 	runlogscli "github.com/LucasPcq/wtm/next/internal/command/runlogs/cli"
+	runstartcli "github.com/LucasPcq/wtm/next/internal/command/runstart/cli"
+	runstopcli "github.com/LucasPcq/wtm/next/internal/command/runstop/cli"
 	runupcli "github.com/LucasPcq/wtm/next/internal/command/runup/cli"
 	statuscli "github.com/LucasPcq/wtm/next/internal/command/status/cli"
 	synccli "github.com/LucasPcq/wtm/next/internal/command/sync/cli"
 	treecli "github.com/LucasPcq/wtm/next/internal/command/tree/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
+	"github.com/LucasPcq/wtm/next/internal/ui/runview"
 	"github.com/spf13/cobra"
 )
 
@@ -62,15 +65,15 @@ func commands(streams *output.Streams, env cli.Env) []*cobra.Command {
 		statuscli.New(streams, env, openStatus, commandLine),
 		treecli.New(streams, env, openTree, commandLine),
 		eventscli.New(streams, env, systemStream(), commandLine),
-		runCmd(runupcli.New(streams, env, openRunUp, commandLine, liveView()), runlogscli.New(streams, env, openRunLogs, commandLine, runlogscli.View(liveView())), rundowncli.New(streams, env, openRunDown, commandLine), runDaemonCmd(streams)),
+		runCmd(runupcli.New(streams, env, openRunUp, commandLine, liveView()), runlogscli.New(streams, env, openRunLogs, commandLine, runlogscli.View{Daemon: runDaemon(), Open: openURL}), rundowncli.New(streams, env, openRunDown, commandLine), runstartcli.New(streams, env, openRunStart, commandLine, liveView()), runstopcli.New(streams, env, openRunStop, commandLine), runDaemonCmd(streams)),
 		uiCmd(env),
 		daemonCmd(),
 	}
 }
 
-// liveView is where run up shows the jobs it started, and run logs those it read: the run daemon of this machine, never started for it, and the browser.
-func liveView() runupcli.View {
-	return runupcli.View{Daemon: runDaemon(), Open: openURL}
+// liveView is where run up and run start show the jobs they started: the run daemon of this machine, never started for it, and the browser.
+func liveView() runview.View {
+	return runview.View{Daemon: runDaemon(), Open: openURL, Stop: stopJob, Restart: restartJob, Again: startAgain, Show: showJob}
 }
 
 // runCmd is run, the parent of the commands that start, watch and stop the jobs of run.toml.

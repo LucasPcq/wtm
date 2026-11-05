@@ -42,6 +42,10 @@ import (
 	rundowncli "github.com/LucasPcq/wtm/next/internal/command/rundown/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/runlogs"
 	runlogscli "github.com/LucasPcq/wtm/next/internal/command/runlogs/cli"
+	"github.com/LucasPcq/wtm/next/internal/command/runstart"
+	runstartcli "github.com/LucasPcq/wtm/next/internal/command/runstart/cli"
+	"github.com/LucasPcq/wtm/next/internal/command/runstop"
+	runstopcli "github.com/LucasPcq/wtm/next/internal/command/runstop/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/runup"
 	runupcli "github.com/LucasPcq/wtm/next/internal/command/runup/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/status"
@@ -50,6 +54,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
+	"github.com/LucasPcq/wtm/next/internal/service/runjobs"
 	"github.com/LucasPcq/wtm/next/internal/service/teardown"
 	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
 	"github.com/LucasPcq/wtm/next/internal/web"
@@ -516,10 +521,10 @@ var enums = map[reflect.Type]struct {
 	reflect.TypeFor[domain.OptionTag]():          {"What sets an option apart, as a code each surface words its own way.", domain.OptionTags()},
 	reflect.TypeFor[create.Action]():             {"How a branch gets its worktree.", create.Actions()},
 	reflect.TypeFor[checkout.Action]():           {"How a pull request's branch gets its worktree.", checkout.Actions()},
-	reflect.TypeFor[runup.Action]():              {"What a start does to one job of its profile.", runup.Actions()},
-	reflect.TypeFor[runup.JobStatus]():           {"What became of one job of a start.", runup.JobStatuses()},
+	reflect.TypeFor[runjobs.Action]():            {"What a start does to one job of its profile.", runjobs.Actions()},
+	reflect.TypeFor[runjobs.JobStatus]():         {"What became of one job of a start.", runjobs.JobStatuses()},
 	reflect.TypeFor[runlogs.JobState]():          {"Where a job whose output is read stands: the run daemon's state, stopped for a job only its log knows, not_started for one that never ran.", runlogs.JobStates()},
-	reflect.TypeFor[rundown.JobStatus]():         {"What became of one job of a stop.", rundown.JobStatuses()},
+	reflect.TypeFor[runjobs.StopStatus]():        {"What became of one job of a stop.", runjobs.StopStatuses()},
 	reflect.TypeFor[run.Fate]():                  {"What a stop does to one job: stops it, releases a shared service others keep, or clears a crash.", run.Fates()},
 	reflect.TypeFor[list.Finished]():             {"How a worktree's pull request has done with it: merged, or closed unmerged.", list.Finisheds()},
 	reflect.TypeFor[prune.Reason]():              {"Why a worktree is done with, as a code each surface words its own way.", prune.Reasons()},
@@ -936,7 +941,7 @@ func shortDir(t *testing.T) string {
 	return dir
 }
 
-// spelling is how the command line spells a command a follow-up names: run up for the catalogue's run-up, run down for its run-down.
+// spelling is how the command line spells a command a follow-up names: run up for the catalogue's run-up, run down for its run-down, run start for its run-start, run stop for its run-stop.
 func spelling(command string) string {
 	switch command {
 	case runup.Name:
@@ -945,6 +950,10 @@ func spelling(command string) string {
 		return runlogscli.Use
 	case rundown.Name:
 		return rundowncli.Use
+	case runstart.Name:
+		return runstartcli.Use
+	case runstop.Name:
+		return runstopcli.Use
 	}
 	return command
 }

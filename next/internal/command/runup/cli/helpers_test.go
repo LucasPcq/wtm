@@ -7,6 +7,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
+	"github.com/LucasPcq/wtm/next/internal/ui/runview"
 
 	"github.com/spf13/cobra"
 )
@@ -15,7 +16,7 @@ func runUp(t *testing.T, w world, words ...string) formtest.Printed {
 	t.Helper()
 	return formtest.Run(t.Context(), func(streams *output.Streams) *cobra.Command {
 		parent := &cobra.Command{Use: "run"}
-		parent.AddCommand(New(streams, w.env(), w.open, formtest.CommandLine, View{Daemon: w.daemon}))
+		parent.AddCommand(New(streams, w.env(), w.open, formtest.CommandLine, runview.View{Daemon: w.daemon}))
 		return parent
 	}, append([]string{"run", "up"}, words...)...)
 }
@@ -33,7 +34,7 @@ func runUpIn(ctx context.Context, w world, keys string, words ...string) formtes
 		streams.SetStdinTerminal(true)
 		streams.Err.SetTerminal(true)
 		parent := &cobra.Command{Use: "run"}
-		parent.AddCommand(New(streams, w.env(), w.open, formtest.CommandLine, View{Daemon: w.daemon}))
+		parent.AddCommand(New(streams, w.env(), w.open, formtest.CommandLine, runview.View{Daemon: w.daemon}))
 		return parent
 	}, append([]string{"run", "up"}, words...)...)
 }

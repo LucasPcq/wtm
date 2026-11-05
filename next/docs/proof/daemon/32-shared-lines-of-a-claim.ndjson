@@ -1,3 +1,4 @@
+{"status":"line","protocol":2,"version":"<NEXT>","pid":<PID>,"at":"<T>","text":"[wtm] started"}
 {"status":"line","protocol":2,"version":"<NEXT>","pid":<PID>,"at":"<T>","text":"cache up"}
 {"status":"line","protocol":2,"version":"<NEXT>","pid":<PID>,"at":"<T>","text":"[wtm] namespace app_a ready for a"}
 {"status":"line","protocol":2,"version":"<NEXT>","pid":<PID>,"at":"<T>","text":"[wtm] namespace app_b ready for b"}

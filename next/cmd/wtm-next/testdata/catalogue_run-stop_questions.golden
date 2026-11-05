@@ -1,0 +1,40 @@
+{
+  "fields": [
+    {
+      "kind": "multi_select",
+      "path": "worktree",
+      "origin": "request",
+      "picked": [
+        "main"
+      ],
+      "options": [
+        {
+          "value": "main",
+          "tag": "current",
+          "up": [
+            "idle"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "select",
+      "path": "job",
+      "value": "idle",
+      "options": [
+        {
+          "value": "idle",
+          "running_in": [
+            "main"
+          ],
+          "kind": "service"
+        }
+      ],
+      "rememberable": false,
+      "remember": false,
+      "refreshable": false,
+      "closed": false
+    }
+  ],
+  "problems": []
+}

@@ -442,3 +442,157 @@ func TestAnAttachThatLandsAfterTheViewLeftIsClosed(t *testing.T) {
 	_, err := job.Write([]byte("x"))
 	assert.ErrorIs(t, err, io.ErrClosedPipe)
 }
+
+// Q5: s stops the job selected, r starts it again, each through the command the view is handed; what became of it is a notice.
+func TestSStopsTheJobSelectedAndRStartsItAgain(t *testing.T) {
+	stops, restarts := &acts{}, &acts{}
+	view := actable(t, stops, restarts)
+
+	view.keys("down", "down", "s")
+	view.keys("r")
+
+	assert.Equal(t, []Act{{Worktree: "feat/b", Dir: featBDir, Job: "api"}}, stops.asked)
+	assert.Equal(t, []Act{{Worktree: "feat/b", Dir: featBDir, Job: "api"}}, restarts.asked)
+	assert.Equal(t, []string{"api stopped", "api restarted"}, view.m.notices)
+}
+
+func TestSOnASharedServiceReleasesItAndRIsRefused(t *testing.T) {
+	stops, restarts := &acts{}, &acts{}
+	view := actable(t, stops, restarts)
+
+	view.keys("s")
+	view.keys("r")
+
+	assert.Equal(t, []Act{{Worktree: "feat/b", Dir: featBDir, Job: "db"}}, stops.asked)
+	assert.Empty(t, restarts.asked)
+	assert.Contains(t, view.helpRow(), "db runs for every worktree holding it")
+	assert.Equal(t, []string{"db released"}, view.m.notices)
+}
+
+func TestAnActionThatFailsSaysWhy(t *testing.T) {
+	stops := &acts{err: errors.New("the stop command of api failed (exit 4)")}
+	view := actable(t, stops, &acts{})
+
+	view.keys("down", "down", "s")
+
+	assert.Equal(t, []string{"could not stop api: the stop command of api failed (exit 4)"}, view.m.notices)
+}
+
+func TestAnActionUnderWayRefusesAnother(t *testing.T) {
+	stops := &acts{}
+	view := actable(t, stops, &acts{})
+	view.keys("down", "down")
+
+	_ = view.m.act(stopping)
+	view.keys("s")
+
+	assert.Empty(t, stops.asked)
+	assert.Contains(t, view.helpRow(), "stopping api… is under way")
+}
+
+func TestAViewHandedNoStopSaysSo(t *testing.T) {
+	view := opened(t, &daemon{}, 120, 30)
+
+	view.keys("down", "down", "s")
+
+	assert.Contains(t, view.helpRow(), "api: nothing to stop here")
+}
+
+// Q5: refresh moved from r to ctrl+r, r restarting.
+func TestCtrlRListsTheJobsAgain(t *testing.T) {
+	d := &daemon{}
+	piped(d)
+	worktrees, jobs := board()
+	d.set(jobs)
+	view := open(t, d, Params{Worktrees: worktrees, Main: "main"}, 120, 30)
+	d.set(jobs[:1])
+
+	view.keys("ctrl+r")
+
+	assert.Len(t, view.m.jobs, 1)
+}
+
+func TestQWaitsForAnActionUnderWay(t *testing.T) {
+	view := actable(t, &acts{}, &acts{})
+	view.keys("down", "down")
+	_ = view.m.act(restarting)
+
+	view.keys("q")
+
+	assert.False(t, view.quit)
+	assert.Contains(t, view.helpRow(), "restarting api… is under way")
+}
+
+// Review: an action that had nothing to do says so, never that it stopped or released.
+func TestAnActionWithNothingToDoSaysSo(t *testing.T) {
+	stops := &acts{acted: Acted{Unchanged: true}}
+	view := actable(t, stops, &acts{})
+
+	view.keys("s")
+
+	assert.Equal(t, []string{"db: nothing to release here"}, view.m.notices)
+}
+
+// Review: Ctrl+C under a restart cuts it short, waits for it to end, then leaves, saying after the view that the job is stopped and how to start it.
+func TestCtrlCUnderARestartWaitsForItAndSaysTheJobIsStopped(t *testing.T) {
+	restarts := &acts{cut: true}
+	view := actable(t, &acts{}, restarts)
+	view.keys("down", "down")
+	cmd := view.m.act(restarting)
+
+	view.keys("ctrl+c")
+	assert.False(t, view.quit, "it waits for the restart")
+	assert.Contains(t, view.helpRow(), "leaving once restarting api… ends")
+	view.send(cmd())
+
+	assert.True(t, view.quit)
+	assert.Equal(t, "restart of api cut short: api is stopped — wtm run start feat/b --job api starts it again", view.m.left)
+}
+
+// Review: the view left before the action ended (its wait over, or Ctrl+C again) says the action still runs and how to check it: a restart by starting the job again, a stop by a read, never a start of what its user meant to stop.
+func TestLeavingBeforeAnActionEndsSaysItStillRuns(t *testing.T) {
+	for name, c := range map[string]struct {
+		action action
+		leave  func(d *driver)
+		left   string
+	}{
+		"wait_over":    {action: restarting, leave: func(d *driver) { d.send(leaveMsg{}) }, left: "restarting api… still under way when the view was left: check it with wtm run start feat/b --job api"},
+		"ctrl_c_again": {action: restarting, leave: func(d *driver) { d.keys("ctrl+c") }, left: "restarting api… still under way when the view was left: check it with wtm run start feat/b --job api"},
+		"stop":         {action: stopping, leave: func(d *driver) { d.send(leaveMsg{}) }, left: "stopping api… still under way when the view was left: check it with wtm status feat/b"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			view := actable(t, &acts{}, &acts{})
+			view.keys("down", "down")
+			_ = view.m.act(c.action)
+			view.keys("ctrl+c")
+
+			c.leave(view)
+
+			assert.True(t, view.quit)
+			assert.Equal(t, c.left, view.m.left)
+		})
+	}
+}
+
+// Review: an action that fails while the view is left says why after it; one cut short before it did anything says nothing.
+func TestAnActionFailingWhileTheViewIsLeftSaysWhyAfterIt(t *testing.T) {
+	for name, c := range map[string]struct {
+		err  error
+		left string
+	}{
+		"failed":    {err: errors.New("start job api: spawn failed"), left: "could not restart api: start job api: spawn failed"},
+		"cancelled": {err: context.Canceled},
+	} {
+		t.Run(name, func(t *testing.T) {
+			view := actable(t, &acts{}, &acts{err: c.err})
+			view.keys("down", "down")
+			cmd := view.m.act(restarting)
+			view.keys("ctrl+c")
+
+			view.send(cmd())
+
+			assert.True(t, view.quit)
+			assert.Equal(t, c.left, view.m.left)
+		})
+	}
+}

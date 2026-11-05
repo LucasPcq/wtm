@@ -17,6 +17,8 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/resolve"
 	"github.com/LucasPcq/wtm/next/internal/command/rundown"
 	"github.com/LucasPcq/wtm/next/internal/command/runlogs"
+	"github.com/LucasPcq/wtm/next/internal/command/runstart"
+	"github.com/LucasPcq/wtm/next/internal/command/runstop"
 	"github.com/LucasPcq/wtm/next/internal/command/runup"
 	"github.com/LucasPcq/wtm/next/internal/command/status"
 	"github.com/LucasPcq/wtm/next/internal/command/sync"
@@ -44,6 +46,8 @@ func catalogue() api.Catalogue {
 		api.Bind(runup.Name, openRunUp, runup.UseCase.Questions, runup.UseCase.Run),
 		api.Bind(runlogs.Name, openRunLogs, runlogs.UseCase.Questions, runlogs.UseCase.Run),
 		api.Bind(rundown.Name, openRunDown, rundown.UseCase.Questions, rundown.UseCase.Run),
+		api.Bind(runstart.Name, openRunStart, runstart.UseCase.Questions, runstart.UseCase.Run),
+		api.Bind(runstop.Name, openRunStop, runstop.UseCase.Questions, runstop.UseCase.Run),
 	}
 }
 

@@ -33,7 +33,6 @@
         "worktree": "feat/b",
         "branch": "feat/b",
         "path": "<SB>/acme.trees/feat-b",
-        "profile": "stuck",
         "jobs": [
           {
             "name": "stuck",
@@ -42,7 +41,8 @@
             "fate": "stop",
             "stop_command": "test -f \"<SB>/home/unstick\" || { echo cannot stop; exit 4; }"
           }
-        ]
+        ],
+        "profile": "stuck"
       }
     ],
     "recap": [

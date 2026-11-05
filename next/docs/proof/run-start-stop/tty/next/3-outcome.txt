@@ -1,0 +1,14 @@
+$ wtm run stop --job api; echo EXIT=$?
+  ✓ feat/a · api (<DUR>)
+
+┃  ✓ run stop: 1 done
+┃
+┃  Worktrees  feat/a
+┃  Job        api
+┃  Stops      api
+┃
+┃  → wtm-next run start feat/a --job api   start it again
+
+EXIT=0
+$
+

@@ -4,6 +4,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
@@ -48,11 +49,12 @@ const (
 	SkipOneProfile      Skip = "one_profile"      // run.toml declares one profile or none: there is no other to start
 	SkipAlone           Skip = "alone"            // no other worktree runs jobs: nothing to keep or stop
 	SkipConfigured      Skip = "configured"       // run.toml answers it
+	SkipTask            Skip = "task"             // the job is a task: it binds no port and is gone once done, nothing to keep or stop
 )
 
 // Skips returns every Skip.
 func Skips() []Skip {
-	return []Skip{SkipFlagOnly, SkipExists, SkipNotBehind, SkipHeld, SkipRunUnread, SkipNothingIsolated, SkipNoConflict, SkipAll, SkipNoOrphan, SkipSafe, SkipNoDataOwed, SkipNoCandidate, SkipNoDescendant, SkipNoRebase, SkipNothingToPush, SkipOneProfile, SkipAlone, SkipConfigured}
+	return []Skip{SkipFlagOnly, SkipExists, SkipNotBehind, SkipHeld, SkipRunUnread, SkipNothingIsolated, SkipNoConflict, SkipAll, SkipNoOrphan, SkipSafe, SkipNoDataOwed, SkipNoCandidate, SkipNoDescendant, SkipNoRebase, SkipNothingToPush, SkipOneProfile, SkipAlone, SkipConfigured, SkipTask}
 }
 
 // Answer is the value a question settled on, and where that value came from.
@@ -81,7 +83,8 @@ type Option struct {
 	Crashed   int                   `json:"crashed,omitempty"`      // the jobs a worktree runs for itself that crashed
 	Holds     []string              `json:"holds,omitempty"`        // the shared services a worktree runs for every worktree, up, sorted
 	Profile   string                `json:"profile,omitempty"`      // the profile a worktree's jobs up were started under, empty when they say none
-	RunningIn []string              `json:"running_in,omitempty"`   // the worktrees picked whose jobs up a profile started
+	RunningIn []string              `json:"running_in,omitempty"`   // the worktrees picked whose jobs up a profile started, or that a job is up in
+	Kind      project.JobKind       `json:"kind,omitempty"`         // a job's kind
 	Problem   *FieldError           `json:"problem,omitempty"`      // the problem picking it raises, nil when it raises none
 }
 
