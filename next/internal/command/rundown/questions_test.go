@@ -41,3 +41,24 @@ func TestARequestRoundTripsThroughItsAnswers(t *testing.T) {
 
 	assert.Equal(t, req, answered)
 }
+
+func TestMainHoldsOnlyTheSharedServicesItHoldsItself(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		mainHolds bool
+		want      []string
+	}{
+		{name: "for_the_others", mainHolds: false, want: nil},
+		{name: "held", mainHolds: true, want: []string{"db"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := newWorld(t)
+			w.shared(tc.mainHolds, featA)
+
+			questions, err := w.usecase.Questions(t.Context(), rundown.Request{}.From(domain.Caller{Cwd: w.at(featA)}))
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, questions.Options[0].Holds, "a stop of main reaches db only while main holds it")
+		})
+	}
+}
