@@ -59,6 +59,12 @@ export function RunDownWizard({
 
   // a worktree asked for that the core no longer offers (removed meanwhile) has nothing to stop
   const gone = step === 'confirm' && all.data !== undefined && chosen.length === 0
+  const left = [
+    ...checked
+      .filter((worktree) => !chosen.includes(worktree))
+      .map((worktree) => ({ worktree, why: 'nothing running' })),
+    ...ask.left,
+  ]
 
   const runBlocked = (): string | undefined => {
     if (gone) return `Nothing runs ${where(checked)}`
@@ -94,11 +100,7 @@ export function RunDownWizard({
 
     if (gone)
       return (
-        <ItemList
-          left={[...checked.map((worktree) => ({ worktree, why: 'nothing running' })), ...ask.left].map(
-            ({ worktree, why }) => <LeftItem key={worktree} worktree={worktree} why={why} />,
-          )}
-        >
+        <ItemList left={left.map(({ worktree, why }) => <LeftItem key={worktree} worktree={worktree} why={why} />)}>
           {[]}
         </ItemList>
       )
@@ -116,7 +118,7 @@ export function RunDownWizard({
         plan={plan}
         warnings={planned.data?.warnings ?? []}
         options={options.filter(({ value }) => stopping.includes(value))}
-        left={ask.left}
+        left={left}
       />
     )
   }
