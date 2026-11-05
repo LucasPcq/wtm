@@ -304,3 +304,55 @@ func TestARestartWhoseStopAnswerWasLostIsAFailureNotRunningOn(t *testing.T) {
 	assert.Empty(t, result.Items[0].Detail.Reached())
 	assert.Empty(t, result.FollowUps)
 }
+
+func TestARestartOfASharedServiceItsWorktreeHoldsRestartsItForEveryHolder(t *testing.T) {
+	w := newWorld(t)
+	w.daemon.listed = append(w.daemon.listed,
+		run.Job{Name: "db", WorkDir: w.main, SharedDir: w.main, MainHolds: true, Up: true, State: run.Running, Hold: run.HoldOwn},
+		run.Job{Name: "db", WorkDir: w.at(featA), SharedDir: w.main, Up: true, Hold: run.HoldClaim},
+		run.Job{Name: "db", WorkDir: w.at(featB), SharedDir: w.main, Up: true, Hold: run.HoldClaim},
+	)
+	req := starting("db", featA)
+	req.Restart = true
+
+	planned, _ := w.plan(t, req)
+	result, _ := w.apply(t, req)
+
+	assert.Equal(t, runjobs.ActionRestart, planned.Worktrees[0].Jobs[0].Action)
+	assert.Equal(t, []string{"main", featA, featB}, planned.HeldBy, "every worktree holding it stops for a moment")
+	assert.Empty(t, w.daemon.stopped, "the daemon restarts it in place: a stop would let go of feat/a's hold")
+	assert.True(t, w.daemon.specOf(t, w.at(featA), "db").Restart)
+	assert.Equal(t, map[string]runjobs.JobStatus{"db": runjobs.JobStarted}, statusesOf(result.Items[0]))
+}
+
+func TestARestartOfASharedServiceTheMainCheckoutRunsWithoutHoldingItIsRefused(t *testing.T) {
+	w := newWorld(t)
+	w.daemon.listed = append(w.daemon.listed,
+		run.Job{Name: "db", WorkDir: w.main, SharedDir: w.main, Up: true, State: run.Running, Hold: run.HoldOwn},
+		run.Job{Name: "db", WorkDir: w.at(featA), SharedDir: w.main, Up: true, Hold: run.HoldClaim},
+	)
+	req := starting("db", "main")
+	req.Restart = true
+
+	refused := w.refused(t, req)
+
+	require.Len(t, refused.Fields, 1)
+	assert.Equal(t, runstart.CodeRestartShared, refused.Fields[0].Code)
+}
+
+// Found driving the web: the Undo of main's release was planned up (already running), and main never held it again.
+func TestTheMainCheckoutRunningASharedServiceForTheOthersJoinsIt(t *testing.T) {
+	w := newWorld(t)
+	w.daemon.listed = append(w.daemon.listed,
+		run.Job{Name: "db", WorkDir: w.main, SharedDir: w.main, Up: true, State: run.Running, Hold: run.HoldOwn},
+		run.Job{Name: "db", WorkDir: w.at(featA), SharedDir: w.main, Up: true, Hold: run.HoldClaim},
+	)
+
+	planned, _ := w.plan(t, starting("db", "main"))
+	result, _ := w.apply(t, starting("db", "main"))
+
+	assert.Equal(t, runjobs.ActionJoin, planned.Worktrees[0].Jobs[0].Action)
+	assert.False(t, planned.Empty)
+	assert.Equal(t, w.main, w.daemon.specOf(t, w.main, "db").WorkDir, "the daemon is asked: it takes main's own hold")
+	assert.Equal(t, map[string]runjobs.JobStatus{"db": runjobs.JobJoined}, statusesOf(result.Items[0]))
+}

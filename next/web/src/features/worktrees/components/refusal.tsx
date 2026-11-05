@@ -6,9 +6,11 @@ import { CommandLine } from '@/features/worktrees/components/command-line'
 type Consent = { label: string; to: 'force' | 'exclusive' }
 
 // the follow-ups of a refusal the person consents to on Confirm, by their code; any other is a command to copy
-const consents: Record<'run-up.force' | 'run-up.exclusive', Consent> = {
+const consents: Record<`${'run-up' | 'run-start'}.${'force' | 'exclusive'}`, Consent> = {
   'run-up.force': { label: 'Start anyway', to: 'force' },
   'run-up.exclusive': { label: "Stop the others' jobs", to: 'exclusive' },
+  'run-start.force': { label: 'Start anyway', to: 'force' },
+  'run-start.exclusive': { label: "Stop the others' jobs", to: 'exclusive' },
 }
 
 const consented = (code: string | undefined): code is keyof typeof consents =>

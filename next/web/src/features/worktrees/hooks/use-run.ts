@@ -106,6 +106,18 @@ export function useRun<C extends MutationCommand>(repo: string, command: C) {
   }
 }
 
+// the direct run under way on one job of worktree, if any: its unit names the job among its phases
+export const useJobRun = (repo: string, worktree: string, job: string) =>
+  useRuns((runs) =>
+    (['run-start', 'run-stop'] as const).find((command) => {
+      const run = runs[keyOf(repo, command)]
+      return (
+        run?.running &&
+        run.progress.units.some((unit) => unit.subject === worktree && unit.phases.some((phase) => phase.job === job))
+      )
+    }),
+  )
+
 export const clockEvery = 30_000
 
 const doing: Record<MutationCommand, string> = {
@@ -119,6 +131,8 @@ const doing: Record<MutationCommand, string> = {
   sync: 'Syncing',
   'run-up': 'Starting',
   'run-down': 'Stopping',
+  'run-start': 'Starting',
+  'run-stop': 'Stopping',
 }
 
 export const isMutation = (command: string): command is MutationCommand => Object.hasOwn(doing, command)

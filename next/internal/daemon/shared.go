@@ -57,7 +57,19 @@ func (d *Daemon) startShared(spec run.Spec, out func(run.Line)) (run.Job, error)
 		}
 		if held := d.jobs[own]; held != nil && held.up() && (!mainAsks || held.record.MainHolds) {
 			d.mu.Unlock()
+			if spec.Restart {
+				return d.restartShared(restartParams{Served: served, Own: own, Runs: runs})
+			}
 			return run.Job{}, &run.Error{Code: run.CodeJobRunning, Message: fmt.Sprintf("job %s is already running in %s", spec.Job.Name, spec.WorkDir)}
+		}
+		// A job a restart stopped is waited for: it comes back with every hold on it.
+		if d.restarting[served] {
+			d.mu.Unlock()
+			if d.waited != nil {
+				d.waited()
+			}
+			<-time.After(pendingPoll)
+			continue
 		}
 		// A job being stopped, or a stack whose first launch runs, is waited for: a claim on it would hold a job about to be gone.
 		if pending := d.jobs[served]; pending != nil && pending.up() && (pending.stopped || pending.process != nil && pending.record.Spec.Detached()) {
@@ -126,6 +138,59 @@ func (d *Daemon) startShared(spec run.Spec, out func(run.Line)) (run.Job, error)
 		d.publish(hold, publishParams{Event: domain.JobStarted{JobChange: d.change(hold, nil)}})
 	}
 
+	return d.view(hold), nil
+}
+
+// restartParams is the shared job a restart stops and starts again (Served), the hold of the worktree asking it (Own), and the spec it runs again from (Runs, in the main checkout).
+type restartParams struct {
+	Served key
+	Own    key
+	Runs   run.Spec
+}
+
+// restartShared stops the shared job params serves and starts it again from
+// params.Runs, its log continued behind the run mark, every hold on it kept:
+// the claims wait out the restart rather than drop, the main checkout's own
+// hold is carried over, and the namespaces stay (stopping is not destroying).
+// A start that fails leaves the claims dangling, and drops them. It returns
+// the asking worktree's hold as it then stands.
+func (d *Daemon) restartShared(params restartParams) (run.Job, error) {
+	d.mu.Lock()
+	service := d.realLocked(params.Served)
+	if service == nil || d.restarting[params.Served] {
+		d.mu.Unlock()
+		return run.Job{}, &run.Error{Code: run.CodeJobRunning, Message: fmt.Sprintf("job %s is being stopped or restarted", params.Served.name)}
+	}
+	d.restarting[params.Served] = true
+	mainHolds, mainHold := service.record.MainHolds, service.mainHold
+	d.mu.Unlock()
+
+	var correlation string
+	if params.Runs.Origin != nil {
+		correlation = params.Runs.Origin.CorrelationID
+	}
+	_, err := d.halt(service, correlation, nil)
+	if err == nil {
+		runs := params.Runs
+		runs.Restart = true
+		_, err = d.start(runs, nil)
+	}
+
+	d.mu.Lock()
+	delete(d.restarting, params.Served)
+	if again := d.realLocked(params.Served); again != nil {
+		again.record.MainHolds, again.mainHold = mainHolds, mainHold
+	}
+	d.dropDanglingClaimsLocked()
+	hold := d.jobs[params.Own]
+	d.mu.Unlock()
+	d.save()
+	switch {
+	case err != nil:
+		return run.Job{}, err
+	case hold == nil:
+		return run.Job{}, &run.Error{Code: run.CodeLaunchFailed, Message: fmt.Sprintf("job %s was let go of while it restarted", params.Served.name)}
+	}
 	return d.view(hold), nil
 }
 
@@ -335,7 +400,8 @@ func (d *Daemon) heldLocked(j *job) []domain.JobWorktree {
 // tell the next worktree its service runs. The lock is held.
 func (d *Daemon) dropDanglingClaimsLocked() {
 	for at, j := range d.jobs {
-		if j.record.Claim && d.realLocked(key{workDir: j.record.SharedDir, name: at.name}) == nil {
+		served := key{workDir: j.record.SharedDir, name: at.name}
+		if j.record.Claim && !d.restarting[served] && d.realLocked(served) == nil {
 			delete(d.jobs, at)
 		}
 	}

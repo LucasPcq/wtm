@@ -2,10 +2,29 @@ import { Copy, Download, Ellipsis, ExternalLink, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import { downloadLog, type JobAt } from '@/api/queries/job-logs'
 import { Button } from '@/components/ui/button'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { MenuEntry } from '@/features/worktrees/components/menu-entry'
+import type { JobActs } from '@/features/worktrees/running/hooks/use-job-actions'
+import { actEntry, actLook } from '@/features/worktrees/running/utils/job-words'
 import { copy } from '@/features/worktrees/utils/copy'
 
-export function JobMenu({ at, url, log }: { at: JobAt; url: string | undefined; log: string | undefined }) {
+export function JobMenu({
+  at,
+  url,
+  log,
+  acts,
+}: {
+  at: JobAt
+  url: string | undefined
+  log: string | undefined
+  acts: JobActs['acts']
+}) {
   const save = () => downloadLog(at).catch((failed: Error) => toast.error(failed.message))
 
   return (
@@ -15,7 +34,7 @@ export function JobMenu({ at, url, log }: { at: JobAt; url: string | undefined; 
           <Ellipsis />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuContent align="end" className="w-64">
         <DropdownMenuItem disabled={!url} onSelect={() => url && window.open(url, '_blank', 'noreferrer')}>
           <ExternalLink />
           Open the address
@@ -32,6 +51,17 @@ export function JobMenu({ at, url, log }: { at: JobAt; url: string | undefined; 
           <Download />
           Download the log
         </DropdownMenuItem>
+        {acts.length > 0 && <DropdownMenuSeparator />}
+        {acts.map(({ act, why, keptBy, run }) => (
+          <MenuEntry
+            key={act}
+            Item={DropdownMenuItem}
+            icon={actLook[act].icon}
+            {...actEntry(act, at, keptBy)}
+            why={why}
+            onSelect={run}
+          />
+        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   )

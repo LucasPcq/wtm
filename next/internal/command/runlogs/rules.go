@@ -248,11 +248,17 @@ type Job struct {
 	Count       int             `json:"count,omitempty"`
 }
 
-// A Line is one line a job printed: when (zero for a line of a log that kept no time), its text, and, read from the whole log, its number in it from 1.
+// A Line is one line a job printed: when (zero for a line of a log that kept no time), its text, read from the whole log its number in it from 1, and whether it is the daemon's run mark (run.Mark), where a run of the job begins.
 type Line struct {
 	At   time.Time `json:"at,omitzero"`
 	Text string    `json:"text"`
 	N    int       `json:"n,omitempty"`
+	Mark bool      `json:"mark,omitempty"`
+}
+
+// lineOf is line as run logs gives it, numbered n (0: not read from the whole log).
+func lineOf(line run.Line, n int) Line {
+	return Line{At: line.At, Text: line.Text, N: n, Mark: line.Text == run.Mark}
 }
 
 // JobState is where a job stands, as run logs reads it.
@@ -436,7 +442,7 @@ type Found struct {
 func LastOf(lines []run.Line) Found {
 	found := Found{Lines: make([]Line, 0, len(lines)), Logged: len(lines) > 0}
 	for _, line := range lines {
-		found.Lines = append(found.Lines, Line{At: line.At, Text: line.Text})
+		found.Lines = append(found.Lines, lineOf(line, 0))
 	}
 	return found
 }
@@ -467,9 +473,9 @@ func (s *Sift) Take(line run.Line) {
 	switch {
 	case !s.started || s.match != nil && !s.match(line.Text):
 	case len(s.found.Lines) < run.MaxTail:
-		s.found.Lines = append(s.found.Lines, Line{At: line.At, Text: line.Text, N: s.found.Count})
+		s.found.Lines = append(s.found.Lines, lineOf(line, s.found.Count))
 	case s.match != nil:
-		s.found.Lines = append(s.found.Lines[1:], Line{At: line.At, Text: line.Text, N: s.found.Count})
+		s.found.Lines = append(s.found.Lines[1:], lineOf(line, s.found.Count))
 	}
 }
 

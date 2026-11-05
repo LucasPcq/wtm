@@ -91,7 +91,8 @@
             "job": { "type": "string" },
             "at": { "type": "string", "format": "date-time", "description": "When it printed it, absent for a line of a log that kept no time." },
             "text": { "type": "string" },
-            "n": { "type": "integer", "minimum": 1, "description": "Its number in the whole log, for a line a search or a time read from it." }
+            "n": { "type": "integer", "minimum": 1, "description": "Its number in the whole log, for a line a search or a time read from it." },
+            "mark": { "type": "boolean", "description": "The daemon's run mark, where a run of the job begins; absent on any other line." }
           }
         },
         {

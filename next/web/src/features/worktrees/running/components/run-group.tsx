@@ -15,6 +15,7 @@ import { Rail } from '@/features/worktrees/components/rail'
 import { openRunDown } from '@/features/worktrees/hooks/use-run-down-dialog'
 import { ProfilesMenu } from '@/features/worktrees/running/components/profiles-menu'
 import { RunningJob } from '@/features/worktrees/running/components/running-job'
+import { StartJobEntry } from '@/features/worktrees/running/components/start-job-entry'
 import { groupLine, type RunningGroup } from '@/features/worktrees/running/utils/groups'
 import { menu } from '@/features/worktrees/utils/actions'
 import { named, runsSomething } from '@/features/worktrees/utils/run-words'
@@ -74,6 +75,7 @@ export function RunGroup({
             <DropdownMenuLabel className="truncate text-xs text-muted-foreground">{group.worktree}</DropdownMenuLabel>
             <StopEntry holds={option?.holds ?? []} why={why} onSelect={stop} />
             <ProfilesMenu repo={repo} worktree={group.worktree} />
+            <StartJobEntry repo={repo} worktree={group.worktree} />
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

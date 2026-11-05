@@ -587,3 +587,39 @@ func TestTheLastReleaseOfASharedStackHandsTheLinesOfItsStopCommandToTheStop(t *t
 	assert.Equal(t, []run.Outcome{run.OutcomeReleased, run.OutcomeStopped}, []run.Outcome{released, stopped})
 	assert.Equal(t, []string{"Container db Stopped"}, lines, "only the release that stops the stack runs its stop command")
 }
+
+func TestARestartOfASharedJobStartsItAgainKeepingEveryHold(t *testing.T) {
+	w := newWorld(t, map[string]script{"up db": exits(0), "down db": exits(0)})
+	for _, at := range []string{"/wt/a", "/wt/b", "/repo"} {
+		_, err := w.Start(shared("db", at, "down db"), nil)
+		require.NoError(t, err)
+	}
+	again := shared("db", "/wt/a", "down db")
+	again.Restart = true
+
+	restarted, err := w.Start(again, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, run.HoldClaim, restarted.Hold)
+	assert.True(t, restarted.Up)
+	assert.Equal(t, []string{"up db", "down db", "up db"}, w.spawner.lines(), "stopped once, started once")
+	assert.Equal(t, []string{"/repo:db", "/wt/a:db", "/wt/b:db"}, w.index.names(), "every claim kept")
+	service := w.List("/repo")
+	require.Len(t, service, 1)
+	assert.True(t, service[0].MainHolds, "the main checkout's own hold carried over")
+	assert.True(t, service[0].Up)
+}
+
+func TestARestartAskedWhereASharedJobIsNotHeldJoinsIt(t *testing.T) {
+	w := newWorld(t, map[string]script{"up db": exits(0)})
+	_, err := w.Start(shared("db", "/wt/a", "down db"), nil)
+	require.NoError(t, err)
+	join := shared("db", "/wt/b", "down db")
+	join.Restart = true
+
+	_, err = w.Start(join, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"up db"}, w.spawner.lines(), "nothing restarted")
+	assert.Equal(t, []string{"/repo:db", "/wt/a:db", "/wt/b:db"}, w.index.names())
+}

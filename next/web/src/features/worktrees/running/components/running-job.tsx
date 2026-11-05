@@ -1,12 +1,15 @@
 import { Link } from '@tanstack/react-router'
-import { CircleDashed } from 'lucide-react'
+import { CircleDashed, LoaderCircle } from 'lucide-react'
 import { toneIcon } from '@/features/worktrees/components/glyph'
+import { useJobRun } from '@/features/worktrees/hooks/use-run'
 import type { RunningRow } from '@/features/worktrees/running/utils/groups'
 import { jobLook, jobSince } from '@/features/worktrees/running/utils/job-look'
+import { doingWords } from '@/features/worktrees/running/utils/job-words'
 import { withoutScheme } from '@/lib/url'
 import { cn } from '@/lib/utils'
 
-// a job the start under way brings up is greyed with where it stands until the read lists it
+// a job the start under way brings up is greyed with where it stands until the read lists it, as one a direct
+// restart, stop or release of it reaches
 export function RunningJob({
   repo,
   worktree,
@@ -20,6 +23,8 @@ export function RunningJob({
   now: number
   selected: boolean
 }) {
+  const reached = useJobRun(repo, worktree, row.name)
+
   if (!('job' in row))
     return (
       <li aria-label={row.name} className="flex items-center gap-3 py-1.5 text-sm text-muted-foreground">
@@ -30,7 +35,12 @@ export function RunningJob({
     )
 
   const { job } = row
-  const { icon: Icon, tone } = jobLook[job.state ?? 'stopped']
+  const { icon: Icon, tone } = reached ? { icon: LoaderCircle, tone: 'busy' as const } : jobLook[job.state ?? 'stopped']
+  const said = () => {
+    if (reached === 'run-start') return doingWords[job.state === 'running' ? 'restarting' : 'starting']
+    if (reached === 'run-stop') return doingWords.stopping
+    return jobSince(job, now)
+  }
 
   return (
     <li
@@ -38,6 +48,7 @@ export function RunningJob({
       className={cn(
         '-mx-2 flex flex-col gap-0.5 rounded-md px-2 py-1.5',
         selected ? 'bg-accent' : 'hover:bg-accent/50',
+        reached && 'opacity-60',
       )}
     >
       <Link
@@ -50,7 +61,7 @@ export function RunningJob({
         <Icon className={cn(toneIcon({ tone }), 'size-4')} aria-hidden="true" />
         <span className={cn('flex-1 font-medium', tone === 'muted' && 'text-muted-foreground')}>{job.name}</span>
         <span className={cn('text-xs', tone === 'failed' ? 'text-destructive' : 'text-muted-foreground')}>
-          {jobSince(job, now)}
+          {said()}
         </span>
       </Link>
       {job.url && job.state === 'running' && (

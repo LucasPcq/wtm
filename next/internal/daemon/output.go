@@ -98,7 +98,7 @@ func (o *output) end() []string {
 	last := []string{}
 	for _, line := range o.lines[max(0, len(o.lines)-lastLines):] {
 		// A crash's last lines are the job's: the run mark is wtm's.
-		if line.Text != RunMark {
+		if line.Text != run.Mark {
 			last = append(last, line.Text)
 		}
 	}
@@ -181,11 +181,12 @@ func (o *output) note(text string) {
 	o.hand(lines)
 }
 
-// beginParams are how a run of the job begins: its process spawned, its log opened, and the mark written first.
+// beginParams are how a run of the job begins: its process spawned, its log opened, and the mark written first; Before are the last lines of the run before, which a run continuing its log (a restart) keeps above the mark for its readers, as its log does.
 type beginParams struct {
-	Spawn func() error
-	Open  func() Log
-	Mark  string
+	Spawn  func() error
+	Open   func() Log
+	Mark   string
+	Before []run.Line
 }
 
 // begin spawns the job's process with the lock held, so nothing it prints
@@ -203,12 +204,20 @@ func (o *output) begin(params beginParams) error {
 	o.log = params.Open()
 	mark := []run.Line{{At: o.now(), Text: params.Mark}}
 	last := o.last.Load()
+	o.keep(params.Before)
 	o.keep(mark)
 	o.last.Store(last)
 	if o.log != nil {
 		o.log.Write(mark)
 	}
 	return nil
+}
+
+// kept returns the last lines kept.
+func (o *output) kept() []run.Line {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return slices.Clone(o.lines)
 }
 
 func (o *output) lastLine() *run.Line {

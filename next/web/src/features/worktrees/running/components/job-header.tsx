@@ -1,9 +1,11 @@
-import { ChevronRight, Copy, ExternalLink } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { ChevronRight, Copy, ExternalLink, LoaderCircle } from 'lucide-react'
 import type { ListJob, RunlogsJob } from '@/api/types.gen'
 import { toneIcon } from '@/features/worktrees/components/glyph'
+import { JobActions } from '@/features/worktrees/running/components/job-actions'
 import { JobMenu } from '@/features/worktrees/running/components/job-menu'
+import { useJobActions } from '@/features/worktrees/running/hooks/use-job-actions'
 import { jobLook, jobSince } from '@/features/worktrees/running/utils/job-look'
+import { doingWords } from '@/features/worktrees/running/utils/job-words'
 import { copy } from '@/features/worktrees/utils/copy'
 import { withoutScheme } from '@/lib/url'
 import { cn } from '@/lib/utils'
@@ -15,7 +17,6 @@ export function JobHeader({
   job,
   facts,
   now,
-  actions,
 }: {
   repo: string
   worktree: string
@@ -23,9 +24,15 @@ export function JobHeader({
   job: ListJob
   facts: RunlogsJob | undefined
   now: number
-  actions?: ReactNode
 }) {
-  const { icon: Icon, tone } = jobLook[job.state ?? 'stopped']
+  const { acts, doing } = useJobActions({ repo, worktree, job })
+  const look = jobLook[job.state ?? 'stopped']
+  const { icon: Icon, tone } = doing ? { icon: LoaderCircle, tone: 'busy' as const } : look
+
+  const since = () => {
+    if (doing) return doingWords[doing]
+    return job.hold === 'detached' ? `detached · ${jobSince(job, now)}` : jobSince(job, now)
+  }
   const where = [facts?.dir, facts?.command].filter(Boolean).join(' · ')
 
   return (
@@ -44,12 +51,12 @@ export function JobHeader({
           <Icon className={cn(toneIcon({ tone }), 'size-4')} aria-hidden="true" />
           <span className="truncate text-lg font-semibold">{job.name}</span>
           <span className={cn('shrink-0 text-sm', tone === 'failed' ? 'text-destructive' : 'text-muted-foreground')}>
-            {job.hold === 'detached' ? `detached · ${jobSince(job, now)}` : jobSince(job, now)}
+            {since()}
           </span>
         </h2>
         <div className="flex shrink-0 items-center gap-1">
-          {actions}
-          <JobMenu at={{ repo, worktree, job: job.name }} url={job.url} log={facts?.log} />
+          <JobActions acts={acts} job={job.name} />
+          <JobMenu at={{ repo, worktree, job: job.name }} url={job.url} log={facts?.log} acts={acts} />
         </div>
       </div>
       {job.url && (

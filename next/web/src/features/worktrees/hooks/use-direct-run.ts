@@ -24,6 +24,8 @@ export type DirectRun<C extends MutationCommand> = {
   applying: DomainAnswered[]
   unitsOf: (plan: Planned<C>) => Unit[]
   doing: string
+  // the under-way toast's second line
+  doingWhere?: string
   // refused: why the run ended on no envelope (a lock held, a stale plan)
   told: (envelope: Applied<C> | undefined, refused: string | undefined) => Told
   shown: (envelope: Applied<C> | undefined) => boolean
@@ -45,6 +47,7 @@ export function useDirectRun<C extends MutationCommand>(repo: string, command: C
     applying,
     unitsOf,
     doing,
+    doingWhere,
     told,
     shown,
     onDecide,
@@ -56,7 +59,7 @@ export function useDirectRun<C extends MutationCommand>(repo: string, command: C
       onDetails(held)
       return undefined
     }
-    const id = toast.loading(doing)
+    const id = toast.loading(doing, { description: doingWhere })
     // asked again, never from the cache: a plan read earlier would be on facts since moved
     const dry = await client
       .fetchQuery({ ...dryRunQuery(repo, command, answers), staleTime: 0 })
