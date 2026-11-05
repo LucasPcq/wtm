@@ -9,6 +9,8 @@ import { Alert } from '@/features/worktrees/components/alert'
 import { CommandLine } from '@/features/worktrees/components/command-line'
 import { DialogBand } from '@/features/worktrees/components/dialog-band'
 import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
+import { ItemList } from '@/features/worktrees/components/item-list'
+import { LeftItem } from '@/features/worktrees/components/left-item'
 import { NextButton } from '@/features/worktrees/components/next-button'
 import { ReasonButton } from '@/features/worktrees/components/reason-button'
 import { RunFailure } from '@/features/worktrees/components/run-failure'
@@ -55,7 +57,11 @@ export function RunDownWizard({
   const unplanned = planned.isError ? planned.error.message : refusal?.message
   const stopping = (plan?.worktrees ?? []).filter((target) => (target.jobs ?? []).length > 0).map((t) => t.worktree)
 
+  // a worktree asked for that the core no longer offers (removed meanwhile) has nothing to stop
+  const gone = step === 'confirm' && all.data !== undefined && chosen.length === 0
+
   const runBlocked = (): string | undefined => {
+    if (gone) return `Nothing runs ${where(checked)}`
     if (unplanned) return 'The plan was refused'
     if (!plan || !fingerprint || planned.isFetching) return 'Planning…'
     if (stopping.length === 0) return `Nothing runs ${where(chosen)}`
@@ -86,6 +92,16 @@ export function RunDownWizard({
         />
       )
 
+    if (gone)
+      return (
+        <ItemList
+          left={[...checked.map((worktree) => ({ worktree, why: 'nothing running' })), ...ask.left].map(
+            ({ worktree, why }) => <LeftItem key={worktree} worktree={worktree} why={why} />,
+          )}
+        >
+          {[]}
+        </ItemList>
+      )
     if (unplanned)
       return (
         <Alert

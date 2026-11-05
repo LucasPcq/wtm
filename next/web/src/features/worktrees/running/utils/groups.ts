@@ -13,8 +13,6 @@ export type RunningGroup = {
   counts: Record<RunState, number>
   starting: boolean
   rows: RunningRow[]
-  // the shared services it holds, which run in the main checkout's group
-  holds: string[]
 }
 
 // what needs the person first: a crash, then what comes up, then what runs. Stopped and exited jobs are not listed
@@ -57,7 +55,6 @@ export function groupsOf({
         counts: jobCounts(listed),
         starting: coming.length > 0,
         rows: [...listed.map((job) => ({ name: job.name, job })), ...coming],
-        holds: (detail?.jobs ?? []).filter((job) => job.hold === 'claim').map((job) => job.name),
       },
     ]
   })

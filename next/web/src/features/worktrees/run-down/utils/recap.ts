@@ -1,6 +1,6 @@
 import type { Applied } from '@/api/queries/commands'
 import type { DomainWarning, RundownPlan, RunjobsStopStatus } from '@/api/types.gen'
-import { sharedOf } from '@/features/worktrees/run-down/utils/plan'
+import { sharedOf, stopJob } from '@/features/worktrees/run-down/utils/plan'
 import { kept, statusWords } from '@/features/worktrees/run-down/utils/words'
 import {
   itemWarnings,
@@ -25,10 +25,15 @@ export function recapOf(
   const items = envelope?.items ?? []
   const warnings = envelope?.warnings ?? []
   const shared = sharedOf(plan)
-  const isShared = (name: string) => shared.some((service) => service.name === name)
+  // by the plan's job of that worktree: a job of its own may be named like a shared service
+  const isShared = (worktree: string, name: string) => Boolean(stopJob(plan, worktree, name)?.shared_in)
 
+  // a worktree that held shared services alone says it let them go
   const said = (item: RunDownItem) => {
-    const jobs = (item.detail?.jobs ?? []).filter((job) => !isShared(job.name))
+    const all = item.detail?.jobs ?? []
+    const jobs = all.filter((job) => !isShared(item.subject, job.name))
+    const holds = all.filter((job) => isShared(item.subject, job.name)).map((job) => job.name)
+    if (jobs.length === 0 && holds.length > 0) return `let go of ${holds.join(', ')}`
     return order
       .flatMap((status) => {
         const names = jobs.filter((job) => job.status === status).map((job) => job.name)
@@ -52,7 +57,9 @@ export function recapOf(
 
   // a shared service says what its holders' stops did to it, once
   const services = shared.map((service) => {
-    const statuses = items.flatMap((item) => (item.detail?.jobs ?? []).filter((job) => job.name === service.name))
+    const statuses = items.flatMap((item) =>
+      (item.detail?.jobs ?? []).filter((job) => job.name === service.name && isShared(item.subject, job.name)),
+    )
     const status = (wanted: RunjobsStopStatus) => statuses.some((job) => job.status === wanted)
     const row = { key: `shared:${service.name}`, title: service.name }
     if (status('failed')) return { row: { ...row, tone: 'failed' as const, message: "didn't stop" }, group: 'failed' }
@@ -63,7 +70,8 @@ export function recapOf(
         row: { ...row, tone: 'ok' as const, message: `keeps running for ${kept(service.keptBy)}` },
         group: 'released',
       }
-    return undefined
+    if (statuses.length === 0) return undefined
+    return { row: { ...row, tone: 'muted' as const, message: 'already stopped' }, group: 'stopped' }
   })
   const servicesIn = (group: string) => services.flatMap((service) => (service?.group === group ? [service.row] : []))
 

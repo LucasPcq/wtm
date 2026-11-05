@@ -11,9 +11,11 @@ export const statusWords: Record<RunjobsStopStatus, string> = {
   not_reached: 'not reached',
 }
 
-// past three names a line no longer holds: a count
-export const kept = (worktrees: string[]) =>
-  worktrees.length <= 3 ? worktrees.join(', ') : `${worktrees.length} worktrees`
+// past three names a line no longer holds: a count; none named, the plan saw nobody keeping it and another came since
+export const kept = (worktrees: string[]) => {
+  if (worktrees.length === 0) return 'another worktree'
+  return worktrees.length <= 3 ? worktrees.join(', ') : `${worktrees.length} worktrees`
+}
 
 const who = (holders: string[]) => {
   if (holders.length === 1) return holders[0] ?? ''

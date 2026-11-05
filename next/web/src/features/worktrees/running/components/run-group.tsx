@@ -1,4 +1,6 @@
+import { useQuery } from '@tanstack/react-query'
 import { Ellipsis, Square } from 'lucide-react'
+import { questionsQuery } from '@/api/queries/commands'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -30,9 +32,6 @@ export function RunGroup({
 }) {
   const line = groupLine(group)
   const stop = () => openRunDown(repo, { worktrees: [group.worktree] })
-  const stops = ['run down', group.holds.length > 0 && `releases its hold on ${named(group.holds)}`]
-    .filter(Boolean)
-    .join(' · ')
 
   return (
     <section aria-label={group.worktree} className="flex flex-col gap-1 py-3">
@@ -62,14 +61,7 @@ export function RunGroup({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64">
             <DropdownMenuLabel className="truncate text-xs text-muted-foreground">{group.worktree}</DropdownMenuLabel>
-            <MenuEntry
-              Item={DropdownMenuItem}
-              icon={menu.run_down.icon}
-              label={menu.run_down.label}
-              description={stops}
-              why={undefined}
-              onSelect={stop}
-            />
+            <StopEntry repo={repo} worktree={group.worktree} onSelect={stop} />
             <ProfilesMenu repo={repo} worktree={group.worktree} />
           </DropdownMenuContent>
         </DropdownMenu>
@@ -87,5 +79,26 @@ export function RunGroup({
         ))}
       </Rail>
     </section>
+  )
+}
+
+// what it holds is run down's to say: its claims, and in the main checkout the shared services it holds itself
+function StopEntry({ repo, worktree, onSelect }: { repo: string; worktree: string; onSelect: () => void }) {
+  const form = useQuery(questionsQuery(repo, 'run-down'))
+  const field = form.data?.fields.find((one) => one.path === 'worktree')
+  const holds = (field?.kind === 'multi_select' ? field.options : []).find((one) => one.value === worktree)?.holds ?? []
+  const description = ['run down', holds.length > 0 && `releases its hold on ${named(holds)}`]
+    .filter(Boolean)
+    .join(' · ')
+
+  return (
+    <MenuEntry
+      Item={DropdownMenuItem}
+      icon={menu.run_down.icon}
+      label={menu.run_down.label}
+      description={description}
+      why={undefined}
+      onSelect={onSelect}
+    />
   )
 }

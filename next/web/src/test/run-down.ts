@@ -16,8 +16,9 @@ import { line, streamed } from '@/test/stream'
 const asked = (answers: DomainAnswered[] | undefined, path: string) =>
   answers?.find((a) => a.path === path)?.values ?? []
 
-// acme's jobs: main runs the shared postgres, feat/billing and fix/login hold it; feat/billing runs dev (web, api, its
-// worker crashed), fix/login runs full (web and a compose stack); the others run nothing
+// acme's jobs: main runs the shared postgres for the others without holding it; feat/billing, fix/login and feat/search
+// hold it; feat/billing runs dev (web, api, its worker crashed), fix/login runs full (web and a compose stack),
+// feat/search its claim alone; the others run nothing
 const own: Record<string, RunjobsStopJob[]> = {
   'feat/billing': [
     { name: 'web', kind: 'service', hold: 'own', fate: 'stop' },
@@ -30,7 +31,7 @@ const own: Record<string, RunjobsStopJob[]> = {
   ],
 }
 const profiles: Record<string, string> = { 'feat/billing': 'dev', 'fix/login': 'full' }
-const holders = ['feat/billing', 'fix/login']
+const holders = ['feat/billing', 'fix/login', 'feat/search']
 
 // the core lists a claim with no state: its service runs in the main checkout
 const claim = (name: string) => {
@@ -40,13 +41,12 @@ const claim = (name: string) => {
 
 export const runningAcme: ListDetail[] = worktrees.map((w) => {
   if (w.main) return { ...w, jobs: [job('postgres', { profile: '' })] }
-  const jobs = own[w.branch]
-  if (!jobs) return w
+  if (!holders.includes(w.branch)) return w
   return {
     ...w,
     profile: profiles[w.branch] ?? '',
     jobs: [
-      ...jobs.map(({ name, fate }) =>
+      ...(own[w.branch] ?? []).map(({ name, fate }) =>
         job(name, { profile: profiles[w.branch] ?? '', ...(fate === 'clear' && { state: 'crashed', exit_code: 1 }) }),
       ),
       claim('postgres'),
@@ -54,6 +54,7 @@ export const runningAcme: ListDetail[] = worktrees.map((w) => {
   }
 })
 
+// main runs postgres for the others: it holds none of it
 export function runDownQuestionsOf(answers: DomainAnswered[] = []) {
   return {
     fields: [
@@ -63,9 +64,9 @@ export function runDownQuestionsOf(answers: DomainAnswered[] = []) {
         picked: asked(answers, 'worktree'),
         options: worktrees.map((w) => {
           const jobs = own[w.branch] ?? []
-          if (w.main) return { value: w.branch, holds: ['postgres'] }
           return {
             value: w.branch,
+            ...(holders.includes(w.branch) && { holds: ['postgres'] }),
             ...(jobs.length > 0 && {
               profile: profiles[w.branch],
               up: jobs.filter((one) => one.fate === 'stop').map((one) => one.name),
@@ -79,19 +80,27 @@ export function runDownQuestionsOf(answers: DomainAnswered[] = []) {
   }
 }
 
-// both holders of postgres stopping together leave it to main alone; one of them leaves it to main and the other
+// postgres keeps running for its holders the stop leaves; with none left, the stop's last hold stops it
 const targetOf = (worktree: string, picked: string[]): RundownTarget => {
-  const jobs = own[worktree] ?? []
-  const keptBy = ['main', ...holders.filter((one) => one !== worktree && !picked.includes(one))]
+  const keptBy = holders.filter((one) => !picked.includes(one))
   const holds: RunjobsStopJob[] = holders.includes(worktree)
-    ? [{ name: 'postgres', kind: 'service', hold: 'claim', fate: 'release', kept_by: keptBy, shared_in: 'main' }]
+    ? [
+        {
+          name: 'postgres',
+          kind: 'service',
+          hold: 'claim',
+          fate: keptBy.length > 0 ? 'release' : 'stop',
+          ...(keptBy.length > 0 && { kept_by: keptBy }),
+          shared_in: 'main',
+        },
+      ]
     : []
   return {
     worktree,
     branch: worktree,
     path: `/acme.trees/${worktree.replace('/', '-')}`,
     ...(profiles[worktree] && { profile: profiles[worktree] }),
-    jobs: [...jobs, ...holds],
+    jobs: [...(own[worktree] ?? []), ...holds],
   }
 }
 
@@ -193,8 +202,9 @@ export const answeringRunDown = (run: (call: WebCall) => Response = runDownRun()
   }),
 ]
 
-// a stop the test holds under way: fix/login's stack runs its stop command, and the rest waits for finish()
-export function heldRunDown() {
+// a stop the test holds under way: fix/login's stack runs its stop command, and the rest waits for finish(); in the
+// worktrees failing names, the stack does not stop
+export function heldRunDown(failing: string[] = []) {
   const encoder = new TextEncoder()
   let finish = () => {}
   const run = (call: WebCall) => {
@@ -210,7 +220,7 @@ export function heldRunDown() {
           ),
         )
         finish = async () => {
-          controller.enqueue(encoder.encode(await runDownRun()(call).text()))
+          controller.enqueue(encoder.encode(await runDownRun(failing)(call).text()))
           controller.close()
         }
       },
@@ -219,3 +229,26 @@ export function heldRunDown() {
   }
   return { run, finish: () => finish() }
 }
+
+// run down's questions, their worktree options changed by change
+export const questionsWith = (change: (options: { value: string; holds?: string[] }[]) => object[]) =>
+  http.post('/api/repos/r1/commands/run-down/questions', async ({ request }) => {
+    const form = runDownQuestionsOf(((await request.json()) as WebCall).answers)
+    const [field] = form.fields
+    const options = field?.kind === 'multi_select' ? field.options : []
+    return HttpResponse.json({ ...form, fields: [{ ...field, options: change(options) }] as DomainField[] })
+  })
+
+// the kit's plan, and an apply whose postgres ended as status says rather than as the plan foresaw
+export const postgresEnded = (status: string) =>
+  http.post('/api/repos/r1/commands/run-down', async ({ request }) => {
+    const call = (await request.json()) as WebCall
+    if (call.dry_run) return runDownPlan(call)
+    const text = await runDownRun()(call).text()
+    return new HttpResponse(
+      text.replace(/"name":"postgres","status":"\w+"/g, `"name":"postgres","status":"${status}"`),
+      {
+        headers: { 'Content-Type': 'text/event-stream', 'X-Wtm-Operation': 'op-1' },
+      },
+    )
+  })

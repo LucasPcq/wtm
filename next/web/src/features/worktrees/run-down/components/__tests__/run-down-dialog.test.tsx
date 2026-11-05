@@ -1,31 +1,13 @@
 import { screen, waitFor, within } from '@testing-library/react'
+import { HttpResponse, http } from 'msw'
 import { expect, test } from 'vitest'
+import { envelope } from '@/test/fixtures'
 import { renderApp } from '@/test/render'
-import { answeringRunDown, heldRunDown, runDownRun } from '@/test/run-down'
+import { answeringRunDown, questionsWith } from '@/test/run-down'
+import { confirm, confirmBoth, disabled, enabled, rows } from '@/test/run-down-app'
 import { server } from '@/test/server'
 
-type User = Awaited<ReturnType<typeof renderApp>>['user']
-
-const enabled = (dialog: HTMLElement, name: string) =>
-  waitFor(() => expect(within(dialog).getByRole('button', { name }).getAttribute('aria-disabled')).toBe('false'))
-
-const rows = (region: HTMLElement) =>
-  within(region)
-    .getAllByRole('listitem')
-    .map((row) => row.textContent)
-
-// from the page's header: both worktrees checked, Next, then Confirm
-const confirmBoth = async (user: User) => {
-  await user.click(await screen.findByRole('button', { name: 'Stop jobs' }))
-  const dialog = await screen.findByRole('dialog', { name: 'Stop jobs' })
-  await user.click(await within(dialog).findByRole('checkbox', { name: 'Stop in feat/billing' }))
-  await user.click(within(dialog).getByRole('checkbox', { name: 'Stop in fix/login' }))
-  await user.click(within(dialog).getByRole('button', { name: 'Next' }))
-  await enabled(dialog, 'Stop jobs in 2 worktrees')
-  return dialog
-}
-
-test('Stop jobs lists only the worktrees that run something, each with what it runs', async () => {
+test('Stop jobs lists only the worktrees that run something, a claim alone included, each with what it runs', async () => {
   server.use(...answeringRunDown())
   const { user } = await renderApp('/r/r1/running')
 
@@ -34,10 +16,10 @@ test('Stop jobs lists only the worktrees that run something, each with what it r
 
   expect(within(dialog).getByText('Stops every job of the worktrees you pick (run down).')).toBeDefined()
   const list = await within(dialog).findByRole('list', { name: 'Worktrees' })
-  expect(rows(list)).toEqual([
-    'mainholds postgres',
+  expect(rows(list), 'main runs postgres for the others: nothing of its own to stop').toEqual([
     'feat/billingrunning dev · 2 up · 1 crashed',
     'fix/loginrunning full · 2 up',
+    'feat/searchholds postgres',
   ])
   expect(within(dialog).getByText('0 of 3 selected · only the worktrees that run something')).toBeDefined()
   expect(within(dialog).getByRole('button', { name: 'Next' }).getAttribute('aria-disabled')).toBe('true')
@@ -60,7 +42,7 @@ test('Confirm says what stops in each worktree, the stack by its stop command, a
     'stackdocker compose down',
   ])
   expect(rows(within(dialog).getByRole('region', { name: 'Shared services, released' }))).toEqual([
-    'postgresboth let go: keeps running for main',
+    'postgresboth let go: keeps running for feat/search',
   ])
   expect(rows(within(dialog).getByRole('region', { name: 'How it runs' }))).toEqual([
     'Their databases stay: stopping drops nothing.',
@@ -69,64 +51,40 @@ test('Confirm says what stops in each worktree, the stack by its stop command, a
   expect(within(dialog).getByRole('button', { name: 'Back' })).toBeDefined()
 })
 
-test('a stop under way has no Cancel, and the stack unfolds on the lines of its stop command, live', async () => {
-  const held = heldRunDown()
-  server.use(...answeringRunDown(held.run))
-  const { user } = await renderApp('/r/r1/running')
-  const dialog = await confirmBoth(user)
-
-  await user.click(within(dialog).getByRole('button', { name: 'Stop jobs in 2 worktrees' }))
-
-  expect(await within(dialog).findByText('Stopping jobs in 2 worktrees · 0 of 6 stopped')).toBeDefined()
-  expect(within(dialog).queryByRole('button', { name: /Cancel/ })).toBeNull()
-  expect(within(dialog).getByText('Closing this keeps it running.')).toBeDefined()
-  const stack = within(within(dialog).getByRole('region', { name: 'fix/login' })).getByRole('listitem', {
-    name: 'stack',
-  })
-  expect(within(stack).getByText('running its stop command')).toBeDefined()
-  await user.click(within(stack).getByRole('button', { name: 'Output of stack' }))
-  expect(within(stack).getByText('Container minio-1 Stopping')).toBeDefined()
-  expect(rows(within(dialog).getByRole('region', { name: 'Shared services' }))).toEqual([
-    'postgresreleased once both worktrees stop',
-  ])
-
-  await held.finish()
-  expect(await within(dialog).findByText('Jobs stopped in 2 worktrees.')).toBeDefined()
-})
-
-test('the outcome says what was released and for whom, then what stopped in each worktree', async () => {
+test('a worktree that holds a claim alone confirms its release, nothing of its own', async () => {
   server.use(...answeringRunDown())
   const { user } = await renderApp('/r/r1/running')
-  const dialog = await confirmBoth(user)
 
-  await user.click(within(dialog).getByRole('button', { name: 'Stop jobs in 2 worktrees' }))
+  const dialog = await confirm(user, ['feat/search'], 'Stop jobs')
 
-  expect(await within(dialog).findByText('Jobs stopped in 2 worktrees.')).toBeDefined()
-  const released = within(dialog).getByRole('region', { name: 'Released' })
-  expect(within(released).getByText('postgres')).toBeDefined()
-  expect(within(released).getByText('keeps running for main')).toBeDefined()
-  const stopped = within(dialog).getByRole('region', { name: 'Stopped' })
-  expect(within(stopped).getByText('web, api · worker cleared')).toBeDefined()
-  expect(within(stopped).getByText('web, stack')).toBeDefined()
-  await user.click(within(dialog).getByRole('button', { name: 'Done' }))
-  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  expect(within(dialog).getByText('its jobs stop')).toBeDefined()
+  expect(rows(within(dialog).getByRole('region', { name: 'Shared services, released' }))).toEqual([
+    'postgresfeat/search lets go: keeps running for feat/billing, fix/login',
+  ])
 })
 
-test("a stack that doesn't stop fails its worktree alone, said first", async () => {
-  server.use(...answeringRunDown(runDownRun(['fix/login'])))
+test('a plan the core refuses is said on Confirm, nothing to press', async () => {
+  server.use(
+    http.post('/api/repos/r1/commands/run-down', () =>
+      HttpResponse.json(
+        {
+          ...envelope('run-down', []),
+          ok: false,
+          error: { kind: 'precondition', code: 'run-down.daemon_unavailable', message: 'no run daemon answers' },
+        },
+        { status: 412 },
+      ),
+    ),
+    ...answeringRunDown(),
+  )
   const { user } = await renderApp('/r/r1/running')
-  const dialog = await confirmBoth(user)
+  await user.click(await screen.findByRole('button', { name: 'Stop jobs' }))
+  const dialog = await screen.findByRole('dialog', { name: 'Stop jobs' })
+  await user.click(await within(dialog).findByRole('checkbox', { name: 'Stop in fix/login' }))
+  await user.click(within(dialog).getByRole('button', { name: 'Next' }))
 
-  await user.click(within(dialog).getByRole('button', { name: 'Stop jobs in 2 worktrees' }))
-
-  expect(await within(dialog).findByText('Jobs stopped in 1 of 2 worktrees.')).toBeDefined()
-  const failed = within(dialog).getByRole('region', { name: "Couldn't stop" })
-  expect(within(failed).getByText("stack didn't stop: exit 1")).toBeDefined()
-  await user.click(within(failed).getByRole('button', { name: /Details of fix\/login/ }))
-  expect(within(failed).getByText(/Container mailpit-1 +Stopped/), "the stack's own lines say why").toBeDefined()
-  expect(
-    within(within(dialog).getByRole('region', { name: 'Stopped' })).getByText('web, api · worker cleared'),
-  ).toBeDefined()
+  expect(await within(dialog).findByText('no run daemon answers')).toBeDefined()
+  await disabled(dialog, 'Stop jobs')
 })
 
 test("a group's stop button opens Confirm on that worktree, with no Back", async () => {
@@ -140,7 +98,7 @@ test("a group's stop button opens Confirm on that worktree, with no Back", async
   await enabled(dialog, 'Stop jobs')
   expect(within(dialog).getByText('its jobs stop · 2 up, 1 crashed')).toBeDefined()
   expect(rows(within(dialog).getByRole('region', { name: 'Shared services, released' }))).toEqual([
-    'postgresfeat/billing lets go: keeps running for main, fix/login',
+    'postgresfeat/billing lets go: keeps running for fix/login, feat/search',
   ])
   expect(within(dialog).queryByRole('button', { name: 'Back' })).toBeNull()
 })
@@ -151,11 +109,27 @@ test("a group's menu offers Stop its jobs, saying the hold it releases", async (
 
   await user.click(await screen.findByRole('button', { name: 'More for fix/login' }))
   const item = await screen.findByRole('menuitem', { name: /Stop its jobs/ })
-  expect(item.textContent).toBe('Stop its jobsrun down · releases its hold on postgres')
+  await waitFor(() => expect(item.textContent).toBe('Stop its jobsrun down · releases its hold on postgres'))
   await user.click(item)
 
   const dialog = await screen.findByRole('dialog', { name: 'Stop jobs' })
   expect(await within(dialog).findByRole('region', { name: 'profile full' })).toBeDefined()
+})
+
+// main held postgres itself: its group's menu said only "run down".
+test("main's group names the shared service main holds itself", async () => {
+  server.use(
+    questionsWith((options) =>
+      options.map((option) => (option.value === 'main' ? { ...option, holds: ['postgres'] } : option)),
+    ),
+    ...answeringRunDown(),
+  )
+  const { user } = await renderApp('/r/r1/running')
+
+  await user.click(await screen.findByRole('button', { name: 'More for main' }))
+
+  const item = await screen.findByRole('menuitem', { name: /Stop its jobs/ })
+  await waitFor(() => expect(item.textContent).toBe('Stop its jobsrun down · releases its hold on postgres'))
 })
 
 test("a worktree's menu on the Worktrees page opens Confirm on it", async () => {
@@ -173,18 +147,33 @@ test("a worktree's menu on the Worktrees page opens Confirm on it", async () => 
   ])
 })
 
-test('the detail of a worktree that runs nothing says so on Confirm, nothing to press', async () => {
-  server.use(...answeringRunDown())
-  const { user } = await renderApp('/r/r1/worktrees?worktree=feat%2Fsearch')
-  const detail = await screen.findByRole('complementary', { name: 'feat/search' })
+// A worktree removed since the page read it was no longer an option: Confirm waited on "Planning…" for good.
+test('a worktree no longer offered says it runs nothing on Confirm, nothing to press', async () => {
+  server.use(
+    questionsWith((options) => options.filter((option) => option.value !== 'fix/login')),
+    ...answeringRunDown(),
+  )
+  const { user } = await renderApp('/r/r1/worktrees')
 
-  await user.click(await within(detail).findByRole('button', { name: 'Actions on feat/search' }))
+  await user.click(await screen.findByRole('button', { name: 'Actions on fix/login' }))
   await user.click(await screen.findByRole('menuitem', { name: 'Stop its jobs' }))
 
   const dialog = await screen.findByRole('dialog', { name: 'Stop jobs' })
   const left = await within(dialog).findByRole('region', { name: 'Left as they are' })
-  expect(rows(left)).toEqual(['feat/searchnothing running'])
-  await waitFor(() =>
-    expect(within(dialog).getByRole('button', { name: 'Stop jobs' }).getAttribute('aria-disabled')).toBe('true'),
-  )
+  expect(rows(left)).toEqual(['fix/loginnothing running'])
+  await disabled(dialog, 'Stop jobs')
+})
+
+test('the detail of a worktree that runs nothing says so on Confirm, nothing to press', async () => {
+  server.use(...answeringRunDown())
+  const { user } = await renderApp('/r/r1/worktrees?worktree=feat%2Fbilling-ui')
+  const detail = await screen.findByRole('complementary', { name: 'feat/billing-ui' })
+
+  await user.click(await within(detail).findByRole('button', { name: 'Actions on feat/billing-ui' }))
+  await user.click(await screen.findByRole('menuitem', { name: 'Stop its jobs' }))
+
+  const dialog = await screen.findByRole('dialog', { name: 'Stop jobs' })
+  const left = await within(dialog).findByRole('region', { name: 'Left as they are' })
+  expect(rows(left)).toEqual(['feat/billing-uinothing running'])
+  await disabled(dialog, 'Stop jobs')
 })

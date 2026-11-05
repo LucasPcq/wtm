@@ -38,10 +38,14 @@ export function RunDownProgress({
   const refused = progress.refused ?? (items.some((item) => item.error) ? undefined : envelope?.error?.message)
   const { groups, labels, warnings } = recapOf(envelope, ran.plan, progress.units)
   const shared = sharedOf(ran.plan)
-  const isShared = (name: string | undefined) => shared.some((service) => service.name === name)
+  // by the plan's job of that worktree: a job of its own may be named like a shared service
+  const isShared = (worktree: string, name: string | undefined) =>
+    Boolean(stopJob(ran.plan, worktree, name ?? '')?.shared_in)
 
   const sharedRows = shared.flatMap((service) => {
-    const runs = progress.units.flatMap((unit) => unit.phases.filter((run) => run.job === service.name))
+    const runs = progress.units.flatMap((unit) =>
+      unit.phases.filter((run) => run.job === service.name && isShared(unit.subject, run.job)),
+    )
     const least = runs.toSorted((a, b) => rank[a.state] - rank[b.state])[0]
     return least ? [{ service, run: least, lines: runs.flatMap((run) => run.lines ?? []) }] : []
   })
@@ -67,7 +71,7 @@ export function RunDownProgress({
             {progress.units.map((unit) => (
               <JobSection dense key={unit.subject} title={unit.subject}>
                 {unit.phases
-                  .filter((run) => !isShared(run.job))
+                  .filter((run) => !isShared(unit.subject, run.job))
                   .map((run) => (
                     <PhaseRow
                       key={run.job}
