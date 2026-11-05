@@ -40,6 +40,26 @@ func (f Facts) standing() []worktree.Worktree {
 	return slices.DeleteFunc(f.MainFirst(), func(w worktree.Worktree) bool { return f.Gone[w.Path] })
 }
 
+// worktreeOptions are the standing worktrees, each with the logs it holds: those of the jobs that run in it, a shared service the main checkout runs among them; a claim, whose log is the main checkout's, none.
+func (f Facts) worktreeOptions() []domain.Option {
+	standing := f.standing()
+	options := domain.RunningIn(domain.WorktreeOptions(standing, domain.WorktreeQuery{Cwd: f.Cwd}), standing, f.Jobs)
+	for i, option := range options {
+		options[i].Holds = nil
+		at := slices.IndexFunc(standing, func(w worktree.Worktree) bool { return w.Name() == option.Value })
+		if at < 0 {
+			continue
+		}
+		for _, job := range f.Jobs {
+			if job.Up && job.Hold != run.HoldClaim && job.SharedDir != "" && job.WorkDir == standing[at].Path {
+				options[i].Up = append(options[i].Up, job.Name)
+			}
+		}
+		slices.Sort(options[i].Up)
+	}
+	return options
+}
+
 // picked are the worktrees the request names, else the one the caller stands in.
 func (f Facts) picked(req Request) ([]string, domain.Origin) {
 	if len(req.Worktrees) > 0 {

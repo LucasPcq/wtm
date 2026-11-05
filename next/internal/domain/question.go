@@ -181,9 +181,9 @@ func RunningIn(options []Option, worktrees []worktree.Worktree, jobs []run.Job) 
 			case job.State == run.Crashed && run.Own(job):
 				options[i].Crashed++
 			case !job.Up:
-			// A shared service the main checkout runs for the others alone is theirs, not its hold.
-			case job.Hold == run.HoldClaim || (!run.Own(job) && (job.MainHolds || job.MainHoldsUnknown)):
+			case !run.Own(job) && (job.Hold == run.HoldClaim || job.MainHolds || job.MainHoldsUnknown):
 				holds = append(holds, job.Name)
+			// A shared service the main checkout runs for the others alone is theirs, not its hold.
 			case !run.Own(job):
 			default:
 				up = append(up, job.Name)

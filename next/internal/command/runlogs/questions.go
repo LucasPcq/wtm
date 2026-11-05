@@ -123,9 +123,8 @@ const (
 func NewQuestions(f Facts, req Request) Questions {
 	picked, origin := f.picked(req)
 	targets, problems := f.targets(picked)
-	standing := f.standing()
 	questions := Questions{
-		Worktrees: Worktrees{Picked: picked, Origin: origin, Options: domain.RunningIn(domain.WorktreeOptions(standing, domain.WorktreeQuery{Cwd: f.Cwd}), standing, f.Jobs)},
+		Worktrees: Worktrees{Picked: picked, Origin: origin, Options: f.worktreeOptions()},
 		Job:       req.Job,
 		Jobs:      jobOptions(f.Run.Jobs),
 		Request:   req,
