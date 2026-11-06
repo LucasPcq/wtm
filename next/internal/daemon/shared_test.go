@@ -772,3 +772,35 @@ func TestAShutdownDuringASharedRestartLeavesTheClaimsToTheIndex(t *testing.T) {
 	assert.Contains(t, w.index.names(), "/wt/a:db")
 	assert.Contains(t, w.index.names(), "/wt/b:db")
 }
+
+// Review of #275: the main checkout's job a restart stopped is not up for a moment, and a stop of it then dropped it.
+func TestAStopOfTheMainCheckoutsSharedJobARestartStoppedWaitsForIt(t *testing.T) {
+	w := newWorld(t, map[string]script{"up db": exits(0)})
+	for _, holder := range []string{"/wt/a", "/repo"} {
+		_, err := w.Start(shared("db", holder, "down db"), nil)
+		require.NoError(t, err)
+	}
+	served := key{workDir: "/repo", name: "db"}
+	w.mu.Lock()
+	service := w.jobs[served]
+	w.restarting[served], service.state = true, run.Stopped
+	w.mu.Unlock()
+	done := make(chan run.Outcome)
+	go func() {
+		outcome, _ := w.Stop(run.Stop{Name: "db", WorkDir: "/repo"}, nil)
+		done <- outcome
+	}()
+
+	select {
+	case <-done:
+		t.Fatal("stopped while the restart runs")
+	case <-time.After(50 * time.Millisecond):
+	}
+	w.mu.Lock()
+	service.state = run.Running
+	delete(w.restarting, served)
+	w.mu.Unlock()
+
+	assert.Equal(t, run.OutcomeReleased, <-done, "main let go of it, still held by feat/a")
+	assert.Contains(t, w.index.names(), "/repo:db")
+}

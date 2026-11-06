@@ -387,3 +387,32 @@ func TestARestartFromAMainCheckoutADaemonOfAnotherBuildCannotTellHoldsIsTakenAsH
 	assert.Equal(t, runjobs.ActionRestart, planned.Worktrees[0].Jobs[0].Action)
 	assert.Equal(t, []string{"main", featA}, planned.HeldBy)
 }
+
+// Review of #275: the daemon's listing is the machine's; another repository's db made this one's restart refused.
+func TestARestartOfASharedServiceUpOnlyInAnotherRepositoryStartsIt(t *testing.T) {
+	w := newWorld(t)
+	other := "/elsewhere/main"
+	w.daemon.listed = append(w.daemon.listed,
+		run.Job{Name: "db", WorkDir: other, SharedDir: other, MainHolds: true, Up: true, State: run.Running, Hold: run.HoldOwn},
+	)
+	req := starting("db", featA)
+	req.Restart = true
+
+	planned, _ := w.plan(t, req)
+
+	assert.Equal(t, runjobs.ActionJoin, planned.Worktrees[0].Jobs[0].Action)
+}
+
+func TestARestartFromAClaimCountsAMainCheckoutADaemonOfAnotherBuildCannotTellAsHolding(t *testing.T) {
+	w := newWorld(t)
+	w.daemon.listed = append(w.daemon.listed,
+		run.Job{Name: "db", WorkDir: w.main, SharedDir: w.main, MainHoldsUnknown: true, Up: true, State: run.Running, Hold: run.HoldOwn},
+		run.Job{Name: "db", WorkDir: w.at(featA), SharedDir: w.main, Up: true, Hold: run.HoldClaim},
+	)
+	req := starting("db", featA)
+	req.Restart = true
+
+	planned, _ := w.plan(t, req)
+
+	assert.Equal(t, []string{"main", featA}, planned.HeldBy)
+}

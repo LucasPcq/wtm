@@ -197,18 +197,17 @@ func (d *Daemon) restartShared(params restartParams) (run.Job, error) {
 	return d.view(hold), nil
 }
 
-// awaitRestart waits while a restart of the shared job k runs: a hold let go
-// of meanwhile is let go of on the job restarted, never on the one it stopped,
-// whose holds the restart puts back.
-func (d *Daemon) awaitRestart(k key) {
-	for {
-		d.mu.Lock()
-		busy := d.restarting[k]
+// awaitRestartLocked takes the lock once no restart of the shared job k runs,
+// and returns holding it: a hold let go of meanwhile is let go of on the job
+// restarted, never on the one it stopped, whose holds the restart puts back.
+// It waits as startShared does, with no bound of its own: a restart ends with
+// its stop's.
+func (d *Daemon) awaitRestartLocked(k key) {
+	d.mu.Lock()
+	for d.restarting[k] {
 		d.mu.Unlock()
-		if !busy {
-			return
-		}
 		<-time.After(pendingPoll)
+		d.mu.Lock()
 	}
 }
 
@@ -318,8 +317,7 @@ func (d *Daemon) letGo(params letGoParams) (run.Outcome, error) {
 		return run.OutcomeNotRunning, nil
 	}
 	name := j.record.Spec.Job.Name
-	d.awaitRestart(key{workDir: j.record.SharedDir, name: name})
-	d.mu.Lock()
+	d.awaitRestartLocked(key{workDir: j.record.SharedDir, name: name})
 	if params.Stands != nil && !params.Stands() {
 		d.mu.Unlock()
 		return run.OutcomeNotRunning, nil

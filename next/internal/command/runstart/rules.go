@@ -75,7 +75,8 @@ func (f Facts) holds(targets []runjobs.Target, name string) bool {
 
 // upAnywhere reports whether the job name is up in some worktree: a shared service up nowhere is started, restart or not.
 func (f Facts) upAnywhere(name string) bool {
-	return slices.ContainsFunc(f.Jobs, func(job run.Job) bool { return job.Name == name && job.Up })
+	// the daemon's listing is the machine's: another repository's service of that name is not this one's
+	return slices.ContainsFunc(f.Jobs, func(job run.Job) bool { return job.Name == name && job.Up && job.SharedDir == f.MainPath })
 }
 
 // holders are the worktrees, by path, holding the shared service name that the worktree at dir runs or claims: none when it has none of it up. A daemon of another build that cannot tell whether the main checkout holds it is taken as holding it, as run stop takes it.
@@ -85,9 +86,12 @@ func (f Facts) holders(name, dir string) []string {
 		return nil
 	}
 	held := run.Holders(f.Jobs, f.Jobs[at])
-	service := f.Jobs[at]
-	if service.MainHoldsUnknown && service.WorkDir == service.SharedDir && !slices.Contains(held, dir) {
-		held = append(held, dir)
+	shared := f.Jobs[at].SharedDir
+	unknown := slices.ContainsFunc(f.Jobs, func(job run.Job) bool {
+		return job.Name == name && job.WorkDir == shared && job.SharedDir == shared && job.Up && job.MainHoldsUnknown
+	})
+	if unknown && !slices.Contains(held, shared) {
+		held = append(held, shared)
 		slices.Sort(held)
 	}
 	return held
