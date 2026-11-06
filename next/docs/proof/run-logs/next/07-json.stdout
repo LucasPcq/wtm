@@ -21,7 +21,8 @@
             "lines": [
               {
                 "at": "<TIME>",
-                "text": "[wtm] started"
+                "text": "[wtm] started",
+                "mark": true
               },
               {
                 "at": "<TIME>",
