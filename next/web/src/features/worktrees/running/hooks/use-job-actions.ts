@@ -32,8 +32,8 @@ export function useJobActions({ repo, worktree, job }: { repo: string; worktree:
     { path: 'job', values: [job.name] },
   ]
   const up = job.state === 'running' || job.state === 'starting'
-  const stopping = useQuery({ ...dryRunQuery(repo, 'run-stop', answers), enabled: up })
-  const fate = stopping.data?.plan?.worktrees?.[0]?.jobs?.[0]
+  const stopPlan = useQuery({ ...dryRunQuery(repo, 'run-stop', answers), enabled: up })
+  const fate = stopPlan.data?.plan?.worktrees?.[0]?.jobs?.[0]
   // a worktree restarts a shared service only while it holds it: the core refuses it elsewhere
   const form = useQuery({ ...questionsQuery(repo, 'run-start', [...answers, restart]), enabled: up })
   const unheld = form.data?.problems.some((problem) => problem.code === 'run-start.restart_shared')
@@ -48,7 +48,7 @@ export function useJobActions({ repo, worktree, job }: { repo: string; worktree:
   const stopRun = useDirectRun(repo, 'run-stop')
   // one start and one stop at a time, as the run's store holds one of each: another job's waits its end
   const starting = useRun(repo, 'run-start').running
-  const stopping_ = useRun(repo, 'run-stop').running
+  const stopping = useRun(repo, 'run-stop').running
 
   const refusedToast = (title: string, message: string | undefined) =>
     toast.error(title, { description: message ?? 'Nothing to do: the jobs changed meanwhile.' })
@@ -103,16 +103,16 @@ export function useJobActions({ repo, worktree, job }: { repo: string; worktree:
   }
 
   // a shared service main runs for the others alone is theirs to let go of: run stop's plan reaches none of it
-  const unreached = stopping.isSuccess && !fate ? `Runs ${job.name} for the other worktrees only` : undefined
+  const unreached = stopPlan.isSuccess && !fate ? `Runs ${job.name} for the other worktrees only` : undefined
   const busy = doing ? 'Under way' : undefined
   const startBusy = busy ?? (starting ? 'Another job is starting: one at a time' : undefined)
-  const stopBusy = busy ?? (stopping_ ? 'Another job is stopping: one at a time' : undefined)
+  const stopBusy = busy ?? (stopping ? 'Another job is stopping: one at a time' : undefined)
   const [claimer] = claimers
 
   // whether it is a shared service, whose restart asks first, is the stop's plan's to say
   const restartWhy = () => {
     if (unheld && !claimer) return `${worktree} doesn’t hold ${job.name}: a worktree holding it restarts it`
-    if (!stopping.isSuccess) return 'Reading the job…'
+    if (!stopPlan.isSuccess) return 'Reading the job…'
     return undefined
   }
 
