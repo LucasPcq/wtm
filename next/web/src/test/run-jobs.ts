@@ -106,7 +106,15 @@ export const runJobsHandlers = ({ failing = [] as string[], calls = [] as WebCal
           worktree,
           path: pathOf(worktree),
           numbered: true,
-          jobs: [{ name, kind: 'service', action: restart ? 'restart' : 'start', ports: { PORT: 3020 } }],
+          jobs: [
+            {
+              name,
+              kind: 'service',
+              action: restart ? 'restart' : 'start',
+              ports: { PORT: 3020 },
+              ...(name === 'postgres' && { shared_in: 'main' }),
+            },
+          ],
         },
       ],
     }

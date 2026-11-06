@@ -1,5 +1,6 @@
 import { LogOut, type LucideIcon, Play, RotateCcw, Square } from 'lucide-react'
 import { holdOf, type JobAt } from '@/features/worktrees/utils/job-told'
+import { plural } from '@/lib/plural'
 
 export type JobAct = 'restart' | 'stop' | 'release' | 'start'
 
@@ -16,7 +17,7 @@ export function actEntry(
   { at, keptBy, holders }: { at: JobAt; keptBy: string[]; holders: number | undefined },
 ): { label: string; description?: string } {
   if (act === 'restart' && holders !== undefined)
-    return { label: `Restart ${at.job}`, description: `for the ${holders} worktrees holding it` }
+    return { label: `Restart ${at.job}`, description: `for the ${plural(holders, 'worktree')} holding it` }
   if (act !== 'release') return { label: actLook[act].label }
   return {
     label: `Release ${at.worktree}’s hold`,

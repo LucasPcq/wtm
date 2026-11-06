@@ -10,6 +10,16 @@ import { line, server } from '@/test/server'
 
 const panelOf = (job: string, worktree: string) => screen.findByRole('region', { name: `${job} in ${worktree}` })
 
+// a start's stream held open: it has begun, nothing more
+const held = http.post('/api/repos/r1/commands/run-start', async ({ request }) => {
+  if (((await request.clone().json()) as WebCall).dry_run) return undefined
+  const body = new ReadableStream({
+    start: (controller) =>
+      controller.enqueue(new TextEncoder().encode(line({ type: 'unit.started', subject: 'feat/billing' }))),
+  })
+  return new HttpResponse(body, { headers: { 'Content-Type': 'text/event-stream', 'X-Wtm-Operation': 'op-1' } })
+})
+
 const answers = (call: WebCall | undefined) => Object.fromEntries((call?.answers ?? []).map((a) => [a.path, a.values]))
 
 test('Restart starts the job again beside the others’ jobs and ends on a toast with no Undo', async () => {
@@ -134,15 +144,6 @@ test('Start one job… offers the jobs not running in the worktree, then starts 
 })
 
 test('a job restarting is greyed in its row and its header, saying it restarts', async () => {
-  // the restart's stream held open: it has begun, nothing more
-  const held = http.post('/api/repos/r1/commands/run-start', async ({ request }) => {
-    if (((await request.clone().json()) as WebCall).dry_run) return undefined
-    const body = new ReadableStream({
-      start: (controller) =>
-        controller.enqueue(new TextEncoder().encode(line({ type: 'unit.started', subject: 'feat/billing' }))),
-    })
-    return new HttpResponse(body, { headers: { 'Content-Type': 'text/event-stream', 'X-Wtm-Operation': 'op-1' } })
-  })
   server.use(held, ...answeringRunJobs())
   const { user } = await renderApp('/r/r1/running?worktree=feat/billing&job=web')
   const panel = await panelOf('web', 'feat/billing')
@@ -186,4 +187,34 @@ test('main restarts a shared service it runs for the others alone through a work
 
   const dialog = await screen.findByRole('dialog', { name: 'Restart postgres' })
   expect(await within(dialog).findByText('feat/billing')).toBeDefined()
+  await waitFor(() =>
+    expect(within(dialog).getByRole('button', { name: 'Restart postgres' }).getAttribute('aria-disabled')).toBe(
+      'false',
+    ),
+  )
+  server.use(held)
+  await user.click(within(dialog).getByRole('button', { name: 'Restart postgres' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Hide' }))
+
+  // main runs the process its holder restarts: its row and panel say so
+  const main = screen.getByRole('region', { name: 'main' })
+  await waitFor(() =>
+    expect(within(main).getByRole('listitem', { name: 'postgres' }).textContent).toContain('restarting…'),
+  )
+  expect(within(panel).getByRole('heading').textContent).toContain('restarting…')
+})
+
+test('an undo under way says starting, though the list still reads the job running', async () => {
+  server.use(...answeringRunJobs())
+  const { user } = await renderApp('/r/r1/running?worktree=feat/billing&job=web')
+  const panel = await panelOf('web', 'feat/billing')
+  await user.click(await within(panel).findByRole('button', { name: 'Stop web' }))
+  await screen.findByText('web stopped')
+  server.use(held)
+
+  await user.click(screen.getByRole('button', { name: 'Undo' }))
+
+  // the kit's list still says web runs: the run's own answer says it is a start
+  const group = screen.getByRole('region', { name: 'feat/billing' })
+  await waitFor(() => expect(within(group).getByRole('listitem', { name: 'web' }).textContent).toContain('starting…'))
 })
