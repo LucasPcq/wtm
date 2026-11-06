@@ -53,6 +53,7 @@ func Decide(f Facts, req Request, params DecideParams) (Plan, []domain.Warning, 
 	if exclusive {
 		planned.Others = append(planned.Others, f.Others(targets)...)
 	}
+	planned.HeldBy = f.heldBy(planned)
 
 	refusal := runjobs.RefusalParams{Command: Name, Restart: params.Restart, Targets: planned.Worktrees, Jobs: jobs, Exclusive: exclusive, Force: req.Force, JobsPath: PathJob, Stopping: stopping(req), Forced: forced(req)}
 	if err := f.Refusal(refusal); err != nil {
@@ -67,10 +68,65 @@ func Decide(f Facts, req Request, params DecideParams) (Plan, []domain.Warning, 
 	return planned, warnings, nil
 }
 
-// restarting is t with its job restarted when req asks it and the job is up there; a shared service is never restarted (Resolve refuses it).
+// holds reports whether a worktree of targets holds the shared service name: a claim on it, or the main checkout's own hold.
+func (f Facts) holds(targets []runjobs.Target, name string) bool {
+	return slices.ContainsFunc(targets, func(t runjobs.Target) bool { return slices.Contains(f.holders(name, t.Path), t.Path) })
+}
+
+// upAnywhere reports whether the job name is up in some worktree: a shared service up nowhere is started, restart or not.
+func (f Facts) upAnywhere(name string) bool {
+	// the daemon's listing is the machine's: another repository's service of that name is not this one's
+	return slices.ContainsFunc(f.Jobs, func(job run.Job) bool { return job.Name == name && job.Up && job.SharedDir == f.MainPath })
+}
+
+// holders are the worktrees, by path, holding the shared service name that the worktree at dir runs or claims: none when it has none of it up. A daemon of another build that cannot tell whether the main checkout holds it is taken as holding it, as run stop takes it.
+func (f Facts) holders(name, dir string) []string {
+	at := slices.IndexFunc(f.Jobs, func(job run.Job) bool { return job.Name == name && job.WorkDir == dir && job.Up })
+	if at < 0 {
+		return nil
+	}
+	held := run.Holders(f.Jobs, f.Jobs[at])
+	shared := f.Jobs[at].SharedDir
+	unknown := slices.ContainsFunc(f.Jobs, func(job run.Job) bool {
+		return job.Name == name && job.WorkDir == shared && job.SharedDir == shared && job.Up && job.MainHoldsUnknown
+	})
+	if unknown && !slices.Contains(held, shared) {
+		held = append(held, shared)
+		slices.Sort(held)
+	}
+	return held
+}
+
+// heldBy are the worktrees, by name, a restart of the shared service the plan starts again stops for a moment: every one holding it; none for any other start.
+func (f Facts) heldBy(p Plan) []string {
+	if !p.Restarts() || !f.Shared(p.Job) {
+		return nil
+	}
+	var names []string
+	for _, t := range p.Worktrees {
+		for _, path := range f.holders(p.Job, t.Path) {
+			names = append(names, f.nameAt(path))
+		}
+	}
+	return names
+}
+
+// nameAt is the name of the worktree at path, its path when git lists none there.
+func (f Facts) nameAt(path string) string {
+	if at := slices.IndexFunc(f.Worktrees, func(w worktree.Worktree) bool { return w.Path == path }); at >= 0 {
+		return f.Worktrees[at].Name()
+	}
+	return path
+}
+
+// restarting is t with its job restarted when req asks it and the job is up there; a shared service only where the worktree holds it (Resolve refuses it elsewhere), the daemon restarting it in place for every worktree holding it.
 func (f Facts) restarting(t runjobs.Target, req Request) runjobs.Target {
+	if !req.Restart {
+		return t
+	}
 	for i, job := range t.Jobs {
-		if req.Restart && job.Action != runjobs.ActionJoin && slices.Contains(run.UpIn(f.Jobs, t.Path), job.Name) {
+		own := !f.Shared(job.Name) && slices.Contains(run.UpIn(f.Jobs, t.Path), job.Name)
+		if own || f.Shared(job.Name) && slices.Contains(f.holders(job.Name, t.Path), t.Path) {
 			t.Jobs[i].Action = runjobs.ActionRestart
 		}
 	}
@@ -110,6 +166,7 @@ func (f Facts) teardown() teardown.Facts {
 type Plan struct {
 	Job       string           `json:"job"`
 	Restart   bool             `json:"restart"`
+	HeldBy    []string         `json:"held_by,omitempty"`
 	Worktrees []runjobs.Target `json:"worktrees"`
 	Exclusive bool             `json:"exclusive"`
 	Others    []runjobs.Other  `json:"others"`
@@ -179,8 +236,11 @@ func (p Plan) unchanged() bool {
 // ----------------------------------------------------------------------------
 // The recap
 
-// RecapOwed keys the recap's row of the drops owed the plan pays.
-const RecapOwed = teardown.RecapOwed
+// RecapOwed keys the recap's row of the drops owed the plan pays; RecapHeldBy the worktrees a shared service's restart stops for a moment.
+const (
+	RecapOwed   = teardown.RecapOwed
+	RecapHeldBy = "held_by"
+)
 
 // recap is the plan row by row: the worktree, the job with what the start does to it, the worktrees whose jobs stop first, and the drops owed it pays.
 func (p Plan) recap() []domain.RecapRow {
@@ -201,6 +261,9 @@ func (p Plan) recap() []domain.RecapRow {
 			stopped = append(stopped, other.Worktree)
 		}
 		rows = append(rows, domain.RecapRow{Key: "stops", Label: "Stops first", Path: PathExclusive, Values: domain.RecapValues(stopped)})
+	}
+	if len(p.HeldBy) > 0 {
+		rows = append(rows, domain.RecapRow{Key: RecapHeldBy, Label: "Stops for a moment in", Values: domain.RecapValues(p.HeldBy)})
 	}
 	if len(p.Owed) > 0 {
 		rows = append(rows, domain.RecapRow{Key: RecapOwed, Label: "Owed", Values: teardown.RecappedDebts(p.Owed)})

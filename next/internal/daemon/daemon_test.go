@@ -466,7 +466,7 @@ func TestAJobsLinesGoToItsLogAndItsLastIsListed(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool { return len(w.logs.texts(spec.LogDir, "web")) == 3 }, time.Second, time.Millisecond)
-	assert.Equal(t, []string{RunMark, "ready", "GET / 200"}, w.logs.texts(spec.LogDir, "web"), "the run's mark first")
+	assert.Equal(t, []string{run.Mark, "ready", "GET / 200"}, w.logs.texts(spec.LogDir, "web"), "the run's mark first")
 	assert.Equal(t, []run.LogFile{{Dir: spec.LogDir, Job: "web"}}, w.logs.opened)
 	assert.Equal(t, &run.Line{At: now, Text: "GET / 200"}, w.job(t, "web").LastLine)
 }
@@ -521,7 +521,7 @@ func TestLinesWithoutFollowEndAtOnce(t *testing.T) {
 	job, err := w.Lines(t.Context(), run.Tail{Name: "web", WorkDir: "/wt/a"}, func(line run.Line) { got = append(got, line.Text) })
 
 	require.NoError(t, err)
-	assert.Equal(t, []string{RunMark, "a", "b", "c"}, got, "the run's mark first")
+	assert.Equal(t, []string{run.Mark, "a", "b", "c"}, got, "the run's mark first")
 	assert.True(t, job.Up)
 }
 
@@ -540,9 +540,31 @@ func TestARestartsLogContinuesTheRunBeforeBehindItsMark(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, []run.LogFile{{Dir: spec.LogDir, Job: "web"}, {Dir: spec.LogDir, Job: "web", Append: true}}, w.logs.opened, "a plain start empties the log, a restart's continues it")
-	want := []string{RunMark, "ready", RunMark, "ready"}
+	want := []string{run.Mark, "ready", run.Mark, "ready"}
 	require.Eventually(t, func() bool { return len(w.logs.texts(spec.LogDir, "web")) >= len(want) }, time.Second, time.Millisecond)
 	assert.Equal(t, want, w.logs.texts(spec.LogDir, "web"), "the run before is kept above the restart's mark")
+}
+
+func TestARestartsReadersSeeTheRunBeforeAboveItsMark(t *testing.T) {
+	w := newWorld(t, map[string]script{"serve web": prints("ready")})
+	spec := service("web")
+	_, err := w.Start(spec, nil)
+	require.NoError(t, err)
+	require.Eventually(t, func() bool { l := w.job(t, "web").LastLine; return l != nil && l.Text == "ready" }, time.Second, time.Millisecond)
+	_, err = w.Stop(run.Stop{Name: "web", WorkDir: "/wt/a"}, nil)
+	require.NoError(t, err)
+	spec.Restart = true
+	_, err = w.Start(spec, nil)
+	require.NoError(t, err)
+	want := []string{run.Mark, "ready", run.Mark, "ready"}
+	var got []string
+
+	require.Eventually(t, func() bool {
+		got = nil
+		_, err := w.Lines(t.Context(), run.Tail{Name: "web", WorkDir: "/wt/a"}, func(line run.Line) { got = append(got, line.Text) })
+		return err == nil && len(got) >= len(want)
+	}, time.Second, time.Millisecond)
+	assert.Equal(t, want, got, "a follower of the new run reads the run before first, as the log does")
 }
 
 // Review: a start whose spawn fails never opens the log, so the run before is kept, with no mark for a process that never ran.
@@ -562,7 +584,7 @@ func TestAStartWhoseSpawnFailsLeavesTheLogOfTheRunBefore(t *testing.T) {
 	_, err = w.Start(spec, nil)
 
 	require.Error(t, err)
-	assert.Equal(t, []string{RunMark, "ready"}, w.logs.texts(spec.LogDir, "web"))
+	assert.Equal(t, []string{run.Mark, "ready"}, w.logs.texts(spec.LogDir, "web"))
 	assert.Len(t, w.logs.opened, 1)
 }
 

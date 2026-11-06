@@ -1,0 +1,10 @@
+
+  ✓ run start: 1 done
+
+  Worktree               feat/a
+  Job                    db (stopped, then started again)
+  Stops for a moment in  feat/a, feat/b
+
+  → wtm run logs feat/a   see feat/a's output
+  → wtm run down feat/a   stop feat/a's jobs
+

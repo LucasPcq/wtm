@@ -512,3 +512,44 @@ func TestAFollowSaysHowItsJobEnded(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []runlogs.Ended{{Worktree: featA, Job: "api", State: runlogs.JobCrashed, ExitCode: new(1)}}, ended)
 }
+
+func TestTheDaemonsRunMarkIsMarkedWhereverALineIsRead(t *testing.T) {
+	w := newWorld(t)
+	w.logged(t, featA, "api", "ready", run.Mark, "ready again")
+	w.daemon.listed = []run.Job{ran("api", w.at(featA), run.Running)}
+	w.daemon.lines[key(w.at(featA), "api")] = []script{{lines: lines("ready", run.Mark)}}
+	marks := func(lines []runlogs.Line) []bool {
+		var got []bool
+		for _, line := range lines {
+			got = append(got, line.Mark)
+		}
+		return got
+	}
+
+	for name, req := range map[string]runlogs.Request{
+		"last":   {},
+		"search": {Search: "ready|wtm", Regex: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			req.Worktrees, req.Job = []string{featA}, "api"
+			w.daemon.listed = nil
+			api := jobOf(t, w.read(t, req).Items[0], "api")
+			assert.Equal(t, []bool{false, true, false}, marks(api.Lines))
+		})
+	}
+
+	t.Run("stream", func(t *testing.T) {
+		w.daemon.listed = []run.Job{ran("api", w.at(featA), run.Running)}
+		var got []bool
+		err := w.usecase.Watch(t.Context(), runlogs.Request{Worktrees: []string{featA}, Job: "api", Follow: true}, runlogs.Out{
+			Emit: func(entry runlogs.Entry) error {
+				got = append(got, entry.Mark)
+				return nil
+			},
+			Absent: func(runlogs.Absent) error { return nil },
+			Warn:   func(domain.Warning) {},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, []bool{false, true}, got)
+	})
+}

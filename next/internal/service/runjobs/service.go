@@ -332,7 +332,8 @@ func (s *starting) job(ctx context.Context, index int) bool {
 	var lines tail
 	result.Log = s.logFile(spec)
 	s.report(domain.PhaseStarted{Subject: s.target.Worktree, Phase: domain.PhaseJob, Job: planned.Name, Log: result.Log})
-	if planned.Action == ActionRestart {
+	// A shared service is restarted by the daemon in place, every hold on it kept: a stop here would let go of the worktree's hold.
+	if planned.Action == ActionRestart && !s.facts.Shared(planned.Name) {
 		// A stop sent is let finish, as run stop's: a stack stopped half-way is worse than one stopped or not.
 		if _, err := s.Daemon.Stop(context.WithoutCancel(ctx), run.Stop{Name: planned.Name, WorkDir: s.target.Path, CorrelationID: s.params.CorrelationID}, nil); err != nil {
 			s.report(domain.PhaseFinished{Subject: s.target.Worktree, Phase: domain.PhaseJob, Job: planned.Name, Failed: true})

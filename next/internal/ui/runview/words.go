@@ -46,7 +46,7 @@ const (
 	actedFmt         = "%s %s"
 	actFailedFmt     = "could not %s %s: %v"
 	underWayFmt      = "%s is under way: wait for it"
-	restartSharedFmt = "%s runs for every worktree holding it: stop it, then run start"
+	restartSharedFmt = "%s runs for every worktree holding it: run start --restart restarts it for them, once asked"
 	notActedFmt      = "%s: nothing to %s here"
 	cutShortFmt      = "restart of %s cut short: %s is stopped — %s starts it again"
 	unendedFmt       = "%s still under way when the view was left: check it with %s"

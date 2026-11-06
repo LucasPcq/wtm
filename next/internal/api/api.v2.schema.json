@@ -5538,6 +5538,9 @@
           "format": "date-time",
           "type": "string"
         },
+        "mark": {
+          "type": "boolean"
+        },
         "n": {
           "type": "integer"
         },
@@ -5586,6 +5589,12 @@
         },
         "exclusive": {
           "type": "boolean"
+        },
+        "held_by": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
         "job": {
           "type": "string"
@@ -7387,6 +7396,10 @@
             },
             "job": {
               "type": "string"
+            },
+            "mark": {
+              "description": "The daemon's run mark, where a run of the job begins; absent on any other line.",
+              "type": "boolean"
             },
             "n": {
               "description": "Its number in the whole log, for a line a search or a time read from it.",

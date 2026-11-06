@@ -587,3 +587,220 @@ func TestTheLastReleaseOfASharedStackHandsTheLinesOfItsStopCommandToTheStop(t *t
 	assert.Equal(t, []run.Outcome{run.OutcomeReleased, run.OutcomeStopped}, []run.Outcome{released, stopped})
 	assert.Equal(t, []string{"Container db Stopped"}, lines, "only the release that stops the stack runs its stop command")
 }
+
+func TestARestartOfASharedJobStartsItAgainKeepingEveryHold(t *testing.T) {
+	w := newWorld(t, map[string]script{"up db": exits(0), "down db": exits(0)})
+	for _, at := range []string{"/wt/a", "/wt/b", "/repo"} {
+		_, err := w.Start(shared("db", at, "down db"), nil)
+		require.NoError(t, err)
+	}
+	again := shared("db", "/wt/a", "down db")
+	again.Restart = true
+
+	restarted, err := w.Start(again, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, run.HoldClaim, restarted.Hold)
+	assert.True(t, restarted.Up)
+	assert.Equal(t, []string{"up db", "down db", "up db"}, w.spawner.lines(), "stopped once, started once")
+	assert.Equal(t, []string{"/repo:db", "/wt/a:db", "/wt/b:db"}, w.index.names(), "every claim kept")
+	service := w.List("/repo")
+	require.Len(t, service, 1)
+	assert.True(t, service[0].MainHolds, "the main checkout's own hold carried over")
+	assert.True(t, service[0].Up)
+}
+
+func TestARestartAskedWhereASharedJobIsNotHeldJoinsIt(t *testing.T) {
+	w := newWorld(t, map[string]script{"up db": exits(0)})
+	_, err := w.Start(shared("db", "/wt/a", "down db"), nil)
+	require.NoError(t, err)
+	join := shared("db", "/wt/b", "down db")
+	join.Restart = true
+
+	_, err = w.Start(join, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"up db"}, w.spawner.lines(), "nothing restarted")
+	assert.Equal(t, []string{"/repo:db", "/wt/a:db", "/wt/b:db"}, w.index.names())
+}
+
+// Review of #275: a release during a restart was reported, then undone by the restart putting the holds back.
+func TestAReleaseDuringASharedRestartWaitsForItThenLetsGo(t *testing.T) {
+	served := key{workDir: "/repo", name: "db"}
+	for name, at := range map[string]string{"main": "/repo", "claim": "/wt/a"} {
+		t.Run(name, func(t *testing.T) {
+			w := newWorld(t, map[string]script{"up db": exits(0), "down db": exits(0)})
+			for _, holder := range []string{"/wt/a", "/wt/b", "/repo"} {
+				_, err := w.Start(shared("db", holder, "down db"), nil)
+				require.NoError(t, err)
+			}
+			w.mu.Lock()
+			w.restarting[served] = true
+			w.mu.Unlock()
+			done := make(chan run.Outcome)
+			go func() {
+				outcome, _ := w.Stop(run.Stop{Name: "db", WorkDir: at}, nil)
+				done <- outcome
+			}()
+
+			select {
+			case <-done:
+				t.Fatal("let go while the restart runs")
+			case <-time.After(50 * time.Millisecond):
+			}
+			w.mu.Lock()
+			delete(w.restarting, served)
+			w.mu.Unlock()
+
+			assert.Equal(t, run.OutcomeReleased, <-done)
+			if at == "/repo" {
+				assert.False(t, w.List("/repo")[0].MainHolds, "main let go of once the restart ended")
+				return
+			}
+			assert.NotContains(t, w.index.names(), at+":db", "let go of once the restart ended")
+		})
+	}
+}
+
+func TestASharedRestartWhoseStopFailsKeepsEveryHold(t *testing.T) {
+	w := newWorld(t, map[string]script{"up db": exits(0), "down db": exits(4)})
+	for _, holder := range []string{"/wt/a", "/wt/b"} {
+		_, err := w.Start(shared("db", holder, "down db"), nil)
+		require.NoError(t, err)
+	}
+	again := shared("db", "/wt/a", "down db")
+	again.Restart = true
+
+	_, err := w.Start(again, nil)
+
+	var refusal *run.Error
+	require.ErrorAs(t, err, &refusal)
+	assert.Equal(t, run.CodeStopFailed, refusal.Code)
+	assert.Equal(t, []string{"/repo:db", "/wt/a:db", "/wt/b:db"}, w.index.names(), "left up, held as before")
+	assert.Empty(t, w.restarting)
+}
+
+func TestASharedRestartWhoseStartFailsDropsTheClaimsLeftOnNothing(t *testing.T) {
+	w := newWorld(t, map[string]script{"up db": exits(0), "down db": exits(0)})
+	for _, holder := range []string{"/wt/a", "/wt/b"} {
+		_, err := w.Start(shared("db", holder, "down db"), nil)
+		require.NoError(t, err)
+	}
+	// its stop runs, its launch again fails
+	w.spawner.mu.Lock()
+	w.spawner.scripts["up db"] = exits(1)
+	w.spawner.mu.Unlock()
+	again := shared("db", "/wt/a", "down db")
+	again.Restart = true
+
+	_, err := w.Start(again, nil)
+
+	require.Error(t, err)
+	assert.Empty(t, w.index.names(), "no claim on a job that is not up")
+}
+
+func TestASecondRestartOfASharedJobIsRefusedWhileTheFirstRuns(t *testing.T) {
+	w := newWorld(t, map[string]script{"up db": exits(0)})
+	_, err := w.Start(shared("db", "/wt/a", "down db"), nil)
+	require.NoError(t, err)
+	w.restarting[key{workDir: "/repo", name: "db"}] = true
+	again := shared("db", "/wt/a", "down db")
+	again.Restart = true
+
+	_, err = w.Start(again, nil)
+
+	var refusal *run.Error
+	require.ErrorAs(t, err, &refusal)
+	assert.Equal(t, run.CodeJobRunning, refusal.Code)
+}
+
+func TestAStartOfASharedJobARestartStoppedWaitsForIt(t *testing.T) {
+	w := newWorld(t, map[string]script{"up db": exits(0)})
+	_, err := w.Start(shared("db", "/wt/a", "down db"), nil)
+	require.NoError(t, err)
+	served := key{workDir: "/repo", name: "db"}
+	w.mu.Lock()
+	w.restarting[served] = true
+	w.mu.Unlock()
+	waited := make(chan struct{}, 1)
+	w.waited = func() {
+		select {
+		case waited <- struct{}{}:
+		default:
+		}
+	}
+	done := make(chan error)
+	go func() {
+		_, err := w.Start(shared("db", "/wt/b", "down db"), nil)
+		done <- err
+	}()
+
+	<-waited
+	w.mu.Lock()
+	delete(w.restarting, served)
+	w.mu.Unlock()
+
+	require.NoError(t, <-done)
+	assert.Equal(t, []string{"up db"}, w.spawner.lines(), "joined, not launched again")
+	assert.Contains(t, w.index.names(), "/wt/b:db")
+}
+
+// Review of #275: a shutdown during a shared restart dropped the claims, where a shutdown leaves them to the next daemon.
+func TestAShutdownDuringASharedRestartLeavesTheClaimsToTheIndex(t *testing.T) {
+	w := newWorld(t, map[string]script{"up db": exits(0)})
+	for _, holder := range []string{"/wt/a", "/wt/b"} {
+		_, err := w.Start(shared("db", holder, "down db"), nil)
+		require.NoError(t, err)
+	}
+	// the daemon stops while the restart's stop runs: its start again is refused
+	w.spawner.mu.Lock()
+	w.spawner.scripts["down db"] = func(p *fakeProcess, _ func(string)) {
+		w.mu.Lock()
+		w.stopping = true
+		w.mu.Unlock()
+		p.end(0)
+	}
+	w.spawner.mu.Unlock()
+	again := shared("db", "/wt/a", "down db")
+	again.Restart = true
+
+	_, err := w.Start(again, nil)
+
+	var refusal *run.Error
+	require.ErrorAs(t, err, &refusal)
+	assert.Equal(t, run.CodeStopping, refusal.Code)
+	assert.Contains(t, w.index.names(), "/wt/a:db")
+	assert.Contains(t, w.index.names(), "/wt/b:db")
+}
+
+// Review of #275: the main checkout's job a restart stopped is not up for a moment, and a stop of it then dropped it.
+func TestAStopOfTheMainCheckoutsSharedJobARestartStoppedWaitsForIt(t *testing.T) {
+	w := newWorld(t, map[string]script{"up db": exits(0)})
+	for _, holder := range []string{"/wt/a", "/repo"} {
+		_, err := w.Start(shared("db", holder, "down db"), nil)
+		require.NoError(t, err)
+	}
+	served := key{workDir: "/repo", name: "db"}
+	w.mu.Lock()
+	service := w.jobs[served]
+	w.restarting[served], service.state = true, run.Stopped
+	w.mu.Unlock()
+	done := make(chan run.Outcome)
+	go func() {
+		outcome, _ := w.Stop(run.Stop{Name: "db", WorkDir: "/repo"}, nil)
+		done <- outcome
+	}()
+
+	select {
+	case <-done:
+		t.Fatal("stopped while the restart runs")
+	case <-time.After(50 * time.Millisecond):
+	}
+	w.mu.Lock()
+	service.state = run.Running
+	delete(w.restarting, served)
+	w.mu.Unlock()
+
+	assert.Equal(t, run.OutcomeReleased, <-done, "main let go of it, still held by feat/a")
+	assert.Contains(t, w.index.names(), "/repo:db")
+}

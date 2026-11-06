@@ -76,6 +76,8 @@ const runsHere: Record<
     verb: menu.run_down.label,
     open: (_repo, fix, runEntry) => runEntry({ action: 'run_down', followUp: fix }, []),
   },
+  'run-start': null,
+  'run-stop': null,
 }
 
 export function Callout({ repo, problems: [first, ...more] }: { repo: string; problems: StatusProblem[] }) {

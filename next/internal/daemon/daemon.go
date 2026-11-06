@@ -62,6 +62,8 @@ type Daemon struct {
 	mu       sync.Mutex
 	jobs     map[key]*job
 	stopping bool
+	// restarting holds the shared jobs a restart stopped to start again: their claims wait it out rather than drop.
+	restarting map[key]bool
 	// quit is closed once the daemon stops: what waits outside the job table (a namespace's create) ends with it.
 	quit chan struct{}
 
@@ -116,7 +118,7 @@ func New(params Params) *Daemon {
 		params.After = time.After
 	}
 
-	return &Daemon{params: params, jobs: map[key]*job{}, quit: make(chan struct{})}
+	return &Daemon{params: params, jobs: map[key]*job{}, restarting: map[key]bool{}, quit: make(chan struct{})}
 }
 
 // ----------------------------------------------------------------------------
@@ -191,9 +193,6 @@ func (d *Daemon) Start(spec run.Spec, out func(run.Line)) (run.Job, error) {
 	return d.start(spec, out)
 }
 
-// RunMark is the line the daemon writes into a job's log, and hands its readers, each time it starts a process for it: a restart's log, which continues the run before, reads where the new run begins.
-const RunMark = "[wtm] started"
-
 // start starts the process of the job spec asks for, in the worktree it names.
 func (d *Daemon) start(spec run.Spec, out func(run.Line)) (run.Job, error) {
 	if strings.TrimSpace(spec.Job.Cmd) == "" {
@@ -217,15 +216,21 @@ func (d *Daemon) start(spec run.Spec, out func(run.Line)) (run.Job, error) {
 	}
 	// The log is opened, which empties it, only once the process runs: a refused start or a spawn that fails leaves the log of the run before as it was.
 	var process Process
+	appends := previous != nil && previous.up() || spec.Restart
+	var before []run.Line
+	if appends && previous != nil && previous.output != nil {
+		before = previous.output.kept()
+	}
 	err := output.begin(beginParams{
 		Spawn: func() (err error) {
 			process, err = d.params.Spawn(spec.Command(output.write))
 			return err
 		},
 		Open: func() Log {
-			return d.openLog(run.LogFile{Dir: spec.LogDir, Job: spec.Job.Name, Append: previous != nil && previous.up() || spec.Restart})
+			return d.openLog(run.LogFile{Dir: spec.LogDir, Job: spec.Job.Name, Append: appends})
 		},
-		Mark: RunMark,
+		Mark:   run.Mark,
+		Before: before,
 	})
 	if err != nil {
 		d.mu.Unlock()
@@ -375,7 +380,8 @@ func (d *Daemon) settle(j *job, code int) {
 // stop command prints is handed to out (nil for none) while the stop runs.
 func (d *Daemon) Stop(req run.Stop, out func(run.Line)) (run.Outcome, error) {
 	k := key{workDir: req.WorkDir, name: req.Name}
-	d.mu.Lock()
+	// The main checkout's shared job a restart stopped is not up for a moment: never dropped as ended meanwhile.
+	d.awaitRestartLocked(k)
 	j := d.jobs[k]
 	if j == nil || !j.up() {
 		delete(d.jobs, k)
