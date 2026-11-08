@@ -18,7 +18,8 @@
           "crashed": 1,
           "exited": 0,
           "stopped": 0,
-          "not_started": 0
+          "not_started": 0,
+          "holders": 0
         },
         "jobs": [
           {
@@ -71,7 +72,8 @@
           "crashed": 0,
           "exited": 1,
           "stopped": 0,
-          "not_started": 0
+          "not_started": 0,
+          "holders": 0
         },
         "jobs": [
           {
@@ -121,6 +123,7 @@
             "services": [
               {
                 "name": "cache",
+                "state": "running",
                 "address": "localhost:24864"
               }
             ]

@@ -36,7 +36,7 @@ var acmeRun = project.Run{
 	},
 	Profiles: []project.Profile{
 		{Name: "dev", Jobs: []string{"migrate", "db", "web", "api", "worker"}, Default: true},
-		{Name: "full", Jobs: []string{"web", "stack"}},
+		{Name: "full", Jobs: []string{"web", "stack", "mailpit"}},
 	},
 }
 

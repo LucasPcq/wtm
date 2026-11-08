@@ -86,7 +86,7 @@ func headline(w io.Writer, name string, problems int) {
 		output.UnchangedLine(w, name+" — nothing to fix")
 		return
 	}
-	output.WarningLine(w, name+" — "+counted(problems, "problem", "problems"))
+	output.WarningLine(w, name+" — "+output.Counted(problems, "problem", "problems"))
 }
 
 func drawJobs(w io.Writer, jobs []status.Job) {
@@ -180,7 +180,7 @@ func drawAll(w io.Writer, items []status.Item, view output.View) {
 
 // headlineAll counts the worktrees, and how many need attention or could not be read; nothing to fix only when every one read and none has a problem.
 func headlineAll(w io.Writer, worktrees, troubled, unread int) {
-	line := counted(worktrees, "worktree", "worktrees")
+	line := output.Counted(worktrees, "worktree", "worktrees")
 	switch {
 	case troubled == 1:
 		line += output.Dot + "1 needs attention"
@@ -247,7 +247,7 @@ func envCell(d status.Detail) string {
 	if missing > 0 {
 		return strconv.Itoa(missing) + " missing"
 	}
-	return counted(d.Env.Declared, "file", "files")
+	return output.Counted(d.Env.Declared, "file", "files")
 }
 
 // ----------------------------------------------------------------------------
@@ -321,7 +321,7 @@ func ports(d status.Detail) string {
 }
 
 func envFiles(env status.Env) string {
-	files := counted(env.Declared, "file", "files")
+	files := output.Counted(env.Declared, "file", "files")
 	if missing := missingFiles(env); missing > 0 {
 		return files + output.Dot + strconv.Itoa(missing) + " missing"
 	}
@@ -455,13 +455,6 @@ func address(job status.Job) string {
 		return job.URL
 	}
 	return "port " + strconv.Itoa(*job.Port)
-}
-
-func counted(n int, one, many string) string {
-	if n == 1 {
-		return "1 " + one
-	}
-	return strconv.Itoa(n) + " " + many
 }
 
 // decision is GitHub's review decision as words: review required, changes requested, approved.

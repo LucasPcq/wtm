@@ -1,8 +1,6 @@
 package runlist
 
 import (
-	"slices"
-
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
@@ -20,8 +18,8 @@ type Facts struct {
 	repository.Asked
 	Target     worktree.Worktree
 	Records    map[string]worktree.Meta
-	RecordErrs map[string]error // by branch: a record that exists and does not read
-	Logged     map[string]bool  // by job
+	RecordErrs map[string]error     // by branch: a record that exists and does not read
+	Logged     map[string]*run.Line // by job: the last line a job the daemon lists nothing of left in its log
 }
 
 // ----------------------------------------------------------------------------
@@ -119,15 +117,11 @@ func (f Facts) standing(name string) (*run.State, run.Hold, string) {
 	if f.JobsErr != nil {
 		return nil, "", ""
 	}
-	at := slices.IndexFunc(f.Jobs, func(job run.Job) bool { return job.WorkDir == f.Target.Path && job.Name == name })
-	if at < 0 {
-		at = slices.IndexFunc(f.Jobs, func(job run.Job) bool { return job.WorkDir == f.Target.Path && f.runs(job.Name, name) })
-	}
-	if at < 0 {
-		return new(run.Unlisted(f.Logged[name])), "", ""
+	job, listed := f.standingIn(name)
+	if !listed {
+		return new(run.Unlisted(f.Logged[name] != nil)), "", ""
 	}
 
-	job := f.Jobs[at]
 	state := job.State
 	if job.Hold == run.HoldClaim {
 		state = run.Running
@@ -139,8 +133,7 @@ func (f Facts) standing(name string) (*run.State, run.Hold, string) {
 	return &state, job.Hold, url
 }
 
-// runs reports whether run.toml's job runner starts the job called name itself.
-func (f Facts) runs(runner, name string) bool {
-	at := slices.IndexFunc(f.Run.Jobs, func(job project.Job) bool { return job.Name == runner })
-	return at >= 0 && slices.Contains(f.Run.Jobs[at].Runs, name)
+// standingIn is what the daemon lists of the job called name in the worktree read, or of the runner there that starts it.
+func (f Facts) standingIn(name string) (run.Job, bool) {
+	return run.StandingIn(run.StandingParams{Jobs: f.Jobs, Dir: f.Target.Path, Name: name, Declared: f.Run.Jobs})
 }

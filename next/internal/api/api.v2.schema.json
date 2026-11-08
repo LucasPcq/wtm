@@ -5868,7 +5868,8 @@
         "crashed",
         "exited",
         "stopped",
-        "not_started"
+        "not_started",
+        "holders"
       ],
       "type": "object"
     },
@@ -6031,10 +6032,14 @@
         },
         "name": {
           "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/run.State"
         }
       },
       "required": [
-        "name"
+        "name",
+        "state"
       ],
       "type": "object"
     },

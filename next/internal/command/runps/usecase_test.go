@@ -8,6 +8,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/command/runps"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 
 	"github.com/stretchr/testify/assert"
@@ -71,7 +72,7 @@ func TestARunnerListsTheServicesItStartsAtItsWorktreesPorts(t *testing.T) {
 
 	login := group(t, read, "fix/login")
 	assert.Equal(t, []string{"web:running", "stack:running"}, names(login.Jobs))
-	assert.Equal(t, []runps.Service{{Name: "mailpit", Address: "localhost:8055"}}, login.Jobs[1].Services, "fix/login's ordinal 3 puts its ports 30 above main's")
+	assert.Equal(t, []runps.Service{{Name: "mailpit", State: run.Running, Address: "localhost:8055"}}, login.Jobs[1].Services, "fix/login's ordinal 3 puts its ports 30 above main's")
 }
 
 func TestASharedServiceListsTheWorktreesHoldingItTheirNamespaceAndSinceWhen(t *testing.T) {
@@ -147,4 +148,49 @@ func TestAWorktreeWhoseRecordDoesNotReadIsWarnedOnItsGroup(t *testing.T) {
 			assert.Equal(t, runps.CodeMetaUnreadable, item.Warnings[0].Code)
 		}
 	}
+}
+
+func TestAServiceARunnerStartsIsNoJobOfItsOwnInTheGroup(t *testing.T) {
+	read := read(t, seed{Jobs: jobs(), Projects: []runps.Project{acme()}}, runps.Request{})
+
+	assert.Equal(t, []string{"web:running", "stack:running"}, names(group(t, read, "fix/login").Jobs), "full declares mailpit, which its stack runs")
+}
+
+func TestACrashedSharedServiceComesFirstWhateverItsRepository(t *testing.T) {
+	crashed := slices.Clone(jobs())
+	crashed[0].State, crashed[0].Up = run.Crashed, false
+	crashed = slices.DeleteFunc(crashed, func(job run.Job) bool { return job.Name == "worker" })
+
+	read := read(t, seed{Jobs: crashed, Projects: []runps.Project{acme(), other()}}, runps.Request{})
+
+	assert.Equal(t, "shared", subjects(read)[0])
+}
+
+func TestAJobOfAWorktreeGitNoLongerListsIsGroupedByItsPath(t *testing.T) {
+	gone := run.Job{Name: "web", WorkDir: "/acme.trees/gone", Repo: mainPath, Up: true, Kind: project.Service, State: run.Running, Hold: run.HoldOwn}
+
+	read := read(t, seed{Jobs: []run.Job{gone}, Projects: []runps.Project{acme()}}, runps.Request{})
+
+	removed := group(t, read, "/acme.trees/gone")
+	assert.Empty(t, removed.Branch)
+	assert.Equal(t, []string{"web:running"}, names(removed.Jobs))
+}
+
+func TestAJobWhoseStartNamedNoRepositoryIsReadFromItsWorktree(t *testing.T) {
+	skewed := run.Job{Name: "web", WorkDir: loginPath, Up: true, Kind: project.Service, State: run.Running, Hold: run.HoldOwn}
+
+	read := read(t, seed{Jobs: []run.Job{skewed}, Projects: []runps.Project{acme()}}, runps.Request{})
+
+	login := group(t, read, "fix/login")
+	assert.Equal(t, mainPath, login.Repository)
+	assert.Equal(t, "apps/web", login.Jobs[0].Dir, "run.toml of the repository its worktree belongs to")
+}
+
+func TestAJobOutsideAnyRepositoryIsWarnedAndGroupedByItsDirectory(t *testing.T) {
+	stray := run.Job{Name: "tool", WorkDir: "/elsewhere/wt", Up: true, Kind: project.Service, State: run.Running, Hold: run.HoldOwn}
+
+	read := read(t, seed{Jobs: []run.Job{stray}, Projects: []runps.Project{acme()}}, runps.Request{})
+
+	assert.Equal(t, []string{runps.CodeRepoUnreadable}, codes(read))
+	assert.Equal(t, []string{"tool:running"}, names(group(t, read, "/elsewhere/wt").Jobs))
 }

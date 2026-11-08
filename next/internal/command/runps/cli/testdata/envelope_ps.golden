@@ -18,7 +18,8 @@
           "crashed": 1,
           "exited": 1,
           "stopped": 0,
-          "not_started": 1
+          "not_started": 1,
+          "holders": 0
         },
         "jobs": [
           {
@@ -94,7 +95,8 @@
           "crashed": 0,
           "exited": 0,
           "stopped": 0,
-          "not_started": 0
+          "not_started": 0,
+          "holders": 0
         },
         "jobs": [
           {
@@ -122,6 +124,7 @@
             "services": [
               {
                 "name": "mailpit",
+                "state": "running",
                 "address": "localhost:8055"
               }
             ]

@@ -65,9 +65,64 @@ const (
 	NotStarted State = "not_started"
 )
 
-// Listed reports whether jobs lists a job called name in the worktree at dir: its own, or its claim on a shared one.
-func Listed(jobs []Job, dir, name string) bool {
-	return slices.ContainsFunc(jobs, func(job Job) bool { return job.WorkDir == dir && job.Name == name })
+// StandingParams are what tells where a job run.toml declares stands in a worktree: the jobs the daemon lists, the worktree's directory, the job's name, and run.toml's jobs (whose runners start some of the others).
+type StandingParams struct {
+	Jobs     []Job
+	Dir      string
+	Name     string
+	Declared []project.Job
+}
+
+// StandingIn is what the daemon lists of the job run.toml declares under params.Name in the worktree at params.Dir: the job itself (its own, or its claim on a shared one), else a runner listed there that starts it itself (run.toml's runs); false when it lists neither, its log then telling whether it ran (Unlisted).
+func StandingIn(params StandingParams) (Job, bool) {
+	listed := func(match func(Job) bool) (Job, bool) {
+		at := slices.IndexFunc(params.Jobs, func(job Job) bool { return job.WorkDir == params.Dir && match(job) })
+		if at < 0 {
+			return Job{}, false
+		}
+		return params.Jobs[at], true
+	}
+	if job, ok := listed(func(job Job) bool { return job.Name == params.Name }); ok {
+		return job, true
+	}
+	return listed(func(job Job) bool {
+		at := slices.IndexFunc(params.Declared, func(declared project.Job) bool { return declared.Name == job.Name })
+		return at >= 0 && slices.Contains(params.Declared[at].Runs, params.Name)
+	})
+}
+
+// LastLinesParams name the logs to read: those of the jobs called Names in the worktree of Branch, under wtm's state StateDir, and their reader.
+type LastLinesParams struct {
+	StateDir string
+	Branch   string
+	Names    []string
+	Read     func(file LogFile, n int) ([]Line, error)
+}
+
+// LastLines is the last line each job of params.Names left in its log, nil for one whose log holds none (or does not read): the jobs StandingIn finds nothing of, whose log tells whether they ran; none for a worktree on no branch.
+func LastLines(params LastLinesParams) map[string]*Line {
+	lines := map[string]*Line{}
+	dir := LogDir(params.StateDir, params.Branch)
+	if dir == "" {
+		return lines
+	}
+	for _, name := range params.Names {
+		read, _ := params.Read(LogFile{Dir: dir, Job: name}, 1)
+		if len(read) > 0 {
+			lines[name] = &read[len(read)-1]
+		}
+	}
+	return lines
+}
+
+// StartedUnder is the profile the jobs the worktree at dir runs for itself were started under, up or ended, "" when none says one: a worktree whose every job crashed keeps it, where ProfileIn, which counts the jobs up alone, says none.
+func StartedUnder(jobs []Job, dir string) string {
+	for _, job := range jobs {
+		if job.WorkDir == dir && Own(job) && job.Profile != "" {
+			return job.Profile
+		}
+	}
+	return ""
 }
 
 // Unlisted is the state of a job run.toml declares that the daemon does not list: stopped once its log holds a line, so it ran; else NotStarted.

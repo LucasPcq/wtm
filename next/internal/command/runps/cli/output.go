@@ -4,11 +4,13 @@ import (
 	"cmp"
 	"io"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/command/runps"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 
@@ -26,7 +28,9 @@ const (
 
 // drawPs draws each group read under its title, its jobs one per row with a runner's services and a shared service's holders under it, then what could not be read; the repository names each title once the read spans several.
 func drawPs(w io.Writer, read runps.Outcome, _ runps.Request, _ output.View) {
-	if len(read.Items) == 0 {
+	// a daemon that cannot tell what runs says so in its warning, never as nothing running
+	unknown := slices.ContainsFunc(read.Warnings, func(warning domain.Warning) bool { return warning.Code == runps.Name+domain.JobsUnknown })
+	if len(read.Items) == 0 && !unknown {
 		output.UnchangedLine(w, nothingRunning)
 	}
 	repos := map[string]bool{}
@@ -82,7 +86,7 @@ func title(d runps.Detail, repos bool) string {
 		}
 	}
 	if c.Holders > 0 {
-		parts = append(parts, "held by "+counted(c.Holders, "worktree", "worktrees"))
+		parts = append(parts, "held by "+output.Counted(c.Holders, "worktree", "worktrees"))
 	}
 	return strings.Join(parts, output.Dot)
 }
@@ -138,14 +142,6 @@ func since(holder runps.Holder, st *output.Styles) string {
 		return ""
 	}
 	return st.Muted.Render("since " + output.Span(now().Sub(*holder.Since)))
-}
-
-// counted is n of one or many.
-func counted(n int, one, many string) string {
-	if n == 1 {
-		return "1 " + one
-	}
-	return strconv.Itoa(n) + " " + many
 }
 
 // fitLast cuts the last cell of each row, a job's last line, so the row fits width beside the cells before it, keeping at least lastLineMin columns of it.

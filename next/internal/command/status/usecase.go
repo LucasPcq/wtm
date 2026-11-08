@@ -113,24 +113,20 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	return facts, nil
 }
 
-// logged says, per worktree of targets, which jobs run.toml declares that the daemon does not hold there left a line in their log: they ran, and were stopped since.
-func (u UseCase) logged(facts Facts, targets []worktree.Worktree) map[string]map[string]bool {
-	logged := map[string]map[string]bool{}
+// logged is, per worktree of targets, the last line each job run.toml declares that the daemon lists nothing of there left in its log: one that has one ran, and was stopped since.
+func (u UseCase) logged(facts Facts, targets []worktree.Worktree) map[string]map[string]*run.Line {
+	logged := map[string]map[string]*run.Line{}
 	if facts.JobsErr != nil || facts.RunErr != nil || u.ReadLog == nil {
 		return logged
 	}
 	for _, w := range targets {
-		dir := run.LogDir(u.StateDir, w.Branch())
-		if dir == "" {
-			continue
-		}
-		logged[w.Path] = map[string]bool{}
+		var names []string
 		for _, job := range facts.Run.Jobs {
-			if !run.Listed(facts.Jobs, w.Path, job.Name) {
-				lines, _ := u.ReadLog(run.LogFile{Dir: dir, Job: job.Name}, 1)
-				logged[w.Path][job.Name] = len(lines) > 0
+			if _, listed := run.StandingIn(run.StandingParams{Jobs: facts.Jobs, Dir: w.Path, Name: job.Name, Declared: facts.Run.Jobs}); !listed {
+				names = append(names, job.Name)
 			}
 		}
+		logged[w.Path] = run.LastLines(run.LastLinesParams{StateDir: u.StateDir, Branch: w.Branch(), Names: names, Read: u.ReadLog})
 	}
 	return logged
 }

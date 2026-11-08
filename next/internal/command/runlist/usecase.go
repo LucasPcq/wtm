@@ -97,16 +97,17 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 		return Facts{}, err
 	}
 
-	facts := Facts{Repository: repo, Target: target, Logged: map[string]bool{}}
+	facts := Facts{Repository: repo, Target: target}
 	facts.Records, facts.RecordErrs = repository.Records(u.Meta, repo.Live())
 	facts.Asked = repository.Ask(ctx, repository.AskParams{Jobs: u.Jobs, Restart: u.Repository.Restart}, func() {})
-	if dir := run.LogDir(u.StateDir, target.Branch()); dir != "" && facts.JobsErr == nil {
+	if facts.JobsErr == nil {
+		var names []string
 		for _, job := range repo.Run.Jobs {
-			if !run.Listed(facts.Jobs, target.Path, job.Name) {
-				lines, _ := u.ReadLog(run.LogFile{Dir: dir, Job: job.Name}, 1)
-				facts.Logged[job.Name] = len(lines) > 0
+			if _, listed := facts.standingIn(job.Name); !listed {
+				names = append(names, job.Name)
 			}
 		}
+		facts.Logged = run.LastLines(run.LastLinesParams{StateDir: u.StateDir, Branch: target.Branch(), Names: names, Read: u.ReadLog})
 	}
 	return facts, nil
 }

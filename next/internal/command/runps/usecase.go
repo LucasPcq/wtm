@@ -82,9 +82,16 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 		facts.Projects = u.projects(ctx, facts)
 	}
 
-	for key, file := range Unlisted(facts.Projects, facts.Jobs) {
-		if lines, _ := u.ReadLog(file, 1); len(lines) > 0 {
-			facts.Logged[key] = &lines[len(lines)-1]
+	// the jobs of a worktree's profile the daemon lists nothing of: their logs say whether they ran
+	for _, p := range facts.Projects {
+		for _, g := range groupsOf(p, facts.Jobs) {
+			var names []string
+			for _, job := range p.declaredIdle(g.path, facts.Jobs) {
+				names = append(names, job.Name)
+			}
+			for name, line := range run.LastLines(run.LastLinesParams{StateDir: p.StateDir, Branch: p.branchAt(g.path), Names: names, Read: u.ReadLog}) {
+				facts.Logged[LogKey{Path: g.path, Job: name}] = line
+			}
 		}
 	}
 	facts.Interrupted = ctx.Err() != nil
@@ -100,7 +107,7 @@ func (u UseCase) projects(ctx context.Context, facts Facts) []Project {
 		})
 	}
 	for _, job := range facts.Jobs {
-		dir := RepoOf(job)
+		dir := repoOf(job)
 		if dir == "" {
 			dir = job.WorkDir
 		}

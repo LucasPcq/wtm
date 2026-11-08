@@ -73,7 +73,7 @@ func (w world) open(context.Context, string) (runps.UseCase, error) {
 		jobs = append(jobs, run.Job{Name: "tool", WorkDir: otherPath, Repo: otherPath, Up: true, Kind: project.Service, State: run.Running, Hold: run.HoldOwn, StartedAt: at(3 * time.Minute)})
 		projects = append(projects, other)
 	}
-	if w.Nothing {
+	if w.Nothing || w.JobsErr != nil {
 		jobs = nil
 	}
 

@@ -42,22 +42,9 @@ type LogKey struct {
 	Job  string
 }
 
-// RepoOf is the main checkout of the repository job runs for, as the daemon names it: the repository its start named, else the main checkout a shared job runs in, else "" (the daemon does not say).
-func RepoOf(job run.Job) string {
+// repoOf is the main checkout of the repository job runs for, as the daemon names it: the repository its start named, else the main checkout a shared job runs in, else "" (the daemon does not say).
+func repoOf(job run.Job) string {
 	return cmp.Or(job.Repo, job.SharedDir)
-}
-
-// Unlisted are the jobs of the groups of projects that the daemon does not list in them: each job of the profile a worktree's jobs were started under, neither shared nor started by a runner of the worktree; their logs say whether they ran.
-func Unlisted(projects []Project, jobs []run.Job) map[LogKey]run.LogFile {
-	unlisted := map[LogKey]run.LogFile{}
-	for _, p := range projects {
-		for _, g := range groupsOf(p, jobs) {
-			for _, job := range p.declaredIdle(g.path, jobs) {
-				unlisted[LogKey{Path: g.path, Job: job.Name}] = run.LogFile{Dir: run.LogDir(p.StateDir, p.branchAt(g.path)), Job: job.Name}
-			}
-		}
-	}
-	return unlisted
 }
 
 // ----------------------------------------------------------------------------
@@ -90,7 +77,7 @@ type Counts struct {
 	Exited     int `json:"exited"`
 	Stopped    int `json:"stopped"`
 	NotStarted int `json:"not_started"`
-	Holders    int `json:"holders,omitempty"`
+	Holders    int `json:"holders"`
 }
 
 // A Job is one job of a group: its name and kind, its state, what of it the daemon holds (none for one it does not list), its url and where it answers on this machine (host:port), when it started, when it ended and how long it ran (milliseconds), the code it ended with (a crash's or a task's), the last line it printed, the folder it runs in (run.toml's cwd) and its command, the file its lines are kept in; the services a runner starts, and the worktrees holding a shared service.
@@ -119,10 +106,11 @@ type Line struct {
 	Text string    `json:"text"`
 }
 
-// A Service is a job a runner starts itself (run.toml's runs): its name and where it answers on this machine, none when it binds no port or the worktree's ports cannot be told.
+// A Service is a job a runner starts itself (run.toml's runs): its name, its state (its runner's), and where it answers on this machine, none when it binds no port or the worktree's ports cannot be told.
 type Service struct {
-	Name    string `json:"name"`
-	Address string `json:"address,omitempty"`
+	Name    string    `json:"name"`
+	State   run.State `json:"state"`
+	Address string    `json:"address,omitempty"`
 }
 
 // A Holder is a worktree holding a shared service: its branch (none on no branch) and path, the namespace the service made for it (none when it makes none), and since when it holds it.
@@ -136,29 +124,32 @@ type Holder struct {
 // ----------------------------------------------------------------------------
 // List
 
-// List reports the jobs of each repository read, a group per worktree running jobs for itself, those with a crash first, then the main one, then the others in git's order; then the repository's shared services, each with the worktrees holding it. A repository that could not be read is warned, its jobs grouped all the same.
+// List reports the jobs of each repository read, a repository after the other: a group per worktree running jobs for itself, the main one first, then in git's order, then the repository's shared services, each with the worktrees holding it; then every group holding a crash is moved first, whatever its repository. A worktree whose only jobs are claims is no group: it shows among its shared service's holders. A repository that could not be read is warned, its jobs grouped all the same.
 func List(f Facts) ([]domain.Unit[Detail], []domain.Warning) {
 	var items []domain.Unit[Detail]
 	for _, p := range f.Projects {
-		var groups []domain.Unit[Detail]
 		for _, g := range groupsOf(p, f.Jobs) {
 			item := unit(p.group(g, f))
 			if err := p.RecordErrs[item.Detail.Branch]; err != nil {
 				item.Warnings = []domain.Warning{{Code: CodeMetaUnreadable, Message: "couldn't read the record of " + item.Detail.Branch + ": the ports of the services its runners start are not known: " + err.Error(), Params: domain.Params{"branch": item.Detail.Branch}}}
 			}
-			groups = append(groups, item)
+			items = append(items, item)
 		}
-		slices.SortStableFunc(groups, func(a, b domain.Unit[Detail]) int {
-			return cmp.Compare(rank(a.Detail.Counts.Crashed > 0), rank(b.Detail.Counts.Crashed > 0))
-		})
-		items = append(items, groups...)
 		if shared := p.shared(f.Jobs); len(shared.Jobs) > 0 {
 			items = append(items, unit(shared))
 		}
 	}
+	// what crashed comes first, whatever its repository, a crashed shared service among them
+	slices.SortStableFunc(items, func(a, b domain.Unit[Detail]) int {
+		return cmp.Compare(rank(a.Detail.Counts.Crashed > 0), rank(b.Detail.Counts.Crashed > 0))
+	})
 
 	warnings := f.Warnings(Name)
 	for _, dir := range slices.Sorted(maps.Keys(f.Unreadable)) {
+		// an interrupted read says so and nothing more, as Asked.Warnings
+		if f.Interrupted {
+			break
+		}
 		warnings = append(warnings, domain.Warning{Code: CodeRepoUnreadable, Message: "couldn't read the repository of the jobs in " + dir + ", so run.toml says nothing of them: " + f.Unreadable[dir].Error(), Params: domain.Params{"dir": dir}})
 	}
 	return items, warnings
@@ -211,7 +202,7 @@ func groupsOf(p Project, jobs []run.Job) []group {
 
 // owns reports whether job runs for p: the repository its start named, else the worktree it runs in.
 func (p Project) owns(job run.Job) bool {
-	if repo := RepoOf(job); repo != "" {
+	if repo := repoOf(job); repo != "" {
 		return repo == p.MainPath
 	}
 	return p.worktreeAt(job.WorkDir) != nil || job.WorkDir == p.MainPath
@@ -236,7 +227,7 @@ func (p Project) branchAt(path string) string {
 
 // group is the jobs the worktree of g runs for itself, then those of its profile the daemon does not list there.
 func (p Project) group(g group, f Facts) Detail {
-	d := Detail{Repository: p.MainPath, Branch: p.branchAt(g.path), Path: g.path, Profile: profileIn(f.Jobs, g.path), Jobs: []Job{}}
+	d := Detail{Repository: p.MainPath, Branch: p.branchAt(g.path), Path: g.path, Profile: run.StartedUnder(f.Jobs, g.path), Jobs: []Job{}}
 	offset := p.offset(g.path)
 	for _, job := range f.Jobs {
 		if job.WorkDir == g.path && run.Own(job) && p.owns(job) {
@@ -256,36 +247,19 @@ func (p Project) group(g group, f Facts) Detail {
 	return d
 }
 
-// profileIn is the profile the jobs the worktree at path runs for itself were started under, up or ended: a worktree whose every job crashed keeps it; "" when none says one.
-func profileIn(jobs []run.Job, path string) string {
-	for _, job := range jobs {
-		if job.WorkDir == path && run.Own(job) && job.Profile != "" {
-			return job.Profile
-		}
-	}
-	return ""
-}
-
 // declaredIdle are the jobs of the profile the worktree at path runs that the daemon does not list there, in run.toml's order: neither a shared service (listed with the shared services) nor a job a runner listed there starts itself.
 func (p Project) declaredIdle(path string, jobs []run.Job) []project.Job {
-	profile := profileIn(jobs, path)
+	profile := run.StartedUnder(jobs, path)
 	at := slices.IndexFunc(p.Run.Profiles, func(pr project.Profile) bool { return pr.Name == profile })
 	if profile == "" || at < 0 || p.RunErr != nil {
 		return nil
 	}
 
-	started := map[string]bool{}
-	for _, job := range jobs {
-		if job.WorkDir == path {
-			started[job.Name] = true
-			for _, child := range p.declared(job.Name).Runs {
-				started[child] = true
-			}
-		}
-	}
 	var idle []project.Job
 	for _, name := range p.Run.Profiles[at].Jobs {
-		if declared := p.declared(name); !started[name] && declared.Name != "" && declared.Scope != project.Shared {
+		declared := p.declared(name)
+		_, listed := run.StandingIn(run.StandingParams{Jobs: jobs, Dir: path, Name: name, Declared: p.Run.Jobs})
+		if !listed && declared.Name != "" && declared.Scope != project.Shared {
 			idle = append(idle, declared)
 		}
 	}
@@ -326,7 +300,7 @@ func (p Project) jobOf(job run.Job, offset *int) Job {
 	}
 	for _, name := range declared.Runs {
 		child := p.declared(name)
-		found.Services = append(found.Services, Service{Name: name, Address: addressOf(child, env.PortsAt(child, offset))})
+		found.Services = append(found.Services, Service{Name: name, State: job.State, Address: addressOf(child, env.PortsAt(child, offset))})
 	}
 	return found
 }

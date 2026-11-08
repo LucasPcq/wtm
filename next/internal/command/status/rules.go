@@ -24,11 +24,11 @@ type Facts struct {
 	worktree.Repository
 	repository.Asked
 	Targets    []worktree.Worktree
-	Records    map[string]worktree.Meta   // by branch
-	RecordErrs map[string]error           // by branch
-	States     map[string]State           // by worktree path
-	Behind     map[string]bool            // by branch
-	Logged     map[string]map[string]bool // by worktree path, then job: a job the daemon does not hold there whose log holds a line
+	Records    map[string]worktree.Meta        // by branch
+	RecordErrs map[string]error                // by branch
+	States     map[string]State                // by worktree path
+	Behind     map[string]bool                 // by branch
+	Logged     map[string]map[string]*run.Line // by worktree path, then job: the last line a job the daemon lists nothing of there left in its log
 	Stack      worktree.Stack
 }
 
@@ -400,7 +400,7 @@ func portsOf(w worktree.Worktree, params portsParams) Ports {
 // ----------------------------------------------------------------------------
 // The jobs
 
-// jobs are the jobs w can run, nil when the daemon cannot tell: each job run.toml declares, in its order, as the daemon holds it in w, else stopped once it ran there and not_started when it never did, then each job up in w that run.toml no longer declares.
+// jobs are the jobs w can run, nil when the daemon cannot tell: each job run.toml declares, in its order, as the daemon holds it in w (a job a runner listed there starts itself as that runner), else stopped once it ran there and not_started when it never did, then each job up in w that run.toml no longer declares.
 func (f Facts) jobs(w worktree.Worktree, offset *int) []Job {
 	if f.JobsErr != nil {
 		return nil
@@ -415,9 +415,13 @@ func (f Facts) jobs(w worktree.Worktree, offset *int) []Job {
 	jobs := []Job{}
 	for _, job := range declared {
 		at := slices.IndexFunc(held, func(h Job) bool { return h.Name == job.Name })
-		found := Job{Name: job.Name, Kind: job.Kind, State: run.Unlisted(f.Logged[w.Path][job.Name])}
-		if at >= 0 {
+		found := Job{Name: job.Name, Kind: job.Kind, State: run.Unlisted(f.Logged[w.Path][job.Name] != nil)}
+		switch runner, listed := run.StandingIn(run.StandingParams{Jobs: f.Jobs, Dir: w.Path, Name: job.Name, Declared: declared}); {
+		case at >= 0:
 			found = held[at]
+		case listed:
+			// started by a runner listed there, it stands as the runner does
+			found.State = runner.State
 		}
 		found.Port = portOf(job, offset)
 		jobs = append(jobs, found)

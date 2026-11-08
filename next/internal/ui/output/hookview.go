@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"strconv"
 	"time"
 )
 
@@ -154,19 +153,6 @@ func cutSegment(buf *bytes.Buffer) (string, byte, bool) {
 		buf.Next(1)
 	}
 	return segment, terminator, true
-}
-
-// Span returns d in its largest unit, rounded down: seconds, minutes, hours or days (12m, 3h).
-func Span(d time.Duration) string {
-	switch {
-	case d < time.Minute:
-		return strconv.Itoa(max(int(d.Seconds()), 0)) + "s"
-	case d < time.Hour:
-		return strconv.Itoa(int(d.Minutes())) + "m"
-	case d < 24*time.Hour:
-		return strconv.Itoa(int(d.Hours())) + "h"
-	}
-	return strconv.Itoa(int(d.Hours()/24)) + "d"
 }
 
 // Duration returns d in milliseconds under a second, else in seconds to a tenth.

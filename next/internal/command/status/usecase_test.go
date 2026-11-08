@@ -688,3 +688,21 @@ func TestWhereABranchStandsAgainstTheBaseIsAskedOnceAndSaidUnreadOnceWhenItFails
 	}
 	assert.Equal(t, 1, asked, "a count that failed is not asked again")
 }
+
+func TestAServiceAStackRunsStandsAsItsStack(t *testing.T) {
+	run2 := isolating()
+	run2.Jobs = append(run2.Jobs,
+		project.Job{Name: "cache", Kind: project.Service, Cmd: "true"},
+		project.Job{Name: "stack", Kind: project.Service, Cmd: "docker compose up -d", Stop: "docker compose down", Runs: []string{"cache"}},
+	)
+	w := newWorld(seed{Run: run2, Jobs: []run.Job{{Name: "stack", WorkDir: mainPath, State: run.Running, Up: true, Hold: run.HoldDetached}}})
+
+	main := only(t, read(t, w, status.Request{}))
+
+	states := map[string]run.State{}
+	for _, job := range main.Jobs {
+		states[job.Name] = job.State
+	}
+	assert.Equal(t, run.Running, states["cache"], "the stack runs it")
+	assert.Equal(t, run.NotStarted, states["web"])
+}
