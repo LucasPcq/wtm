@@ -6,7 +6,7 @@ import { answeringCheckout } from '@/test/checkout'
 import { cleanPlan, cleanQuestionsOf, cleanRun } from '@/test/clean'
 import { answeringExec } from '@/test/exec'
 import { ffPlan, ffQuestions, ffRun } from '@/test/fast-forward'
-import { envelope, followUp, offers, statusDetail, treeDetail } from '@/test/fixtures'
+import { envelope, followUp, offers, psOf, statusDetail, treeDetail } from '@/test/fixtures'
 import { prunePlan, pruneRun } from '@/test/prune'
 import { answeringReparent } from '@/test/reparent'
 import { runJobsHandlers } from '@/test/run-jobs'
@@ -190,6 +190,8 @@ const handlers = [
     switch (params.command) {
       case 'list':
         return HttpResponse.json(envelope('list', asked('with_prs') === 'true' ? worktrees.map(withPR) : worktrees))
+      case 'run-ps':
+        return HttpResponse.json(psOf(worktrees))
       case 'tree':
         return HttpResponse.json(
           envelope('tree', (asked('with_prs') === 'true' ? worktrees.map(withPR) : worktrees).map(tree)),

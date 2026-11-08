@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { dryRunQuery, questionsQuery, readQuery } from '@/api/queries/commands'
-import type { DomainAnswered, DomainFollowUp, ListJob } from '@/api/types.gen'
+import type { DomainAnswered, DomainFollowUp, RunpsJob } from '@/api/types.gen'
 import { useDirectRun } from '@/features/worktrees/hooks/use-direct-run'
 import { useRun } from '@/features/worktrees/hooks/use-run'
 import { openRunStart, setRunStartDialog, showRunStart } from '@/features/worktrees/hooks/use-run-start-dialog'
@@ -25,7 +25,7 @@ const restart: DomainAnswered = { path: 'restart', values: ['true'] }
 
 // what acts on one job: a job up restarts and stops, or releases the worktree's hold on a shared service, as run
 // stop's plan says; a job not up starts again. A shared service's restart cuts the others' work: it asks first
-export function useJobActions({ repo, worktree, job }: { repo: string; worktree: string; job: ListJob }): JobActs {
+export function useJobActions({ repo, worktree, job }: { repo: string; worktree: string; job: RunpsJob }): JobActs {
   const at: JobAt = { worktree, job: job.name }
   const answers: DomainAnswered[] = [
     { path: 'worktree', values: [worktree] },

@@ -5,7 +5,8 @@ const key = 'wtm.token'
 
 export const token = (): string | null => localStorage.getItem(key)
 
-// the fragment is dropped so that the token never shows in the address bar again
+// the fragment is dropped so that the token never shows in the address bar again; the worktree `wtm-next ui` ran in is
+// kept for its repository, the Running page's "this worktree"
 export function takeFragment(): string | undefined {
   const fragment = new URLSearchParams(location.hash.slice(1))
   const fresh = fragment.get('token')
@@ -13,8 +14,16 @@ export function takeFragment(): string | undefined {
     localStorage.setItem(key, fresh)
     history.replaceState(history.state, '', location.pathname + location.search)
   }
-  return fragment.get('repo') ?? undefined
+  const repo = fragment.get('repo') ?? undefined
+  const worktree = fragment.get('worktree')
+  if (repo && worktree) localStorage.setItem(`${hereKey}.${repo}`, worktree)
+  return repo
 }
+
+const hereKey = 'wtm.here'
+
+// the path of the worktree `wtm-next ui` last ran in, in repo, if it ran in one of it
+export const hereIn = (repo: string): string | undefined => localStorage.getItem(`${hereKey}.${repo}`) ?? undefined
 
 export function onTokenChange(listener: () => void): () => void {
   const handle = (event: StorageEvent) => event.key === key && listener()

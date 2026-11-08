@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, useMatchRoute } from '@tanstack/react-router'
 import { Activity, FileKey, GitBranch, Layers, type LucideIcon, Settings, SlidersHorizontal } from 'lucide-react'
-import { jobsUp, readQuery, worktreeCount } from '@/api/queries/commands'
+import { jobsQuery, jobsUp, readQuery, worktreeCount } from '@/api/queries/commands'
+import { reposQuery } from '@/api/queries/repos'
 import {
   Sidebar,
   SidebarContent,
@@ -113,10 +114,10 @@ function WorktreeCount({ repo }: { repo: string }) {
   return read && <SidebarMenuBadge>{worktreeCount(read)}</SidebarMenuBadge>
 }
 
-// shortcut: as WorktreeCount, it counts what list's read said last; on the tree view that read is off and the count
-// waits for it, until the jobs read (LUC-345) gives the page and this badge their own
+// the jobs read the Running page reads too, so the badge says what the page lists
 function JobsUp({ repo }: { repo: string }) {
-  const list = useQuery({ ...readQuery(repo, 'list'), enabled: false })
-  const up = list.data ? jobsUp(list.data) : 0
+  const root = useQuery(reposQuery).data?.find((known) => known.id === repo)?.root
+  const jobs = useQuery(jobsQuery(repo, root))
+  const up = jobs.data ? jobsUp(jobs.data) : 0
   return up > 0 && <SidebarMenuBadge>{up}</SidebarMenuBadge>
 }

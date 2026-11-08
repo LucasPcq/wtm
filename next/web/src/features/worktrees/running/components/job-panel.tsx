@@ -3,7 +3,7 @@ import { Info } from 'lucide-react'
 import { type ReactNode, useMemo, useRef, useState } from 'react'
 import { readQuery } from '@/api/queries/commands'
 import { jobLinesQuery } from '@/api/queries/job-logs'
-import type { DomainAnswered, ListJob } from '@/api/types.gen'
+import type { DomainAnswered, RunpsJob } from '@/api/types.gen'
 import { Button } from '@/components/ui/button'
 import { Alert } from '@/features/worktrees/components/alert'
 import { CopyCommand } from '@/features/worktrees/components/copy-command'
@@ -35,7 +35,7 @@ export function JobPanel({
   repo: string
   worktree: string
   profile: string | undefined
-  job: ListJob
+  job: RunpsJob
   now: number
   switcher?: ReactNode
 }) {

@@ -1,4 +1,4 @@
-import { Copy, Download, Ellipsis, ExternalLink, FileText } from 'lucide-react'
+import { Copy, Download, Ellipsis, ExternalLink, FileText, Pin, PinOff } from 'lucide-react'
 import { toast } from 'sonner'
 import { downloadLog, type JobAt } from '@/api/queries/job-logs'
 import { Button } from '@/components/ui/button'
@@ -21,6 +21,8 @@ export function JobMenu({
   acts,
   shared,
   holders,
+  pinned,
+  onPin,
 }: {
   at: JobAt
   url: string | undefined
@@ -28,6 +30,8 @@ export function JobMenu({
   acts: JobActs['acts']
   shared: boolean
   holders: number
+  pinned: boolean
+  onPin: () => void
 }) {
   const save = () => downloadLog(at).catch((failed: Error) => toast.error(failed.message))
 
@@ -71,6 +75,11 @@ export function JobMenu({
         </DropdownMenuItem>
         {!shared && acts.length > 0 && <DropdownMenuSeparator />}
         {!shared && entries}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={onPin}>
+          {pinned ? <PinOff /> : <Pin />}
+          {pinned ? 'Unpin' : 'Pin to the top'}
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )

@@ -125,7 +125,15 @@ test("the job's menu offers its address, its log file, then what acts on the job
     within(menu)
       .getAllByRole('menuitem')
       .map((item) => item.textContent),
-  ).toEqual(['Open the address', 'Copy the address', 'Copy the log file’s path', 'Download the log', 'Restart', 'Stop'])
+  ).toEqual([
+    'Open the address',
+    'Copy the address',
+    'Copy the log file’s path',
+    'Download the log',
+    'Restart',
+    'Stop',
+    'Pin to the top',
+  ])
 })
 
 // In the sandbox, E pressed as the panel opened said no line was an error, then never looked at the lines that came.
