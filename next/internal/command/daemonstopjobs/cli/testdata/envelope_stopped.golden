@@ -1,0 +1,165 @@
+{
+  "v": 2,
+  "command": "daemon-stop-jobs",
+  "ok": true,
+  "op": "op-1",
+  "items": [
+    {
+      "subject": "main (acme)",
+      "status": "done",
+      "detail": {
+        "path": "/src/acme",
+        "jobs": [
+          {
+            "name": "web",
+            "status": "stopped"
+          },
+          {
+            "name": "api",
+            "status": "stopped"
+          }
+        ]
+      }
+    },
+    {
+      "subject": "feat/a (acme)",
+      "status": "done",
+      "detail": {
+        "path": "/src/acme.trees/feat-a",
+        "jobs": [
+          {
+            "name": "db",
+            "status": "stopped"
+          },
+          {
+            "name": "mail",
+            "status": "stopped"
+          }
+        ]
+      }
+    },
+    {
+      "subject": "main (wtm)",
+      "status": "done",
+      "detail": {
+        "path": "/src/wtm",
+        "jobs": [
+          {
+            "name": "docs",
+            "status": "stopped"
+          }
+        ]
+      }
+    }
+  ],
+  "plan": {
+    "repos": [
+      {
+        "root": "/src/acme",
+        "worktrees": [
+          {
+            "worktree": "main (acme)",
+            "branch": "main",
+            "path": "/src/acme",
+            "jobs": [
+              {
+                "name": "web",
+                "kind": "service",
+                "hold": "own",
+                "fate": "stop"
+              },
+              {
+                "name": "api",
+                "kind": "service",
+                "hold": "own",
+                "fate": "clear"
+              }
+            ]
+          },
+          {
+            "worktree": "feat/a (acme)",
+            "branch": "feat/a",
+            "path": "/src/acme.trees/feat-a",
+            "jobs": [
+              {
+                "name": "db",
+                "kind": "service",
+                "hold": "claim",
+                "fate": "stop",
+                "shared_in": "/src/acme"
+              },
+              {
+                "name": "mail",
+                "kind": "service",
+                "hold": "detached",
+                "fate": "stop",
+                "stop_command": "docker compose down"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "root": "/src/wtm",
+        "worktrees": [
+          {
+            "worktree": "main (wtm)",
+            "branch": "main",
+            "path": "/src/wtm",
+            "jobs": [
+              {
+                "name": "docs",
+                "kind": "service",
+                "hold": "own",
+                "fate": "stop"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "confirm": true,
+    "recap": [
+      {
+        "key": "jobs:main (acme)",
+        "label": "Stops in main (acme)",
+        "values": [
+          {
+            "value": "web",
+            "text": "web"
+          },
+          {
+            "value": "api (crashed: nothing to stop)",
+            "text": "api (crashed: nothing to stop)"
+          }
+        ]
+      },
+      {
+        "key": "jobs:feat/a (acme)",
+        "label": "Stops in feat/a (acme)",
+        "values": [
+          {
+            "value": "db (shared)",
+            "text": "db (shared)"
+          },
+          {
+            "value": "mail (a stack: docker compose down)",
+            "text": "mail (a stack: docker compose down)"
+          }
+        ]
+      },
+      {
+        "key": "jobs:main (wtm)",
+        "label": "Stops in main (wtm)",
+        "values": [
+          {
+            "value": "docs",
+            "text": "docs"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": []
+}

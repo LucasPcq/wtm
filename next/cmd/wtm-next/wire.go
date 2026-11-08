@@ -12,6 +12,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/LucasPcq/wtm/next/internal/command/daemonstopjobs"
+	daemonstopjobscli "github.com/LucasPcq/wtm/next/internal/command/daemonstopjobs/cli"
+
+	"github.com/LucasPcq/wtm/next/internal/command/daemonrestart"
+	daemonrestartcli "github.com/LucasPcq/wtm/next/internal/command/daemonrestart/cli"
+
 	"github.com/LucasPcq/wtm/next/internal/adapter/config"
 	"github.com/LucasPcq/wtm/next/internal/adapter/daemon"
 	bus "github.com/LucasPcq/wtm/next/internal/adapter/events"
@@ -63,7 +69,6 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
 	"github.com/LucasPcq/wtm/next/internal/service/runjobs"
 	"github.com/LucasPcq/wtm/next/internal/service/teardown"
-	"github.com/LucasPcq/wtm/next/internal/ui/cli"
 )
 
 const opIDBytes = 8
@@ -395,7 +400,7 @@ func runPs() runps.UseCase {
 
 // daemonRestart is the follow-up that replaces a daemon of another build by one of this build: daemon restart.
 func daemonRestart() *domain.FollowUp {
-	return &domain.FollowUp{Command: commandRestartDaemon}
+	return &domain.FollowUp{Command: daemonrestart.Name}
 }
 
 // settle settles a worktree's env ports, in the legacy wtm until env migrates.
@@ -433,8 +438,10 @@ func commandLine(followUp domain.FollowUp) []string {
 		return runstartcli.Line(followUp)
 	case runstop.Name:
 		return runstopcli.Line(followUp)
-	case commandRestartDaemon:
-		return []string{cli.Program, "daemon", "restart"}
+	case daemonrestart.Name:
+		return daemonrestartcli.Line(followUp)
+	case daemonstopjobs.Name:
+		return daemonstopjobscli.Line(followUp)
 	}
 
 	argv, _ := spelled(followUp)

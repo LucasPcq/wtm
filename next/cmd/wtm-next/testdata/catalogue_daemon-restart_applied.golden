@@ -1,0 +1,85 @@
+{
+  "v": 2,
+  "command": "daemon-restart",
+  "ok": true,
+  "op": "<id>",
+  "items": [
+    {
+      "subject": "daemon",
+      "status": "done",
+      "detail": {
+        "back": [
+          {
+            "name": "idle",
+            "path": "<root>/main",
+            "back": true
+          },
+          {
+            "name": "other",
+            "path": "<root>/main",
+            "back": true
+          }
+        ]
+      }
+    }
+  ],
+  "plan": {
+    "running": true,
+    "from": "dev",
+    "to": "dev",
+    "back": [
+      {
+        "root": "",
+        "worktrees": [
+          {
+            "path": "<root>/main",
+            "jobs": [
+              {
+                "name": "idle",
+                "kind": "service",
+                "hold": "own"
+              },
+              {
+                "name": "other",
+                "kind": "service",
+                "hold": "own"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "taken_over": [],
+    "tasks": [],
+    "unrecorded": [],
+    "confirm": true,
+    "recap": [
+      {
+        "key": "daemon",
+        "label": "Daemon",
+        "values": [
+          {
+            "value": "dev → dev",
+            "text": "dev → dev"
+          }
+        ]
+      },
+      {
+        "key": "back",
+        "label": "Come back",
+        "values": [
+          {
+            "value": "idle (<root>/main)",
+            "text": "idle (<root>/main)"
+          },
+          {
+            "value": "other (<root>/main)",
+            "text": "other (<root>/main)"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": []
+}

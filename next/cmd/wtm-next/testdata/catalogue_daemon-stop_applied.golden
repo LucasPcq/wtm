@@ -43,12 +43,12 @@
         "label": "Stops",
         "values": [
           {
-            "value": "idle (<root>/main · .)",
-            "text": "idle (<root>/main · .)"
+            "value": "idle (<root>/main)",
+            "text": "idle (<root>/main)"
           },
           {
-            "value": "other (<root>/main · .)",
-            "text": "other (<root>/main · .)"
+            "value": "other (<root>/main)",
+            "text": "other (<root>/main)"
           },
           {
             "value": "the daemon",

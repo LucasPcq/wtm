@@ -1,0 +1,156 @@
+{
+  "v": 2,
+  "command": "daemon-restart",
+  "ok": true,
+  "op": "op-1",
+  "items": [
+    {
+      "subject": "daemon",
+      "status": "done",
+      "detail": {
+        "back": [
+          {
+            "name": "web",
+            "path": "/src/acme",
+            "back": true
+          },
+          {
+            "name": "db",
+            "path": "/src/acme.trees/feat-a",
+            "back": true
+          }
+        ]
+      }
+    }
+  ],
+  "plan": {
+    "running": true,
+    "from": "0.30.9",
+    "to": "0.31.0",
+    "back": [
+      {
+        "root": "/src/acme",
+        "worktrees": [
+          {
+            "branch": "main",
+            "path": "/src/acme",
+            "jobs": [
+              {
+                "name": "web",
+                "kind": "service",
+                "hold": "own"
+              },
+              {
+                "name": "db",
+                "kind": "service",
+                "hold": "own",
+                "shared": true
+              }
+            ]
+          },
+          {
+            "branch": "feat/a",
+            "path": "/src/acme.trees/feat-a",
+            "jobs": [
+              {
+                "name": "db",
+                "kind": "service",
+                "hold": "claim"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "taken_over": [
+      {
+        "root": "/src/acme",
+        "worktrees": [
+          {
+            "branch": "feat/a",
+            "path": "/src/acme.trees/feat-a",
+            "jobs": [
+              {
+                "name": "mail",
+                "kind": "service",
+                "hold": "detached"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "tasks": [
+      {
+        "root": "/src/acme",
+        "worktrees": [
+          {
+            "branch": "main",
+            "path": "/src/acme",
+            "jobs": [
+              {
+                "name": "seed",
+                "kind": "task",
+                "hold": "own"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "unrecorded": [],
+    "confirm": true,
+    "recap": [
+      {
+        "key": "daemon",
+        "label": "Daemon",
+        "values": [
+          {
+            "value": "0.30.9 → 0.31.0",
+            "text": "0.30.9 → 0.31.0"
+          }
+        ]
+      },
+      {
+        "key": "back",
+        "label": "Come back",
+        "values": [
+          {
+            "value": "web (main · acme)",
+            "text": "web (main · acme)"
+          },
+          {
+            "value": "db (main · acme)",
+            "text": "db (main · acme)"
+          },
+          {
+            "value": "db (feat/a · acme)",
+            "text": "db (feat/a · acme)"
+          }
+        ]
+      },
+      {
+        "key": "taken_over",
+        "label": "Taken over",
+        "values": [
+          {
+            "value": "mail (feat/a · acme)",
+            "text": "mail (feat/a · acme)"
+          }
+        ]
+      },
+      {
+        "key": "not_back",
+        "label": "Not back",
+        "values": [
+          {
+            "value": "seed (main · acme), a task: not run again",
+            "text": "seed (main · acme), a task: not run again"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": []
+}

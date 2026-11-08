@@ -31,8 +31,8 @@
         "label": "Stops",
         "values": [
           {
-            "value": "idle (<root>/main · .)",
-            "text": "idle (<root>/main · .)"
+            "value": "idle (<root>/main)",
+            "text": "idle (<root>/main)"
           },
           {
             "value": "the daemon",

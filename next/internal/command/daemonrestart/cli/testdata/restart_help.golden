@@ -1,0 +1,35 @@
+
+  Restart wtm's daemon, the one process of this machine that runs the jobs of every
+  repository, as this wtm's build: the way past a daemon of another build, a 0.30
+  wtm's among them, which refuses new jobs while it holds some.
+
+  The services it runs itself stop, then start again on the new daemon as they were
+  started (their profile, worktree, environment and addresses), a shared one with the
+  worktrees that hold it. Its stacks (a service with a stop command, docker compose
+  up -d) run on, and the new daemon takes them over. A task running is not run again,
+  nor a job its index has no record of; the restart names each, and each job that
+  did not come back.
+
+  It asks first when a service would stop, if only for a moment; --yes restarts
+  without asking. With no daemon running, it starts one.
+
+  Usage:
+    wtm-next daemon restart [flags]
+
+  Examples:
+    wtm daemon restart
+
+    # For a script or an agent
+    wtm daemon restart --yes --output json
+
+  Flags:
+        --ask                         Ask again the questions this repository remembers an answer to, to change or forget it
+    -n, --dry-run                     Show the plan and its fingerprint, apply nothing
+        --expect-fingerprint string   Apply only if the facts still have this fingerprint, the one --dry-run printed
+    -h, --help                        help for restart
+        --output string               Output format: text or json (default "text")
+    -y, --yes                         Restart without asking
+
+  Global Flags:
+    -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+

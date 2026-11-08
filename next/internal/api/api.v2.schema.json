@@ -1033,6 +1033,42 @@
       },
       "type": "array"
     },
+    "daemon-restart.envelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/domain.Envelope"
+        }
+      ],
+      "properties": {
+        "command": {
+          "const": "daemon-restart"
+        },
+        "items": {
+          "items": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/daemonrestart.Detail"
+                  },
+                  {
+                    "maxProperties": 0,
+                    "type": "object"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "plan": {
+          "$ref": "#/$defs/daemonrestart.Plan"
+        }
+      }
+    },
+    "daemon-restart.request": {
+      "maxItems": 0,
+      "type": "array"
+    },
     "daemon-status.envelope": {
       "allOf": [
         {
@@ -1065,6 +1101,66 @@
     },
     "daemon-status.request": {
       "maxItems": 0,
+      "type": "array"
+    },
+    "daemon-stop-jobs.envelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/domain.Envelope"
+        }
+      ],
+      "properties": {
+        "command": {
+          "const": "daemon-stop-jobs"
+        },
+        "items": {
+          "items": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/runjobs.StopDetail"
+                  },
+                  {
+                    "maxProperties": 0,
+                    "type": "object"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "plan": {
+          "$ref": "#/$defs/daemonstopjobs.Plan"
+        }
+      }
+    },
+    "daemon-stop-jobs.request": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "repo"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          }
+        ]
+      },
       "type": "array"
     },
     "daemon-stop.envelope": {
@@ -1102,6 +1198,148 @@
     "daemon-stop.request": {
       "maxItems": 0,
       "type": "array"
+    },
+    "daemonrestart.Back": {
+      "additionalProperties": false,
+      "properties": {
+        "back": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "path",
+        "back"
+      ],
+      "type": "object"
+    },
+    "daemonrestart.Detail": {
+      "additionalProperties": false,
+      "properties": {
+        "back": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/daemonrestart.Back"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "back"
+      ],
+      "type": "object"
+    },
+    "daemonrestart.Plan": {
+      "additionalProperties": false,
+      "properties": {
+        "back": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/run.HeldRepo"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "confirm": {
+          "type": "boolean"
+        },
+        "empty": {
+          "type": "boolean"
+        },
+        "from": {
+          "type": "string"
+        },
+        "legacy": {
+          "type": "boolean"
+        },
+        "recalled": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "recap": {
+          "items": {
+            "$ref": "#/$defs/domain.RecapRow"
+          },
+          "type": "array"
+        },
+        "running": {
+          "type": "boolean"
+        },
+        "taken_over": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/run.HeldRepo"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tasks": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/run.HeldRepo"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "to": {
+          "type": "string"
+        },
+        "unrecorded": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/run.HeldRepo"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "running",
+        "to",
+        "back",
+        "taken_over",
+        "tasks",
+        "unrecorded",
+        "confirm"
+      ],
+      "type": "object"
     },
     "daemonstatus.Detail": {
       "additionalProperties": false,
@@ -1256,6 +1494,76 @@
         "kept",
         "lost",
         "confirm"
+      ],
+      "type": "object"
+    },
+    "daemonstopjobs.Plan": {
+      "additionalProperties": false,
+      "properties": {
+        "confirm": {
+          "type": "boolean"
+        },
+        "empty": {
+          "type": "boolean"
+        },
+        "recalled": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "recap": {
+          "items": {
+            "$ref": "#/$defs/domain.RecapRow"
+          },
+          "type": "array"
+        },
+        "repo": {
+          "type": "string"
+        },
+        "repos": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/daemonstopjobs.Repo"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "repos",
+        "confirm"
+      ],
+      "type": "object"
+    },
+    "daemonstopjobs.Repo": {
+      "additionalProperties": false,
+      "properties": {
+        "root": {
+          "type": "string"
+        },
+        "worktrees": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runjobs.StopTarget"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "root",
+        "worktrees"
       ],
       "type": "object"
     },

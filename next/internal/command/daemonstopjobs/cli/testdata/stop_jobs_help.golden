@@ -1,0 +1,30 @@
+
+  Stop every job wtm's daemon runs, in every repository of this machine, or with
+  --repo in one: each worktree's services, its stacks by their stop command, its holds
+  on shared services, which stop with their last hold; a crashed job is cleared. The
+  worktrees stop at once. The daemon and its proxy stay up, and nothing starts again
+  on its own: `wtm run up` in a worktree starts its jobs again.
+
+  It asks first; --yes stops without asking.
+
+  Usage:
+    wtm-next daemon stop-jobs [flags]
+
+  Examples:
+    wtm daemon stop-jobs
+
+    # One repository's, for a script or an agent
+    wtm daemon stop-jobs --repo ~/src/acme --yes --output json
+
+  Flags:
+        --ask                         Ask again the questions this repository remembers an answer to, to change or forget it
+    -n, --dry-run                     Show the plan and its fingerprint, apply nothing
+        --expect-fingerprint string   Apply only if the facts still have this fingerprint, the one --dry-run printed
+    -h, --help                        help for stop-jobs
+        --output string               Output format: text or json (default "text")
+        --repo string                 Only this repository's jobs (a path in it)
+    -y, --yes                         Stop without asking
+
+  Global Flags:
+    -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+

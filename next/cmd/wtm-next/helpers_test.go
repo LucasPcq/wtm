@@ -27,6 +27,8 @@ import (
 	"testing"
 	"time"
 
+	daemonrestartcli "github.com/LucasPcq/wtm/next/internal/command/daemonrestart/cli"
+
 	"github.com/LucasPcq/wtm/next/internal/adapter/daemon"
 	bus "github.com/LucasPcq/wtm/next/internal/adapter/events"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
@@ -35,6 +37,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/api"
 	"github.com/LucasPcq/wtm/next/internal/command/checkout"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
+	"github.com/LucasPcq/wtm/next/internal/command/daemonrestart"
 	"github.com/LucasPcq/wtm/next/internal/command/fastforward"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
@@ -880,6 +883,27 @@ func servingDaemon(t *testing.T) string {
 	return serving(t, daemonParams{})
 }
 
+// restartable puts in place of the daemon a command starts one of the test's own, on the socket the commands reach, so a restart has a daemon to start; it is stopped with the test.
+func restartable(t *testing.T) {
+	t.Helper()
+	ctx, cancel := context.WithCancel(context.Background())
+	served := make(chan error, 1)
+	started := false
+	was := startDaemon
+	startDaemon = func() error {
+		started = true
+		go func() { served <- serveDaemon(ctx, daemonParams{Socket: daemon.SocketPath(), Stderr: io.Discard}) }()
+		return nil
+	}
+	t.Cleanup(func() {
+		startDaemon = was
+		cancel()
+		if started {
+			<-served
+		}
+	})
+}
+
 // serving runs the daemon of params as servingDaemon does, on params.Socket when it names one, its standard error to its log, as a daemon a client starts.
 func serving(t *testing.T, params daemonParams) string {
 	t.Helper()
@@ -975,6 +999,8 @@ func spelling(command string) string {
 		return runstartcli.Use
 	case runstop.Name:
 		return runstopcli.Use
+	case daemonrestart.Name:
+		return daemonrestartcli.Use
 	}
 	return command
 }

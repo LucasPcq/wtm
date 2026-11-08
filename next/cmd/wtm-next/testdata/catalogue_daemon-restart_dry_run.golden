@@ -1,0 +1,57 @@
+{
+  "v": 2,
+  "command": "daemon-restart",
+  "ok": true,
+  "op": "<id>",
+  "plan": {
+    "running": true,
+    "from": "dev",
+    "to": "dev",
+    "back": [
+      {
+        "root": "",
+        "worktrees": [
+          {
+            "path": "<root>/main",
+            "jobs": [
+              {
+                "name": "idle",
+                "kind": "service",
+                "hold": "own"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "taken_over": [],
+    "tasks": [],
+    "unrecorded": [],
+    "confirm": true,
+    "recap": [
+      {
+        "key": "daemon",
+        "label": "Daemon",
+        "values": [
+          {
+            "value": "dev → dev",
+            "text": "dev → dev"
+          }
+        ]
+      },
+      {
+        "key": "back",
+        "label": "Come back",
+        "values": [
+          {
+            "value": "idle (<root>/main)",
+            "text": "idle (<root>/main)"
+          }
+        ]
+      }
+    ]
+  },
+  "fingerprint": "<id>",
+  "follow_ups": [],
+  "warnings": []
+}

@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"os"
 	"path/filepath"
 	"slices"
@@ -12,7 +11,9 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/daemon"
 	"github.com/LucasPcq/wtm/next/internal/adapter/events"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
+	"github.com/LucasPcq/wtm/next/internal/command/daemonrestart"
 	"github.com/LucasPcq/wtm/next/internal/command/daemonstop"
+	"github.com/LucasPcq/wtm/next/internal/command/daemonstopjobs"
 	"github.com/LucasPcq/wtm/next/internal/command/rundown"
 	"github.com/LucasPcq/wtm/next/internal/command/runstart"
 	"github.com/LucasPcq/wtm/next/internal/command/runstop"
@@ -211,6 +212,61 @@ func mutations() []mutation {
 			},
 		},
 		{
+			name:     daemonrestart.Name,
+			complete: true,
+			// a service up, under a daemon of the test's own at the socket the commands reach, which the restart replaces by another of its own
+			setup: func(t *testing.T, main string) {
+				writeRun(t, main, idleJob("idle"))
+				t.Setenv("HOME", shortDir(t))
+				serving(t, daemonParams{Socket: daemon.SocketPath()})
+				restartable(t)
+				startIdle(t, main, "idle")
+			},
+			// another service up: one more comes back
+			stale: func(t *testing.T, main string) {
+				startIdle(t, main, "other")
+			},
+			untouched: func(t *testing.T, _ string) {
+				assert.Len(t, slices.DeleteFunc(daemonJobs(t), func(job run.Job) bool { return !job.Up }), 2)
+			},
+			// N4: the services are back on the new daemon
+			applied: func(t *testing.T, _ string) {
+				var names []string
+				for _, job := range daemonJobs(t) {
+					if job.Up {
+						names = append(names, job.Name)
+					}
+				}
+				assert.ElementsMatch(t, []string{"idle", "other"}, names)
+			},
+		},
+		{
+			name:     daemonstopjobs.Name,
+			answers:  []domain.Answered{{Path: domain.PathRepo, Values: []string{"."}}},
+			complete: true,
+			// a service up in main, started for its repository, under a daemon of the test's own at the socket the commands reach, in a home short enough for it
+			setup: func(t *testing.T, main string) {
+				writeRun(t, main, idleJob("idle"))
+				t.Setenv("HOME", shortDir(t))
+				serving(t, daemonParams{Socket: daemon.SocketPath()})
+				startIdleFor(t, main, "idle")
+			},
+			// another job up: the plan stops one more
+			stale: func(t *testing.T, main string) {
+				startIdleFor(t, main, "other")
+			},
+			untouched: func(t *testing.T, _ string) {
+				assert.True(t, slices.ContainsFunc(daemonJobs(t), func(job run.Job) bool { return job.Up }))
+			},
+			// the jobs stop, the daemon stays up
+			applied: func(t *testing.T, _ string) {
+				assert.False(t, slices.ContainsFunc(daemonJobs(t), func(job run.Job) bool { return job.Up }))
+				status, err := wtmDaemon().Status(t.Context())
+				require.NoError(t, err)
+				assert.True(t, status.Answering)
+			},
+		},
+		{
 			name:     runstart.Name,
 			answers:  []domain.Answered{{Path: domain.PathWorktree, Values: []string{"main"}}, {Path: runstart.PathJob, Values: []string{"seed"}}},
 			complete: true,
@@ -362,7 +418,7 @@ func pushOnOrigin(t *testing.T, main, name string) {
 var reads = []string{"list", "resolve", "status", "tree", "run-logs", "run-ps", "run-list", "daemon-status"}
 
 // machine are the commands on wtm's daemon, the machine's one: they run on no repository, so wire.go builds none of them per repository and none refuses a directory with no wtm config.
-var machine = []string{"daemon-status", "daemon-stop"}
+var machine = []string{"daemon-status", "daemon-stop", "daemon-restart", "daemon-stop-jobs"}
 
 // streamsListed are the commands that stream rather than return: out of the catalogue's contract, each a stream of catalogue.go's streams.
 var streamsListed = []string{"events"}
@@ -424,33 +480,14 @@ func startIdle(t *testing.T, main, name string) {
 	require.NoError(t, err)
 }
 
+// startIdleFor is startIdle, the service started for main's repository, as run up starts it.
+func startIdleFor(t *testing.T, main, name string) {
+	t.Helper()
+	root, err := mainWorktree(t.Context(), main)
+	require.NoError(t, err)
+	_, err = daemon.Daemon{SocketPath: daemon.SocketPath(), Version: version}.Start(t.Context(), run.Spec{Job: project.Job{Name: name, Kind: project.Service, Cmd: "sleep 30"}, WorkDir: main, Origin: &run.Origin{Root: root, Branch: "main"}}, nil)
+	require.NoError(t, err)
+}
+
 // seedJob is a run.toml of one task, which run up runs to its end.
 const seedJob = "[[job]]\nname = \"seed\"\nkind = \"task\"\ncmd = \"true\"\n"
-
-// restarting is a daemon a restart is tried on: the jobs it lists, what the user answers, what the restart says, and how often it was stopped.
-type restarting struct {
-	jobs      []run.Job
-	in        string
-	out       bytes.Buffer // what it says it did
-	said      bytes.Buffer // what it found, and its question
-	shutdowns int
-}
-
-// params are the restart of r, its daemon's jobs read with err beside them (a *run.Skewed, a protocol's *run.Error, nil for this build's).
-func (r *restarting) params(err error, ask, yes bool) restartParams {
-	return restartParams{
-		Jobs: func(context.Context) ([]run.Job, error) {
-			if err == nil {
-				return r.jobs, nil
-			}
-			return r.jobs, err
-		},
-		Shutdown: func(context.Context) error { r.shutdowns++; return nil },
-		Ensure:   func(context.Context) error { return nil },
-		In:       strings.NewReader(r.in),
-		Out:      &r.out,
-		Err:      &r.said,
-		CanAsk:   ask,
-		Yes:      yes,
-	}
-}

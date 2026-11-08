@@ -1,0 +1,11 @@
+{
+  "fields": [
+    {
+      "kind": "text",
+      "path": "repo",
+      "skip": "flag_only",
+      "value": "."
+    }
+  ],
+  "problems": []
+}
