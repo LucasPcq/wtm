@@ -71,6 +71,9 @@ func (s *Session[R, Q, O]) Script() Script {
 		script.ApplyLabel = func() string { return s.command.ApplyLabel(*s.preview) }
 	}
 	script.Empty = func() bool { return (*s.preview).Empty() }
+	if s.command.Unasked != nil {
+		script.Unasked = func() bool { return s.command.Unasked(*s.preview) }
+	}
 
 	return script
 }

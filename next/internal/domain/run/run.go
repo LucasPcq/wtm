@@ -202,3 +202,19 @@ func UnknownMessage(err error) string {
 
 	return "couldn't ask wtm's daemon which jobs are up: " + err.Error()
 }
+
+// A Daemon is wtm's daemon as a client finds it: whether one answers, its
+// stamp and its skew against the client, the jobs it holds (nil when they
+// cannot be read: another protocol; the stacks and claims its index holds when
+// none answers), its proxy, the socket and the index it keeps, and whether a
+// newer wtm wrote that index, which it then leaves unwritten (IndexFrozen).
+type Daemon struct {
+	Answering   bool
+	Stamp       Stamp
+	Skew        Skew
+	Jobs        []Job
+	Proxy       Proxy
+	Socket      string
+	Index       string
+	IndexFrozen bool
+}

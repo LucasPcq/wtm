@@ -57,3 +57,8 @@ func errorText(err error) string {
 	}
 	return err.Error()
 }
+
+// IndexFrozenWarning is <command>.index_frozen: the daemon's index of jobs, at path, was written by a newer wtm, so the daemon of this one records nothing it starts: a stack it starts is not taken back by the next daemon, nor a job it runs brought back by a restart.
+func IndexFrozenWarning(command, path string) Warning {
+	return Warning{Code: command + IndexFrozen, Params: Params{"path": path}, Message: "the index of jobs " + path + " was written by a newer wtm: nothing started here is recorded, so no restart brings it back — run the newer wtm, or remove the file once nothing runs"}
+}

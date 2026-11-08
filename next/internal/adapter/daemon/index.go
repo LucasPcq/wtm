@@ -102,6 +102,23 @@ func (i *Index) Load() []run.Record {
 	return records
 }
 
+// Frozen reports whether a newer wtm wrote the index: a daemon of this one then
+// records nothing, the jobs it starts left out of it.
+func (i *Index) Frozen() bool {
+	data, err := os.ReadFile(i.Path)
+	if err != nil {
+		return false
+	}
+	var held struct {
+		Version int `json:"version"`
+	}
+	if json.Unmarshal(data, &held) != nil {
+		return false
+	}
+	_, frozen := run.IndexAccess(held.Version)
+	return frozen
+}
+
 // Save replaces the index with records, atomically, unless a newer wtm wrote
 // it: its record of what it started is left as it is.
 func (i *Index) Save(records []run.Record) error {

@@ -266,6 +266,9 @@ func (s shapes) golden(part string, v any) {
 	data, err := json.MarshalIndent(v, "", "  ")
 	require.NoError(s.t, err)
 	text := strings.ReplaceAll(string(data), s.root, "<root>")
+	if config, err := os.UserConfigDir(); err == nil {
+		text = strings.ReplaceAll(text, config, "<config>")
+	}
 	text = lasted.ReplaceAllString(text, `"duration_ms": 0`)
 	text = runLog.ReplaceAllString(text, `/<id>.log"`)
 	text = varying.ReplaceAllStringFunc(text, func(value string) string {
@@ -481,6 +484,10 @@ func requestSchema(form domain.Form) map[string]any {
 			answerSchema(domain.PathAsk, oneValue(map[string]any{"enum": []string{"true", "false"}})))
 	}
 
+	// A form with no field takes no answer.
+	if len(answers) == 0 {
+		return map[string]any{"type": "array", "maxItems": 0}
+	}
 	return map[string]any{"type": "array", "items": map[string]any{"oneOf": answers}}
 }
 

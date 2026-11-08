@@ -22,7 +22,8 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/process"
 	"github.com/LucasPcq/wtm/next/internal/adapter/proxy"
 	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
-	rundaemon "github.com/LucasPcq/wtm/next/internal/daemon"
+	"github.com/LucasPcq/wtm/next/internal/command/daemonstatus"
+	core "github.com/LucasPcq/wtm/next/internal/daemon"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/ui/cli"
@@ -101,7 +102,7 @@ func serveDaemon(ctx context.Context, params daemonParams) error {
 	relay := bus.NewRelay()
 	names := proxy.New()
 	defer names.Close()
-	jobs := rundaemon.New(rundaemon.Params{
+	jobs := core.New(core.Params{
 		Spawn:   spawn,
 		Orphans: process.Orphans{},
 		Index:   &daemon.Index{Path: daemon.IndexPath(socket)},
@@ -142,7 +143,7 @@ func serveDaemon(ctx context.Context, params daemonParams) error {
 }
 
 // spawn starts a job's process, as wtm's daemon's port takes it.
-func spawn(command run.Command) (rundaemon.Process, error) {
+func spawn(command run.Command) (core.Process, error) {
 	child, err := process.Spawn(command)
 	if err != nil {
 		return nil, err
@@ -151,7 +152,7 @@ func spawn(command run.Command) (rundaemon.Process, error) {
 }
 
 // openLog opens a job's log, as wtm's daemon's port takes it.
-func openLog(file run.LogFile) (rundaemon.Log, error) {
+func openLog(file run.LogFile) (core.Log, error) {
 	log, err := joblog.Open(file)
 	if err != nil {
 		return nil, err
@@ -165,8 +166,13 @@ func dirExists(path string) bool {
 	return err == nil && info.IsDir()
 }
 
-// runDaemon is wtm's daemon of this machine as a command asks it: on the bus's socket, started from this binary when one is needed.
-func runDaemon() daemon.Daemon {
+// openDaemonStatus is daemon status over wtm's daemon of this machine, whatever the directory: the daemon is the machine's one.
+func openDaemonStatus(context.Context, string) (daemonstatus.UseCase, error) {
+	return daemonstatus.UseCase{Daemon: wtmDaemon().Status, Version: version, Restart: daemonRestart()}, nil
+}
+
+// wtmDaemon is wtm's daemon of this machine as a command asks it: on the bus's socket, started from this binary when one is needed.
+func wtmDaemon() daemon.Daemon {
 	return daemon.Daemon{SocketPath: daemon.SocketPath(), Version: version, StartDaemon: startDaemon}
 }
 

@@ -56,7 +56,7 @@ func TestEachRegisteredCommandIsInTheCatalogueOrItsStreamsAndWired(t *testing.T)
 	assert.ElementsMatch(t, registered, append(listed, streamed...), "main.go registers a command catalogue.go does not list, or the reverse")
 	for _, name := range registered {
 		// a stream follows every repository: wire.go builds it once, not per repository in app
-		if !slices.Contains(streamsListed, name) {
+		if !slices.Contains(streamsListed, name) && !slices.ContainsFunc(machine, func(m string) bool { return strings.ReplaceAll(m, "-", "") == name }) {
 			assert.True(t, wired[name], "%s is registered in main.go but wire.go builds no %s.UseCase", name, name)
 		}
 	}

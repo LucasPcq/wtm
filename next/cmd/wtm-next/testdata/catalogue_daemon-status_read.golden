@@ -1,0 +1,20 @@
+{
+  "v": 2,
+  "command": "daemon-status",
+  "ok": true,
+  "items": [
+    {
+      "subject": "daemon",
+      "status": "done",
+      "detail": {
+        "running": false,
+        "build": "dev",
+        "repos": [],
+        "socket": "<config>/wtm/wtm.sock",
+        "index": "<config>/wtm/jobs.json"
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}

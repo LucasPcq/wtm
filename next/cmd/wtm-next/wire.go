@@ -114,7 +114,7 @@ func wire(params wireParams) app {
 	}
 
 	meta := store.Meta{StateDir: params.StateDir}
-	runs := runDaemon()
+	runs := wtmDaemon()
 	jobs := runs.Jobs
 	gh := github.GitHub{Dir: params.MainPath}
 
@@ -390,7 +390,7 @@ func initialize() *domain.FollowUp {
 
 // runPs is run ps over the daemon of the machine, opening each repository its jobs run for.
 func runPs() runps.UseCase {
-	return runps.UseCase{Jobs: runDaemon().Jobs, Open: openProject, ReadLog: joblog.Tail, Restart: daemonRestart()}
+	return runps.UseCase{Jobs: wtmDaemon().Jobs, Open: openProject, ReadLog: joblog.Tail, Restart: daemonRestart()}
 }
 
 // daemonRestart is the follow-up that replaces a daemon of another build by one of this build: daemon restart.

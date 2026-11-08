@@ -41,6 +41,8 @@ type Script struct {
 	ApplyLabel func() string
 	// Empty reports whether the plan Preview computed changes nothing: the wizard then finishes without asking to confirm it, and its apply says nothing was to do; nil always asks.
 	Empty func() bool
+	// Unasked reports whether the plan Preview computed applies without asking to confirm it, though it changes something; nil always asks.
+	Unasked func() bool
 	// Apply carries out the request once the wizard has finished.
 	Apply func(ctx context.Context) error
 	// Stale reports whether err, an error of Apply, is a plan the facts changed under, which starts the wizard again.

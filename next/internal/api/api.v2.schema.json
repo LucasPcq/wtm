@@ -1033,6 +1033,115 @@
       },
       "type": "array"
     },
+    "daemon-status.envelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/domain.Envelope"
+        }
+      ],
+      "properties": {
+        "command": {
+          "const": "daemon-status"
+        },
+        "items": {
+          "items": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/daemonstatus.Detail"
+                  },
+                  {
+                    "maxProperties": 0,
+                    "type": "object"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "plan": false
+      }
+    },
+    "daemon-status.request": {
+      "maxItems": 0,
+      "type": "array"
+    },
+    "daemonstatus.Detail": {
+      "additionalProperties": false,
+      "properties": {
+        "build": {
+          "type": "string"
+        },
+        "daemon": {
+          "type": "string"
+        },
+        "index": {
+          "type": "string"
+        },
+        "index_frozen": {
+          "type": "boolean"
+        },
+        "jobs_unreadable": {
+          "type": "boolean"
+        },
+        "pid": {
+          "type": "integer"
+        },
+        "protocol": {
+          "type": "integer"
+        },
+        "proxy": {
+          "$ref": "#/$defs/daemonstatus.Proxy"
+        },
+        "repos": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/run.HeldRepo"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "running": {
+          "type": "boolean"
+        },
+        "skew": {
+          "type": "string"
+        },
+        "socket": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "running",
+        "build",
+        "repos",
+        "socket",
+        "index"
+      ],
+      "type": "object"
+    },
+    "daemonstatus.Proxy": {
+      "additionalProperties": false,
+      "properties": {
+        "port": {
+          "type": "integer"
+        },
+        "public_port": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "port",
+        "public_port"
+      ],
+      "type": "object"
+    },
     "domain.Answered": {
       "additionalProperties": false,
       "description": "The answer to the field at path: its values, as many as the field takes, an array even when it takes none.",
@@ -5114,6 +5223,83 @@
         "release",
         "clear"
       ]
+    },
+    "run.HeldJob": {
+      "additionalProperties": false,
+      "properties": {
+        "hold": {
+          "$ref": "#/$defs/run.Hold"
+        },
+        "kind": {
+          "$ref": "#/$defs/project.JobKind"
+        },
+        "name": {
+          "type": "string"
+        },
+        "shared": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "hold"
+      ],
+      "type": "object"
+    },
+    "run.HeldRepo": {
+      "additionalProperties": false,
+      "properties": {
+        "root": {
+          "type": "string"
+        },
+        "worktrees": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/run.HeldWorktree"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "root",
+        "worktrees"
+      ],
+      "type": "object"
+    },
+    "run.HeldWorktree": {
+      "additionalProperties": false,
+      "properties": {
+        "branch": {
+          "type": "string"
+        },
+        "jobs": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/run.HeldJob"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "jobs"
+      ],
+      "type": "object"
     },
     "run.Hold": {
       "description": "What of a job wtm's daemon holds: its own process, a stack its launcher left, a claim on a shared job another worktree runs.",

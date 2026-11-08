@@ -335,7 +335,10 @@ func pushOnOrigin(t *testing.T, main, name string) {
 }
 
 // reads are the commands of the catalogue that change nothing.
-var reads = []string{"list", "resolve", "status", "tree", "run-logs", "run-ps", "run-list"}
+var reads = []string{"list", "resolve", "status", "tree", "run-logs", "run-ps", "run-list", "daemon-status"}
+
+// machine are the commands on wtm's daemon, the machine's one: they run on no repository, so wire.go builds none of them per repository and none refuses a directory with no wtm config.
+var machine = []string{"daemon-status"}
 
 // streamsListed are the commands that stream rather than return: out of the catalogue's contract, each a stream of catalogue.go's streams.
 var streamsListed = []string{"events"}

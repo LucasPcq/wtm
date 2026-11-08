@@ -1,0 +1,24 @@
+
+  Read wtm's daemon, the one process of this machine that runs the jobs of every
+  repository, serves their named addresses and carries the event stream: whether
+  it runs and its pid, its build against this wtm's, the jobs it holds by repository
+  and worktree, the port of its proxy, its socket and its index of jobs.
+
+  With none running, the stacks and the holds on shared services its index keeps,
+  which run on without it. It changes nothing and never starts the daemon.
+
+  Usage:
+    wtm-next status [flags]
+
+  Examples:
+    wtm daemon status
+
+    wtm daemon status --output json
+
+  Flags:
+    -h, --help            help for status
+        --output string   Output format: text or json (default "text")
+
+  Global Flags:
+    -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+

@@ -119,7 +119,7 @@ func (d Daemon) Jobs(ctx context.Context) ([]run.Job, error) {
 // the stop command of a stack, and whether the main checkout holds a shared
 // job, unknown when the index has no record of it.
 func (d Daemon) recorded(jobs []run.Job) []run.Job {
-	records := (&Index{Path: IndexPath(d.SocketPath)}).Load()
+	records := d.Records()
 	for i, job := range jobs {
 		at := slices.IndexFunc(records, func(record run.Record) bool {
 			return record.Spec.WorkDir == job.WorkDir && record.Spec.Job.Name == job.Name
@@ -146,13 +146,25 @@ func (d Daemon) recorded(jobs []run.Job) []run.Job {
 	return jobs
 }
 
-// indexed returns the jobs the index says are up with no daemon to ask.
+// indexed returns the jobs the index says are up with no daemon to ask; a
+// foreground service left in it fails it with run.ErrUnknown.
 func (d Daemon) indexed() ([]run.Job, error) {
-	var jobs []run.Job
-	for _, record := range (&Index{Path: IndexPath(d.SocketPath)}).Load() {
+	jobs, foreground := d.held()
+	if foreground {
+		return nil, run.ErrUnknown
+	}
+	return jobs, nil
+}
+
+// held returns the stacks and the claims the index holds, which run with no
+// daemon, and whether it also holds a foreground service, which a daemon that
+// died left.
+func (d Daemon) held() (jobs []run.Job, foreground bool) {
+	for _, record := range d.Records() {
 		spec, hold := record.Spec, record.Hold()
 		if hold == run.HoldOwn {
-			return nil, run.ErrUnknown
+			foreground = true
+			continue
 		}
 		job := run.Job{Name: spec.Job.Name, WorkDir: spec.WorkDir, Up: true, Kind: spec.Job.Kind, Hold: hold, SharedDir: record.SharedDir, MainHolds: record.MainHolds}
 		if spec.Origin != nil {
@@ -164,7 +176,58 @@ func (d Daemon) indexed() ([]run.Job, error) {
 		jobs = append(jobs, job)
 	}
 
-	return jobs, nil
+	return jobs, foreground
+}
+
+// Records returns the records of the daemon's index: every job up it
+// recorded, with what started it; none when the index is absent, unreadable
+// or a newer wtm's.
+func (d Daemon) Records() []run.Record {
+	return (&Index{Path: IndexPath(d.SocketPath)}).Load()
+}
+
+// IndexFrozen reports whether a newer wtm wrote the daemon's index, which a
+// daemon of this one leaves unwritten: what it starts is recorded nowhere.
+func (d Daemon) IndexFrozen() bool {
+	return (&Index{Path: IndexPath(d.SocketPath)}).Frozen()
+}
+
+// Status returns the daemon as it stands, never starting it: whether one
+// answers, its stamp, its skew, its jobs and its proxy, or, with none
+// answering, the stacks and claims its index holds. A daemon of another
+// protocol, or a process on the socket that is no daemon of wtm's, answers with
+// jobs that cannot be read.
+func (d Daemon) Status(ctx context.Context) (run.Daemon, error) {
+	status := run.Daemon{Socket: d.SocketPath, Index: IndexPath(d.SocketPath), IndexFrozen: d.IndexFrozen()}
+	listing, err := d.exchange(ctx, exchangeParams{Request: request{Action: actionList}, Timeout: listTimeout})
+	if errors.Is(err, errNoDaemon) {
+		status.Jobs, _ = d.held()
+		return status, nil
+	}
+	if err != nil {
+		return run.Daemon{}, err
+	}
+
+	status.Answering, status.Stamp = true, listing.stamp()
+	status.Skew = run.SkewOf(status.Stamp, d.Version)
+	if listing.Status == statusError || status.Skew == run.SkewProtocol {
+		status.Skew = run.SkewProtocol
+		return status, nil
+	}
+	legacy := status.Skew == run.SkewLegacy
+	for _, j := range listing.Jobs {
+		status.Jobs = append(status.Jobs, j.runJob(legacy))
+	}
+	if status.Skew != run.SkewNone {
+		status.Jobs = d.recorded(status.Jobs)
+	}
+	status.Proxy = run.Proxy{Port: listing.ProxyPort, PublicPort: listing.ProxyPublicPort}
+	if listing.Proxy != nil {
+		status.Proxy = run.Proxy{Port: listing.Proxy.Port, PublicPort: listing.Proxy.PublicPort}
+	}
+	status.Stamp.PID = cmp.Or(status.Stamp.PID, listing.DaemonPID)
+
+	return status, nil
 }
 
 // ----------------------------------------------------------------------------

@@ -59,6 +59,10 @@ type answer struct {
 	At       stamp  `json:"at,omitzero"`
 	Text     string `json:"text,omitempty"`
 	Proxy    *proxy `json:"proxy,omitempty"`
+	// The legacy daemon's words for its pid and its proxy, read from it alone.
+	DaemonPID       int `json:"daemon_pid,omitempty"`
+	ProxyPort       int `json:"proxy_port,omitempty"`
+	ProxyPublicPort int `json:"proxy_public_port,omitempty"`
 }
 
 // proxy is the proxy a daemon serves named URLs on, in its listing.

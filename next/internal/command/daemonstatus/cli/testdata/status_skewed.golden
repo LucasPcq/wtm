@@ -1,0 +1,16 @@
+
+  ! wtm's daemon runs another build · pid 4242
+
+  build   0.30.9 · this wtm is 0.31.0
+  jobs    acme
+            main    web, db (shared)
+            feat/a  db (held), mail (detached)
+          wtm
+            main    docs
+  proxy   port 11080 · addresses on :80
+  socket  /cfg/wtm/wtm.sock
+  index   /cfg/wtm/jobs.json
+  ! the daemon is of another build (0.30.9): restart it to start jobs beside its own
+
+  → wtm daemon-restart   restart it: its jobs come back on a daemon of this build
+

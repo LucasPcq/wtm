@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/LucasPcq/wtm/next/internal/command/runlogs"
 	"io"
 	"net/http"
 	"os"
@@ -11,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/LucasPcq/wtm/next/internal/command/runlogs"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/web"
