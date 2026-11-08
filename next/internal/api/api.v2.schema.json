@@ -22,7 +22,11 @@
         "run-start",
         "run-stop",
         "run-ps",
-        "run-list"
+        "run-list",
+        "daemon-status",
+        "daemon-stop",
+        "daemon-restart",
+        "daemon-stop-jobs"
       ]
     },
     "checkout.Action": {
