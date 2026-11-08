@@ -1,0 +1,119 @@
+{
+  "v": 2,
+  "command": "daemon-stop",
+  "ok": true,
+  "op": "op-1",
+  "items": [
+    {
+      "subject": "daemon",
+      "status": "done",
+      "detail": {}
+    }
+  ],
+  "plan": {
+    "running": true,
+    "stops": [
+      {
+        "root": "/src/acme",
+        "worktrees": [
+          {
+            "branch": "main",
+            "path": "/src/acme",
+            "jobs": [
+              {
+                "name": "web",
+                "kind": "service",
+                "hold": "own"
+              },
+              {
+                "name": "db",
+                "kind": "service",
+                "hold": "own",
+                "shared": true
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "kept": [
+      {
+        "root": "/src/acme",
+        "worktrees": [
+          {
+            "branch": "feat/a",
+            "path": "/src/acme.trees/feat-a",
+            "jobs": [
+              {
+                "name": "mail",
+                "kind": "service",
+                "hold": "detached"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "lost": [
+      {
+        "root": "/src/acme",
+        "worktrees": [
+          {
+            "branch": "feat/a",
+            "path": "/src/acme.trees/feat-a",
+            "jobs": [
+              {
+                "name": "db",
+                "kind": "service",
+                "hold": "claim"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "confirm": true,
+    "recap": [
+      {
+        "key": "stops",
+        "label": "Stops",
+        "values": [
+          {
+            "value": "web (main · acme)",
+            "text": "web (main · acme)"
+          },
+          {
+            "value": "db (main · acme)",
+            "text": "db (main · acme)"
+          },
+          {
+            "value": "the daemon",
+            "text": "the daemon"
+          }
+        ]
+      },
+      {
+        "key": "kept",
+        "label": "Runs on",
+        "values": [
+          {
+            "value": "mail (feat/a · acme)",
+            "text": "mail (feat/a · acme)"
+          }
+        ]
+      },
+      {
+        "key": "lost",
+        "label": "Lets go",
+        "values": [
+          {
+            "value": "db (feat/a · acme)",
+            "text": "db (feat/a · acme)"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": []
+}

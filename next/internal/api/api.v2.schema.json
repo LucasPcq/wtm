@@ -1067,6 +1067,42 @@
       "maxItems": 0,
       "type": "array"
     },
+    "daemon-stop.envelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/domain.Envelope"
+        }
+      ],
+      "properties": {
+        "command": {
+          "const": "daemon-stop"
+        },
+        "items": {
+          "items": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/daemonstop.Detail"
+                  },
+                  {
+                    "maxProperties": 0,
+                    "type": "object"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "plan": {
+          "$ref": "#/$defs/daemonstop.Plan"
+        }
+      }
+    },
+    "daemon-stop.request": {
+      "maxItems": 0,
+      "type": "array"
+    },
     "daemonstatus.Detail": {
       "additionalProperties": false,
       "properties": {
@@ -1139,6 +1175,87 @@
       "required": [
         "port",
         "public_port"
+      ],
+      "type": "object"
+    },
+    "daemonstop.Detail": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    },
+    "daemonstop.Plan": {
+      "additionalProperties": false,
+      "properties": {
+        "confirm": {
+          "type": "boolean"
+        },
+        "empty": {
+          "type": "boolean"
+        },
+        "jobs_unreadable": {
+          "type": "boolean"
+        },
+        "kept": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/run.HeldRepo"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lost": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/run.HeldRepo"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "recalled": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "recap": {
+          "items": {
+            "$ref": "#/$defs/domain.RecapRow"
+          },
+          "type": "array"
+        },
+        "running": {
+          "type": "boolean"
+        },
+        "stops": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/run.HeldRepo"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "running",
+        "stops",
+        "kept",
+        "lost",
+        "confirm"
       ],
       "type": "object"
     },

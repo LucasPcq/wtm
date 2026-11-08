@@ -26,3 +26,9 @@ func TestJobsAreHeldByRepositoryEachWorktreesTogether(t *testing.T) {
 	assert.Equal(t, 4, Count(got))
 	assert.Equal(t, []HeldRepo{}, Held(nil))
 }
+
+func TestAJobHeldIsNamedWithItsWorktreeAndItsRepository(t *testing.T) {
+	repos := Held([]Job{{Name: "web", Repo: "/src/acme", Branch: "feat/a", WorkDir: "/src/acme.trees/feat-a"}, {Name: "docs", Repo: "/src/wtm", WorkDir: "/src/wtm.trees/x"}})
+
+	assert.Equal(t, []string{"web (feat/a · acme)", "docs (/src/wtm.trees/x · wtm)"}, Names(repos))
+}

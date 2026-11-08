@@ -11,6 +11,7 @@ import (
 	cleancli "github.com/LucasPcq/wtm/next/internal/command/clean/cli"
 	createcli "github.com/LucasPcq/wtm/next/internal/command/create/cli"
 	daemonstatuscli "github.com/LucasPcq/wtm/next/internal/command/daemonstatus/cli"
+	daemonstopcli "github.com/LucasPcq/wtm/next/internal/command/daemonstop/cli"
 	eventscli "github.com/LucasPcq/wtm/next/internal/command/events/cli"
 	execcli "github.com/LucasPcq/wtm/next/internal/command/exec/cli"
 	extractcli "github.com/LucasPcq/wtm/next/internal/command/extract/cli"
@@ -69,7 +70,7 @@ func commands(streams *output.Streams, env cli.Env) []*cobra.Command {
 		treecli.New(streams, env, openTree, commandLine),
 		eventscli.New(streams, env, systemStream(), commandLine),
 		runCmd(runupcli.New(streams, env, openRunUp, commandLine, liveView()), runlogscli.New(streams, env, openRunLogs, commandLine, runlogscli.View{Daemon: wtmDaemon(), Open: openURL}), rundowncli.New(streams, env, openRunDown, commandLine), runstartcli.New(streams, env, openRunStart, commandLine, liveView()), runstopcli.New(streams, env, openRunStop, commandLine), runpscli.New(streams, env, openRunPs, commandLine), runlistcli.New(streams, env, openRunList, commandLine)),
-		daemonCmd(streams, daemonstatuscli.New(streams, env, openDaemonStatus, commandLine), restartCmd(streams, func() restartParams {
+		daemonCmd(streams, daemonstatuscli.New(streams, env, openDaemonStatus, commandLine), daemonstopcli.New(streams, env, openDaemonStop, commandLine), restartCmd(streams, func() restartParams {
 			runs := wtmDaemon()
 			return restartParams{Jobs: runs.Jobs, Shutdown: runs.Shutdown, Ensure: runs.Ensure}
 		})),

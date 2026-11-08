@@ -145,9 +145,11 @@ func keepsTheMutationContract(t *testing.T, m mutation) {
 
 	empty, err := c.Questions(t.Context(), api.Call{Dir: main})
 	require.NoError(t, err)
-	// a later answer's problem may wait on the subject's, as extract's files wait on their source
-	subject := m.answers[0].Path
-	assert.Equal(t, m.complete, len(domain.ProblemsOf(empty.Problems, subject)) == 0, "an empty request is not asked its %s, unless it is complete", subject)
+	// a later answer's problem may wait on the subject's, as extract's files wait on their source; a command of no field has no subject
+	if len(m.answers) > 0 {
+		subject := m.answers[0].Path
+		assert.Equal(t, m.complete, len(domain.ProblemsOf(empty.Problems, subject)) == 0, "an empty request is not asked its %s, unless it is complete", subject)
+	}
 
 	asked, err := c.Questions(t.Context(), api.Call{Dir: main, Answers: m.answers})
 	require.NoError(t, err)

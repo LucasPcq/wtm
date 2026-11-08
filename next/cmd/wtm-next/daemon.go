@@ -15,17 +15,22 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"path/filepath"
+
 	"github.com/LucasPcq/wtm/next/internal/adapter/config"
 	"github.com/LucasPcq/wtm/next/internal/adapter/daemon"
 	bus "github.com/LucasPcq/wtm/next/internal/adapter/events"
 	"github.com/LucasPcq/wtm/next/internal/adapter/joblog"
+	"github.com/LucasPcq/wtm/next/internal/adapter/oplock"
 	"github.com/LucasPcq/wtm/next/internal/adapter/process"
 	"github.com/LucasPcq/wtm/next/internal/adapter/proxy"
 	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
 	"github.com/LucasPcq/wtm/next/internal/command/daemonstatus"
+	"github.com/LucasPcq/wtm/next/internal/command/daemonstop"
 	core "github.com/LucasPcq/wtm/next/internal/daemon"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
+	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
@@ -169,6 +174,24 @@ func dirExists(path string) bool {
 // openDaemonStatus is daemon status over wtm's daemon of this machine, whatever the directory: the daemon is the machine's one.
 func openDaemonStatus(context.Context, string) (daemonstatus.UseCase, error) {
 	return daemonstatus.UseCase{Daemon: wtmDaemon().Status, Version: version, Restart: daemonRestart()}, nil
+}
+
+// openDaemonStop is daemon stop over wtm's daemon of this machine, whatever the directory.
+func openDaemonStop(context.Context, string) (daemonstop.UseCase, error) {
+	return daemonstop.UseCase{Operations: machineOperations(), Daemon: wtmDaemon()}, nil
+}
+
+// machineOperations runs the operations on wtm's daemon, which is no repository's: recorded in the daemon's own directory, publishing no event, since the bus files every event under a repository.
+func machineOperations() operation.Service {
+	return operation.Service{Locker: locker{oplock.Locks{StateDir: filepath.Dir(daemon.SocketPath())}}, Publisher: unpublished{}, NewOpID: newOpID, Now: time.Now}
+}
+
+// unpublished publishes nothing of an operation.
+type unpublished struct{}
+
+// Open returns a report that drops every event.
+func (unpublished) Open(domain.Operation) domain.Report {
+	return func(domain.Event) {}
 }
 
 // wtmDaemon is wtm's daemon of this machine as a command asks it: on the bus's socket, started from this binary when one is needed.

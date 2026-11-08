@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+
 	"github.com/LucasPcq/wtm/next/internal/command/daemonstatus"
+	"github.com/LucasPcq/wtm/next/internal/command/daemonstop"
 
 	"github.com/LucasPcq/wtm/next/internal/api"
 	"github.com/LucasPcq/wtm/next/internal/command/checkout"
@@ -54,6 +56,7 @@ func catalogue() api.Catalogue {
 		api.Bind(runps.Name, openRunPs, runps.UseCase.Questions, runps.UseCase.Run),
 		api.Bind(runlist.Name, openRunList, runlist.UseCase.Questions, runlist.UseCase.Run),
 		api.Bind(daemonstatus.Name, openDaemonStatus, daemonstatus.UseCase.Questions, daemonstatus.UseCase.Run),
+		api.Bind(daemonstop.Name, openDaemonStop, daemonstop.UseCase.Questions, daemonstop.UseCase.Run),
 	}
 }
 

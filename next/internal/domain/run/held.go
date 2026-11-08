@@ -2,6 +2,7 @@ package run
 
 import (
 	"cmp"
+	"path/filepath"
 	"slices"
 
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
@@ -61,4 +62,17 @@ func Count(repos []HeldRepo) int {
 		}
 	}
 	return n
+}
+
+// Names returns each job of repos as a recap names it: its name, then its worktree and its repository.
+func Names(repos []HeldRepo) []string {
+	var names []string
+	for _, repo := range repos {
+		for _, wt := range repo.Worktrees {
+			for _, job := range wt.Jobs {
+				names = append(names, job.Name+" ("+cmp.Or(wt.Branch, wt.Path)+" · "+filepath.Base(repo.Root)+")")
+			}
+		}
+	}
+	return names
 }

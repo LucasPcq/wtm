@@ -1,0 +1,63 @@
+{
+  "v": 2,
+  "command": "daemon-stop",
+  "ok": true,
+  "op": "<id>",
+  "items": [
+    {
+      "subject": "daemon",
+      "status": "done",
+      "detail": {}
+    }
+  ],
+  "plan": {
+    "running": true,
+    "stops": [
+      {
+        "root": "",
+        "worktrees": [
+          {
+            "path": "<root>/main",
+            "jobs": [
+              {
+                "name": "idle",
+                "kind": "service",
+                "hold": "own"
+              },
+              {
+                "name": "other",
+                "kind": "service",
+                "hold": "own"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "kept": [],
+    "lost": [],
+    "confirm": true,
+    "recap": [
+      {
+        "key": "stops",
+        "label": "Stops",
+        "values": [
+          {
+            "value": "idle (<root>/main · .)",
+            "text": "idle (<root>/main · .)"
+          },
+          {
+            "value": "other (<root>/main · .)",
+            "text": "other (<root>/main · .)"
+          },
+          {
+            "value": "the daemon",
+            "text": "the daemon"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": []
+}

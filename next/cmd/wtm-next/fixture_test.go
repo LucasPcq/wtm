@@ -12,6 +12,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/daemon"
 	"github.com/LucasPcq/wtm/next/internal/adapter/events"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
+	"github.com/LucasPcq/wtm/next/internal/command/daemonstop"
 	"github.com/LucasPcq/wtm/next/internal/command/rundown"
 	"github.com/LucasPcq/wtm/next/internal/command/runstart"
 	"github.com/LucasPcq/wtm/next/internal/command/runstop"
@@ -187,6 +188,29 @@ func mutations() []mutation {
 			},
 		},
 		{
+			name:     daemonstop.Name,
+			complete: true,
+			// a service up, under a daemon of the test's own at the socket the commands reach, in a home short enough for it
+			setup: func(t *testing.T, main string) {
+				writeRun(t, main, idleJob("idle"))
+				t.Setenv("HOME", shortDir(t))
+				serving(t, daemonParams{Socket: daemon.SocketPath()})
+				startIdle(t, main, "idle")
+			},
+			// another service up: the plan stops one more
+			stale: func(t *testing.T, main string) {
+				startIdle(t, main, "other")
+			},
+			untouched: func(t *testing.T, _ string) {
+				assert.True(t, slices.ContainsFunc(daemonJobs(t), func(job run.Job) bool { return job.Up }))
+			},
+			applied: func(t *testing.T, _ string) {
+				status, err := wtmDaemon().Status(t.Context())
+				require.NoError(t, err)
+				assert.False(t, status.Answering, "the daemon still answers")
+			},
+		},
+		{
 			name:     runstart.Name,
 			answers:  []domain.Answered{{Path: domain.PathWorktree, Values: []string{"main"}}, {Path: runstart.PathJob, Values: []string{"seed"}}},
 			complete: true,
@@ -338,7 +362,7 @@ func pushOnOrigin(t *testing.T, main, name string) {
 var reads = []string{"list", "resolve", "status", "tree", "run-logs", "run-ps", "run-list", "daemon-status"}
 
 // machine are the commands on wtm's daemon, the machine's one: they run on no repository, so wire.go builds none of them per repository and none refuses a directory with no wtm config.
-var machine = []string{"daemon-status"}
+var machine = []string{"daemon-status", "daemon-stop"}
 
 // streamsListed are the commands that stream rather than return: out of the catalogue's contract, each a stream of catalogue.go's streams.
 var streamsListed = []string{"events"}
