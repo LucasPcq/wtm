@@ -63,6 +63,15 @@ func (r Repo) CommonDir(ctx context.Context) (string, error) {
 	return strings.TrimSpace(string(out)), err
 }
 
+// Toplevel returns the root of the worktree holding r.Dir, its symbolic links resolved.
+func (r Repo) Toplevel(ctx context.Context) (string, error) {
+	out, err := r.git(ctx, "rev-parse", "--show-toplevel")
+	if err != nil {
+		return "", err
+	}
+	return RealPath(strings.TrimSpace(string(out)))
+}
+
 // Locate resolves path, relative to r.Dir unless absolute, to its real path
 // and reports whether something already exists there.
 func (r Repo) Locate(_ context.Context, path string) (worktree.Location, error) {

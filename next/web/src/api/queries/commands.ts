@@ -85,7 +85,14 @@ export const worktreeCount = ({ items }: Read<'list'> | Read<'tree'>) =>
 
 // a claim on a shared service is the worktree's hold on a job another runs: it counts where that job runs
 export const jobCounts = (jobs: ListJob[]) => {
-  const counts: Record<RunState, number> = { starting: 0, running: 0, crashed: 0, exited: 0, stopped: 0 }
+  const counts: Record<RunState, number> = {
+    starting: 0,
+    running: 0,
+    crashed: 0,
+    exited: 0,
+    stopped: 0,
+    not_started: 0,
+  }
   for (const { hold, state } of jobs) if (hold !== 'claim' && state) counts[state] += 1
   return counts
 }

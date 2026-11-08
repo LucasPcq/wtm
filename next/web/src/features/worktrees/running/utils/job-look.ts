@@ -9,6 +9,7 @@ export const jobLook: Record<RunState, { icon: LucideIcon; tone: Tone }> = {
   crashed: { icon: CircleX, tone: 'failed' },
   exited: { icon: CircleMinus, tone: 'muted' },
   stopped: { icon: CircleMinus, tone: 'muted' },
+  not_started: { icon: CircleMinus, tone: 'muted' },
 }
 
 // shortcut: a crash says its exit code, not when it crashed, which list does not publish; the jobs read (LUC-345)
