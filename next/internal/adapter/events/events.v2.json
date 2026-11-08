@@ -168,7 +168,7 @@
     "repo.added": { "description": "A repository joined those wtm knows.", "type": "object", "required": ["type"], "properties": { "type": { "const": "repo.added" } } },
     "repo.removed": { "description": "A repository left those wtm knows: it is gone, or no longer initialized.", "type": "object", "required": ["type"], "properties": { "type": { "const": "repo.removed" } } },
     "job_worktree": {
-      "description": "The worktree a job runs in, as its client named it to the run daemon, which reads no more of it.",
+      "description": "The worktree a job runs in, as its client named it to wtm's daemon, which reads no more of it.",
       "type": "object",
       "required": ["branch", "path"],
       "properties": { "branch": { "type": "string" }, "path": { "type": "string", "minLength": 1 } }
@@ -185,23 +185,23 @@
         "name": { "type": "string", "minLength": 1 },
         "kind": { "enum": ["service", "task"] },
         "url": { "type": "string", "minLength": 1, "description": "Where the job answers; absent when it publishes none." },
-        "hold": { "enum": ["own", "detached", "claim"], "description": "What of the job the run daemon holds: a process of its own (own), a stack its launcher left running (detached), a worktree's hold on a shared job another worktree runs (claim)." }
+        "hold": { "enum": ["own", "detached", "claim"], "description": "What of the job wtm's daemon holds: a process of its own (own), a stack its launcher left running (detached), a worktree's hold on a shared job another worktree runs (claim)." }
       }
     },
     "job.started": {
-      "description": "The run daemon started a job: a foreground service is up, a detached launcher left its stack running, a task began. Published by the daemon itself.",
+      "description": "wtm's daemon started a job: a foreground service is up, a detached launcher left its stack running, a task began. Published by the daemon itself.",
       "type": "object",
       "required": ["type", "worktree", "job"],
       "properties": { "type": { "const": "job.started" }, "worktree": { "$ref": "#/$defs/job_worktree" }, "job": { "$ref": "#/$defs/job" }, "held_by": { "$ref": "#/$defs/held_by" } }
     },
     "job.stopped": {
-      "description": "A job stopped because a client asked. Published by the run daemon itself.",
+      "description": "A job stopped because a client asked. Published by wtm's daemon itself.",
       "type": "object",
       "required": ["type", "worktree", "job"],
       "properties": { "type": { "const": "job.stopped" }, "worktree": { "$ref": "#/$defs/job_worktree" }, "job": { "$ref": "#/$defs/job" }, "held_by": { "$ref": "#/$defs/held_by" } }
     },
     "job.crashed": {
-      "description": "A service ended on its own, or a task failed. Published by the run daemon itself.",
+      "description": "A service ended on its own, or a task failed. Published by wtm's daemon itself.",
       "type": "object",
       "required": ["type", "worktree", "job"],
       "properties": {
@@ -214,7 +214,7 @@
       }
     },
     "job.exited": {
-      "description": "A task ran to its end, exit code 0. Published by the run daemon itself.",
+      "description": "A task ran to its end, exit code 0. Published by wtm's daemon itself.",
       "type": "object",
       "required": ["type", "worktree", "job"],
       "properties": {

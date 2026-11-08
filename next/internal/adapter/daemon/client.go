@@ -33,13 +33,13 @@ const (
 	logName       = "daemon.log"
 )
 
-// startWait is how long a daemon started has to answer, and a process on the socket that is no run daemon to go.
+// startWait is how long a daemon started has to answer, and a process on the socket that is not wtm's daemon to go.
 var startWait = 5 * time.Second
 
 // errNoDaemon is the error of a request no daemon answered.
-var errNoDaemon = errors.New("no run daemon answers")
+var errNoDaemon = errors.New("no daemon answers")
 
-// Daemon is the run daemon listening on SocketPath, as a client asks it:
+// Daemon is wtm's daemon listening on SocketPath, as a client asks it:
 // Version is this build's, which a daemon of another is told apart by, and
 // StartDaemon starts a daemon of this build when one is needed (nil starts
 // none). Its index of jobs, its lock and its log lie beside the socket.
@@ -100,7 +100,7 @@ func (d Daemon) Jobs(ctx context.Context) ([]run.Job, error) {
 	}
 	skew := run.SkewOf(listing.stamp(), d.Version)
 	if skew == run.SkewProtocol {
-		return nil, &run.Error{Code: run.CodeSkew, Message: fmt.Sprintf("the run daemon speaks protocol %d, this wtm %d", listing.Protocol, run.ProtocolVersion)}
+		return nil, &run.Error{Code: run.CodeSkew, Message: fmt.Sprintf("the daemon speaks protocol %d, this wtm %d", listing.Protocol, run.ProtocolVersion)}
 	}
 
 	jobs := make([]run.Job, 0, len(listing.Jobs))
@@ -136,6 +136,9 @@ func (d Daemon) recorded(jobs []run.Job) []run.Job {
 		if spec.Origin != nil && job.Repo == "" {
 			jobs[i].Repo = spec.Origin.Root
 		}
+		if spec.Origin != nil && job.Branch == "" {
+			jobs[i].Branch = spec.Origin.Branch
+		}
 		if job.Hold == run.HoldDetached && job.StopCommand == "" {
 			jobs[i].StopCommand = spec.Job.Stop
 		}
@@ -153,7 +156,7 @@ func (d Daemon) indexed() ([]run.Job, error) {
 		}
 		job := run.Job{Name: spec.Job.Name, WorkDir: spec.WorkDir, Up: true, Kind: spec.Job.Kind, Hold: hold, SharedDir: record.SharedDir, MainHolds: record.MainHolds}
 		if spec.Origin != nil {
-			job.Repo = spec.Origin.Root
+			job.Repo, job.Branch = spec.Origin.Root, spec.Origin.Branch
 		}
 		if hold == run.HoldDetached {
 			job.State, job.StartedAt, job.StopCommand = run.Running, record.StartedAt, spec.Job.Stop
@@ -313,7 +316,7 @@ func (d Daemon) Attach(ctx context.Context, req run.Window) (net.Conn, error) {
 	}
 	if err := json.NewEncoder(conn).Encode(request{Action: actionAttach, Name: req.Name, WorkDir: req.WorkDir, Cols: req.Cols, Rows: req.Rows}); err != nil {
 		_ = conn.Close()
-		return nil, fmt.Errorf("ask the run daemon: %w", err)
+		return nil, fmt.Errorf("ask wtm's daemon: %w", err)
 	}
 	// The answer is one line, the terminal's raw bytes after it: what the reader read past the line is the terminal's.
 	reader := bufio.NewReader(conn)
@@ -361,7 +364,7 @@ func (d Daemon) Resize(ctx context.Context, req run.Window) error {
 func (d Daemon) skewed(a answer) error {
 	switch skew := run.SkewOf(a.stamp(), d.Version); skew {
 	case run.SkewProtocol, run.SkewBuild:
-		return &run.Error{Code: run.CodeSkew, Message: fmt.Sprintf("the run daemon is wtm %s (protocol %d), this is wtm %s", cmp.Or(a.Version, "of an older build"), a.Protocol, d.Version)}
+		return &run.Error{Code: run.CodeSkew, Message: fmt.Sprintf("the daemon is wtm %s (protocol %d), this is wtm %s", cmp.Or(a.Version, "of an older build"), a.Protocol, d.Version)}
 	}
 	return nil
 }
@@ -374,7 +377,7 @@ func (d Daemon) skewed(a answer) error {
 // legacy wtm holding no job up is stopped and replaced; one holding jobs is
 // left alone, refused with [run.CodeSkew] or [run.CodeLegacy], since stopping
 // it would stop the services someone works in. A daemon is never signalled:
-// it is asked to stop, or named. A process on the socket that is no run daemon
+// it is asked to stop, or named. A process on the socket that is not wtm's daemon
 // (an older wtm-next's event bus, which stops once idle) is waited for a
 // moment, then refused with [run.CodeBusy].
 func (d Daemon) Ensure(ctx context.Context) error {
@@ -413,11 +416,11 @@ func (d Daemon) Ensure(ctx context.Context) error {
 	return d.launch(ctx)
 }
 
-// afterBus waits for a process on the socket that is no run daemon to stop,
+// afterBus waits for a process on the socket that is not wtm's daemon to stop,
 // then starts one.
 func (d Daemon) afterBus(ctx context.Context) error {
 	if err := d.poll(ctx, pollParams{Within: startWait, Done: d.unlocked}); err != nil {
-		return &run.Error{Code: run.CodeBusy, Message: "a process that is no run daemon holds its socket " + d.SocketPath + " (an older wtm-next's event bus): it stops once idle"}
+		return &run.Error{Code: run.CodeBusy, Message: "a process that is not wtm's daemon holds its socket " + d.SocketPath + " (an older wtm-next's event bus): it stops once idle"}
 	}
 
 	return d.launch(ctx)
@@ -438,7 +441,7 @@ func skewed(params skewedParams) error {
 		code, daemon = run.CodeLegacy, "the legacy wtm "+cmp.Or(params.Daemon, "of an older build")
 	}
 
-	return &run.Error{Code: code, Message: fmt.Sprintf("the run daemon is %s, this is wtm %s, and it runs %d job(s)", daemon, params.Client, params.Up)}
+	return &run.Error{Code: code, Message: fmt.Sprintf("the daemon is %s, this is wtm %s, and it runs %d job(s)", daemon, params.Client, params.Up)}
 }
 
 // Shutdown asks the daemon to stop and returns once it is gone: its foreground
@@ -457,7 +460,7 @@ func (d Daemon) Shutdown(ctx context.Context) error {
 	}
 
 	if err := d.poll(ctx, pollParams{Within: shutdownWait, Done: d.unlocked}); err != nil {
-		return &run.Error{Code: run.CodeStopTimeout, Message: fmt.Sprintf("the run daemon did not stop within %v", shutdownWait)}
+		return &run.Error{Code: run.CodeStopTimeout, Message: fmt.Sprintf("wtm's daemon did not stop within %v", shutdownWait)}
 	}
 
 	return nil
@@ -468,17 +471,17 @@ func (d Daemon) Shutdown(ctx context.Context) error {
 // answer in time is reported with the last line it wrote to its log.
 func (d Daemon) launch(ctx context.Context) error {
 	if limit := maxSocketPath(); len(d.SocketPath) > limit {
-		return &run.Error{Code: run.CodeSocketTooLong, Message: fmt.Sprintf("the run daemon's socket %s is %d bytes long, past the %d this system allows: move the user config directory to a shorter path", d.SocketPath, len(d.SocketPath), limit)}
+		return &run.Error{Code: run.CodeSocketTooLong, Message: fmt.Sprintf("wtm's daemon's socket %s is %d bytes long, past the %d this system allows: move the user config directory to a shorter path", d.SocketPath, len(d.SocketPath), limit)}
 	}
 	if d.StartDaemon == nil {
 		return errNoDaemon
 	}
 	if err := d.StartDaemon(); err != nil {
-		return &run.Error{Code: run.CodeStartFailed, Message: "start the run daemon: " + err.Error()}
+		return &run.Error{Code: run.CodeStartFailed, Message: "start wtm's daemon: " + err.Error()}
 	}
 
 	if err := d.poll(ctx, pollParams{Within: startWait, Done: func() bool { return d.answers(ctx) }}); err != nil {
-		message := fmt.Sprintf("the run daemon did not start within %v", startWait)
+		message := fmt.Sprintf("wtm's daemon did not start within %v", startWait)
 		if why := lastLine(LogPath(d.SocketPath)); why != "" {
 			message += ": " + why
 		}
@@ -586,13 +589,13 @@ func (d Daemon) exchange(ctx context.Context, params exchangeParams) (answer, er
 	defer context.AfterFunc(ctx, func() { _ = conn.Close() })()
 
 	if err := json.NewEncoder(conn).Encode(params.Request); err != nil {
-		return answer{}, fmt.Errorf("ask the run daemon: %w", err)
+		return answer{}, fmt.Errorf("ask wtm's daemon: %w", err)
 	}
 	decoder := json.NewDecoder(conn)
 	for {
 		var a answer
 		if err := decoder.Decode(&a); err != nil {
-			return answer{}, fmt.Errorf("read the run daemon's answer: %w", cmp.Or(ctx.Err(), err))
+			return answer{}, fmt.Errorf("read wtm's daemon's answer: %w", cmp.Or(ctx.Err(), err))
 		}
 		if a.Status != statusLine {
 			return a, nil

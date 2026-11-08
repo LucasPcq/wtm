@@ -1,4 +1,4 @@
-// Package process runs the processes of the run daemon's jobs: a service under a terminal of its own, anything else through a pipe, each in a process group of its own; it stops a group the way a terminal's hangup would, and probes and reaps the groups a daemon that died left behind.
+// Package process runs the processes of wtm's daemon's jobs: a service under a terminal of its own, anything else through a pipe, each in a process group of its own; it stops a group the way a terminal's hangup would, and probes and reaps the groups a daemon that died left behind.
 package process
 
 import (

@@ -20,7 +20,7 @@ type Meta interface {
 	repository.Meta
 }
 
-// Jobs lists the jobs the run daemon runs; it fails with run.ErrUnknown when it cannot tell which are up.
+// Jobs lists the jobs wtm's daemon runs; it fails with run.ErrUnknown when it cannot tell which are up.
 type Jobs func(ctx context.Context) ([]run.Job, error)
 
 // PullRequests returns the pull request of each of branches, its open one else its newest whatever its state, none from a fork, an empty branch (a worktree on none) having none; it fails with worktree.ErrPullRequestsUnavailable, wrapped with what to do about it, or the context's error, keeping what it found before failing.

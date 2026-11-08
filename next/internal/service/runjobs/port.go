@@ -21,7 +21,7 @@ type EnvFiles interface {
 	Read(path string) ([]dotenv.Line, error)
 }
 
-// Daemon is the run daemon as a start asks it: the jobs it runs (with a *run.Skewed beside them when it is of another build), one of this build made sure of, a job started, the jobs of a worktree stopped, and a job stopped before its restart.
+// Daemon is wtm's daemon as a start asks it: the jobs it runs (with a *run.Skewed beside them when it is of another build), one of this build made sure of, a job started, the jobs of a worktree stopped, and a job stopped before its restart.
 type Daemon interface {
 	Jobs(ctx context.Context) ([]run.Job, error)
 	Ensure(ctx context.Context) error
@@ -30,12 +30,12 @@ type Daemon interface {
 	Stop(ctx context.Context, req run.Stop, out func(run.Line)) (run.Outcome, error)
 }
 
-// Lister is the run daemon as a read asks it: the jobs it runs, with a *run.Skewed beside them when it is of another build, run.ErrUnknown when none answers and its index holds a process.
+// Lister is wtm's daemon as a read asks it: the jobs it runs, with a *run.Skewed beside them when it is of another build, run.ErrUnknown when none answers and its index holds a process.
 type Lister interface {
 	Jobs(ctx context.Context) ([]run.Job, error)
 }
 
-// Stopper is the run daemon as a stop asks it: a job stopped, a daemon woken for it when its index holds the worktree's jobs.
+// Stopper is wtm's daemon as a stop asks it: a job stopped, a daemon woken for it when its index holds the worktree's jobs.
 type Stopper interface {
 	Stop(ctx context.Context, req run.Stop, out func(run.Line)) (run.Outcome, error)
 }

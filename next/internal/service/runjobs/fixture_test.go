@@ -28,7 +28,7 @@ var repo = worktree.Repository{
 	}},
 }
 
-// A daemon is the run daemon a test scripts: the jobs it lists, whether none answers with processes in its index (unknown) even once made sure of (staysUnknown), and every call it got, in order.
+// A daemon is wtm's daemon a test scripts: the jobs it lists, whether none answers with processes in its index (unknown) even once made sure of (staysUnknown), and every call it got, in order.
 type daemon struct {
 	mu           sync.Mutex
 	listed       []run.Job

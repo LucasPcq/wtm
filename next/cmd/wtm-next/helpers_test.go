@@ -531,7 +531,7 @@ var enums = map[reflect.Type]struct {
 	reflect.TypeFor[checkout.Action]():           {"How a pull request's branch gets its worktree.", checkout.Actions()},
 	reflect.TypeFor[runjobs.Action]():            {"What a start does to one job of its profile.", runjobs.Actions()},
 	reflect.TypeFor[runjobs.JobStatus]():         {"What became of one job of a start.", runjobs.JobStatuses()},
-	reflect.TypeFor[runlogs.JobState]():          {"Where a job whose output is read stands: the run daemon's state, stopped for a job only its log knows, not_started for one that never ran.", runlogs.JobStates()},
+	reflect.TypeFor[runlogs.JobState]():          {"Where a job whose output is read stands: wtm's daemon's state, stopped for a job only its log knows, not_started for one that never ran.", runlogs.JobStates()},
 	reflect.TypeFor[runjobs.StopStatus]():        {"What became of one job of a stop.", runjobs.StopStatuses()},
 	reflect.TypeFor[run.Fate]():                  {"What a stop does to one job: stops it, releases a shared service others keep, or clears a crash.", run.Fates()},
 	reflect.TypeFor[list.Finished]():             {"How a worktree's pull request has done with it: merged, or closed unmerged.", list.Finisheds()},
@@ -550,7 +550,7 @@ var enums = map[reflect.Type]struct {
 	reflect.TypeFor[project.Isolation]():         {"How a worktree stands against its source.", project.Isolations()},
 	reflect.TypeFor[project.JobKind]():           {"Whether a job keeps running or runs to its end.", project.JobKinds()},
 	reflect.TypeFor[run.State]():                 {"A job's state.", run.States()},
-	reflect.TypeFor[run.Hold]():                  {"What of a job the run daemon holds: its own process, a stack its launcher left, a claim on a shared job another worktree runs.", run.Holds()},
+	reflect.TypeFor[run.Hold]():                  {"What of a job wtm's daemon holds: its own process, a stack its launcher left, a claim on a shared job another worktree runs.", run.Holds()},
 	reflect.TypeFor[worktree.PullRequestState](): {"Where a pull request stands.", worktree.PullRequestStates()},
 	reflect.TypeFor[worktree.Action]():           {"An action on a worktree, one entry of the menu every surface shows of it.", worktree.Actions()},
 	reflect.TypeFor[worktree.Unoffered]():        {"Why a worktree does not offer an action, as a code each surface words its own way.", worktree.Unoffereds()},
@@ -865,7 +865,7 @@ func stringsOf(values any) []string {
 	return found
 }
 
-// servingDaemon runs the daemon, the run daemon and the bus, on a new socket in a short directory until the test ends, and returns its socket.
+// servingDaemon runs the daemon, wtm's daemon and the bus, on a new socket in a short directory until the test ends, and returns its socket.
 func servingDaemon(t *testing.T) string {
 	t.Helper()
 	return serving(t, daemonParams{})
@@ -936,7 +936,7 @@ func writeRun(t *testing.T, main, content string) {
 	require.NoError(t, os.WriteFile(filepath.Join(main, ".git", "wtm", "run.toml"), []byte(content), 0o644))
 }
 
-// daemonJobs are the jobs the run daemon at the commands' socket lists.
+// daemonJobs are the jobs wtm's daemon at the commands' socket lists.
 func daemonJobs(t *testing.T) []run.Job {
 	t.Helper()
 	jobs, err := daemon.Daemon{SocketPath: daemon.SocketPath(), Version: version}.Jobs(t.Context())

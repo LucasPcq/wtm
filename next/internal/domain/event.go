@@ -33,7 +33,7 @@ const (
 	PhasePorts       Phase = "ports"        // its ports settled in its .env files
 	PhaseOnCreate    Phase = "on_create"    // the project's on_create hooks
 	PhaseMove        Phase = "move"         // extract moves its changes
-	PhaseStopJobs    Phase = "stop_jobs"    // the run daemon stops the jobs a worktree runs for itself, before it is removed
+	PhaseStopJobs    Phase = "stop_jobs"    // wtm's daemon stops the jobs a worktree runs for itself, before it is removed
 	PhaseOnClean     Phase = "on_clean"     // the project's on_clean hooks, before a worktree is removed
 	PhaseRemove      Phase = "remove"       // git removes the worktree, its branch and its meta record go
 	PhaseDropData    Phase = "drop_data"    // the namespaces a removed worktree made in shared services dropped
@@ -166,7 +166,7 @@ func (JobStopped) event()          {}
 func (JobCrashed) event()          {}
 func (JobExited) event()           {}
 
-// JobChange is what a job event says: the worktree the job runs in (its branch and path: the run daemon reads no more of it), the job, for one that ended its exit code and the last lines it printed, and, for a shared job, the worktrees holding it.
+// JobChange is what a job event says: the worktree the job runs in (its branch and path: wtm's daemon reads no more of it), the job, for one that ended its exit code and the last lines it printed, and, for a shared job, the worktrees holding it.
 type JobChange struct {
 	Worktree  JobWorktree   `json:"worktree"`
 	Job       EventJob      `json:"job"`
@@ -175,13 +175,13 @@ type JobChange struct {
 	HeldBy    []JobWorktree `json:"held_by,omitempty"`
 }
 
-// JobWorktree is the worktree a job event is about, as its client named it to the run daemon.
+// JobWorktree is the worktree a job event is about, as its client named it to wtm's daemon.
 type JobWorktree struct {
 	Branch string `json:"branch"`
 	Path   string `json:"path"`
 }
 
-// EventJob is the job a job event is about: its name, its kind, its URL, and what of it the run daemon holds.
+// EventJob is the job a job event is about: its name, its kind, its URL, and what of it wtm's daemon holds.
 type EventJob struct {
 	Name string          `json:"name"`
 	Kind project.JobKind `json:"kind"`
@@ -189,7 +189,7 @@ type EventJob struct {
 	Hold run.Hold        `json:"hold"`
 }
 
-// JobStarted reports that the run daemon started a job: a foreground service is up, a detached launcher left its stack running, a task began.
+// JobStarted reports that wtm's daemon started a job: a foreground service is up, a detached launcher left its stack running, a task began.
 type JobStarted struct{ JobChange }
 
 // JobStopped reports that a job stopped because a client asked.

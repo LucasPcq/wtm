@@ -211,7 +211,7 @@ func TestEachLineOfAJobsStreamMatchesTheSchema(t *testing.T) {
 		"absent":  runlogs.Absent{Worktree: "feat/a"},
 		"never":   runlogs.Absent{Worktree: "feat/a", Job: "never"},
 		"ended":   runlogs.Ended{Worktree: "feat/a", Job: "api", State: runlogs.JobCrashed, ExitCode: new(1)},
-		"warning": domain.Warning{Code: "run-logs.daemon_skew", Message: "of another build", Params: domain.Params{"skew": "build"}, FollowUp: &domain.FollowUp{Command: "run daemon restart", Code: "run-logs.restart_daemon", Message: "restart it"}},
+		"warning": domain.Warning{Code: "run-logs.daemon_skew", Message: "of another build", Params: domain.Params{"skew": "build"}, FollowUp: &domain.FollowUp{Command: "daemon restart", Code: "run-logs.restart_daemon", Message: "restart it"}},
 		"failure": &domain.Error{Kind: domain.KindInternal, Code: "run-logs.broken", Message: "the daemon went away"},
 	} {
 		t.Run(name, func(t *testing.T) {

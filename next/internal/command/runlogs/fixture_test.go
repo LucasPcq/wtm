@@ -103,7 +103,7 @@ func newWorld(t *testing.T) *world {
 		Meta:       store.Meta{StateDir: stateDir},
 		EnvFiles:   store.EnvFiles{},
 		StateDir:   stateDir,
-		Repository: repository.Service{Config: config.Project{StateDir: stateDir, GlobalPath: filepath.Join(root, "no-global.toml")}, Git: repo, MainPath: main, Restart: &domain.FollowUp{Command: "run daemon restart"}},
+		Repository: repository.Service{Config: config.Project{StateDir: stateDir, GlobalPath: filepath.Join(root, "no-global.toml")}, Git: repo, MainPath: main, Restart: &domain.FollowUp{Command: "daemon restart"}},
 	}
 	return w
 }
@@ -121,7 +121,7 @@ type script struct {
 	err    error
 }
 
-// A daemon is the run daemon a test scripts: the jobs it lists, whether it could not tell them or is of another build, and what each lines of a job answers, in turn (the last one again once they ran out); every tail it was asked.
+// A daemon is wtm's daemon a test scripts: the jobs it lists, whether it could not tell them or is of another build, and what each lines of a job answers, in turn (the last one again once they ran out); every tail it was asked.
 type daemon struct {
 	mu      sync.Mutex
 	listed  []run.Job

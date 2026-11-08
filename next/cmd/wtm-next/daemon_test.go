@@ -224,7 +224,7 @@ func TestARestartExitsWithItsFailuresCode(t *testing.T) {
 // run up sends a daemon of another protocol here: its jobs cannot be read, and it is replaced all the same once agreed.
 func TestARestartReplacesADaemonOfAnotherProtocol(t *testing.T) {
 	r := &restarting{}
-	protocol := &run.Error{Code: run.CodeSkew, Message: "the run daemon speaks protocol 3, this wtm 2"}
+	protocol := &run.Error{Code: run.CodeSkew, Message: "wtm's daemon speaks protocol 3, this wtm 2"}
 
 	err := restartDaemon(t.Context(), r.params(protocol, false, true))
 
@@ -244,4 +244,16 @@ func TestARestartUnderQuietSaysNothingOfWhatItDid(t *testing.T) {
 	assert.Empty(t, r.out.String())
 	assert.Empty(t, r.said.String(), "nothing is asked: nothing is said")
 	assert.Equal(t, 1, r.shutdowns)
+}
+
+// A daemon started while another held the socket once said "the request is invalid", the label of a usage error, exit 2.
+func TestADaemonStartingBesideAnotherSaysOneAlreadyRuns(t *testing.T) {
+	t.Setenv("HOME", shortDir(t))
+	serving(t, daemonParams{Socket: daemon.SocketPath()})
+	streams, _, _, stderr := output.Test()
+
+	code := cli.Execute(t.Context(), cli.NewRoot(version, streams, commands(streams, cli.Env{})), serveArgs)
+
+	assert.Equal(t, cli.ExitConflict, code)
+	assert.Contains(t, stderr.String(), "wtm's daemon already runs on "+daemon.SocketPath()+": this one stops")
 }

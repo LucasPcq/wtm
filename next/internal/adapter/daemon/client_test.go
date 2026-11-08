@@ -95,7 +95,7 @@ func TestADaemonRefusingTheListingFails(t *testing.T) {
 
 	_, err := daemon.Daemon{SocketPath: socket}.Jobs(t.Context())
 
-	require.EqualError(t, err, "run daemon: busy")
+	require.EqualError(t, err, "busy")
 }
 
 func TestWithNoDaemonTheStacksAndClaimsOfTheIndexAreUp(t *testing.T) {
@@ -157,7 +157,7 @@ func TestARestartsStartReachesTheDaemonAsOne(t *testing.T) {
 }
 
 func TestAStartThatMeetsADaemonStoppingIsMadeAgainOnce(t *testing.T) {
-	fake := &jobs{once: &run.Error{Code: run.CodeStopping, Message: "the run daemon is stopping"}}
+	fake := &jobs{once: &run.Error{Code: run.CodeStopping, Message: "wtm's daemon is stopping"}}
 	socket, _ := served(t, fake, "1.0")
 	spec := run.Spec{Job: project.Job{Name: "web"}, Profile: "dev", WorkDir: "/wt/a"}
 
@@ -198,7 +198,7 @@ func TestAStartTheDaemonRefusesFailsWithItsCodeAndExitCode(t *testing.T) {
 	require.ErrorAs(t, err, &failure)
 	assert.Equal(t, run.CodeTaskFailed, failure.Code)
 	assert.Equal(t, 3, *failure.ExitCode)
-	assert.Equal(t, "run daemon: task migrate exited with code 3", failure.Message)
+	assert.Equal(t, "task migrate exited with code 3", failure.Message)
 }
 
 func TestEnsureStartsADaemonWhenNoneAnswers(t *testing.T) {
@@ -244,8 +244,8 @@ func TestEnsureRefusesASkewedDaemonHoldingJobs(t *testing.T) {
 		code   string
 		says   string
 	}{
-		"build":  {answer: `{"status":"ok","protocol":2,"version":"0.9","jobs":[{"name":"web","work_dir":"/wt/a","state":"running","hold":"own"}]}`, code: run.CodeSkew, says: "the run daemon is wtm 0.9, this is wtm 1.0, and it runs 1 job(s)"},
-		"legacy": {answer: `{"status":"ok","version":"0.30.1","daemon_pid":12,"jobs":[{"name":"web","status":"running"},{"name":"db","status":"detached"},{"name":"api","status":"crashed"}]}`, code: run.CodeLegacy, says: "the run daemon is the legacy wtm 0.30.1, this is wtm 1.0, and it runs 2 job(s)"},
+		"build":  {answer: `{"status":"ok","protocol":2,"version":"0.9","jobs":[{"name":"web","work_dir":"/wt/a","state":"running","hold":"own"}]}`, code: run.CodeSkew, says: "the daemon is wtm 0.9, this is wtm 1.0, and it runs 1 job(s)"},
+		"legacy": {answer: `{"status":"ok","version":"0.30.1","daemon_pid":12,"jobs":[{"name":"web","status":"running"},{"name":"db","status":"detached"},{"name":"api","status":"crashed"}]}`, code: run.CodeLegacy, says: "the daemon is the legacy wtm 0.30.1, this is wtm 1.0, and it runs 2 job(s)"},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -300,7 +300,7 @@ func TestADaemonThatDoesNotStartSaysWhyFromItsLog(t *testing.T) {
 	var failure *run.Error
 	require.ErrorAs(t, err, &failure)
 	assert.Equal(t, run.CodeStartFailed, failure.Code)
-	assert.Equal(t, "the run daemon did not start within 100ms: Error: listen unix: bind: invalid argument", failure.Message)
+	assert.Equal(t, "wtm's daemon did not start within 100ms: Error: listen unix: bind: invalid argument", failure.Message)
 }
 
 func TestAStopWithNoDaemonStartsOneOnlyForAJobTheIndexHolds(t *testing.T) {

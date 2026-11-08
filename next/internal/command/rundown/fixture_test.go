@@ -70,7 +70,7 @@ type world struct {
 	usecase  rundown.UseCase
 }
 
-// newWorld is a repository with two worktrees and main, run.toml declaring runToml, and a run daemon running nothing yet.
+// newWorld is a repository with two worktrees and main, run.toml declaring runToml, and a daemon running nothing yet.
 func newWorld(t *testing.T) *world {
 	t.Helper()
 	root := gittest.TempDir(t)
@@ -91,7 +91,7 @@ func newWorld(t *testing.T) *world {
 	ids := 0
 	w.usecase = rundown.UseCase{
 		Stops:      runjobs.Stops{Daemon: w.daemon, Gone: repository.GoneIn(repo), Located: repository.LocatedIn(repo), Locate: repository.LocateIn(repo)},
-		Repository: repository.Service{Config: config.Project{StateDir: stateDir, GlobalPath: filepath.Join(root, "no-global.toml")}, Git: repo, MainPath: main, Restart: &domain.FollowUp{Command: "run daemon restart"}},
+		Repository: repository.Service{Config: config.Project{StateDir: stateDir, GlobalPath: filepath.Join(root, "no-global.toml")}, Git: repo, MainPath: main, Restart: &domain.FollowUp{Command: "daemon restart"}},
 		Operations: operation.Service{
 			Locker:    locks{oplock.Locks{StateDir: stateDir}},
 			Publisher: &operationtest.Recorder{},
@@ -117,7 +117,7 @@ func (l locks) Take(op domain.Operation) (operation.Hold, error) {
 	return l.Locks.Take(op)
 }
 
-// A daemon is the run daemon a test scripts: the jobs it lists, the stops it refuses, what it says of a stop, whether none answers with processes in its index (unknown) until it is made sure of, and every stop it got.
+// A daemon is wtm's daemon a test scripts: the jobs it lists, the stops it refuses, what it says of a stop, whether none answers with processes in its index (unknown) until it is made sure of, and every stop it got.
 type daemon struct {
 	mu        sync.Mutex
 	listed    []run.Job

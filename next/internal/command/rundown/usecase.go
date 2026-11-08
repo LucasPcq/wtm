@@ -1,4 +1,4 @@
-// Package rundown stops the jobs the run daemon runs in worktrees of a repository: which worktrees the request settles on, what the stop does to each job (stopped, a shared service released for the worktrees still holding it, a crash cleared), then each stop, the worktrees at once, and what became of each job.
+// Package rundown stops the jobs wtm's daemon runs in worktrees of a repository: which worktrees the request settles on, what the stop does to each job (stopped, a shared service released for the worktrees still holding it, a crash cleared), then each stop, the worktrees at once, and what became of each job.
 package rundown
 
 import (
@@ -22,7 +22,7 @@ const CodeConfigNotFound = Name + domain.ConfigNotFound
 // CodeConfigInvalid refuses a repository whose config.toml does not parse or validate.
 const CodeConfigInvalid = Name + domain.ConfigInvalid
 
-// A UseCase stops the jobs of worktrees of one repository: the ports it reaches the repository and the run daemon through, and the services it shares with the other commands.
+// A UseCase stops the jobs of worktrees of one repository: the ports it reaches the repository and wtm's daemon through, and the services it shares with the other commands.
 type UseCase struct {
 	Repository repository.Service
 	Operations operation.Service
@@ -87,7 +87,7 @@ func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (
 // ----------------------------------------------------------------------------
 // Plan
 
-// Plan decides what the request stops as the repository and the run daemon stand, changing nothing: the plan and its warnings, or the refusal that stops the request (a *domain.Error, field errors included).
+// Plan decides what the request stops as the repository and wtm's daemon stand, changing nothing: the plan and its warnings, or the refusal that stops the request (a *domain.Error, field errors included).
 func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning, error) {
 	facts, err := u.observe(ctx, req, u.Stops.Reach)
 	if err != nil {
@@ -135,10 +135,10 @@ func (u UseCase) Questions(ctx context.Context, req Request) (Questions, error) 
 // ----------------------------------------------------------------------------
 // Observe
 
-// CodeDaemonUnavailable refuses a stop whose jobs cannot be read: the run daemon answers in a protocol this wtm does not read, or one that died left processes in its index and no daemon could be started to take them over.
+// CodeDaemonUnavailable refuses a stop whose jobs cannot be read: wtm's daemon answers in a protocol this wtm does not read, or one that died left processes in its index and no daemon could be started to take them over.
 const CodeDaemonUnavailable = Name + runjobs.DaemonUnavailable
 
-// Observe reads what run down decides from: the project's config and its run.toml (one that does not load is no refusal: what runs stays stoppable), the repository's snapshot, which worktrees' directory is gone, where the caller stands, where each name asked as a path leads, and the jobs the run daemon runs, never starting it: with none answering and processes in its index, the jobs are Unknown. A repository with no wtm config is refused with CodeConfigNotFound.
+// Observe reads what run down decides from: the project's config and its run.toml (one that does not load is no refusal: what runs stays stoppable), the repository's snapshot, which worktrees' directory is gone, where the caller stands, where each name asked as a path leads, and the jobs wtm's daemon runs, never starting it: with none answering and processes in its index, the jobs are Unknown. A repository with no wtm config is refused with CodeConfigNotFound.
 func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	return u.observe(ctx, req, u.Stops.Observe)
 }

@@ -29,8 +29,8 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
-// daemonCommand is the command line that runs the daemon in a process of its own.
-const daemonCommand = "daemon"
+// serveArgs are the arguments that run the daemon in a process of its own.
+var serveArgs = []string{"daemon", "serve"}
 
 // flagProxyPort is the port the daemon's proxy serves named URLs on, 0 turning it off; the global config's when not given.
 const flagProxyPort = "proxy-port"
@@ -38,22 +38,39 @@ const flagProxyPort = "proxy-port"
 // daemonIdle is how long the daemon waits with no subscriber, no request and no process of a job before it stops.
 const daemonIdle = 30 * time.Second
 
-// errDaemonInTest refuses to start a daemon from a test: the executable is the test binary, which would run the whole suite again as "daemon".
+// errDaemonInTest refuses to start a daemon from a test: the executable is the test binary, which would run the whole suite again as the daemon.
 var errDaemonInTest = errors.New("no daemon is started from a test")
 
-// daemonCmd is the hidden command that runs the daemon of the machine: the run daemon, which holds the jobs of every worktree, and the event bus every wtm-next process publishes to, on one socket. A client that needs one starts it; it stops once idle, leaving detached stacks to the next.
-func daemonCmd() *cobra.Command {
+// daemonCmd is daemon, the commands on wtm's daemon itself, which runs the jobs of every repository of this machine, serves their named addresses and carries the event bus: its own subcommands, and the hidden serve that runs it.
+func daemonCmd(streams *output.Streams, commands ...*cobra.Command) *cobra.Command {
+	cmd := &cobra.Command{Use: "daemon", Short: "Inspect, stop or restart wtm's daemon, which runs the jobs of every repository", Args: cobra.NoArgs}
+	cmd.AddCommand(commands...)
+	cmd.AddCommand(daemonServeCmd(streams))
+	return cmd
+}
+
+// daemonServeCmd is the hidden command that runs wtm's daemon, which holds the jobs of every worktree and the event bus every wtm-next process publishes to, on one socket. A client that needs one starts it; it stops once idle, leaving detached stacks to the next. Another daemon holding its socket is a conflict, said in the daemon's log.
+func daemonServeCmd(streams *output.Streams) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:    daemonCommand,
-		Short:  "Run the daemon that holds the jobs and relays the event bus",
+		Use:    serveArgs[1],
+		Short:  "Run wtm's daemon",
 		Hidden: true,
 		Args:   cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			port, problem := proxyPort(cmd)
-			return serveDaemon(cmd.Context(), daemonParams{Socket: daemon.SocketPath(), ProxyPort: port, ProxyProblem: problem, Stderr: cmd.ErrOrStderr()})
+			socket := daemon.SocketPath()
+			err := serveDaemon(cmd.Context(), daemonParams{Socket: socket, ProxyPort: port, ProxyProblem: problem, Stderr: cmd.ErrOrStderr()})
+			if errors.Is(err, daemon.ErrRunning) {
+				err = &domain.Error{Kind: domain.KindConflict, Code: run.CodeRunning, Message: "wtm's daemon already runs on " + socket + ": this one stops"}
+			}
+			if failure := domain.AsError(domain.AsErrorParams{Err: err}); failure != nil {
+				failing := cli.Run{Command: "daemon serve", Streams: streams}
+				return failing.FailWith(failure, nil)
+			}
+			return nil
 		},
 	}
-	cmd.Flags().Int(flagProxyPort, 0, "Port the run proxy serves named job URLs on (0 turns it off); the global config's when not given")
+	cmd.Flags().Int(flagProxyPort, 0, "Port the proxy serves named job URLs on (0 turns it off); the global config's when not given")
 	return cmd
 }
 
@@ -78,7 +95,7 @@ type daemonParams struct {
 	Stderr       io.Writer
 }
 
-// serveDaemon runs the daemon until ctx is done or it idles out. Once it holds the lock, it empties its log, binds its proxy, then takes over the jobs its index names, so a stack taken over is served again, then serves the run daemon's requests and the bus's; it closes its proxy before it lets the lock go, so the next daemon binds the same port. A proxy that cannot bind is said on stderr, and every job answers on its port.
+// serveDaemon runs the daemon until ctx is done or it idles out. Once it holds the lock, it empties its log, binds its proxy, then takes over the jobs its index names, so a stack taken over is served again, then serves wtm's daemon's requests and the bus's; it closes its proxy before it lets the lock go, so the next daemon binds the same port. A proxy that cannot bind is said on stderr, and every job answers on its port.
 func serveDaemon(ctx context.Context, params daemonParams) error {
 	socket := params.Socket
 	relay := bus.NewRelay()
@@ -124,7 +141,7 @@ func serveDaemon(ctx context.Context, params daemonParams) error {
 	})
 }
 
-// spawn starts a job's process, as the run daemon's port takes it.
+// spawn starts a job's process, as wtm's daemon's port takes it.
 func spawn(command run.Command) (rundaemon.Process, error) {
 	child, err := process.Spawn(command)
 	if err != nil {
@@ -133,7 +150,7 @@ func spawn(command run.Command) (rundaemon.Process, error) {
 	return child, nil
 }
 
-// openLog opens a job's log, as the run daemon's port takes it.
+// openLog opens a job's log, as wtm's daemon's port takes it.
 func openLog(file run.LogFile) (rundaemon.Log, error) {
 	log, err := joblog.Open(file)
 	if err != nil {
@@ -148,7 +165,7 @@ func dirExists(path string) bool {
 	return err == nil && info.IsDir()
 }
 
-// runDaemon is the run daemon of this machine as a command asks it: on the bus's socket, started from this binary when one is needed.
+// runDaemon is wtm's daemon of this machine as a command asks it: on the bus's socket, started from this binary when one is needed.
 func runDaemon() daemon.Daemon {
 	return daemon.Daemon{SocketPath: daemon.SocketPath(), Version: version, StartDaemon: startDaemon}
 }
@@ -163,28 +180,18 @@ func startDaemon() error {
 		return err
 	}
 
-	return shell.Detached(shell.DetachedParams{Name: exe, Args: []string{daemonCommand}, Env: shell.Environ([]string{cli.CorrelationIDEnv}, nil), Log: daemon.LogPath(daemon.SocketPath())})
+	return shell.Detached(shell.DetachedParams{Name: exe, Args: serveArgs, Env: shell.Environ([]string{cli.CorrelationIDEnv}, nil), Log: daemon.LogPath(daemon.SocketPath())})
 }
 
-// commandRestartDaemon is the follow-up that restarts the run daemon, as a follow-up names it.
-const commandRestartDaemon = "run daemon restart"
+// commandRestartDaemon is the follow-up that restarts wtm's daemon, as a follow-up names it.
+const commandRestartDaemon = "daemon restart"
 
-// runDaemonCmd is run daemon, the commands on the run daemon itself: restart, which replaces a daemon of another build, or of the legacy wtm, by one of this build.
-func runDaemonCmd(streams *output.Streams) *cobra.Command {
-	cmd := &cobra.Command{Use: "daemon", Short: "Manage the run daemon", Args: cobra.NoArgs}
-	cmd.AddCommand(restartCmd(streams, func() restartParams {
-		runs := runDaemon()
-		return restartParams{Jobs: runs.Jobs, Shutdown: runs.Shutdown, Ensure: runs.Ensure}
-	}))
-	return cmd
-}
-
-// restartCmd is run daemon restart over the daemon daemon gives, asking on streams.
+// restartCmd is daemon restart over the daemon daemon gives, asking on streams.
 func restartCmd(streams *output.Streams, daemon func() restartParams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "restart",
-		Short: "Restart the run daemon, as this build",
-		Long:  "Replace a run daemon of another build, or of the legacy wtm, by one of this build; a daemon of this build is left alone. Every service the daemon runs itself stops with it, in every repository, a shared one included; its detached stacks (a service with a stop command, docker compose up -d) and the holds worktrees have on shared services are handed over to the new one through its index. It says which jobs stop and which are kept, then asks; --yes restarts without asking.",
+		Short: "Restart wtm's daemon, as this build",
+		Long:  "Replace a daemon of another build, or of the legacy wtm, by one of this build; a daemon of this build is left alone. Every service the daemon runs itself stops with it, in every repository, a shared one included; its detached stacks (a service with a stop command, docker compose up -d) and the holds worktrees have on shared services are handed over to the new one through its index. It says which jobs stop and which are kept, then asks; --yes restarts without asking.",
 		Args:  cobra.NoArgs,
 	}
 	yes := cmd.Flags().BoolP("yes", "y", false, "Restart without asking")
@@ -231,12 +238,12 @@ func restartDaemon(ctx context.Context, p restartParams) error {
 		if err := p.Ensure(ctx); err != nil {
 			return err
 		}
-		p.said("A run daemon of this build runs: the stacks and claims of its index are kept, the services a daemon that died left are stopped")
+		p.said("A daemon of this build runs: the stacks and claims of its index are kept, the services a daemon that died left are stopped")
 		return nil
 	case err != nil && !isSkewed && !protocol:
 		return err
 	case err == nil:
-		p.said("The run daemon is of this build, or none runs: nothing to restart")
+		p.said("wtm's daemon is of this build, or none runs: nothing to restart")
 		return nil
 	}
 
@@ -260,7 +267,7 @@ func restartDaemon(ctx context.Context, p restartParams) error {
 	if err := p.Ensure(ctx); err != nil {
 		return err
 	}
-	p.said("The run daemon restarted as wtm-next " + version)
+	p.said("The daemon restarted as wtm-next " + version)
 	return nil
 }
 
@@ -275,13 +282,13 @@ type foundParams struct {
 func (p restartParams) found(f foundParams) {
 	output.Frame(p.Err, func(w io.Writer) {
 		if f.Protocol {
-			output.Message(w, "The run daemon speaks another protocol: its jobs can't be read.")
+			output.Message(w, "wtm's daemon speaks another protocol: its jobs can't be read.")
 			output.Message(w, "Stops:  every service it runs itself")
 			output.Message(w, "Kept:   its stacks, in its index")
 			return
 		}
 		stops, kept := restartReach(f.Jobs)
-		output.Message(w, "The run daemon is "+daemonOf(f.Skewed)+".")
+		output.Message(w, "wtm's daemon is "+daemonOf(f.Skewed)+".")
 		output.Message(w, "Stops:  "+cmp.Or(strings.Join(stops, ", "), "nothing"))
 		output.Message(w, "Kept:   "+cmp.Or(strings.Join(kept, ", "), "nothing"))
 	})

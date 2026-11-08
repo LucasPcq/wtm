@@ -168,7 +168,7 @@ func (u UseCase) Questions(ctx context.Context, req Request) (Questions, error) 
 // Observe reads what prune decides from:
 //  1. the project's config and the repository's snapshot, and the meta record of each worktree;
 //  2. origin's branch of each worktree fetched again, the gone ones dropped, when gone branches are asked for and the fetch is not skipped;
-//  3. at once: the jobs of the run daemon, the pull request of each worktree's branch, and the branches whose upstream origin deleted;
+//  3. at once: the jobs of wtm's daemon, the pull request of each worktree's branch, and the branches whose upstream origin deleted;
 //  4. which branches stand behind their finished pull request's head;
 //  5. what makes each worktree done with unsafe to remove, those named going together when the request names some (its uncommitted changes, the commits no other branch holds but its merged pull request's head, its open pull request), the jobs it runs and the environment they got.
 //

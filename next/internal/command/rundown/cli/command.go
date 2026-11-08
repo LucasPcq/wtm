@@ -17,7 +17,7 @@ const Use = "run down"
 
 const (
 	downShort = "Stop a worktree's jobs"
-	downLong  = "Stop every job the run daemon runs in each worktree named, or in the one you stand in.\n" +
+	downLong  = "Stop every job wtm's daemon runs in each worktree named, or in the one you stand in.\n" +
 		"With --profile, only that profile's jobs stop; with --all, every worktree of this repository's,\n" +
 		"never another repository's. Several worktrees stop at once.\n" +
 		"\n" +

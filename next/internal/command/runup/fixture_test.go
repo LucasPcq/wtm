@@ -151,7 +151,7 @@ func newWorld(t *testing.T) *world {
 	}}
 	w.usecase = runup.UseCase{
 		Meta:       meta,
-		Repository: repository.Service{Config: config.Project{StateDir: stateDir, GlobalPath: filepath.Join(root, "no-global.toml")}, Git: repo, MainPath: main, Restart: &domain.FollowUp{Command: "run daemon restart"}},
+		Repository: repository.Service{Config: config.Project{StateDir: stateDir, GlobalPath: filepath.Join(root, "no-global.toml")}, Git: repo, MainPath: main, Restart: &domain.FollowUp{Command: "daemon restart"}},
 		Operations: operation.Service{
 			Locker:    locks{oplock.Locks{StateDir: stateDir}},
 			Publisher: &operationtest.Recorder{},
@@ -199,7 +199,7 @@ func (l locks) Take(op domain.Operation) (operation.Hold, error) {
 	return l.Locks.Take(op)
 }
 
-// A daemon is the run daemon a test scripts: the jobs it lists, those it refuses or reports crashed, the lines a start prints, whether it is of another build, and every start and stop it got.
+// A daemon is wtm's daemon a test scripts: the jobs it lists, those it refuses or reports crashed, the lines a start prints, whether it is of another build, and every start and stop it got.
 type daemon struct {
 	mu        sync.Mutex
 	listed    []run.Job

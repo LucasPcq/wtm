@@ -1,4 +1,4 @@
-// Package runstart starts one job of run.toml in a worktree of a repository, or starts it again: which worktree and which job the request settles on, what the other worktrees' jobs become, then the job through the run daemon (service/runjobs), stopped first for a restart, and what it became.
+// Package runstart starts one job of run.toml in a worktree of a repository, or starts it again: which worktree and which job the request settles on, what the other worktrees' jobs become, then the job through wtm's daemon (service/runjobs), stopped first for a restart, and what it became.
 package runstart
 
 import (
@@ -130,7 +130,7 @@ func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (
 // ----------------------------------------------------------------------------
 // Plan
 
-// Plan decides what the request starts as the repository and the run daemon stand, changing nothing: the plan and its warnings, or the refusal that stops the request (a *domain.Error, field errors included).
+// Plan decides what the request starts as the repository and wtm's daemon stand, changing nothing: the plan and its warnings, or the refusal that stops the request (a *domain.Error, field errors included).
 func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning, error) {
 	facts, err := u.Observe(ctx, req)
 	if err != nil {
@@ -153,7 +153,7 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 // ----------------------------------------------------------------------------
 // Apply
 
-// CodeDaemonUnavailable fails a start that could not begin: the run daemon of this build could not be made sure of.
+// CodeDaemonUnavailable fails a start that could not begin: wtm's daemon of this build could not be made sure of.
 const CodeDaemonUnavailable = Name + runjobs.DaemonUnavailable
 
 // CodeStopFailed warns of a worktree whose jobs an exclusive start could not stop.
@@ -173,7 +173,7 @@ const (
 	CodeNamespaceUnrecorded = Name + runjobs.NamespaceUnrecorded
 )
 
-// Apply makes sure of a run daemon of this build, stops the other worktrees' jobs when the plan says so, then starts the job (runjobs.Service.Start: a restart stops it first, within its phase, and its log continues behind the run mark). Then the drops owed the plan pays are made (teardown.Service.Pay). Once ctx is cancelled, what the daemon took keeps running.
+// Apply makes sure of a daemon of this build, stops the other worktrees' jobs when the plan says so, then starts the job (runjobs.Service.Start: a restart stops it first, within its phase, and its log continues behind the run mark). Then the drops owed the plan pays are made (teardown.Service.Pay). Once ctx is cancelled, what the daemon took keeps running.
 func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Result {
 	items := make([]Item, len(plan.Worktrees))
 	if failure := u.Jobs.Ensure(ctx, Name, u.Repository.Restart); failure != nil {
@@ -247,7 +247,7 @@ const (
 	CodeRunInvalid     = Name + runjobs.RunInvalid
 )
 
-// Observe reads what run start decides from: the project's config and its run.toml, the repository's snapshot, and what a start decides from besides (runjobs.Service.Observe), never starting the run daemon (B12). A repository with no wtm config is refused with CodeConfigNotFound, one with no run.toml with CodeNotInitialized.
+// Observe reads what run start decides from: the project's config and its run.toml, the repository's snapshot, and what a start decides from besides (runjobs.Service.Observe), never starting wtm's daemon (B12). A repository with no wtm config is refused with CodeConfigNotFound, one with no run.toml with CodeNotInitialized.
 func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	repo, err := u.Repository.Observe(ctx, Name)
 	if err != nil {

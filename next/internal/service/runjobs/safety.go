@@ -238,7 +238,7 @@ func (f Facts) conflicts(targets []Target, jobs []project.Job) []conflict {
 // ----------------------------------------------------------------------------
 // The refusals
 
-// The codes of the refusals of a start, after the command's name: a job that changes foreign data (Unsafe, a ForeignData problem per job, followed by Force, the request forced), a port another worktree holds (PortClash, followed by ExclusiveStart, the request stopping the others first), a job a runner of the same start starts too (RunnerConflict), a run daemon of another build holding jobs (domain.DaemonSkew, followed by RestartDaemon).
+// The codes of the refusals of a start, after the command's name: a job that changes foreign data (Unsafe, a ForeignData problem per job, followed by Force, the request forced), a port another worktree holds (PortClash, followed by ExclusiveStart, the request stopping the others first), a job a runner of the same start starts too (RunnerConflict), a daemon of another build holding jobs (domain.DaemonSkew, followed by RestartDaemon).
 const (
 	Unsafe         = ".unsafe"
 	ForeignData    = ".foreign_data"
@@ -249,7 +249,7 @@ const (
 	RestartDaemon  = ".restart_daemon"
 )
 
-// RefusalParams are what a start is checked against besides the facts: the command asking, whose codes the refusals give; the follow-up that restarts a run daemon of another build; the worktrees as planned and the jobs the start runs in each, in order; whether the other worktrees' jobs stop first and whether a job that changes foreign data starts all the same; the field a runner conflict is a problem of; the answers of the request stopping the others first, offered when that frees every port held (nil: offered by no refusal); and those of the request forced.
+// RefusalParams are what a start is checked against besides the facts: the command asking, whose codes the refusals give; the follow-up that restarts a daemon of another build; the worktrees as planned and the jobs the start runs in each, in order; whether the other worktrees' jobs stop first and whether a job that changes foreign data starts all the same; the field a runner conflict is a problem of; the answers of the request stopping the others first, offered when that frees every port held (nil: offered by no refusal); and those of the request forced.
 type RefusalParams struct {
 	Command   string
 	Restart   *domain.FollowUp
@@ -262,7 +262,7 @@ type RefusalParams struct {
 	Forced    []domain.Answered
 }
 
-// Refusal is the refusal that stops a start before anything starts, nil when none does: a run daemon of another build holding jobs, a job a runner of the start starts too, a port another worktree holds unless its jobs are stopped first, a job that changes data a worktree does not own unless forced.
+// Refusal is the refusal that stops a start before anything starts, nil when none does: a daemon of another build holding jobs, a job a runner of the start starts too, a port another worktree holds unless its jobs are stopped first, a job that changes data a worktree does not own unless forced.
 func (f Facts) Refusal(params RefusalParams) error {
 	if f.Skewed != nil && slices.ContainsFunc(f.Jobs, func(job run.Job) bool { return job.Up }) {
 		return domain.SkewRefusal(domain.SkewRefusalParams{Command: params.Command, Undone: "nothing started", Err: f.Skewed, Restart: params.Restart})

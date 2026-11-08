@@ -10,6 +10,6 @@
   z                        ! cycle
   feat/login               (branch deleted)
   └─ feat/x
-  ! the run daemon is not running: which jobs are up is unknown
+  ! wtm's daemon is not running: which jobs are up is unknown
   ! pull requests unavailable: run `gh auth login`
 

@@ -42,7 +42,7 @@ func TestADaemonOfAnotherBuildIsReadAndWarnedOfWithItsRestart(t *testing.T) {
 		Jobs: func(context.Context) ([]run.Job, error) {
 			return []run.Job{{Name: "web", Up: true, WorkDir: "/wt/a"}}, skewed
 		},
-		Restart: &domain.FollowUp{Command: "run daemon restart"},
+		Restart: &domain.FollowUp{Command: "daemon restart"},
 	}
 
 	got := repository.Ask(t.Context(), params, func() {})
@@ -51,9 +51,9 @@ func TestADaemonOfAnotherBuildIsReadAndWarnedOfWithItsRestart(t *testing.T) {
 	assert.Equal(t, []string{"web"}, got.Services("/wt/a"))
 	assert.Equal(t, []domain.Warning{{
 		Code:     "list.daemon_skew",
-		Message:  "the run daemon is the legacy wtm's: restart it to start jobs beside its own",
+		Message:  "the daemon is the legacy wtm's: restart it to start jobs beside its own",
 		Params:   domain.Params{"skew": "legacy", "daemon": ""},
-		FollowUp: &domain.FollowUp{Command: "run daemon restart", Code: "list.restart_daemon", Message: "restart it: its services stop, its stacks are kept"},
+		FollowUp: &domain.FollowUp{Command: "daemon restart", Code: "list.restart_daemon", Message: "restart it: its jobs come back on a daemon of this build"},
 	}}, got.Warnings("list"))
 }
 

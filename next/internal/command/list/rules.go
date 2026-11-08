@@ -15,7 +15,7 @@ import (
 // ----------------------------------------------------------------------------
 // Facts
 
-// Facts are what list reads: the repository, why fetching origin failed when it was asked to, the meta record of each live branch (and the error of a record that exists but does not read), the stack they make, when each branch last moved (and why it could not be read), what each worktree holds, what the run daemon and GitHub said, and the branches behind their merged pull request (repository.Behind).
+// Facts are what list reads: the repository, why fetching origin failed when it was asked to, the meta record of each live branch (and the error of a record that exists but does not read), the stack they make, when each branch last moved (and why it could not be read), what each worktree holds, what wtm's daemon and GitHub said, and the branches behind their merged pull request (repository.Behind).
 type Facts struct {
 	worktree.Repository
 	repository.Asked
@@ -69,7 +69,7 @@ type Detail struct {
 	Condition worktree.Condition `json:"condition"` // the one fact of it that most changes what to do first, as this read knows it
 	Services  []string           `json:"services"`  // the jobs up in it, null when that cannot be told
 	URLs      []string           `json:"urls"`      // the addresses of the jobs up in it, null when that cannot be told
-	Jobs      []Job              `json:"jobs"`      // every job the run daemon holds in it, by name, null when that cannot be told
+	Jobs      []Job              `json:"jobs"`      // every job wtm's daemon holds in it, by name, null when that cannot be told
 	Profile   string             `json:"profile"`   // the profile the jobs it runs for itself were started under, empty when they say none
 	// Actions are every action of it, each the follow-up that carries it out or why it is not offered.
 	Actions []repository.Offer   `json:"actions"`
@@ -78,7 +78,7 @@ type Detail struct {
 	base bool // it is on the base branch, which is never removed
 }
 
-// A Job is one job the run daemon holds in a worktree: what it is, its state, how the worktree holds it, the profile it was started under, its address, the code it crashed with and when it started.
+// A Job is one job wtm's daemon holds in a worktree: what it is, its state, how the worktree holds it, the profile it was started under, its address, the code it crashed with and when it started.
 type Job struct {
 	Name      string          `json:"name"`
 	Kind      project.JobKind `json:"kind"`

@@ -10,7 +10,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
-// AskParams are what a read asks besides git: the run daemon's jobs, and, WithPRs, the forge's pull request of each of Branches; Restart is the command that hands a skewed daemon's jobs over to this wtm's, offered when one answers.
+// AskParams are what a read asks besides git: wtm's daemon's jobs, and, WithPRs, the forge's pull request of each of Branches; Restart is the command that hands a skewed daemon's jobs over to this wtm's, offered when one answers.
 type AskParams struct {
 	Jobs         func(ctx context.Context) ([]run.Job, error)
 	Restart      *domain.FollowUp
@@ -40,7 +40,7 @@ func Ask(ctx context.Context, params AskParams, readWorktrees func()) Asked {
 	return asked
 }
 
-// Asked is what a read asks besides git while it reads the worktrees: the run daemon's jobs and the forge's pull requests, each with the error that kept it from being read, the daemon's skew when one of another build answered, and whether the read was interrupted; PullRequests is nil when the forge was not asked.
+// Asked is what a read asks besides git while it reads the worktrees: wtm's daemon's jobs and the forge's pull requests, each with the error that kept it from being read, the daemon's skew when one of another build answered, and whether the read was interrupted; PullRequests is nil when the forge was not asked.
 type Asked struct {
 	Jobs         []run.Job
 	JobsErr      error

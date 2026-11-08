@@ -14,7 +14,7 @@ type Git interface {
 	repository.Locator
 }
 
-// Daemon is the run daemon as run logs asks it, never starting it: the jobs it knows (with a *run.Skewed beside them when it is of another build), and a job's last lines, then, when the tail follows, each new one until it ends.
+// Daemon is wtm's daemon as run logs asks it, never starting it: the jobs it knows (with a *run.Skewed beside them when it is of another build), and a job's last lines, then, when the tail follows, each new one until it ends.
 type Daemon interface {
 	Jobs(ctx context.Context) ([]run.Job, error)
 	Lines(ctx context.Context, req run.Tail, out func(run.Line)) (run.Job, error)

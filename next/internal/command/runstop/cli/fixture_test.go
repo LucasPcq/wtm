@@ -97,7 +97,7 @@ func (w world) env() uicli.Env {
 func (w world) open(context.Context, string) (runstop.UseCase, error) {
 	return runstop.UseCase{
 		Stops:      runjobs.Stops{Daemon: w.daemon, Gone: repository.GoneIn(w.git), Located: repository.LocatedIn(w.git), Locate: repository.LocateIn(w.git)},
-		Repository: repository.Service{Config: w.config, Git: w.git, MainPath: mainPath, Init: &domain.FollowUp{Command: "init"}, Restart: &domain.FollowUp{Command: "run daemon restart"}},
+		Repository: repository.Service{Config: w.config, Git: w.git, MainPath: mainPath, Init: &domain.FollowUp{Command: "init"}, Restart: &domain.FollowUp{Command: "daemon restart"}},
 		Operations: operation.Service{
 			Locker:    w.locks,
 			Publisher: w.locks,

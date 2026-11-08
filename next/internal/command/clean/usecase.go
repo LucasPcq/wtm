@@ -156,7 +156,7 @@ func (u UseCase) Questions(ctx context.Context, req Request) (Questions, error) 
 // ----------------------------------------------------------------------------
 // Observe
 
-// Observe reads what clean decides from: the project's config, the repository's snapshot, the meta record of each worktree and of each branch asked no worktree holds, and, for each worktree req asks, what makes it unsafe to remove (its uncommitted changes, the commits no other branch holds but its merged pull request's head, its open pull request), the jobs it runs and the environment they got, the forge and the run daemon asked while git reads. A repository with no wtm config is refused with CodeConfigNotFound.
+// Observe reads what clean decides from: the project's config, the repository's snapshot, the meta record of each worktree and of each branch asked no worktree holds, and, for each worktree req asks, what makes it unsafe to remove (its uncommitted changes, the commits no other branch holds but its merged pull request's head, its open pull request), the jobs it runs and the environment they got, the forge and wtm's daemon asked while git reads. A repository with no wtm config is refused with CodeConfigNotFound.
 func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	repo, err := u.Repository.Observe(ctx, Name)
 	if err != nil {

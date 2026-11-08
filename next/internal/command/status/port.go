@@ -29,7 +29,7 @@ type EnvFiles interface {
 	Read(path string) ([]dotenv.Line, error)
 }
 
-// Jobs lists the jobs the run daemon knows, never starting it; it fails with run.ErrUnknown when it cannot tell which are up.
+// Jobs lists the jobs wtm's daemon knows, never starting it; it fails with run.ErrUnknown when it cannot tell which are up.
 type Jobs func(ctx context.Context) ([]run.Job, error)
 
 // ReadLog returns the last n lines of the log file names, oldest first, none when it does not exist.

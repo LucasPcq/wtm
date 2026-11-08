@@ -28,7 +28,7 @@ type EnvFiles interface {
 	Read(path string) ([]dotenv.Line, error)
 }
 
-// Daemon is the run daemon as a removal asks it: the jobs it runs (with a *run.Skewed beside them when it is of another build), a shared service started to take back the data a removal owes it, a job stopped, and every job of a worktree stopped, its claims let go of.
+// Daemon is wtm's daemon as a removal asks it: the jobs it runs (with a *run.Skewed beside them when it is of another build), a shared service started to take back the data a removal owes it, a job stopped, and every job of a worktree stopped, its claims let go of.
 type Daemon interface {
 	Jobs(ctx context.Context) ([]run.Job, error)
 	Start(ctx context.Context, spec run.Spec, out func(run.Line)) (run.Job, error)

@@ -390,7 +390,7 @@ func idleJob(name string) string {
 	return "[[job]]\nname = \"" + name + "\"\nkind = \"service\"\ncmd = \"sleep 30\"\n"
 }
 
-// startIdle starts the service of name in main through the run daemon the commands reach: a process of the test's own daemon, which a stop stops.
+// startIdle starts the service of name in main through wtm's daemon the commands reach: a process of the test's own daemon, which a stop stops.
 func startIdle(t *testing.T, main, name string) {
 	t.Helper()
 	_, err := daemon.Daemon{SocketPath: daemon.SocketPath(), Version: version}.Start(t.Context(), run.Spec{Job: project.Job{Name: name, Kind: project.Service, Cmd: "sleep 30"}, WorkDir: main}, nil)
@@ -400,7 +400,7 @@ func startIdle(t *testing.T, main, name string) {
 // seedJob is a run.toml of one task, which run up runs to its end.
 const seedJob = "[[job]]\nname = \"seed\"\nkind = \"task\"\ncmd = \"true\"\n"
 
-// restarting is a run daemon a restart is tried on: the jobs it lists, what the user answers, what the restart says, and how often it was stopped.
+// restarting is a daemon a restart is tried on: the jobs it lists, what the user answers, what the restart says, and how often it was stopped.
 type restarting struct {
 	jobs      []run.Job
 	in        string

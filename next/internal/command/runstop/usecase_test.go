@@ -168,7 +168,7 @@ func TestTheQuestionsLeaveTheDaemonAloneThePlanStartsOneToReachItsIndex(t *testi
 
 func TestADaemonTheClientCannotGoOnWithIsRefusedFollowedByItsRestart(t *testing.T) {
 	w := newWorld(t)
-	w.daemon.jobsErr = &run.Error{Code: run.CodeSkew, Message: "the run daemon speaks protocol 1, this wtm 2"}
+	w.daemon.jobsErr = &run.Error{Code: run.CodeSkew, Message: "wtm's daemon speaks protocol 1, this wtm 2"}
 
 	refused := w.refused(t, w.stopping("api", featA))
 

@@ -192,7 +192,7 @@ func TestAStopCommandAShutdownCutsShortSaysSo(t *testing.T) {
 
 	var failure *run.Error
 	require.ErrorAs(t, <-stopped, &failure)
-	assert.Equal(t, "the stop command of db was stopped as the run daemon stopped", failure.Message)
+	assert.Equal(t, "the stop command of db was stopped as wtm's daemon stopped", failure.Message)
 }
 
 func TestTheProxysPublicPortIs80OnceTheRedirectionReachesIt(t *testing.T) {

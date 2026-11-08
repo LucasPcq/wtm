@@ -222,7 +222,7 @@ func openingWith(r repo, git events.Git) events.Open {
 	}
 }
 
-// A machine is the jobs the run daemon runs, which a test changes, or err when it cannot tell.
+// A machine is the jobs wtm's daemon runs, which a test changes, or err when it cannot tell.
 type machine struct {
 	mu   sync.Mutex
 	jobs []run.Job

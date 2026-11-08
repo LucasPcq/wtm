@@ -19,7 +19,7 @@ const writeTimeout = time.Second
 // errClientGone is the error of a write to a client already let go.
 var errClientGone = errors.New("the client stopped reading")
 
-// Jobs is what the server asks of the run daemon it serves.
+// Jobs is what the server asks of wtm's daemon it serves.
 type Jobs interface {
 	List(workDir string) []run.Job
 	Proxy() run.Proxy
@@ -31,7 +31,7 @@ type Jobs interface {
 	Resize(req run.Window) error
 }
 
-// A Server answers the requests of the run daemon's protocol for its Jobs,
+// A Server answers the requests of wtm's daemon's protocol for its Jobs,
 // stamping every answer with its build's Version; a shutdown is answered, then
 // handed to Stop.
 type Server struct {

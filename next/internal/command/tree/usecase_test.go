@@ -331,7 +331,7 @@ func TestWhatCannotBeAskedIsAWarningNotAFailure(t *testing.T) {
 		message string
 	}{
 		"prs_unavailable": {seed: seed{PRsErr: fmt.Errorf("%w: run `gh auth login`", worktree.ErrPullRequestsUnavailable)}, code: tree.CodePRsUnavailable, message: "pull requests unavailable: run `gh auth login`"},
-		"daemon_unknown":  {seed: seed{JobsErr: run.ErrUnknown}, code: tree.CodeJobsUnknown, message: "the run daemon is not running: which jobs are up is unknown"},
+		"daemon_unknown":  {seed: seed{JobsErr: run.ErrUnknown}, code: tree.CodeJobsUnknown, message: "wtm's daemon is not running: which jobs are up is unknown"},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {

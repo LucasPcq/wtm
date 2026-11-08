@@ -1,4 +1,4 @@
-// Package runup starts a profile of run.toml in worktrees of a repository, several at once: which worktrees and which profile the request settles on, what the other worktrees' jobs become, then each job in order through the run daemon (service/runjobs), and what each became.
+// Package runup starts a profile of run.toml in worktrees of a repository, several at once: which worktrees and which profile the request settles on, what the other worktrees' jobs become, then each job in order through wtm's daemon (service/runjobs), and what each became.
 package runup
 
 import (
@@ -130,7 +130,7 @@ func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (
 // ----------------------------------------------------------------------------
 // Plan
 
-// Plan decides what the request starts as the repository and the run daemon stand, changing nothing: the plan and its warnings, or the refusal that stops the request (a *domain.Error, field errors included).
+// Plan decides what the request starts as the repository and wtm's daemon stand, changing nothing: the plan and its warnings, or the refusal that stops the request (a *domain.Error, field errors included).
 func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning, error) {
 	facts, err := u.Observe(ctx, req)
 	if err != nil {
@@ -153,7 +153,7 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 // ----------------------------------------------------------------------------
 // Apply
 
-// CodeDaemonUnavailable fails a start that could not begin: the run daemon of this build could not be made sure of.
+// CodeDaemonUnavailable fails a start that could not begin: wtm's daemon of this build could not be made sure of.
 const CodeDaemonUnavailable = Name + runjobs.DaemonUnavailable
 
 // The codes of the drops removed worktrees owed, paid by a start: one withdrawn (a worktree reaches its namespace again), one that failed, one the queue could not give up or take back.
@@ -181,7 +181,7 @@ const (
 	CodeNamespaceUnrecorded = Name + runjobs.NamespaceUnrecorded
 )
 
-// Apply makes sure of a run daemon of this build, stops the other worktrees' jobs when the plan says so, then starts each worktree's jobs (runjobs.Service.Start), the worktrees at once, each one's in order; a worktree that fails stops none of the others. Then the drops owed the plan pays are made (teardown.Service.Pay). Once ctx is cancelled, the jobs the daemon took keep running and the jobs not reached are not started. The items keep the plan's order.
+// Apply makes sure of a daemon of this build, stops the other worktrees' jobs when the plan says so, then starts each worktree's jobs (runjobs.Service.Start), the worktrees at once, each one's in order; a worktree that fails stops none of the others. Then the drops owed the plan pays are made (teardown.Service.Pay). Once ctx is cancelled, the jobs the daemon took keep running and the jobs not reached are not started. The items keep the plan's order.
 func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Result {
 	// The worktrees report from several goroutines; a surface draws one event at a time.
 	var mu sync.Mutex
@@ -269,7 +269,7 @@ const (
 	CodeRunInvalid     = Name + runjobs.RunInvalid
 )
 
-// Observe reads what run up decides from: the project's config and its run.toml, the repository's snapshot, and what a start decides from besides (runjobs.Service.Observe), never starting the run daemon. A repository with no wtm config is refused with CodeConfigNotFound, one with no run.toml with CodeNotInitialized.
+// Observe reads what run up decides from: the project's config and its run.toml, the repository's snapshot, and what a start decides from besides (runjobs.Service.Observe), never starting wtm's daemon. A repository with no wtm config is refused with CodeConfigNotFound, one with no run.toml with CodeNotInitialized.
 func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	repo, err := u.Repository.Observe(ctx, Name)
 	if err != nil {

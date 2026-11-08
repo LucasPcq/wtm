@@ -51,7 +51,7 @@ type Item = domain.Unit[Detail]
 // ----------------------------------------------------------------------------
 // Run
 
-// Run reads the worktree req names, or the one it stands in, or every worktree with All; a read, it takes no lock, runs no operation and never starts the run daemon. An error returned is a refusal of the request or of the repository; a worktree that cannot be read is a failed item, the others still read.
+// Run reads the worktree req names, or the one it stands in, or every worktree with All; a read, it takes no lock, runs no operation and never starts wtm's daemon. An error returned is a refusal of the request or of the repository; a worktree that cannot be read is a failed item, the others still read.
 func (u UseCase) Run(ctx context.Context, req Request, _ domain.RunOptions) (Outcome, error) {
 	// 1. Read the repository, settle the worktrees the request reads, then read each of them.
 	facts, err := u.Observe(ctx, req)

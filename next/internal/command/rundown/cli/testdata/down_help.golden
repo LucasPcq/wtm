@@ -1,5 +1,5 @@
 
-  Stop every job the run daemon runs in each worktree named, or in the one you stand in.
+  Stop every job wtm's daemon runs in each worktree named, or in the one you stand in.
   With --profile, only that profile's jobs stop; with --all, every worktree of this repository's,
   never another repository's. Several worktrees stop at once.
 

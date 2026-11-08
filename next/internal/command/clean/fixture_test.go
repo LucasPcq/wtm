@@ -52,7 +52,7 @@ remove = "echo $WTM_NAMESPACE:$DB_PORT >> dropped.txt"
 
 var createdAt = time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)
 
-// seed is what a world holds beyond its worktrees: its config.toml, the jobs the run daemon runs, the pull requests the forge knows and why it cannot be asked.
+// seed is what a world holds beyond its worktrees: its config.toml, the jobs wtm's daemon runs, the pull requests the forge knows and why it cannot be asked.
 type seed struct {
 	Config string
 	Jobs   []run.Job
@@ -216,7 +216,7 @@ func (broken) Unpushed(context.Context, worktree.Losing) (int, error) {
 // newerRecord is a record a newer wtm wrote, at a schema this one does not know.
 const newerRecord = `{"schema": 99, "source_branch": "main"}`
 
-// A daemon is the run daemon a test scripts: the jobs it lists, those a stop leaves up, why it cannot list, and every start and stop it got.
+// A daemon is wtm's daemon a test scripts: the jobs it lists, those a stop leaves up, why it cannot list, and every start and stop it got.
 type daemon struct {
 	listed  []run.Job
 	stuck   []string

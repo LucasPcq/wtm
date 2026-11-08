@@ -8,7 +8,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
 )
 
-// Jobs lists the jobs the run daemon knows, never starting it; it fails with run.ErrUnknown when it cannot tell which are up.
+// Jobs lists the jobs wtm's daemon knows, never starting it; it fails with run.ErrUnknown when it cannot tell which are up.
 type Jobs func(ctx context.Context) ([]run.Job, error)
 
 // Bus is the event bus. Subscribe starts its daemon when none answers, then

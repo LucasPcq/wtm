@@ -47,7 +47,7 @@ func TestEachJobReadsItsOwnPortsOffsetForItsWorktree(t *testing.T) {
 func TestATaskThatFailsStopsItsWorktreeAloneAndIsOfferedAgainWithItsProfile(t *testing.T) {
 	w := newWorld(t)
 	exit := 3
-	w.daemon.refuse = map[string]error{key(w.at(featA), "migrate"): &run.Error{Code: run.CodeTaskFailed, Message: "run daemon: task migrate exited with code 3", ExitCode: &exit}}
+	w.daemon.refuse = map[string]error{key(w.at(featA), "migrate"): &run.Error{Code: run.CodeTaskFailed, Message: "daemon: task migrate exited with code 3", ExitCode: &exit}}
 	w.daemon.lines = map[string][]string{key(w.at(featA), "migrate"): {"migrating", "no such table"}}
 
 	result, _ := w.apply(t, starting("full", featA, featB))
@@ -154,7 +154,7 @@ func TestADaemonOfAnotherBuildHoldingJobsRefusesTheStartWithItsRestart(t *testin
 	assert.Equal(t, runup.CodeDaemonSkew, refused.Code)
 	assert.Equal(t, domain.KindPrecondition, refused.Kind)
 	require.NotNil(t, refused.FollowUp)
-	assert.Equal(t, "run daemon restart", refused.FollowUp.Command)
+	assert.Equal(t, "daemon restart", refused.FollowUp.Command)
 }
 
 func TestExclusiveStopsTheOtherWorktreesJobsFirst(t *testing.T) {
@@ -275,14 +275,14 @@ func TestARepositoryWithNoRunTomlIsRefusedFollowedByRunInit(t *testing.T) {
 
 func TestADaemonThatCannotBeMadeSureOfFailsEveryWorktree(t *testing.T) {
 	w := newWorld(t)
-	w.daemon.ensureErr = &run.Error{Code: run.CodeLegacy, Message: "the run daemon is the legacy wtm, and it runs 2 job(s)"}
+	w.daemon.ensureErr = &run.Error{Code: run.CodeLegacy, Message: "wtm's daemon is the legacy wtm, and it runs 2 job(s)"}
 
 	result, _ := w.apply(t, starting("", featA, featB))
 
 	for _, item := range result.Items {
 		assert.Equal(t, domain.StatusFailed, item.Status)
 		assert.Equal(t, runup.CodeDaemonSkew, item.Err.Code)
-		assert.Equal(t, "run daemon restart", item.Err.FollowUp.Command)
+		assert.Equal(t, "daemon restart", item.Err.FollowUp.Command)
 		assert.Equal(t, map[string]runup.JobStatus{"api": runup.JobNotStarted, "web": runup.JobNotStarted}, statusesOf(item), "every job of the plan is listed, none started")
 	}
 	assert.Empty(t, w.daemon.started)

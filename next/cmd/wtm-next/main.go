@@ -67,13 +67,16 @@ func commands(streams *output.Streams, env cli.Env) []*cobra.Command {
 		statuscli.New(streams, env, openStatus, commandLine),
 		treecli.New(streams, env, openTree, commandLine),
 		eventscli.New(streams, env, systemStream(), commandLine),
-		runCmd(runupcli.New(streams, env, openRunUp, commandLine, liveView()), runlogscli.New(streams, env, openRunLogs, commandLine, runlogscli.View{Daemon: runDaemon(), Open: openURL}), rundowncli.New(streams, env, openRunDown, commandLine), runstartcli.New(streams, env, openRunStart, commandLine, liveView()), runstopcli.New(streams, env, openRunStop, commandLine), runpscli.New(streams, env, openRunPs, commandLine), runlistcli.New(streams, env, openRunList, commandLine), runDaemonCmd(streams)),
+		runCmd(runupcli.New(streams, env, openRunUp, commandLine, liveView()), runlogscli.New(streams, env, openRunLogs, commandLine, runlogscli.View{Daemon: runDaemon(), Open: openURL}), rundowncli.New(streams, env, openRunDown, commandLine), runstartcli.New(streams, env, openRunStart, commandLine, liveView()), runstopcli.New(streams, env, openRunStop, commandLine), runpscli.New(streams, env, openRunPs, commandLine), runlistcli.New(streams, env, openRunList, commandLine)),
+		daemonCmd(streams, restartCmd(streams, func() restartParams {
+			runs := runDaemon()
+			return restartParams{Jobs: runs.Jobs, Shutdown: runs.Shutdown, Ensure: runs.Ensure}
+		})),
 		uiCmd(env),
-		daemonCmd(),
 	}
 }
 
-// liveView is where run up and run start show the jobs they started: the run daemon of this machine, never started for it, and the browser.
+// liveView is where run up and run start show the jobs they started: wtm's daemon of this machine, never started for it, and the browser.
 func liveView() runview.View {
 	return runview.View{Daemon: runDaemon(), Open: openURL, Stop: stopJob, Restart: restartJob, Again: startAgain, Show: showJob}
 }

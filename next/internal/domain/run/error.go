@@ -1,6 +1,6 @@
 package run
 
-// The codes of what a run daemon refuses or fails, each on its [Error].
+// The codes of what a daemon refuses or fails, each on its [Error].
 const (
 	CodeInvalidRequest = "daemon.invalid_request"  // a request it cannot read
 	CodeUnknownAction  = "daemon.unknown_action"   // an action it does not know
@@ -15,15 +15,16 @@ const (
 	CodeJobNotFound    = "daemon.job_not_found"    // lines, an attach or a resize of a job the daemon does not hold
 	CodeNoTerminal     = "daemon.no_terminal"      // a resize of a job that runs under no terminal
 	CodeFollowerBehind = "daemon.follower_behind"  // a follower of a job's lines that fell behind and was let go: it follows again
-	CodeSkew           = "daemon.skew"             // a daemon of another build or protocol holding jobs: run daemon restart hands them over
-	CodeLegacy         = "daemon.legacy"           // the legacy wtm's daemon holding jobs: run daemon restart hands them over
-	CodeBusy           = "daemon.busy"             // a process holding the socket that is no run daemon
+	CodeSkew           = "daemon.skew"             // a daemon of another build or protocol holding jobs: daemon restart hands them over
+	CodeLegacy         = "daemon.legacy"           // the legacy wtm's daemon holding jobs: daemon restart hands them over
+	CodeBusy           = "daemon.busy"             // a process holding the socket that is not wtm's daemon
 	CodeSocketTooLong  = "daemon.socket_path_too_long"
 	CodeStartFailed    = "daemon.start_failed" // a daemon that did not start
 	CodeStopTimeout    = "daemon.stop_timeout" // a daemon asked to stop that did not
+	CodeRunning        = "daemon.running"      // a daemon starting while another holds its socket
 )
 
-// An Error is what a run daemon refused or failed: its Code, its Message, and
+// An Error is what a daemon refused or failed: its Code, its Message, and
 // the ExitCode of the job it ran, if one ran.
 type Error struct {
 	Code     string

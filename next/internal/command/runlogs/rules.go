@@ -18,7 +18,7 @@ import (
 // ----------------------------------------------------------------------------
 // Facts
 
-// Facts are what run logs reads from, as Observe read them: the project's config, its run.toml, the repository's snapshot, the worktrees whose directory is gone, where the caller stands, the jobs the run daemon knows (with why it could not tell, or that one of another build answered), and wtm's state of the repository, the jobs' logs under it.
+// Facts are what run logs reads from, as Observe read them: the project's config, its run.toml, the repository's snapshot, the worktrees whose directory is gone, where the caller stands, the jobs wtm's daemon knows (with why it could not tell, or that one of another build answered), and wtm's state of the repository, the jobs' logs under it.
 type Facts struct {
 	worktree.Repository
 	repository.Asked

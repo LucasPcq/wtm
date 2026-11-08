@@ -89,7 +89,7 @@ func (p Publisher) Publish(event domain.Event) {
 // another surface knows which worktree an operation works on; phases and
 // their output stay in the process, a snapshot, ready and a worktree the
 // stream polled changed are the stream's own lines, and a job event is the
-// run daemon's, which it relays itself: none of these is published.
+// daemon's, which it relays itself: none of these is published.
 func published(event domain.Event) bool {
 	switch event.(type) {
 	case domain.WorktreeCreated, domain.WorktreeUpdated, domain.WorktreeProvisioned, domain.WorktreeRemoved, domain.OperationStarted, domain.UnitStarted, domain.UnitFinished, domain.OperationFinished, domain.RepoAdded, domain.RepoRemoved:

@@ -299,7 +299,7 @@ func TestAStartThatCannotReachTheDaemonListsTheDropsOwedUnpaid(t *testing.T) {
 func TestARestartWhoseStopAnswerWasLostIsAFailureNotRunningOn(t *testing.T) {
 	w := newWorld(t)
 	w.up("api", featA, nil)
-	w.daemon.stopErr, w.daemon.stopLost = errors.New("run daemon: connection reset"), true
+	w.daemon.stopErr, w.daemon.stopLost = errors.New("daemon: connection reset"), true
 	req := starting("api", featA)
 	req.Restart = true
 

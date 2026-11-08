@@ -1,4 +1,4 @@
-// Package daemon is the run daemon's protocol and files: the server that answers each request on its socket, the client every command asks it through, and its index of the jobs up, jobs.json, shared with the legacy wtm.
+// Package daemon is wtm's daemon's protocol and files: the server that answers each request on its socket, the client every command asks it through, and its index of the jobs up, jobs.json, shared with the legacy wtm.
 package daemon
 
 import (
@@ -78,7 +78,7 @@ func (a answer) failure() error {
 		return nil
 	}
 
-	return &run.Error{Code: cmp.Or(a.Code, run.CodeInvalidRequest), Message: "run daemon: " + a.Message, ExitCode: a.ExitCode}
+	return &run.Error{Code: cmp.Or(a.Code, run.CodeInvalidRequest), Message: a.Message, ExitCode: a.ExitCode}
 }
 
 // job is a job as the daemon reports it. Status is the legacy daemon's word
@@ -92,6 +92,7 @@ type job struct {
 	SharedDir string         `json:"shared_dir,omitempty"`
 	MainHolds bool           `json:"main_holds,omitempty"`
 	Repo      string         `json:"repo,omitempty"`
+	Branch    string         `json:"branch,omitempty"`
 	Stop      string         `json:"stop_command,omitempty"`
 	State     string         `json:"state,omitempty"`
 	Hold      string         `json:"hold,omitempty"`
@@ -137,7 +138,7 @@ func (s *stamp) UnmarshalJSON(data []byte) error {
 }
 
 func jobOf(j run.Job) job {
-	wire := job{Name: j.Name, Kind: string(j.Kind), WorkDir: j.WorkDir, Profile: j.Profile, SharedDir: j.SharedDir, MainHolds: j.MainHolds, Repo: j.Repo, Stop: j.StopCommand, State: string(j.State), Hold: string(j.Hold), Reaped: j.Reaped, PID: j.PID, StartedAt: stamp(j.StartedAt), EndedAt: stamp(j.EndedAt), Namespace: j.Namespace, ExitCode: j.ExitCode, URL: j.URL, Ports: j.Ports, Status: legacyStatus(j)}
+	wire := job{Name: j.Name, Kind: string(j.Kind), WorkDir: j.WorkDir, Profile: j.Profile, SharedDir: j.SharedDir, MainHolds: j.MainHolds, Repo: j.Repo, Branch: j.Branch, Stop: j.StopCommand, State: string(j.State), Hold: string(j.Hold), Reaped: j.Reaped, PID: j.PID, StartedAt: stamp(j.StartedAt), EndedAt: stamp(j.EndedAt), Namespace: j.Namespace, ExitCode: j.ExitCode, URL: j.URL, Ports: j.Ports, Status: legacyStatus(j)}
 	if j.LastLine != nil {
 		wire.LastLine = &line{At: stamp(j.LastLine.At), Text: j.LastLine.Text}
 	}
@@ -169,7 +170,7 @@ func (j job) runJob(legacy bool) run.Job {
 	}
 
 	hold, state := run.Hold(j.Hold), run.State(j.State)
-	read := run.Job{Name: j.Name, WorkDir: j.WorkDir, Profile: j.Profile, Up: hold == run.HoldClaim || state == run.Running, Kind: project.JobKind(j.Kind), State: state, Hold: hold, Reaped: j.Reaped, PID: j.PID, URL: j.URL, Ports: j.Ports, ExitCode: j.ExitCode, StartedAt: time.Time(j.StartedAt), EndedAt: time.Time(j.EndedAt), Namespace: j.Namespace, SharedDir: j.SharedDir, MainHolds: j.MainHolds, Repo: j.Repo, StopCommand: j.Stop}
+	read := run.Job{Name: j.Name, WorkDir: j.WorkDir, Profile: j.Profile, Up: hold == run.HoldClaim || state == run.Running, Kind: project.JobKind(j.Kind), State: state, Hold: hold, Reaped: j.Reaped, PID: j.PID, URL: j.URL, Ports: j.Ports, ExitCode: j.ExitCode, StartedAt: time.Time(j.StartedAt), EndedAt: time.Time(j.EndedAt), Namespace: j.Namespace, SharedDir: j.SharedDir, MainHolds: j.MainHolds, Repo: j.Repo, Branch: j.Branch, StopCommand: j.Stop}
 	if j.LastLine != nil {
 		read.LastLine = &run.Line{At: time.Time(j.LastLine.At), Text: j.LastLine.Text}
 	}

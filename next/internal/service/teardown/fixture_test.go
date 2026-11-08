@@ -45,7 +45,7 @@ type seed struct {
 	StoreFail map[string]error
 	RunHooks  func(context.Context, env.HookChain) error
 	Run       project.Run // run.toml
-	Listed    []run.Job   // the jobs the run daemon lists
+	Listed    []run.Job   // the jobs wtm's daemon lists
 	Owed      []env.OwedDrop
 }
 
@@ -118,7 +118,7 @@ func up(claimer string) []run.Job {
 	}
 }
 
-// A daemon is the run daemon a test scripts: the jobs it lists, those a stop leaves up, why it cannot list or start, and every start and stop it got.
+// A daemon is wtm's daemon a test scripts: the jobs it lists, those a stop leaves up, why it cannot list or start, and every start and stop it got.
 type daemon struct {
 	listed   []run.Job
 	stuck    []string

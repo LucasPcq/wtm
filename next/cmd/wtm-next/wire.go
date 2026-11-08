@@ -393,7 +393,7 @@ func runPs() runps.UseCase {
 	return runps.UseCase{Jobs: runDaemon().Jobs, Open: openProject, ReadLog: joblog.Tail, Restart: daemonRestart()}
 }
 
-// daemonRestart is the follow-up that replaces a run daemon of another build by one of this build: run daemon restart.
+// daemonRestart is the follow-up that replaces a daemon of another build by one of this build: daemon restart.
 func daemonRestart() *domain.FollowUp {
 	return &domain.FollowUp{Command: commandRestartDaemon}
 }
@@ -434,7 +434,7 @@ func commandLine(followUp domain.FollowUp) []string {
 	case runstop.Name:
 		return runstopcli.Line(followUp)
 	case commandRestartDaemon:
-		return []string{cli.Program, "run", "daemon", "restart"}
+		return []string{cli.Program, "daemon", "restart"}
 	}
 
 	argv, _ := spelled(followUp)
@@ -529,7 +529,7 @@ type streamParams struct {
 	Registry string
 }
 
-// eventStream is the events use case over the bus and the registry params name, opening each repository with openEvents and asking the run daemon at the bus's socket for the jobs it polls.
+// eventStream is the events use case over the bus and the registry params name, opening each repository with openEvents and asking wtm's daemon at the bus's socket for the jobs it polls.
 func eventStream(params streamParams) events.UseCase {
 	return events.UseCase{
 		Bus:      bus.Bus{SocketPath: params.Socket, Start: params.Start},

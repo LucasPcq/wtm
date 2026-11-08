@@ -65,7 +65,7 @@ func unanswered(t *testing.T, content string) string {
 	return filepath.Join(dir, "wtm.sock")
 }
 
-// served is a run daemon serving the protocol on a new socket for jobs, of build version, and the number of shutdowns it was asked; a shutdown closes it.
+// served is a daemon serving the protocol on a new socket for jobs, of build version, and the number of shutdowns it was asked; a shutdown closes it.
 func served(t *testing.T, jobs daemon.Jobs, version string) (string, *atomic.Int32) {
 	t.Helper()
 	socket := filepath.Join(socketDir(t), "wtm.sock")

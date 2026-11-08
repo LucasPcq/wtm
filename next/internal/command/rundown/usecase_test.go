@@ -246,7 +246,7 @@ func TestADaemonOfAnotherBuildIsWarnedOfAndAskedAllTheSame(t *testing.T) {
 	require.Len(t, warnings, 1)
 	assert.Equal(t, rundown.CodeDaemonSkew, warnings[0].Code)
 	require.NotNil(t, warnings[0].FollowUp)
-	assert.Equal(t, "run daemon restart", warnings[0].FollowUp.Command)
+	assert.Equal(t, "daemon restart", warnings[0].FollowUp.Command)
 }
 
 func TestTheFollowUpOfAStopNarrowedToAProfileStartsThatProfile(t *testing.T) {
@@ -451,7 +451,7 @@ func TestASkewedDaemonsRecordedSharedServicesAreNoApproximation(t *testing.T) {
 
 // Review: a daemon of another protocol, or the legacy one, that the client cannot go on with refuses the stop as a precondition followed by the restart, whether reading the jobs or making sure of a daemon.
 func TestADaemonTheClientCannotGoOnWithIsRefusedFollowedByItsRestart(t *testing.T) {
-	skew := &run.Error{Code: run.CodeSkew, Message: "the run daemon speaks protocol 1, this wtm 2"}
+	skew := &run.Error{Code: run.CodeSkew, Message: "wtm's daemon speaks protocol 1, this wtm 2"}
 	cases := map[string]func(d *daemon){
 		"jobs":   func(d *daemon) { d.jobsErr = skew },
 		"ensure": func(d *daemon) { d.unknown, d.ensureErr = true, skew },
@@ -466,7 +466,7 @@ func TestADaemonTheClientCannotGoOnWithIsRefusedFollowedByItsRestart(t *testing.
 			assert.Equal(t, domain.KindPrecondition, refused.Kind)
 			assert.Equal(t, rundown.CodeDaemonSkew, refused.Code)
 			require.NotNil(t, refused.FollowUp)
-			assert.Equal(t, "run daemon restart", refused.FollowUp.Command)
+			assert.Equal(t, "daemon restart", refused.FollowUp.Command)
 		})
 	}
 }
@@ -526,7 +526,7 @@ func TestTheRequestLocksOnlyTheBranchesItNames(t *testing.T) {
 	assert.Equal(t, domain.WorktreeLocks([]string{featA}), req.Locks())
 }
 
-// Review: a path the run daemon runs jobs at without saying which repository they were started for is refused saying so.
+// Review: a path wtm's daemon runs jobs at without saying which repository they were started for is refused saying so.
 func TestAPathOfJobsOfNoKnownRepositoryIsRefusedSayingSo(t *testing.T) {
 	w := newWorld(t)
 	removed := w.root + "/wt-removed"

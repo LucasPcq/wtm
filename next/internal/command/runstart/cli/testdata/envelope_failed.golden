@@ -10,7 +10,7 @@
       "error": {
         "kind": "internal",
         "code": "run-start.job_failed",
-        "message": "migrate failed: run daemon: task migrate exited with code 3",
+        "message": "migrate failed: daemon: task migrate exited with code 3",
         "params": {
           "exit_code": "3",
           "job": "migrate"
@@ -85,7 +85,7 @@
   "error": {
     "kind": "internal",
     "code": "run-start.job_failed",
-    "message": "migrate failed: run daemon: task migrate exited with code 3",
+    "message": "migrate failed: daemon: task migrate exited with code 3",
     "params": {
       "exit_code": "3",
       "job": "migrate"

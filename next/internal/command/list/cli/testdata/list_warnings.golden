@@ -4,6 +4,6 @@
   feat/b              ! locked        PR #12                            ✓ clean
   ../.trees/detached                                                    ✓ clean
   feat/gone                                                             ✗ missing
-  ! the run daemon is not running: which jobs are up is unknown
+  ! wtm's daemon is not running: which jobs are up is unknown
   ! pull requests unavailable: run `gh auth login`
 

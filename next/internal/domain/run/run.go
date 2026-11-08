@@ -1,4 +1,4 @@
-// Package run is what the run daemon says of the jobs it runs.
+// Package run is what wtm's daemon says of the jobs it runs.
 package run
 
 import (
@@ -11,7 +11,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
-// A Job is one job the daemon knows: its name, the worktree it runs in, the profile it was started under (empty for one started alone), whether it is up (running, detached or joined), its kind, its State (empty for a claim, which runs no process), what of it the daemon holds (Hold), whether the daemon Reaped it (an orphan stopped as it started), the PID of a process of the daemon's own, its url, the ports it binds, the code its process exited with (-1 when a signal killed it), when the daemon started it (zero for a job taken over that ended before), when it ended (zero while it is up, or when that is not known), the namespace a shared job holds for its worktree (on a claim, and on the main checkout's own job when it holds it; empty when it makes none), the main checkout a shared job runs in, whether that checkout itself holds the shared job (MainHolds, on the job itself, never on a claim) and whether that cannot be told (MainHoldsUnknown: a daemon of another build listed it, and the index has no record of it), the main checkout of the repository it was started for (Repo, empty when its start named none), the command a stack stops with as it was started (StopCommand), and the last line it printed (nil before any).
+// A Job is one job the daemon knows: its name, the worktree it runs in, the profile it was started under (empty for one started alone), whether it is up (running, detached or joined), its kind, its State (empty for a claim, which runs no process), what of it the daemon holds (Hold), whether the daemon Reaped it (an orphan stopped as it started), the PID of a process of the daemon's own, its url, the ports it binds, the code its process exited with (-1 when a signal killed it), when the daemon started it (zero for a job taken over that ended before), when it ended (zero while it is up, or when that is not known), the namespace a shared job holds for its worktree (on a claim, and on the main checkout's own job when it holds it; empty when it makes none), the main checkout a shared job runs in, whether that checkout itself holds the shared job (MainHolds, on the job itself, never on a claim) and whether that cannot be told (MainHoldsUnknown: a daemon of another build listed it, and the index has no record of it), the main checkout of the repository it was started for (Repo, empty when its start named none) and the branch of its worktree there (Branch, the main checkout's for a shared job's own run), the command a stack stops with as it was started (StopCommand), and the last line it printed (nil before any).
 type Job struct {
 	Name             string
 	WorkDir          string
@@ -32,6 +32,7 @@ type Job struct {
 	MainHolds        bool
 	MainHoldsUnknown bool
 	Repo             string
+	Branch           string
 	StopCommand      string
 	LastLine         *Line
 }
@@ -129,7 +130,7 @@ func States() []State {
 }
 
 // ErrUnknown says whether a job is up cannot be told: no daemon answers, yet its index holds jobs it would run.
-var ErrUnknown = errors.New("the run daemon is not running: which jobs are up is unknown")
+var ErrUnknown = errors.New("wtm's daemon is not running: which jobs are up is unknown")
 
 // UpIn returns the names of the jobs up in the worktree at dir, sorted, empty and not nil when none is.
 func UpIn(jobs []Job, dir string) []string {
@@ -199,5 +200,5 @@ func UnknownMessage(err error) string {
 		return ErrUnknown.Error()
 	}
 
-	return "couldn't ask the run daemon which jobs are up: " + err.Error()
+	return "couldn't ask wtm's daemon which jobs are up: " + err.Error()
 }

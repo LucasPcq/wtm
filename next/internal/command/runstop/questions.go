@@ -79,7 +79,7 @@ func NewQuestions(f Facts, req Request) Questions {
 	case req.Job == "":
 		questions.Errors = append(questions.Errors, domain.Required(PathJob))
 	case !slices.ContainsFunc(questions.Jobs, func(o domain.Option) bool { return o.Value == req.Job }):
-		questions.Errors = append(questions.Errors, domain.FieldError{Path: PathJob, Code: domain.CodeNotFound, Template: "{value} is neither a job of run.toml nor one the run daemon runs in the worktrees picked", Params: domain.Params{"value": req.Job}})
+		questions.Errors = append(questions.Errors, domain.FieldError{Path: PathJob, Code: domain.CodeNotFound, Template: "{value} is neither a job of run.toml nor one wtm's daemon runs in the worktrees picked", Params: domain.Params{"value": req.Job}})
 	}
 	return questions
 }
@@ -103,7 +103,7 @@ func (f Facts) picked(req Request) ([]string, domain.Origin) {
 	return nil, domain.OriginDefault
 }
 
-// jobOptions are the jobs a stop of targets may reach: run.toml's, in its order, then those the run daemon runs in targets that run.toml does not declare, by name; each with its kind and the worktrees of targets it is up in.
+// jobOptions are the jobs a stop of targets may reach: run.toml's, in its order, then those wtm's daemon runs in targets that run.toml does not declare, by name; each with its kind and the worktrees of targets it is up in.
 func (f Facts) jobOptions(targets []Target) []domain.Option {
 	upIn := func(name string) []string {
 		var worktrees []string

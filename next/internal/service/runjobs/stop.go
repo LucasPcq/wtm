@@ -17,7 +17,7 @@ import (
 // ----------------------------------------------------------------------------
 // What a stop decides from
 
-// Running is what a stop decides from, as the command stopping read it: the project's config, its run.toml (with why it does not load), the repository's snapshot, the worktrees whose directory is gone, where the caller stands, where each name asked as a path leads, and the jobs the run daemon runs (with a daemon of another build that answered, or Unknown: none answers and its index holds processes whose fate only a daemon can tell).
+// Running is what a stop decides from, as the command stopping read it: the project's config, its run.toml (with why it does not load), the repository's snapshot, the worktrees whose directory is gone, where the caller stands, where each name asked as a path leads, and the jobs wtm's daemon runs (with a daemon of another build that answered, or Unknown: none answers and its index holds processes whose fate only a daemon can tell).
 type Running struct {
 	worktree.Repository
 	Gone    map[string]bool   // by path
@@ -31,7 +31,7 @@ type Running struct {
 // ----------------------------------------------------------------------------
 // The reads of a stop
 
-// Stops reads what a stop decides from, for run down and run stop: the run daemon, whether a worktree's directory is gone, the path a name stands for, and where each name asked as a path leads. Every field must be set.
+// Stops reads what a stop decides from, for run down and run stop: wtm's daemon, whether a worktree's directory is gone, the path a name stands for, and where each name asked as a path leads. Every field must be set.
 type Stops struct {
 	Daemon  StopDaemon
 	Gone    func(ctx context.Context, w worktree.Worktree) (bool, error)                                                              // repository.Gone
@@ -39,14 +39,14 @@ type Stops struct {
 	Locate  func(ctx context.Context, worktrees []worktree.Worktree, names []string, caller domain.Caller) (map[string]string, error) // repository.Locate
 }
 
-// StopDaemon is the run daemon as a stop asks it: the jobs it runs, one of this build made sure of to reach the processes its index holds, and a job stopped.
+// StopDaemon is wtm's daemon as a stop asks it: the jobs it runs, one of this build made sure of to reach the processes its index holds, and a job stopped.
 type StopDaemon interface {
 	Lister
 	Stopper
 	Ensure(ctx context.Context) error
 }
 
-// ObserveStopParams are the command observing, whose codes the refusals give, the repository as it observed it (repository.Service.Observe), the worktrees the request names, where its caller stands, and the follow-up that restarts a run daemon of another build.
+// ObserveStopParams are the command observing, whose codes the refusals give, the repository as it observed it (repository.Service.Observe), the worktrees the request names, where its caller stands, and the follow-up that restarts a daemon of another build.
 type ObserveStopParams struct {
 	Command    string
 	Repository worktree.Repository
@@ -55,7 +55,7 @@ type ObserveStopParams struct {
 	Restart    *domain.FollowUp
 }
 
-// Observe reads, on the repository of params, what a stop decides from: where each name asked as a path leads, which worktrees' directory is gone, where the caller stands, and the jobs the run daemon runs, never starting it: with none answering and processes in its index, the jobs are Unknown. A daemon that cannot be read is refused with <command>.daemon_skew (another protocol, followed by its restart) or <command>.daemon_unavailable.
+// Observe reads, on the repository of params, what a stop decides from: where each name asked as a path leads, which worktrees' directory is gone, where the caller stands, and the jobs wtm's daemon runs, never starting it: with none answering and processes in its index, the jobs are Unknown. A daemon that cannot be read is refused with <command>.daemon_skew (another protocol, followed by its restart) or <command>.daemon_unavailable.
 func (s Stops) Observe(ctx context.Context, params ObserveStopParams) (Running, error) {
 	repo := params.Repository
 	running := Running{Repository: repo, Gone: map[string]bool{}}
@@ -76,7 +76,7 @@ func (s Stops) Observe(ctx context.Context, params ObserveStopParams) (Running, 
 	running.Cwd = cmp.Or(cwd, params.Caller.Cwd)
 
 	if running, err = running.Listed(ctx, s.Daemon); err != nil {
-		return Running{}, daemonFailure(params, err, "couldn't read the jobs the run daemon runs")
+		return Running{}, daemonFailure(params, err, "couldn't read the jobs wtm's daemon runs")
 	}
 	return running, ctx.Err()
 }
@@ -88,13 +88,13 @@ func (s Stops) Reach(ctx context.Context, params ObserveStopParams) (Running, er
 		return running, err
 	}
 	if err := s.Daemon.Ensure(ctx); err != nil {
-		return Running{}, daemonFailure(params, err, "couldn't start the run daemon to reach the jobs its index holds")
+		return Running{}, daemonFailure(params, err, "couldn't start wtm's daemon to reach the jobs its index holds")
 	}
 	if running, err = s.Observe(ctx, params); err != nil {
 		return Running{}, err
 	}
 	if running.Unknown {
-		return Running{}, &domain.Error{Kind: domain.KindInternal, Code: params.Command + DaemonUnavailable, Message: "the run daemon started cannot tell which of the jobs its index holds are up"}
+		return Running{}, &domain.Error{Kind: domain.KindInternal, Code: params.Command + DaemonUnavailable, Message: "wtm's daemon started cannot tell which of the jobs its index holds are up"}
 	}
 	return running, nil
 }
@@ -193,7 +193,7 @@ func (r Running) Entries(names []string) (targets []StopTarget, problems []domai
 		case found:
 			targets = append(targets, target)
 		case r.unattributed(r.Located[name]):
-			problems = append(problems, domain.FieldError{Path: path, Code: domain.CodeNotFound, Template: "{value} names no worktree: the run daemon runs jobs there without saying which repository they were started for", Params: domain.Params{"value": name}})
+			problems = append(problems, domain.FieldError{Path: path, Code: domain.CodeNotFound, Template: "{value} names no worktree: wtm's daemon runs jobs there without saying which repository they were started for", Params: domain.Params{"value": name}})
 		default:
 			problems = append(problems, domain.FieldError{Path: path, Code: domain.CodeNotFound, Template: "{value} names no worktree", Params: domain.Params{"value": name}})
 		}
@@ -219,12 +219,12 @@ func (r Running) removed(path string) bool {
 	return path != "" && slices.ContainsFunc(r.Jobs, func(job run.Job) bool { return job.WorkDir == path && job.Repo == r.MainPath })
 }
 
-// unattributed reports whether the run daemon runs a job at path whose start named no repository (indexed by a wtm that recorded none): a stop cannot tell it is this repository's.
+// unattributed reports whether wtm's daemon runs a job at path whose start named no repository (indexed by a wtm that recorded none): a stop cannot tell it is this repository's.
 func (r Running) unattributed(path string) bool {
 	return path != "" && slices.ContainsFunc(r.Jobs, func(job run.Job) bool { return job.WorkDir == path && job.Repo == "" })
 }
 
-// Every is each worktree of the repository the run daemon lists a job of, the main one first, then each removed one whose jobs still run, by path.
+// Every is each worktree of the repository wtm's daemon lists a job of, the main one first, then each removed one whose jobs still run, by path.
 func (r Running) Every() []StopTarget {
 	var targets []StopTarget
 	for _, w := range r.MainFirst() {
@@ -281,10 +281,10 @@ func (r Running) stopJob(s run.Stopping) StopJob {
 	return planned
 }
 
-// FatesApproximate is the code, after the command's name, of a stop's plan a run daemon of another build answered that does not say whether the main checkout holds a shared service: the fates of the shared services are then approximate.
+// FatesApproximate is the code, after the command's name, of a stop's plan a daemon of another build answered that does not say whether the main checkout holds a shared service: the fates of the shared services are then approximate.
 const FatesApproximate = ".fates_approximate"
 
-// StopWarningsParams are the command stopping, the worktrees it stops the jobs of, and the follow-up that restarts a run daemon of another build.
+// StopWarningsParams are the command stopping, the worktrees it stops the jobs of, and the follow-up that restarts a daemon of another build.
 type StopWarningsParams struct {
 	Command string
 	Targets []StopTarget
@@ -298,7 +298,7 @@ func (r Running) StopWarnings(params StopWarningsParams) []domain.Warning {
 	}
 	warnings := []domain.Warning{domain.SkewWarning(domain.SkewWarningParams{Command: params.Command, Skewed: r.Skewed, Restart: params.Restart})}
 	if r.approximate(params.Targets) {
-		warnings = append(warnings, domain.Warning{Code: params.Command + FatesApproximate, Message: "a run daemon of another build does not say whether the main checkout holds a shared service: which ones stop and which run on is approximate"})
+		warnings = append(warnings, domain.Warning{Code: params.Command + FatesApproximate, Message: "a daemon of another build does not say whether the main checkout holds a shared service: which ones stop and which run on is approximate"})
 	}
 	return warnings
 }

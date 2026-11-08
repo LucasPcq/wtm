@@ -51,7 +51,7 @@ func (f Facts) jobsOf(name string) []project.Job {
 // ----------------------------------------------------------------------------
 // Decide
 
-// The codes of the refusals of a request: a job that changes foreign data (CodeUnsafe, followed by CodeForce, the request forced), a port another worktree holds (CodePortClash, followed by CodeExclusive, the request stopping the others first), a job a runner of the same start starts too (CodeRunnerConflict), a run daemon of another build holding jobs (CodeDaemonSkew, followed by the restart), and every job of the request already up as asked is no refusal.
+// The codes of the refusals of a request: a job that changes foreign data (CodeUnsafe, followed by CodeForce, the request forced), a port another worktree holds (CodePortClash, followed by CodeExclusive, the request stopping the others first), a job a runner of the same start starts too (CodeRunnerConflict), a daemon of another build holding jobs (CodeDaemonSkew, followed by the restart), and every job of the request already up as asked is no refusal.
 const (
 	CodeUnsafe         = Name + runjobs.Unsafe
 	CodeForeignData    = Name + runjobs.ForeignData
@@ -73,7 +73,7 @@ type DecideParams struct {
 	Restart *domain.FollowUp
 }
 
-// Decide turns the facts and the resolved request into the plan and its warnings, or the refusal that stops it (runjobs.Facts.Refusal): a run daemon of another build holding jobs, a job a runner of the start starts too, a port another worktree holds unless its jobs are stopped first, a job that changes data a worktree does not own unless forced.
+// Decide turns the facts and the resolved request into the plan and its warnings, or the refusal that stops it (runjobs.Facts.Refusal): a daemon of another build holding jobs, a job a runner of the start starts too, a port another worktree holds unless its jobs are stopped first, a job that changes data a worktree does not own unless forced.
 func Decide(f Facts, req Request, params DecideParams) (Plan, []domain.Warning, error) {
 	targets, _ := f.Entries(Name, req.Worktrees)
 	jobs := f.jobsOf(req.Profile)

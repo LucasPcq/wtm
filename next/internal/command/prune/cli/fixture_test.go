@@ -168,7 +168,7 @@ func hookFails(context.Context, env.HookChain) error {
 	return &env.HookFailure{Cmd: "make down", Err: errHook}
 }
 
-// idle is a run daemon running nothing but the jobs it lists, or that cannot tell what it runs (err).
+// idle is a daemon running nothing but the jobs it lists, or that cannot tell what it runs (err).
 type idle struct {
 	listed []run.Job
 	err    error

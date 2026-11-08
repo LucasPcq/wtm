@@ -150,7 +150,7 @@ func TestWhatCannotBeAskedIsAWarningNotAFailure(t *testing.T) {
 		message string
 	}{
 		"prs_unavailable": {seed: seed{PRsErr: fmt.Errorf("%w: run `gh auth login`", worktree.ErrPullRequestsUnavailable)}, codes: []string{list.CodePRsUnavailable}, message: "pull requests unavailable: run `gh auth login`"},
-		"daemon_unknown":  {seed: seed{JobsErr: run.ErrUnknown}, codes: []string{list.CodeJobsUnknown}, message: "the run daemon is not running: which jobs are up is unknown"},
+		"daemon_unknown":  {seed: seed{JobsErr: run.ErrUnknown}, codes: []string{list.CodeJobsUnknown}, message: "wtm's daemon is not running: which jobs are up is unknown"},
 		"base_missing":    {seed: seed{Base: "develop"}, codes: []string{list.CodeBaseMissing}, message: "the base branch develop does not exist: commits ahead of it are not counted"},
 	}
 	for name, c := range cases {

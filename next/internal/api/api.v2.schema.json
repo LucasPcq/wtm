@@ -5116,7 +5116,7 @@
       ]
     },
     "run.Hold": {
-      "description": "What of a job the run daemon holds: its own process, a stack its launcher left, a claim on a shared job another worktree runs.",
+      "description": "What of a job wtm's daemon holds: its own process, a stack its launcher left, a claim on a shared job another worktree runs.",
       "enum": [
         "own",
         "detached",
@@ -5805,7 +5805,7 @@
       "type": "object"
     },
     "runlogs.JobState": {
-      "description": "Where a job whose output is read stands: the run daemon's state, stopped for a job only its log knows, not_started for one that never ran.",
+      "description": "Where a job whose output is read stands: wtm's daemon's state, stopped for a job only its log knows, not_started for one that never ran.",
       "enum": [
         "starting",
         "running",

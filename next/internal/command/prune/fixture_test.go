@@ -58,7 +58,7 @@ var (
 	errBroken  = errors.New("bad ref")
 )
 
-// seed is what a world holds beyond its worktrees: its config.toml, the jobs the run daemon runs, and why the forge cannot be asked.
+// seed is what a world holds beyond its worktrees: its config.toml, the jobs wtm's daemon runs, and why the forge cannot be asked.
 type seed struct {
 	Config string
 	Jobs   []run.Job
@@ -210,7 +210,7 @@ func (uncountable) Unpushed(context.Context, worktree.Losing) (int, error) {
 // newerRecord is a record a newer wtm wrote, at a schema this one does not know.
 const newerRecord = `{"schema": 99, "source_branch": "main"}`
 
-// A daemon is the run daemon a test scripts: the jobs it lists, why it cannot list, and every start and stop it got.
+// A daemon is wtm's daemon a test scripts: the jobs it lists, why it cannot list, and every start and stop it got.
 type daemon struct {
 	listed  []run.Job
 	jobsErr error

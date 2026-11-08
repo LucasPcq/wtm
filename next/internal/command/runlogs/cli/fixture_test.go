@@ -98,7 +98,7 @@ func (w world) open(context.Context, string) (runlogs.UseCase, error) {
 		Meta:       storetest.NewFake(storetest.FakeParams{}),
 		EnvFiles:   storetest.NewFake(storetest.FakeParams{}),
 		StateDir:   stateDir,
-		Repository: repository.Service{Config: w.config, Git: w.git, MainPath: mainPath, Init: &domain.FollowUp{Command: "init"}, Restart: &domain.FollowUp{Command: "run daemon restart"}},
+		Repository: repository.Service{Config: w.config, Git: w.git, MainPath: mainPath, Init: &domain.FollowUp{Command: "init"}, Restart: &domain.FollowUp{Command: "daemon restart"}},
 	}, nil
 }
 
