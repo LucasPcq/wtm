@@ -1,6 +1,6 @@
 import type { RunFate, RunjobsStopJob, RunjobsStopStatus } from '@/api/types.gen'
-import type { Shared } from '@/features/worktrees/run-down/utils/plan'
 import type { PhaseRun } from '@/features/worktrees/utils/progress'
+import type { Shared } from '@/features/worktrees/utils/stop-plan'
 
 export const statusWords: Record<RunjobsStopStatus, string> = {
   stopped: 'stopped',

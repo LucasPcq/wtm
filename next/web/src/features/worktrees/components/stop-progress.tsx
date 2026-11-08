@@ -8,28 +8,35 @@ import { PhaseRow } from '@/features/worktrees/components/phase-row'
 import { RunFailure } from '@/features/worktrees/components/run-failure'
 import { RunOutcome } from '@/features/worktrees/components/run-outcome'
 import type { RunDownRan } from '@/features/worktrees/hooks/use-run-down-dialog'
-import { countOf, sharedOf, stopJob } from '@/features/worktrees/run-down/utils/plan'
-import { recapOf } from '@/features/worktrees/run-down/utils/recap'
-import { sharedStopping, stopping } from '@/features/worktrees/run-down/utils/words'
 import type { PhaseRun, Progress } from '@/features/worktrees/utils/progress'
 import { where } from '@/features/worktrees/utils/run-words'
+import { countOf, sharedOf, stopJob } from '@/features/worktrees/utils/stop-plan'
+import { recapOf } from '@/features/worktrees/utils/stop-recap'
+import { sharedStopping, stopping } from '@/features/worktrees/utils/stop-words'
 
 // a shared service is let go by each of its holders: its row says where the least advanced one stands
 const rank: Record<PhaseRun['state'], number> = { failed: 0, now: 1, todo: 2, done: 3 }
 
 // a stop is never cancelled: a stack stopped half-way is worse than one stopped or not
-export function RunDownProgress({
+export function StopProgress({
+  title,
+  stopping: doing,
   progress,
   running,
   ran,
   onHide,
   onDone,
+  onAgain,
 }: {
-  progress: Progress<'run-down'>
+  title: string
+  stopping: string
+  progress: Progress<'run-down' | 'daemon-stop-jobs'>
   running: boolean
   ran: RunDownRan
   onHide: () => void
   onDone: () => void
+  // what did not stop asked again, where the command offers it
+  onAgain?: (() => void) | undefined
 }) {
   const envelope = progress.envelope
   const items = envelope?.items ?? []
@@ -51,7 +58,7 @@ export function RunDownProgress({
   })
 
   const description = () => {
-    if (running) return `Stopping jobs ${where(ran.worktrees)} · ${done} of ${total} stopped`
+    if (running) return `${doing} · ${done} of ${total} stopped`
     if (items.length === 0) return 'Nothing stopped.'
     if (failed > 0) return `Jobs stopped in ${items.length - failed} of ${items.length} worktrees.`
     return `Jobs stopped ${where(items.map((item) => item.subject))}.`
@@ -60,7 +67,7 @@ export function RunDownProgress({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Stop jobs</DialogTitle>
+        <DialogTitle>{title}</DialogTitle>
         <DialogDescription>{description()}</DialogDescription>
       </DialogHeader>
       <DialogBand>{running && <Bar value={total ? (done / total) * 100 : 0} aria-label="Progress" />}</DialogBand>
@@ -122,7 +129,14 @@ export function RunDownProgress({
             </Button>
           </>
         ) : (
-          <Button onClick={onDone}>Done</Button>
+          <>
+            {onAgain && failed > 0 && (
+              <Button variant="outline" onClick={onAgain}>
+                Run again
+              </Button>
+            )}
+            <Button onClick={onDone}>Done</Button>
+          </>
         )}
       </DialogFooter>
     </>

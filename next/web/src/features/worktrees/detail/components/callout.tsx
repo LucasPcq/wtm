@@ -78,6 +78,8 @@ const runsHere: Record<
   },
   'run-start': null,
   'run-stop': null,
+  'daemon-restart': null,
+  'daemon-stop-jobs': null,
 }
 
 export function Callout({ repo, problems: [first, ...more] }: { repo: string; problems: StatusProblem[] }) {

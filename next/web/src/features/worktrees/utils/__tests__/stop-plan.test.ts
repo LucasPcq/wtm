@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
-import { countOf, sharedOf, unitsOf } from '@/features/worktrees/run-down/utils/plan'
 import { advance } from '@/features/worktrees/utils/progress'
+import { countOf, sharedOf, unitsOf } from '@/features/worktrees/utils/stop-plan'
 import { runDownPlanOf } from '@/test/run-down'
 
 test('a shared service is counted once, stopped once every holder let it go; nothing to stop is no unit', () => {

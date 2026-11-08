@@ -36,3 +36,15 @@ export async function json<T>(path: string, body?: unknown): Promise<T> {
   }
   return read as T
 }
+
+// the token travels in a header, which a link cannot send: the file is fetched, then handed to the browser to save
+export async function saved(path: string, { name, failure }: { name: string; failure: string }) {
+  const response = await request(path)
+  if (!response.ok) throw new HttpError(response.status, failure)
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(await response.blob())
+  link.download = name
+  link.click()
+  // Safari cancels a download whose URL is revoked as it starts
+  setTimeout(() => URL.revokeObjectURL(link.href), 60_000)
+}

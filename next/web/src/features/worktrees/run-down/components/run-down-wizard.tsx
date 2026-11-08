@@ -19,9 +19,9 @@ import { Stepper } from '@/features/worktrees/components/stepper'
 import type { Start } from '@/features/worktrees/hooks/use-run'
 import type { RunDownAsk, RunDownRan, RunDownStep } from '@/features/worktrees/hooks/use-run-down-dialog'
 import { ConfirmStep } from '@/features/worktrees/run-down/components/confirm-step'
-import { unitsOf } from '@/features/worktrees/run-down/utils/plan'
-import { stopLabel } from '@/features/worktrees/run-down/utils/words'
 import { runsSomething, where } from '@/features/worktrees/utils/run-words'
+import { unitsOf } from '@/features/worktrees/utils/stop-plan'
+import { stopLabel } from '@/features/worktrees/utils/stop-words'
 
 export function RunDownWizard({
   repo,

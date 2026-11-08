@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { cva } from 'class-variance-authority'
 import { RefreshCw } from 'lucide-react'
-import { fetchOrigin as fetchOriginOf, githubKey, repoKey } from '@/api/queries/commands'
+import type { ReactElement, ReactNode } from 'react'
+import { fetchOrigin as fetchOriginOf, githubKey, readQuery, repoKey } from '@/api/queries/commands'
 import { type Connection, connectionOf, eventsQuery } from '@/api/queries/events'
 import { Button } from '@/components/ui/button'
 import { SidebarFooter } from '@/components/ui/sidebar'
@@ -32,7 +33,10 @@ const detail: Record<Connection, string> = {
   disconnected: 'The server restarted under a new session',
 }
 
-export function ConnectionFooter({ repo }: { repo: string | undefined }) {
+// what opens wtm's daemon's panel from the connection block, which it turns into its trigger
+export type Daemon = (trigger: ReactElement) => ReactNode
+
+export function ConnectionFooter({ repo, daemon }: { repo: string | undefined; daemon?: Daemon | undefined }) {
   const client = useQueryClient()
   const events = useQuery(eventsQuery)
   const connection = connectionOf(events)
@@ -48,17 +52,32 @@ export function ConnectionFooter({ repo }: { repo: string | undefined }) {
   })
   const problem = fetchOrigin.error?.message ?? fetchOrigin.data?.warnings[0]?.message
   const live = connection === 'live'
+  const status = useQuery({ ...readQuery(repo ?? '', 'daemon-status'), enabled: Boolean(repo) && live })
+  // a daemon of another build refuses new jobs: the block says it amber, its panel says what to do
+  const skewed = live && Boolean(status.data?.items[0]?.detail?.skew)
+
+  const block = (
+    <button
+      type="button"
+      className="flex flex-col gap-0.5 rounded-md p-2 -m-2 text-left hover:bg-sidebar-accent disabled:hover:bg-transparent"
+      disabled={!daemon}
+      aria-label="wtm's daemon"
+    >
+      <span className="flex items-center gap-2 text-sm font-medium">
+        <span className={dot({ connection: skewed ? 'reconnecting' : connection })} aria-hidden="true" />
+        {label[connection]}
+      </span>
+      <span className={cn('text-xs text-muted-foreground', live && problem && 'text-destructive')}>
+        {(live && (problem ?? events.data?.warning ?? (skewed && "wtm's daemon runs another build"))) ||
+          detail[connection]}
+      </span>
+    </button>
+  )
 
   return (
     <SidebarFooter className="gap-4 border-t border-sidebar-border px-4 pt-4 pb-3">
-      <div className="flex flex-col gap-0.5" role="status" aria-live="polite">
-        <span className="flex items-center gap-2 text-sm font-medium">
-          <span className={dot({ connection })} aria-hidden="true" />
-          {label[connection]}
-        </span>
-        <span className={cn('text-xs text-muted-foreground', live && problem && 'text-destructive')}>
-          {(live && (problem ?? events.data?.warning)) || detail[connection]}
-        </span>
+      <div role="status" aria-live="polite">
+        {daemon ? daemon(block) : block}
       </div>
       {repo && (
         <Button

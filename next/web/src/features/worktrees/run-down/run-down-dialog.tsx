@@ -2,6 +2,7 @@ import { toast } from 'sonner'
 import type { Applied } from '@/api/queries/commands'
 import { Dialog } from '@/components/ui/dialog'
 import { RunDialogContent } from '@/features/worktrees/components/run-dialog-content'
+import { StopProgress } from '@/features/worktrees/components/stop-progress'
 import { succeeded, useRun } from '@/features/worktrees/hooks/use-run'
 import {
   type RunDownRan,
@@ -11,10 +12,9 @@ import {
   toastIdOf,
   useRunDownDialog,
 } from '@/features/worktrees/hooks/use-run-down-dialog'
-import { RunDownProgress } from '@/features/worktrees/run-down/components/run-down-progress'
 import { RunDownWizard } from '@/features/worktrees/run-down/components/run-down-wizard'
-import { countOf } from '@/features/worktrees/run-down/utils/plan'
 import { where } from '@/features/worktrees/utils/run-words'
+import { countOf } from '@/features/worktrees/utils/stop-plan'
 
 // one stop at a time: opened while one runs, or one that failed is still to be read, it shows it
 export function RunDownDialog({ repo }: { repo: string }) {
@@ -55,7 +55,9 @@ export function RunDownDialog({ repo }: { repo: string }) {
   const content = () => {
     if (run.progress)
       return (
-        <RunDownProgress
+        <StopProgress
+          title="Stop jobs"
+          stopping={`Stopping jobs ${where(ask.ran.worktrees)}`}
           progress={run.progress}
           running={run.running}
           ran={ask.ran}

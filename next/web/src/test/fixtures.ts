@@ -144,7 +144,7 @@ export const envelope = (command: string, details: { branch: string }[]): Domain
   items: details.map((detail) => ({ subject: detail.branch, status: 'done', detail: detail as never })),
 })
 
-export const read = <C extends Exclude<ReadCommand, 'run-logs'>>(
+export const read = <C extends Exclude<ReadCommand, 'run-logs' | 'daemon-status'>>(
   command: C,
   details: Read<C>['items'][number]['detail'][],
 ): Read<C> => ({

@@ -7,13 +7,22 @@ import { Centered } from '@/components/centered'
 import { StatePage } from '@/components/state-page'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/features/shell/components/app-sidebar'
+import type { Daemon } from '@/features/shell/components/connection-footer'
 
-export function Shell({ repo, children }: { repo: string | undefined; children: ReactNode }) {
+export function Shell({
+  repo,
+  daemon,
+  children,
+}: {
+  repo: string | undefined
+  daemon?: Daemon | undefined
+  children: ReactNode
+}) {
   const connection = connectionOf(useQuery(eventsQuery))
 
   return (
     <SidebarProvider>
-      <AppSidebar repo={repo} />
+      <AppSidebar repo={repo} daemon={daemon} />
       <SidebarInset className="h-svh min-h-0 overflow-hidden">
         {connection === 'disconnected' ? (
           <Centered>

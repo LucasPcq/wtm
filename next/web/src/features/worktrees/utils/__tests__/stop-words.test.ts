@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { sharedStopping } from '@/features/worktrees/run-down/utils/words'
+import { sharedStopping } from '@/features/worktrees/utils/stop-words'
 
 const done = { phase: 'job', job: 'postgres', state: 'done' } as const
 const lastHolds = { name: 'postgres', holders: ['feat/a', 'feat/b'], keptBy: [], stops: true }

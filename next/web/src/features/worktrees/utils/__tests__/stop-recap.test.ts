@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import type { Applied } from '@/api/queries/commands'
 import type { RundownPlan } from '@/api/types.gen'
-import { recapOf } from '@/features/worktrees/run-down/utils/recap'
+import { recapOf } from '@/features/worktrees/utils/stop-recap'
 
 // feat/a runs a cache of its own; feat/b holds the shared cache main runs
 const plan: RundownPlan = {
