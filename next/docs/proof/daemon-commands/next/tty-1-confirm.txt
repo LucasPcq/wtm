@@ -1,5 +1,7 @@
 
-  Step 1/1 • Confirm
+  Step 2/2 • Confirm
+
+  · Force — set by its flag only
 
   ┃  Review & confirm
   ┃
@@ -17,8 +19,6 @@
    No, cancel
 
   ↑↓ navigate • / filter • enter confirm • esc cancel
-
-
 
 
 

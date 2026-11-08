@@ -130,7 +130,6 @@
         ]
       }
     ],
-    "confirm": true,
     "recap": [
       {
         "key": "repo",
