@@ -1,5 +1,5 @@
 import { HttpResponse, http } from 'msw'
-import type { DaemonrestartPlan, DaemonstatusDetail, DaemonstopjobsPlan, WebCall } from '@/api/types.gen'
+import type { DaemonrestartPlan, DaemonstatusDetail, DaemonstopjobsPlan, DomainError, WebCall } from '@/api/types.gen'
 import { envelope } from '@/test/fixtures'
 import { line, streamed } from '@/test/stream'
 
@@ -41,9 +41,14 @@ export const daemonDetail: DaemonstatusDetail = {
   index: '/cfg/wtm/jobs.json',
 }
 
-export const daemonStatus = (detail: DaemonstatusDetail = daemonDetail) =>
+// the daemon's read, or, given an error, a read refused with no item
+export const daemonStatus = (detail: DaemonstatusDetail = daemonDetail, error?: DomainError) =>
   http.post('/api/repos/r1/commands/daemon-status', () =>
-    HttpResponse.json({ ...envelope('daemon-status', []), items: [{ subject: 'daemon', status: 'done', detail }] }),
+    HttpResponse.json(
+      error
+        ? { ...envelope('daemon-status', []), ok: false, error }
+        : { ...envelope('daemon-status', []), items: [{ subject: 'daemon', status: 'done', detail }] },
+    ),
   )
 
 const restartPlan: DaemonrestartPlan = {
@@ -80,20 +85,21 @@ const restartPlan: DaemonrestartPlan = {
 }
 
 // a restart's plan, then its apply: every job back, or the new daemon failing to start
-export const answeringRestart = (failing = false) =>
+export const answeringRestart = (failing?: 'start_failed' | 'not_back') =>
   http.post('/api/repos/r1/commands/daemon-restart', async ({ request }) => {
     const call = (await request.json()) as WebCall
     if (call.dry_run)
       return HttpResponse.json({ ...envelope('daemon-restart', []), fingerprint: 'r:1', plan: restartPlan })
+    const message = {
+      start_failed: "the new daemon didn't start: wtm's daemon did not start within 5s",
+      not_back: "didn't come back: web: port 3000 is taken",
+    }
     const item = failing
       ? {
           subject: 'daemon',
           status: 'failed',
-          error: {
-            kind: 'internal',
-            code: 'daemon-restart.start_failed',
-            message: "the new daemon didn't start: wtm's daemon did not start within 5s",
-          },
+          error: { kind: 'internal', code: `daemon-restart.${failing}`, message: message[failing] },
+          detail: { back: [{ name: 'web', path: '/Users/me/dev/acme', back: false }] },
         }
       : {
           subject: 'daemon',
@@ -136,6 +142,12 @@ const stopPlan: DaemonstopjobsPlan = {
           ],
         },
         {
+          worktree: 'feat/billing (acme)',
+          branch: 'feat/billing',
+          path: '/a/feat-billing',
+          jobs: [{ name: 'postgres', kind: 'service', hold: 'claim', fate: 'stop', shared_in: '/Users/me/dev/acme' }],
+        },
+        {
           worktree: 'fix/login (acme)',
           branch: 'fix/login',
           path: '/a/fix-login',
@@ -169,6 +181,9 @@ export const answeringStopJobs = (failing = false) =>
           ...envelope('daemon-stop-jobs', []),
           plan: stopPlan,
           ok: !failing,
+          follow_ups: failing
+            ? [{ command: 'daemon-stop-jobs', code: 'daemon-stop-jobs.again', message: 'stop the ones left' }]
+            : [],
           items: targets.map((target) => {
             const failed = failing && target.worktree === 'fix/login (acme)'
             return {

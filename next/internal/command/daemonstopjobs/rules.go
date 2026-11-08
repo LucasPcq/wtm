@@ -48,7 +48,7 @@ const (
 	CodeDaemonSkew = Name + domain.DaemonSkew
 )
 
-// Decide turns the facts and the request into the plan: each worktree's jobs up, of the repository asked or of every one, by repository, a crashed job cleared, a shared job's own run left to its holders' stop when the main checkout does not hold it. A daemon whose jobs cannot be read is refused.
+// Decide turns the facts and the request into the plan: each worktree's jobs up, of the repository asked or of every one, by repository, a crashed job cleared, a shared job's own run let go of by the main checkout and every worktree holding it. A daemon whose jobs cannot be read is refused.
 func Decide(f Facts, req Request) (Plan, []domain.Warning, error) {
 	d := f.Daemon
 	if d.Answering && d.Skew == run.SkewProtocol {

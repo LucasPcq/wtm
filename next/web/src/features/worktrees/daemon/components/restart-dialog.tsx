@@ -7,7 +7,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Alert } from '@/features/worktrees/components/alert'
 import { CommandLine } from '@/features/worktrees/components/command-line'
 import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
-import { RepoRowsList, RowBox } from '@/features/worktrees/daemon/components/repo-rows'
+import { RepoRowsList } from '@/features/worktrees/daemon/components/repo-rows'
+import { RowBox } from '@/features/worktrees/daemon/components/row-box'
 import { notBackRows, restartRows, takenOverRows } from '@/features/worktrees/daemon/utils/rows'
 
 export function RestartDialog({

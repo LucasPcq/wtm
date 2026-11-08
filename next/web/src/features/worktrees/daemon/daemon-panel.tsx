@@ -8,6 +8,7 @@ import { RunDialogContent } from '@/features/worktrees/components/run-dialog-con
 import { type CardState, DaemonCard } from '@/features/worktrees/daemon/components/daemon-card'
 import { RestartDialog } from '@/features/worktrees/daemon/components/restart-dialog'
 import { StopJobsDialog } from '@/features/worktrees/daemon/components/stop-jobs-dialog'
+import { takenOverRows } from '@/features/worktrees/daemon/utils/rows'
 import { succeeded, useRun } from '@/features/worktrees/hooks/use-run'
 import { jobsTodo } from '@/features/worktrees/utils/progress'
 
@@ -18,30 +19,29 @@ export function DaemonPanel({ repo, children }: { repo: string; children: ReactE
   const restart = useRun(repo, 'daemon-restart')
   const [asking, setAsking] = useState<'restart' | 'stop'>()
   const detail = status.data?.items[0]?.detail
-
-  const failure = () => {
-    if (restart.running || !restart.progress) return undefined
-    const item = restart.progress.envelope?.items[0]
-    return restart.progress.refused ?? item?.error?.message ?? restart.progress.envelope?.error?.message
-  }
+  const unread = status.error?.message ?? status.data?.error?.message
 
   const state = (): CardState => {
     if (restart.running) return { kind: 'restarting' }
-    const message = failure()
-    return message ? { kind: 'failed', message } : { kind: 'read' }
+    if (!restart.progress) return { kind: 'read' }
+    const error = restart.progress.envelope?.items[0]?.error
+    const message = restart.progress.refused ?? error?.message ?? restart.progress.envelope?.error?.message
+    if (!message) return { kind: 'read' }
+    return { kind: 'failed', message, down: error?.code === 'daemon-restart.start_failed' }
   }
 
   const told = (envelope: Applied<'daemon-restart'> | undefined) => {
-    if (!succeeded(envelope)) return
-    const back = (envelope?.items[0]?.detail?.back ?? []).filter((job) => job.back).length
-    const stacks = (envelope?.plan?.taken_over ?? [])
-      .flatMap((r) => r.worktrees ?? [])
-      .flatMap((w) => w.jobs ?? []).length
-    const taken = () => {
-      if (stacks === 0) return ''
-      return stacks === 1 ? '; the stack was taken over' : `; ${stacks} stacks were taken over`
+    if (!succeeded(envelope)) {
+      toast.error("Couldn't restart wtm's daemon", { description: 'Its panel says why.' })
+      return
     }
-    toast.success(`Restarted wtm's daemon · ${back === 1 ? '1 job is' : `${back} jobs are`} back${taken()}.`)
+    const back = (envelope?.items[0]?.detail?.back ?? []).filter((job) => job.back).length
+    const stacks = envelope?.plan ? takenOverRows(envelope.plan).length : 0
+    const said = [
+      back > 0 && (back === 1 ? '1 job is back' : `${back} jobs are back`),
+      stacks > 0 && (stacks === 1 ? 'the stack was taken over' : `${stacks} stacks were taken over`),
+    ].filter(Boolean)
+    toast.success(said.length > 0 ? `Restarted wtm's daemon · ${said.join('; ')}.` : "Restarted wtm's daemon.")
     restart.dismiss()
   }
 
@@ -52,6 +52,7 @@ export function DaemonPanel({ repo, children }: { repo: string; children: ReactE
         <PopoverContent side="top" align="start" className="w-96">
           <DaemonCard
             detail={detail}
+            unread={unread}
             state={state()}
             onRestart={() => {
               restart.dismiss()

@@ -55,7 +55,7 @@ describe('a restart', () => {
             key: '/src/acme',
             title: 'main',
             lines: ['web', 'postgres · shared'],
-            warning: 'feat/billing and fix/login lose them for the cut',
+            warning: 'feat/billing and fix/login lose it for the cut',
           },
         ],
       },
@@ -107,7 +107,7 @@ describe('stopping every job', () => {
 
   it('lists each worktree, its stack, its crash and its shared services', () => {
     expect(stopRows(plan)[0]?.rows).toEqual([
-      { key: '/src/acme', title: 'main', lines: ['web', 'postgres · shared'], warning: 'feat/billing lose them' },
+      { key: '/src/acme', title: 'main', lines: ['web', 'postgres · shared'], warning: 'feat/billing loses it' },
       {
         key: '/src/acme.trees/feat-billing',
         title: 'feat/billing',

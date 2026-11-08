@@ -7,14 +7,15 @@ import { StopJobsConfirm } from '@/features/worktrees/daemon/components/stop-job
 import { useRun } from '@/features/worktrees/hooks/use-run'
 import { unitsOf } from '@/features/worktrees/utils/stop-plan'
 
-// every repository's worktrees, as a stop of worktrees takes them: the progress and the outcome are run down's
-const asStop = (plan: Planned<'daemon-stop-jobs'>) => ({
-  worktrees: (plan.repos ?? []).flatMap((repo) => repo.worktrees ?? []),
-})
-
 export function StopJobsDialog({ repo, open, onClose }: { repo: string; open: boolean; onClose: () => void }) {
   const run = useRun(repo, 'daemon-stop-jobs')
   const [ran, setRan] = useState<Planned<'daemon-stop-jobs'>>()
+  const again = run.progress?.envelope?.follow_ups?.some((followUp) => followUp.code === 'daemon-stop-jobs.again')
+
+  // every repository's worktrees, as a stop of worktrees takes them: the progress and the outcome are run down's
+  const asStop = (plan: Planned<'daemon-stop-jobs'>) => ({
+    worktrees: (plan.repos ?? []).flatMap((repo) => repo.worktrees ?? []),
+  })
 
   const content = () => {
     if (run.progress && ran)
@@ -30,10 +31,14 @@ export function StopJobsDialog({ repo, open, onClose }: { repo: string; open: bo
             run.dismiss()
             onClose()
           }}
-          onAgain={() => {
-            run.dismiss()
-            setRan(undefined)
-          }}
+          onAgain={
+            again
+              ? () => {
+                  run.dismiss()
+                  setRan(undefined)
+                }
+              : undefined
+          }
         />
       )
     return (

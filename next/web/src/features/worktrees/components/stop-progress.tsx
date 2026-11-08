@@ -10,7 +10,7 @@ import { RunOutcome } from '@/features/worktrees/components/run-outcome'
 import type { RunDownRan } from '@/features/worktrees/hooks/use-run-down-dialog'
 import type { PhaseRun, Progress } from '@/features/worktrees/utils/progress'
 import { where } from '@/features/worktrees/utils/run-words'
-import { countOf, sharedOf, stopJob } from '@/features/worktrees/utils/stop-plan'
+import { countOf, holdsOn, sharedOf, stopJob } from '@/features/worktrees/utils/stop-plan'
 import { recapOf } from '@/features/worktrees/utils/stop-recap'
 import { sharedStopping, stopping } from '@/features/worktrees/utils/stop-words'
 
@@ -35,7 +35,6 @@ export function StopProgress({
   ran: RunDownRan
   onHide: () => void
   onDone: () => void
-  // what did not stop asked again, where the command offers it
   onAgain?: (() => void) | undefined
 }) {
   const envelope = progress.envelope
@@ -51,7 +50,7 @@ export function StopProgress({
 
   const sharedRows = shared.flatMap((service) => {
     const runs = progress.units.flatMap((unit) =>
-      unit.phases.filter((run) => run.job === service.name && isShared(unit.subject, run.job)),
+      unit.phases.filter((run) => holdsOn(ran.plan, unit.subject, run.job, service)),
     )
     const least = runs.toSorted((a, b) => rank[a.state] - rank[b.state])[0]
     return least ? [{ service, run: least, lines: runs.flatMap((run) => run.lines ?? []) }] : []
@@ -94,7 +93,7 @@ export function StopProgress({
               <JobSection dense title="Shared services">
                 {sharedRows.map(({ service, run, lines }) => (
                   <PhaseRow
-                    key={service.name}
+                    key={`${service.sharedIn}:${service.name}`}
                     name={service.name}
                     run={run}
                     label={sharedStopping(
@@ -102,7 +101,7 @@ export function StopProgress({
                       service,
                       items.flatMap((item) =>
                         (item.detail?.jobs ?? [])
-                          .filter((job) => job.name === service.name && isShared(item.subject, job.name))
+                          .filter((job) => holdsOn(ran.plan, item.subject, job.name, service))
                           .map((job) => job.status),
                       ),
                     )}

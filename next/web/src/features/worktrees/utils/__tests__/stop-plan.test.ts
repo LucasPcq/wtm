@@ -14,10 +14,32 @@ test('a shared service is counted once, stopped once every holder let it go; not
     'a worktree with nothing to stop has no unit',
   ).toEqual(['feat/billing', 'fix/login', 'feat/search'])
   expect(sharedOf(plan)).toEqual([
-    { name: 'postgres', holders: ['feat/billing', 'fix/login', 'feat/search'], keptBy: [], stops: true },
+    {
+      name: 'postgres',
+      sharedIn: 'main',
+      holders: ['feat/billing', 'fix/login', 'feat/search'],
+      keptBy: [],
+      stops: true,
+    },
   ])
   expect(countOf(one.units, plan)).toEqual({ done: 0, total: 6 })
   const two = advance(one, finished('postgres', 'fix/login'))
   expect(countOf(two.units, plan)).toEqual({ done: 0, total: 6 })
   expect(countOf(advance(two, finished('postgres', 'feat/search')).units, plan)).toEqual({ done: 1, total: 6 })
+})
+
+test("two repositories' shared services of one name are two services, each counted once", () => {
+  const job = (shared_in: string) => ({ name: 'db', hold: 'claim' as const, fate: 'stop' as const, shared_in })
+  const plan = {
+    worktrees: [
+      { worktree: 'feat/a (acme)', path: '/acme/.trees/a', jobs: [job('/acme')] },
+      { worktree: 'feat/b (wtm)', path: '/wtm/.trees/b', jobs: [job('/wtm')] },
+    ],
+  }
+
+  expect(sharedOf(plan).map((service) => [service.sharedIn, service.holders])).toEqual([
+    ['/acme', ['feat/a (acme)']],
+    ['/wtm', ['feat/b (wtm)']],
+  ])
+  expect(countOf(unitsOf(plan), plan)).toEqual({ done: 0, total: 2 })
 })

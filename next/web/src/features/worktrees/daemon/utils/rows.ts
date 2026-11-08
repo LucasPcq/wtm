@@ -1,6 +1,5 @@
 import type { DaemonrestartPlan, DaemonstopjobsPlan, RunHeldJob, RunHeldRepo, RunjobsStopJob } from '@/api/types.gen'
 
-// a worktree as a dialog lists it: its name, a line per kind of job, and whose hold goes with it
 export type Row = { key: string; title: string; lines: string[]; warning?: string }
 export type RepoRows = { repo: string; rows: Row[] }
 
@@ -11,8 +10,16 @@ export const together = (names: string[]) =>
 
 const holdersOf = (jobs: { held_by?: string[] | null }[]) => [...new Set(jobs.flatMap((job) => job.held_by ?? []))]
 
+// the worktrees holding a row's shared services, which they lose: "feat/a loses it", "feat/a and fix/b lose them"
+function losing(shared: { held_by?: string[] | null }[], after = '') {
+  const holders = holdersOf(shared)
+  if (holders.length === 0) return {}
+  const verb = holders.length === 1 ? 'loses' : 'lose'
+  return { warning: `${together(holders)} ${verb} ${shared.length === 1 ? 'it' : 'them'}${after}` }
+}
+
 // a claim is its shared job's, said on that job's row: its worktree is listed only for what it runs itself
-function heldRows(repos: RunHeldRepo[] | null, losing: string): RepoRows[] {
+function heldRows(repos: RunHeldRepo[] | null, after: string): RepoRows[] {
   return (repos ?? []).flatMap((repo) => {
     const rows = (repo.worktrees ?? []).flatMap((wt): Row[] => {
       const jobs = (wt.jobs ?? []).filter((job) => job.hold !== 'claim')
@@ -20,13 +27,12 @@ function heldRows(repos: RunHeldRepo[] | null, losing: string): RepoRows[] {
       const shared = jobs.filter((job) => job.shared)
       const own = jobs.filter((job) => !job.shared)
       const lines = [own.map((job) => job.name).join(', '), shared.length > 0 && `${names(shared)} · shared`]
-      const holders = holdersOf(shared)
       return [
         {
           key: wt.path,
           title: wt.branch ?? wt.path,
           lines: lines.filter((line): line is string => Boolean(line)),
-          ...(holders.length > 0 && { warning: `${together(holders)} ${losing}` }),
+          ...losing(shared, after),
         },
       ]
     })
@@ -36,9 +42,8 @@ function heldRows(repos: RunHeldRepo[] | null, losing: string): RepoRows[] {
 
 const names = (jobs: { name: string }[]) => jobs.map((job) => job.name).join(', ')
 
-export const restartRows = (plan: DaemonrestartPlan) => heldRows(plan.back, 'lose them for the cut')
+export const restartRows = (plan: DaemonrestartPlan) => heldRows(plan.back, ' for the cut')
 
-// the stacks a restart takes over, one row per worktree's
 export const takenOverRows = (plan: DaemonrestartPlan): Row[] =>
   (plan.taken_over ?? []).flatMap((repo) =>
     (repo.worktrees ?? []).flatMap((wt) => {
@@ -54,7 +59,6 @@ export const takenOverRows = (plan: DaemonrestartPlan): Row[] =>
     }),
   )
 
-// what a restart does not bring back, each with why
 export const notBackRows = (plan: DaemonrestartPlan): Row[] => {
   const why = (repos: RunHeldRepo[] | null, reason: string): Row[] =>
     (repos ?? []).flatMap((repo) =>
@@ -85,21 +89,19 @@ export function stopRows(plan: DaemonstopjobsPlan): RepoRows[] {
       const own = jobs.filter((job) => !job.shared_in && job.fate === 'stop' && job.hold !== 'detached')
       const stacks = jobs.filter((job) => job.hold === 'detached' && job.fate === 'stop')
       const crashed = jobs.filter((job) => job.fate === 'clear')
-      const ownLine = [names(own), stacks.length > 0 && `and its stack: ${names(stacks)}, through its stop command`]
-        .filter(Boolean)
-        .join(own.length > 0 ? ', ' : '')
+      const stack = `${own.length > 0 ? 'and its' : 'its'} stack: ${names(stacks)}, through its stop command`
+      const ownLine = [names(own), stacks.length > 0 && stack].filter(Boolean).join(own.length > 0 ? ', ' : '')
       const lines = [
         ownLine,
         shared.length > 0 && `${names(shared)} · shared`,
         crashed.length > 0 && `${names(crashed)} crashed: nothing to stop`,
       ]
-      const holders = holdersOf(shared)
       return [
         {
           key: target.path,
           title: target.branch ?? target.path,
           lines: lines.filter((line): line is string => Boolean(line)),
-          ...(holders.length > 0 && { warning: `${together(holders)} lose them` }),
+          ...losing(shared),
         },
       ]
     })
@@ -113,7 +115,6 @@ export const stopTotal = (plan: DaemonstopjobsPlan) =>
     0,
   )
 
-// a repository's jobs as the panel says them: its jobs and its stacks counted, then their names
 export function repoLine(repo: RunHeldRepo): string {
   const jobs: RunHeldJob[] = (repo.worktrees ?? []).flatMap((wt) => wt.jobs ?? []).filter((job) => job.hold !== 'claim')
   const stacks = jobs.filter((job) => job.hold === 'detached').length

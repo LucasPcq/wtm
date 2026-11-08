@@ -262,6 +262,7 @@ test("a job's event reads its repository again, as the job comes up, crashes or 
   ]
   client.setQueryData(facts, { ok: true })
   client.setQueryData(whole, { ok: true })
+  client.setQueryData(['repo', 'r2', 'daemon-status', []], { ok: true })
   serve(
     200,
     'data: {"v":2,"type":"job.started","repo":{"root":"/acme","common_dir":"/acme/.git"},"worktree":{"branch":"feat/a","path":"/acme.trees/feat-a"},"job":{"name":"web","kind":"service","hold":"own"}}\n\n',
@@ -283,4 +284,8 @@ test("a job's event reads its repository again, as the job comes up, crashes or 
   expect(client.getQueryState(whole)?.isInvalidated, 'a scan of a whole log is not started again at each job').toBe(
     false,
   )
+  expect(
+    client.getQueryState(['repo', 'r2', 'daemon-status', []])?.isInvalidated,
+    "wtm's daemon, the machine's, read under another repository",
+  ).toBe(true)
 })

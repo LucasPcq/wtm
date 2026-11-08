@@ -8,30 +8,44 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Glyph } from '@/features/worktrees/components/glyph'
 import { repoLine, repoName } from '@/features/worktrees/daemon/utils/rows'
 
-// the panel says the daemon as it stands, or the restart under way, or the one that failed
-export type CardState = { kind: 'read' } | { kind: 'restarting' } | { kind: 'failed'; message: string }
+// down: the restart stopped the daemon and the new one didn't start
+export type CardState = { kind: 'read' } | { kind: 'restarting' } | { kind: 'failed'; message: string; down: boolean }
 
 export function DaemonCard({
   detail,
+  unread,
   state,
   onRestart,
   onStopJobs,
 }: {
   detail: DaemonstatusDetail | undefined
+  unread: string | undefined
   state: CardState
   onRestart: () => void
   onStopJobs: () => void
 }) {
+  if (!detail && state.kind === 'read' && unread)
+    return <Line icon={CircleX} tone="failed" title="Couldn't read wtm's daemon" below={unread} />
   if (!detail && state.kind === 'read') return <Skeleton className="h-40 w-full" />
 
   const repos = detail?.repos ?? []
   const busy = state.kind === 'restarting'
+  const down = state.kind === 'failed' && state.down
 
   const headline = () => {
     if (state.kind === 'restarting')
       return <Line icon={Loader} tone="busy" title="Restarting" below="Its jobs come back once it's up." />
+    if (down)
+      return (
+        <Line
+          icon={CircleX}
+          tone="failed"
+          title="The new daemon didn't start"
+          below="Named addresses don't answer; see its log."
+        />
+      )
     if (state.kind === 'failed')
-      return <Line icon={CircleX} tone="failed" title="The new daemon didn't start" below={state.message} />
+      return <Line icon={CircleX} tone="failed" title="The restart didn't finish" below={state.message} />
     if (!detail?.running)
       return <Line icon={Square} tone="muted" title="Not running" below="The next job started brings it up." />
     if (detail.skew)
@@ -54,7 +68,7 @@ export function DaemonCard({
       </p>
       {headline()}
 
-      {state.kind !== 'failed' && (
+      {!down && (
         <section className="flex flex-col gap-2" aria-label="Jobs it runs">
           <h3 className="text-xs text-muted-foreground">Jobs it runs</h3>
           {repos.length === 0 && <p className="text-muted-foreground">None</p>}
@@ -77,14 +91,14 @@ export function DaemonCard({
         <p className="flex items-baseline justify-between gap-4">
           <span>Named addresses</span>
           <span className="text-muted-foreground">
-            {detail?.proxy && state.kind !== 'failed' ? `on :${detail.proxy.port}` : 'not served'}
+            {detail?.proxy && !down ? `on :${detail.proxy.port}` : 'not served'}
           </span>
         </p>
       </section>
 
       <Separator />
-      {state.kind === 'failed' ? (
-        <div>
+      <div className="flex flex-wrap gap-2">
+        {down && (
           <Button
             variant="outline"
             size="sm"
@@ -93,19 +107,16 @@ export function DaemonCard({
             <FileText />
             Open its log
           </Button>
-        </div>
-      ) : (
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" disabled={busy} onClick={onRestart}>
-            <RotateCw />
-            Restart
-          </Button>
-          <Button variant="outline" size="sm" disabled={busy || repos.length === 0} onClick={onStopJobs}>
-            <Square />
-            Stop every job
-          </Button>
-        </div>
-      )}
+        )}
+        <Button variant="outline" size="sm" disabled={busy} onClick={onRestart}>
+          <RotateCw />
+          Restart
+        </Button>
+        <Button variant="outline" size="sm" disabled={busy || down || repos.length === 0} onClick={onStopJobs}>
+          <Square />
+          Stop every job
+        </Button>
+      </div>
     </div>
   )
 }

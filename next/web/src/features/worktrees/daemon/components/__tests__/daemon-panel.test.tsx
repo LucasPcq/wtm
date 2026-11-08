@@ -21,6 +21,18 @@ test("the connection block opens wtm's daemon: up, the jobs of every repository,
   expect(within(panel).getByText('on :11080')).toBeDefined()
 })
 
+test("a daemon status that can't be read says why instead of loading forever", async () => {
+  server.use(
+    daemonStatus(undefined, { kind: 'internal', code: 'daemon-status.unreadable', message: 'the socket refused' }),
+  )
+  const { user } = await renderApp('/r/r1/worktrees')
+
+  const panel = await openPanel(user)
+
+  expect(await within(panel).findByText("Couldn't read wtm's daemon")).toBeDefined()
+  expect(within(panel).getByText('the socket refused')).toBeDefined()
+})
+
 test('a daemon of another build turns the block amber and says a start is refused until it restarts', async () => {
   server.use(liveEvents, daemonStatus({ ...daemonDetail, daemon: '0.30.9', skew: 'build' }))
   const { user } = await renderApp('/r/r1/worktrees')
@@ -40,7 +52,7 @@ test('Restart lists what comes back by repository, whose hold goes, what is take
 
   const dialog = await screen.findByRole('dialog', { name: "Restart wtm's daemon" })
   expect(await within(dialog).findByText('postgres · shared')).toBeDefined()
-  expect(within(dialog).getByText('feat/billing lose them for the cut')).toBeDefined()
+  expect(within(dialog).getByText('feat/billing loses it for the cut')).toBeDefined()
   expect(within(dialog).getByText("fix/login's stack")).toBeDefined()
   await user.click(within(dialog).getByRole('button', { name: 'Restart' }))
 
@@ -48,7 +60,7 @@ test('Restart lists what comes back by repository, whose hold goes, what is take
 })
 
 test("a restart whose new daemon didn't start says it in the panel, with its log to open", async () => {
-  server.use(daemonStatus(), answeringRestart(true))
+  server.use(daemonStatus(), answeringRestart('start_failed'))
   const { user } = await renderApp('/r/r1/worktrees')
   let panel = await openPanel(user)
   await user.click(within(panel).getByRole('button', { name: 'Restart' }))
@@ -61,6 +73,25 @@ test("a restart whose new daemon didn't start says it in the panel, with its log
   expect(await within(panel).findByText("The new daemon didn't start")).toBeDefined()
   expect(within(panel).getByRole('button', { name: 'Open its log' })).toBeDefined()
   expect(within(panel).getByText('not served')).toBeDefined()
+  expect(within(panel).getByRole('button', { name: 'Restart' }), 'it can be tried again').toBeDefined()
+})
+
+test("a restart whose job didn't come back keeps the daemon up, says why, and offers Restart again", async () => {
+  server.use(daemonStatus(), answeringRestart('not_back'))
+  const { user } = await renderApp('/r/r1/worktrees')
+  let panel = await openPanel(user)
+  await user.click(within(panel).getByRole('button', { name: 'Restart' }))
+  const dialog = await screen.findByRole('dialog', { name: "Restart wtm's daemon" })
+  await within(dialog).findByText('postgres · shared')
+  await user.click(within(dialog).getByRole('button', { name: 'Restart' }))
+
+  expect(await screen.findByText("Couldn't restart wtm's daemon")).toBeDefined()
+  panel = await openPanel(user)
+  expect(await within(panel).findByText("The restart didn't finish")).toBeDefined()
+  expect(within(panel).getByText("didn't come back: web: port 3000 is taken")).toBeDefined()
+  expect(within(panel).queryByText("The new daemon didn't start")).toBeNull()
+  expect(within(panel).getByText('on :11080')).toBeDefined()
+  expect(within(panel).getByRole('button', { name: 'Restart' })).toBeDefined()
 })
 
 test('Stop every job lists every repository, then stops them and says the proxy stays', async () => {
@@ -70,8 +101,8 @@ test('Stop every job lists every repository, then stops them and says the proxy 
   await user.click(within(panel).getByRole('button', { name: 'Stop every job' }))
 
   const dialog = await screen.findByRole('dialog', { name: 'Stop every job' })
-  expect(await within(dialog).findByText('and its stack: mailpit, through its stop command')).toBeDefined()
-  expect(within(dialog).getByText('feat/billing lose them')).toBeDefined()
+  expect(await within(dialog).findByText('its stack: mailpit, through its stop command')).toBeDefined()
+  expect(within(dialog).getByText('feat/billing loses it')).toBeDefined()
   await user.click(within(dialog).getByRole('button', { name: 'Stop 3 jobs' }))
 
   expect(await within(dialog).findByRole('button', { name: 'Done' })).toBeDefined()
