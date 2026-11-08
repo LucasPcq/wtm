@@ -135,7 +135,7 @@
       "detail": {
         "repository": "/acme",
         "shared": true,
-        "branch": "",
+        "branch": "main",
         "path": "/acme",
         "profile": "",
         "counts": {

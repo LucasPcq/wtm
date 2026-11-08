@@ -89,6 +89,7 @@ func TestASharedServiceListsTheWorktreesHoldingItTheirNamespaceAndSinceWhen(t *t
 	}, db.Holders)
 	assert.Equal(t, runps.Counts{Running: 1, Holders: 3}, shared.Counts)
 	assert.True(t, shared.Shared)
+	assert.Equal(t, "main", shared.Branch, "the shared services run in the main checkout")
 }
 
 func TestARepositoryNamedNarrowsTheListToItsJobs(t *testing.T) {

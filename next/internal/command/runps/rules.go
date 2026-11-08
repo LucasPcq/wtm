@@ -71,7 +71,7 @@ const (
 	CodeMetaUnreadable = Name + ".meta_unreadable"
 )
 
-// A Detail is one group of jobs as the JSON envelope reports it: the jobs one worktree runs for itself, or a repository's shared services (Shared), with the repository's main checkout, the worktree's branch (none for the shared services or a worktree on no branch) and path (the main checkout for the shared services), the profile its jobs were started under, how many of its jobs stand in each state, and its jobs, those to see first first.
+// A Detail is one group of jobs as the JSON envelope reports it: the jobs one worktree runs for itself, or a repository's shared services (Shared), with the repository's main checkout, the worktree's branch and path (for the shared services the main checkout's, where they run; no branch on none), the profile its jobs were started under, how many of its jobs stand in each state, and its jobs, those to see first first.
 type Detail struct {
 	Repository string `json:"repository"`
 	Shared     bool   `json:"shared"`
@@ -407,7 +407,7 @@ func countsOf(jobs []Job) Counts {
 
 // shared is p's shared services, each the job its main checkout runs, with the worktrees holding it: the main one first when it holds it, then the others in git's order.
 func (p Project) shared(jobs []run.Job) Detail {
-	d := Detail{Repository: p.MainPath, Shared: true, Path: p.MainPath, Jobs: []Job{}}
+	d := Detail{Repository: p.MainPath, Shared: true, Branch: p.branchAt(p.MainPath), Path: p.MainPath, Jobs: []Job{}}
 	holders := map[string]bool{}
 	for _, job := range jobs {
 		if job.Hold == run.HoldClaim || job.SharedDir == "" || !p.owns(job) {

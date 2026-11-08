@@ -150,7 +150,7 @@
       "detail": {
         "repository": "<SB>/acme",
         "shared": true,
-        "branch": "",
+        "branch": "main",
         "path": "<SB>/acme",
         "profile": "",
         "counts": {
