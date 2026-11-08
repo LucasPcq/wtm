@@ -99,6 +99,11 @@ test('the shared services are folded by default and open on their holders; a run
 
   expect(within(shared).getByText('acme_feat_billing')).toBeDefined()
   expect(within(screen.getByRole('region', { name: 'fix/login' })).getByText('localhost:8055')).toBeDefined()
+
+  await user.click(within(shared).getByRole('link', { name: /postgres/ }))
+  const where = await screen.findByRole('navigation', { name: 'Where it runs' })
+  expect(where.textContent).toBe('Shared services')
+  expect(await screen.findByText(/runs once, in main’s checkout/)).toBeDefined()
 })
 
 test('a group folded stays folded, kept in this browser for the repository', async () => {
@@ -145,4 +150,17 @@ test('this worktree is where the page was opened from', async () => {
 
   await waitFor(() => expect(screen.queryByRole('region', { name: 'feat/billing' })).toBeNull())
   expect(screen.getByRole('region', { name: 'fix/login' })).toBeDefined()
+})
+
+test('the Pinned group unpins them all from its menu', async () => {
+  acme()
+  const { user } = await renderApp('/r/r1/running?worktree=fix/login&job=web')
+  await user.click(await screen.findByRole('button', { name: 'Pin web to the top' }))
+  const pinned = await screen.findByRole('region', { name: 'Pinned' })
+
+  await user.click(within(pinned).getByRole('button', { name: 'More for Pinned' }))
+  await user.click(await screen.findByRole('menuitem', { name: 'Unpin all' }))
+
+  await waitFor(() => expect(screen.queryByRole('region', { name: 'Pinned' })).toBeNull())
+  expect(names(screen.getByRole('region', { name: 'fix/login' }))).toEqual(['web', 'stack'])
 })

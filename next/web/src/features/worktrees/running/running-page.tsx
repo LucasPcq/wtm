@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Activity, Play } from 'lucide-react'
+import { Activity, Ellipsis, PinOff, Play } from 'lucide-react'
 import { useState } from 'react'
 import { jobsQuery } from '@/api/queries/commands'
 import { reposQuery } from '@/api/queries/repos'
@@ -8,6 +8,7 @@ import { Centered } from '@/components/centered'
 import { PageHeader } from '@/components/page-header'
 import { StatePage } from '@/components/state-page'
 import { Button } from '@/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Rail } from '@/features/worktrees/components/rail'
 import { ReadFailed } from '@/features/worktrees/components/read-failed'
@@ -121,8 +122,25 @@ export function RunningPage({ repo, search }: { repo: string; search: RunningSea
           >
             {shown.pinned.length > 0 && (
               <section aria-label="Pinned" className="flex flex-col gap-1 py-3">
-                <h2 className="text-sm font-semibold">Pinned</h2>
-                <p className="text-xs text-muted-foreground">stays on top, for you</p>
+                <div className="flex items-start gap-3">
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <h2 className="text-sm font-semibold">Pinned</h2>
+                    <p className="text-xs text-muted-foreground">stays on top, for you</p>
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon-sm" aria-label="More for Pinned">
+                        <Ellipsis />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onSelect={pinned.clear}>
+                        <PinOff />
+                        Unpin all
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
                 <Rail elbow={16} indent={14} className="ml-2">
                   {shown.pinned.map(({ group, row }) => (
                     <RunningJob

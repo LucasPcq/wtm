@@ -97,6 +97,7 @@ export function useMarks(kind: 'folded' | 'pinned' | 'quiet', repo: string) {
     has: (id: string) => marked.includes(id),
     toggle: (id: string) =>
       choose(kind, repo, marked.includes(id) ? marked.filter((one) => one !== id) : [...marked, id]),
+    clear: () => choose(kind, repo, undefined),
   }
 }
 

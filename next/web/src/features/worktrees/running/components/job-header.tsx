@@ -37,8 +37,11 @@ export function JobHeader({
   const PinIcon = pinned ? PinOff : Pin
   const { icon: Icon, tone } = doing ? { icon: LoaderCircle, tone: 'busy' as const } : look
 
+  // a shared service runs once for every worktree holding it, in the main checkout
+  const forAll = (job.holders?.length ?? 0) > 0
   const since = () => {
     if (doing) return doingWords[doing]
+    if (forAll) return `${jobSince(job, now)} · runs once, in ${worktree}’s checkout`
     return job.hold === 'detached' ? `detached · ${jobSince(job, now)}` : jobSince(job, now)
   }
   const where = [facts?.dir, facts?.command].filter(Boolean).join(' · ')
@@ -46,8 +49,8 @@ export function JobHeader({
   return (
     <header className="flex flex-col gap-1 px-6 pt-5 pb-4">
       <nav aria-label="Where it runs" className="flex items-center gap-1 text-xs text-muted-foreground">
-        <span className="truncate">{worktree}</span>
-        {profile && (
+        <span className="truncate">{forAll ? 'Shared services' : worktree}</span>
+        {profile && !forAll && (
           <>
             <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
             <span className="truncate">profile {profile}</span>
