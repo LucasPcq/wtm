@@ -42,6 +42,7 @@ const restart: DaemonrestartPlan = {
   ],
   unrecorded: [],
   gone: null,
+  unheld: null,
 }
 
 describe('a restart', () => {

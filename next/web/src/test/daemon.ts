@@ -76,6 +76,7 @@ const restartPlan: DaemonrestartPlan = {
   tasks: [],
   unrecorded: [],
   gone: [],
+  unheld: [],
 }
 
 // a restart's plan, then its apply: every job back, or the new daemon failing to start

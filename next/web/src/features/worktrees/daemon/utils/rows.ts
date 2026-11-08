@@ -68,6 +68,7 @@ export const notBackRows = (plan: DaemonrestartPlan): Row[] => {
     ...why(plan.tasks, 'a task, not run again'),
     ...why(plan.unrecorded, 'no record of it'),
     ...why(plan.gone, 'its worktree is gone'),
+    ...why(plan.unheld, 'the worktrees holding it are gone'),
   ]
 }
 
