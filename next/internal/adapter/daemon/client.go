@@ -26,9 +26,11 @@ const (
 	shutdownWait = 30 * time.Second
 	pollEvery    = 50 * time.Millisecond
 
-	indexName = "jobs.json"
-	lockName  = "wtm.lock"
-	logName   = "daemon.log"
+	globalDirName = "wtm"
+	socketName    = "wtm.sock"
+	indexName     = "jobs.json"
+	lockName      = "wtm.lock"
+	logName       = "daemon.log"
 )
 
 // startWait is how long a daemon started has to answer, and a process on the socket that is no run daemon to go.
@@ -45,6 +47,17 @@ type Daemon struct {
 	SocketPath  string
 	Version     string
 	StartDaemon func() error
+}
+
+// SocketPath returns the socket wtm's daemon listens on, under the user's
+// config directory, or "" when that directory is unknown.
+func SocketPath() string {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return ""
+	}
+
+	return filepath.Join(dir, globalDirName, socketName)
 }
 
 // LogPath returns the file a daemon started beside socket writes why it

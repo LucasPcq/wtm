@@ -151,7 +151,7 @@ func mutations() []mutation {
 			setup: func(t *testing.T, main string) {
 				writeRun(t, main, seedJob)
 				t.Setenv("HOME", shortDir(t))
-				serving(t, daemonParams{Socket: events.SocketPath()})
+				serving(t, daemonParams{Socket: daemon.SocketPath()})
 			},
 			// a job more in run.toml: the profile starts another
 			stale: func(t *testing.T, main string) {
@@ -172,7 +172,7 @@ func mutations() []mutation {
 			setup: func(t *testing.T, main string) {
 				writeRun(t, main, idleJob("idle"))
 				t.Setenv("HOME", shortDir(t))
-				serving(t, daemonParams{Socket: events.SocketPath()})
+				serving(t, daemonParams{Socket: daemon.SocketPath()})
 				startIdle(t, main, "idle")
 			},
 			// another job up: the plan stops one more
@@ -194,7 +194,7 @@ func mutations() []mutation {
 			setup: func(t *testing.T, main string) {
 				writeRun(t, main, seedJob)
 				t.Setenv("HOME", shortDir(t))
-				serving(t, daemonParams{Socket: events.SocketPath()})
+				serving(t, daemonParams{Socket: daemon.SocketPath()})
 			},
 			// the task runs another command since
 			stale: func(t *testing.T, main string) {
@@ -215,12 +215,12 @@ func mutations() []mutation {
 			setup: func(t *testing.T, main string) {
 				writeRun(t, main, idleJob("idle"))
 				t.Setenv("HOME", shortDir(t))
-				serving(t, daemonParams{Socket: events.SocketPath()})
+				serving(t, daemonParams{Socket: daemon.SocketPath()})
 				startIdle(t, main, "idle")
 			},
 			// the job is a stack since, whose launcher left it up: the plan stops it with its stop command
 			stale: func(t *testing.T, main string) {
-				client := daemon.Daemon{SocketPath: events.SocketPath(), Version: version}
+				client := daemon.Daemon{SocketPath: daemon.SocketPath(), Version: version}
 				_, err := client.Stop(t.Context(), run.Stop{Name: "idle", WorkDir: main}, nil)
 				require.NoError(t, err)
 				_, err = client.Start(t.Context(), run.Spec{Job: project.Job{Name: "idle", Kind: project.Service, Cmd: "true", Stop: "true"}, WorkDir: main}, nil)
@@ -393,7 +393,7 @@ func idleJob(name string) string {
 // startIdle starts the service of name in main through the run daemon the commands reach: a process of the test's own daemon, which a stop stops.
 func startIdle(t *testing.T, main, name string) {
 	t.Helper()
-	_, err := daemon.Daemon{SocketPath: events.SocketPath(), Version: version}.Start(t.Context(), run.Spec{Job: project.Job{Name: name, Kind: project.Service, Cmd: "sleep 30"}, WorkDir: main}, nil)
+	_, err := daemon.Daemon{SocketPath: daemon.SocketPath(), Version: version}.Start(t.Context(), run.Spec{Job: project.Job{Name: name, Kind: project.Service, Cmd: "sleep 30"}, WorkDir: main}, nil)
 	require.NoError(t, err)
 }
 

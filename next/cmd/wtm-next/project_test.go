@@ -8,7 +8,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/LucasPcq/wtm/next/internal/adapter/events"
+	"github.com/LucasPcq/wtm/next/internal/adapter/daemon"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
@@ -83,7 +83,7 @@ func TestTheLiveViewsKeysStopAJobAndStartItAgain(t *testing.T) {
 	main := configured(t)
 	writeRun(t, main, idleJob("idle"))
 	t.Setenv("HOME", shortDir(t))
-	serving(t, daemonParams{Socket: events.SocketPath()})
+	serving(t, daemonParams{Socket: daemon.SocketPath()})
 	startIdle(t, main, "idle")
 	idle := runview.Act{Worktree: "main", Dir: main, Job: "idle"}
 	up := func() bool {

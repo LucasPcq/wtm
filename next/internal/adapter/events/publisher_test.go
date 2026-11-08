@@ -134,13 +134,6 @@ func TestADaemonThatRefusesTheEventDoesNotStopThePublisher(t *testing.T) {
 	require.NotEmpty(t, daemon.next(t))
 }
 
-func TestTheSocketIsTheOneWtmsDaemonListensOn(t *testing.T) {
-	path := SocketPath()
-
-	assert.Equal(t, "wtm.sock", filepath.Base(path))
-	assert.Equal(t, "wtm", filepath.Base(filepath.Dir(path)))
-}
-
 func TestTheCommonDirIsResolvedThroughSymlinks(t *testing.T) {
 	target := t.TempDir()
 	link := filepath.Join(t.TempDir(), "link")

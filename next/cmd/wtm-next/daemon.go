@@ -50,7 +50,7 @@ func daemonCmd() *cobra.Command {
 		Args:   cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			port, problem := proxyPort(cmd)
-			return serveDaemon(cmd.Context(), daemonParams{Socket: bus.SocketPath(), ProxyPort: port, ProxyProblem: problem, Stderr: cmd.ErrOrStderr()})
+			return serveDaemon(cmd.Context(), daemonParams{Socket: daemon.SocketPath(), ProxyPort: port, ProxyProblem: problem, Stderr: cmd.ErrOrStderr()})
 		},
 	}
 	cmd.Flags().Int(flagProxyPort, 0, "Port the run proxy serves named job URLs on (0 turns it off); the global config's when not given")
@@ -96,27 +96,28 @@ func serveDaemon(ctx context.Context, params daemonParams) error {
 		// Probed on every answer, never cached: the redirection is installed and removed while the daemon runs.
 		Probe: names.Probe,
 	})
-	return bus.Serve(ctx, bus.ServeParams{
+	return daemon.Serve(ctx, daemon.ServeParams{
 		SocketPath: socket,
 		Idle:       daemonIdle,
-		Relay:      relay,
 		Ready: func() {
 			daemon.EmptyLog(socket)
 			if params.ProxyProblem != nil {
-				fmt.Fprintf(params.Stderr, "run proxy: %v — jobs keep their own ports\n", params.ProxyProblem)
+				fmt.Fprintf(params.Stderr, "proxy: %v — jobs keep their own ports\n", params.ProxyProblem)
 			}
 			if params.ProxyPort > 0 {
 				if err := names.Listen(params.ProxyPort); err != nil {
-					fmt.Fprintf(params.Stderr, "run proxy: cannot serve on port %d (%v) — jobs keep their own ports\n", params.ProxyPort, err)
+					fmt.Fprintf(params.Stderr, "proxy: cannot serve on port %d (%v) — jobs keep their own ports\n", params.ProxyPort, err)
 				}
 			}
 			jobs.Adopt()
 		},
-		Other: func(conn net.Conn, line []byte, stop func()) {
+		Bus: relay.Serve,
+		Answer: func(conn net.Conn, line []byte, stop func()) {
 			daemon.Server{Jobs: jobs, Version: version, Stop: stop}.Serve(conn, line)
 		},
 		Busy: jobs.Busy,
 		Stopping: func() {
+			relay.Close()
 			jobs.Shutdown()
 			_ = names.Close()
 		},
@@ -149,7 +150,7 @@ func dirExists(path string) bool {
 
 // runDaemon is the run daemon of this machine as a command asks it: on the bus's socket, started from this binary when one is needed.
 func runDaemon() daemon.Daemon {
-	return daemon.Daemon{SocketPath: bus.SocketPath(), Version: version, StartDaemon: startDaemon}
+	return daemon.Daemon{SocketPath: daemon.SocketPath(), Version: version, StartDaemon: startDaemon}
 }
 
 // startDaemon starts this binary's daemon in a session of its own, with this process's environment but its correlation ID, which belongs to the one command that started it, its standard error to the daemon's log, where a start that failed says why.
@@ -162,7 +163,7 @@ func startDaemon() error {
 		return err
 	}
 
-	return shell.Detached(shell.DetachedParams{Name: exe, Args: []string{daemonCommand}, Env: shell.Environ([]string{cli.CorrelationIDEnv}, nil), Log: daemon.LogPath(bus.SocketPath())})
+	return shell.Detached(shell.DetachedParams{Name: exe, Args: []string{daemonCommand}, Env: shell.Environ([]string{cli.CorrelationIDEnv}, nil), Log: daemon.LogPath(daemon.SocketPath())})
 }
 
 // commandRestartDaemon is the follow-up that restarts the run daemon, as a follow-up names it.

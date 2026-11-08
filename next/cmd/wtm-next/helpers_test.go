@@ -277,7 +277,7 @@ func (s shapes) golden(part string, v any) {
 	formtest.Golden(s.t, "catalogue_"+s.command+"_"+part, text+"\n")
 }
 
-// servingBus runs the event bus's daemon on a new socket until the test ends, and returns its socket, in a short directory: a unix socket path is limited to about 100 bytes.
+// servingBus runs a daemon carrying only the event bus on a new socket until the test ends, and returns its socket, in a short directory: a unix socket path is limited to about 100 bytes.
 func servingBus(t *testing.T) string {
 	t.Helper()
 	dir, err := os.MkdirTemp("", "wtm-next")
@@ -287,7 +287,10 @@ func servingBus(t *testing.T) string {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	served := make(chan error, 1)
-	go func() { served <- bus.Serve(ctx, bus.ServeParams{SocketPath: socket, Idle: time.Minute}) }()
+	relay := bus.NewRelay()
+	go func() {
+		served <- daemon.Serve(ctx, daemon.ServeParams{SocketPath: socket, Idle: time.Minute, Bus: relay.Serve, Stopping: relay.Close})
+	}()
 	t.Cleanup(func() {
 		cancel()
 		<-served
@@ -936,7 +939,7 @@ func writeRun(t *testing.T, main, content string) {
 // daemonJobs are the jobs the run daemon at the commands' socket lists.
 func daemonJobs(t *testing.T) []run.Job {
 	t.Helper()
-	jobs, err := daemon.Daemon{SocketPath: bus.SocketPath(), Version: version}.Jobs(t.Context())
+	jobs, err := daemon.Daemon{SocketPath: daemon.SocketPath(), Version: version}.Jobs(t.Context())
 	require.NoError(t, err)
 	return jobs
 }

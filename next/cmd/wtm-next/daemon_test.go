@@ -142,7 +142,7 @@ func TestWhyTheDaemonServesNoProxyIsInItsLog(t *testing.T) {
 	unreadable := serving(t, daemonParams{ProxyProblem: errors.New("invalid [proxy] port 99999 in config.toml")})
 	moved := serving(t, daemonParams{ProxyPort: taken})
 
-	assert.Equal(t, "run proxy: invalid [proxy] port 99999 in config.toml — jobs keep their own ports\n", daemonLog(t, unreadable), "said once the log was emptied")
+	assert.Equal(t, "proxy: invalid [proxy] port 99999 in config.toml — jobs keep their own ports\n", daemonLog(t, unreadable), "said once the log was emptied")
 	assert.Empty(t, daemonLog(t, moved), "a port taken moves the proxy to the next, silently")
 }
 

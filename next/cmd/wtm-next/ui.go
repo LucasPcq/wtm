@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	bus "github.com/LucasPcq/wtm/next/internal/adapter/events"
+	"github.com/LucasPcq/wtm/next/internal/adapter/daemon"
 	reposjson "github.com/LucasPcq/wtm/next/internal/adapter/registry"
 	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
 	"github.com/LucasPcq/wtm/next/internal/adapter/webserver"
@@ -140,7 +140,7 @@ func webParams(token string, idle time.Duration) web.Params {
 		Events:      eventsStream(),
 		Logs:        jobLines(),
 		LogFile:     jobLogFile,
-		Repos:       knownRepos(reposjson.Path(), bus.SocketPath()).Prune,
+		Repos:       knownRepos(reposjson.Path(), daemon.SocketPath()).Prune,
 		Version:     version,
 		Token:       token,
 		Kill:        shell.KillCancelled,

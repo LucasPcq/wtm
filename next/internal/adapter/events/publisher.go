@@ -1,10 +1,9 @@
-// Package events is wtm-next's event bus: the daemon that relays the events of every repository to the processes subscribed to it, the publisher every operation reports through, and the subscription a stream reads, all over one unix socket.
+// Package events is the event bus wtm's daemon carries: the relay that hands the events of every repository to the processes subscribed to it, the publisher every operation reports through, and the subscription a stream reads, all over the daemon's socket.
 package events
 
 import (
 	"encoding/json"
 	"net"
-	"os"
 	"path/filepath"
 	"time"
 
@@ -13,8 +12,6 @@ import (
 
 const (
 	publishTimeout = 250 * time.Millisecond
-	globalDirName  = "wtm"
-	socketName     = "wtm.sock"
 )
 
 // PublisherParams is what a [Publisher] stamps on every event: the repository
@@ -64,17 +61,6 @@ func Resolved(dir string) string {
 		return resolved
 	}
 	return dir
-}
-
-// SocketPath returns the path of the socket the bus's daemon listens on, under
-// the user's config directory, or "" when that directory is unknown.
-func SocketPath() string {
-	dir, err := os.UserConfigDir()
-	if err != nil {
-		return ""
-	}
-
-	return filepath.Join(dir, globalDirName, socketName)
 }
 
 // Publish sends event to the daemon as a line of the stream stamped with the

@@ -23,7 +23,7 @@ func TestSubscribingStartsTheDaemonWhenNoneAnswers(t *testing.T) {
 		<-served
 	})
 	bus := Bus{SocketPath: socket, Start: func() error {
-		served = startServe(ctx, ServeParams{SocketPath: socket, Idle: time.Minute})
+		served = startRelay(ctx, socket)
 		return nil
 	}}
 
@@ -49,7 +49,7 @@ func TestADaemonThatFailsToStartFailsTheSubscription(t *testing.T) {
 }
 
 func TestASubscriptionEndsWithItsContext(t *testing.T) {
-	socket, _ := serving(t, time.Minute)
+	socket := serving(t)
 	ctx, cancel := context.WithCancel(t.Context())
 	lines, err := Bus{SocketPath: socket}.Subscribe(ctx, nil)
 	require.NoError(t, err)
@@ -79,7 +79,7 @@ func TestSubscribingWaitsForADaemonThatHoldsTheLockWithoutAnsweringToBeGone(t *t
 	startedAfterIt := false
 	bus := Bus{SocketPath: socket, Start: func() error {
 		startedAfterIt = gone.Load()
-		served = startServe(ctx, ServeParams{SocketPath: socket, Idle: time.Minute})
+		served = startRelay(ctx, socket)
 		return nil
 	}}
 

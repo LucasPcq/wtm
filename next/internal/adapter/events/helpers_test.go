@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -121,24 +122,50 @@ func socketDir(t *testing.T) string {
 	return dir
 }
 
-// serving starts a daemon on a new socket, idling out after idle, and returns its socket and the channel Serve's error arrives on.
-func serving(t *testing.T, idle time.Duration) (string, <-chan error) {
+// serving serves a new Relay on a new socket and returns the socket.
+func serving(t *testing.T) string {
 	t.Helper()
 	socket := filepath.Join(socketDir(t), "wtm.sock")
 	ctx, cancel := context.WithCancel(context.Background())
-	served := startServe(ctx, ServeParams{SocketPath: socket, Idle: idle})
+	served := startRelay(ctx, socket)
 	t.Cleanup(func() {
 		cancel()
 		<-served
 	})
 	require.Eventually(t, Bus{SocketPath: socket}.answers, 2*time.Second, 10*time.Millisecond)
-	return socket, served
+	return socket
 }
 
-// startServe runs Serve with params in the background and returns the channel its error arrives on.
-func startServe(ctx context.Context, params ServeParams) <-chan error {
+// startRelay serves a new Relay on socket in the background, one request per connection as wtm's daemon serves it, until ctx is done, and returns the channel that receives once it stopped.
+func startRelay(ctx context.Context, socket string) <-chan error {
 	served := make(chan error, 1)
-	go func() { served <- Serve(ctx, params) }()
+	listener, err := net.Listen("unix", socket)
+	if err != nil {
+		served <- err
+		return served
+	}
+	relay := NewRelay()
+	context.AfterFunc(ctx, func() {
+		_ = listener.Close()
+		relay.Close()
+	})
+	go func() {
+		var conns sync.WaitGroup
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				conns.Wait()
+				served <- nil
+				return
+			}
+			conns.Go(func() {
+				defer conn.Close()
+				if line, err := bufio.NewReader(conn).ReadBytes('\n'); err == nil {
+					relay.Serve(ctx, conn, line)
+				}
+			})
+		}
+	}()
 	return served
 }
 

@@ -505,7 +505,7 @@ func (p wireParams) publisherParams(op domain.Operation) bus.PublisherParams {
 	return bus.PublisherParams{
 		Root:          p.MainPath,
 		CommonDir:     p.CommonDir,
-		SocketPath:    bus.SocketPath(),
+		SocketPath:    daemon.SocketPath(),
 		OpID:          op.ID,
 		CorrelationID: op.CorrelationID,
 		Now:           time.Now,
@@ -542,7 +542,7 @@ func eventStream(params streamParams) events.UseCase {
 
 // The process's own event stream: its bus at the socket every wtm-next talks to, started from this binary.
 func systemStream() events.UseCase {
-	return eventStream(streamParams{Socket: bus.SocketPath(), Start: startDaemon, Registry: reposjson.Path()})
+	return eventStream(streamParams{Socket: daemon.SocketPath(), Start: startDaemon, Registry: reposjson.Path()})
 }
 
 // knownRepos is the registry of the repositories wtm knows, in the file at path, announcing on the bus at socket each one that joins or leaves it.
