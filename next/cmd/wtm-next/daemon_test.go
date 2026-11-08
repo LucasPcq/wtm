@@ -155,4 +155,5 @@ func TestADaemonStartingBesideAnotherSaysOneAlreadyRuns(t *testing.T) {
 
 	assert.Equal(t, cli.ExitConflict, code)
 	assert.Contains(t, stderr.String(), "wtm's daemon already runs on "+daemon.SocketPath()+": this one stops")
+	assert.Equal(t, run.CodeRunning, serveFailure(daemon.ErrRunning, daemon.SocketPath()).Code)
 }

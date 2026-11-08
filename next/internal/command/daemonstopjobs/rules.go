@@ -67,7 +67,6 @@ func Decide(f Facts, req Request) (Plan, []domain.Warning, error) {
 		}
 		plan.add(job, stop)
 	}
-	plan.Confirm = len(plan.Repos) > 0
 	plan.Recap, plan.Empty = plan.recap(), len(plan.Repos) == 0
 	return plan, nil, nil
 }
@@ -101,11 +100,10 @@ func stopOf(job run.Job, jobs []run.Job) (runjobs.StopJob, bool) {
 // ----------------------------------------------------------------------------
 // The plan
 
-// A Plan is what Apply will do, as the dry run and the JSON envelope show it and the fingerprint covers it: the repository it was narrowed to (none: every one), each repository's worktrees with the jobs that stop there, and whether a surface asks to confirm it; then the recap, which the fingerprint leaves out.
+// A Plan is what Apply will do, as the dry run and the JSON envelope show it and the fingerprint covers it: the repository it was narrowed to (none: every one), each repository's worktrees with the jobs that stop there: then the recap, which the fingerprint leaves out.
 type Plan struct {
-	Repo    string `json:"repo,omitempty"`
-	Repos   []Repo `json:"repos"`
-	Confirm bool   `json:"confirm"`
+	Repo  string `json:"repo,omitempty"`
+	Repos []Repo `json:"repos"`
 	domain.Recapped
 	correlationID string
 }

@@ -12,7 +12,7 @@ import (
 )
 
 // restart is the follow-up a skewed daemon's warning offers.
-var restart = &domain.FollowUp{Command: domain.CommandDaemonRestart}
+var restart = &domain.FollowUp{Command: "daemon-restart"}
 
 // read runs daemon status over a daemon that reads as daemon.
 func read(t *testing.T, daemon run.Daemon) daemonstatus.Outcome {

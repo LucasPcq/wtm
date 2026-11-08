@@ -35,6 +35,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 	"github.com/LucasPcq/wtm/next/internal/ui/runview"
+
 	"github.com/spf13/cobra"
 )
 

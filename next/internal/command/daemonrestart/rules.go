@@ -16,11 +16,12 @@ const subject = "daemon"
 // ----------------------------------------------------------------------------
 // Facts
 
-// Facts are what a restart decides from: the daemon as it stands, the records of its index, and this wtm's build.
+// Facts are what a restart decides from: the daemon as it stands, the records of its index, this wtm's build, and whether a directory is there.
 type Facts struct {
 	Daemon  run.Daemon
 	Records []run.Record
 	Version string
+	Exists  Exists
 }
 
 // recordOf is the record of job, how it was started; nil when the index has none.
@@ -58,9 +59,12 @@ func (f Facts) startOf(record *run.Record) (run.Spec, bool) {
 	return spec, true
 }
 
-// jobs are the jobs the daemon holds; for one whose listing cannot be read (another protocol), those its index records, every one up.
+// jobs are the jobs the daemon holds; for one whose listing cannot be read (another protocol), those its index records, every one up; with none answering, the stacks and claims its index holds and the services a daemon that died left there, which the new daemon reaps and the restart starts again.
 func (f Facts) jobs() []run.Job {
-	if !f.Daemon.Answering || f.Daemon.Skew != run.SkewProtocol {
+	if !f.Daemon.Answering {
+		return append(slices.Clone(f.Daemon.Jobs), f.Daemon.Left...)
+	}
+	if f.Daemon.Skew != run.SkewProtocol {
 		return f.Daemon.Jobs
 	}
 	jobs := make([]run.Job, 0, len(f.Records))
@@ -77,16 +81,24 @@ func (f Facts) jobs() []run.Job {
 // ----------------------------------------------------------------------------
 // Decide
 
-// CodeIndexFrozen warns of an index a newer wtm wrote: the daemon recorded nothing of what it started, so nothing of it comes back.
-const CodeIndexFrozen = Name + domain.IndexFrozen
+// The codes of a restart over a newer wtm's index: a warning that nothing it recorded comes back; the refusal to put this build in a newer daemon's place, unless forced.
+const (
+	CodeIndexFrozen = Name + domain.IndexFrozen
+	CodeDowngrade   = Name + ".downgrade"
+)
 
 // Decide turns the facts into the plan and its warnings: of the jobs the shutdown stops, those that come back (a service its index records, a shared one through the worktrees that hold it), the task not run again and the job with no record (a shared one whose own run has none, or that no worktree holding it brings back); the stacks taken over; the daemon's build and the new one's.
-func Decide(f Facts) (Plan, []domain.Warning) {
+func Decide(f Facts, req Request) (Plan, []domain.Warning, error) {
 	d := f.Daemon
-	plan := Plan{Running: d.Answering, From: d.Stamp.Version, Legacy: d.Answering && d.Skew == run.SkewLegacy, To: f.Version}
+	// A daemon whose index this wtm cannot write is a newer wtm's: this build taking its place would leave its stacks untracked for good.
+	downgrade := d.Answering && d.IndexFrozen
+	if downgrade && !req.Force {
+		return Plan{}, nil, &domain.Error{Kind: domain.KindRefused, Code: CodeDowngrade, Message: "nothing restarted: wtm's daemon is a newer wtm's (its index is), and this build taking its place would leave its stacks untracked", FollowUp: &domain.FollowUp{Command: Name, Answers: []domain.Answered{{Path: PathForce, Values: []string{"true"}}}, Code: Name + ".force", Message: "restart it as this build all the same"}}
+	}
+	plan := Plan{Running: d.Answering, From: d.Stamp.Version, Legacy: d.Answering && d.Skew == run.SkewLegacy, Downgrade: downgrade, To: f.Version}
 	shutdown := run.ShutdownOf(f.jobs())
 
-	var back, tasks, unrecorded, held []run.Job
+	var back, tasks, unrecorded, gone, held []run.Job
 	var own, holds []run.Spec
 	for _, job := range shutdown.Cut {
 		record := f.recordOf(job)
@@ -94,6 +106,8 @@ func Decide(f Facts) (Plan, []domain.Warning) {
 		switch {
 		case job.Kind == project.Task:
 			tasks = append(tasks, job)
+		case !f.Exists(job.WorkDir):
+			gone = append(gone, job)
 		case !startable:
 			unrecorded = append(unrecorded, job)
 		case job.SharedDir == job.WorkDir && !job.MainHolds:
@@ -107,6 +121,10 @@ func Decide(f Facts) (Plan, []domain.Warning) {
 	served := map[string]bool{}
 	for _, claim := range shutdown.Lost {
 		spec, startable := f.startOf(f.recordOf(claim))
+		if !f.Exists(claim.WorkDir) {
+			gone = append(gone, claim)
+			continue
+		}
 		if !startable {
 			unrecorded = append(unrecorded, claim)
 			continue
@@ -128,31 +146,33 @@ func Decide(f Facts) (Plan, []domain.Warning) {
 		// The new daemon reads no index a newer wtm wrote: the stacks run on, untracked.
 		unrecorded, kept = append(unrecorded, kept...), nil
 	}
-	plan.Back, plan.TakenOver, plan.Tasks, plan.Unrecorded = run.Held(back), run.Held(kept), run.Held(tasks), run.Held(unrecorded)
+	plan.Back, plan.TakenOver, plan.Tasks, plan.Unrecorded, plan.Gone = run.Held(back), run.Held(kept), run.Held(tasks), run.Held(unrecorded), run.Held(gone)
 	plan.starts = append(own, holds...)
-	plan.Confirm = len(shutdown.Cut) > 0
+	plan.Confirm = len(shutdown.Cut) > 0 || downgrade
 	plan.Recap = plan.recap()
 
 	var warnings []domain.Warning
 	if d.IndexFrozen {
 		warnings = append(warnings, domain.IndexFrozenWarning(Name, d.Index))
 	}
-	return plan, warnings
+	return plan, warnings, nil
 }
 
 // ----------------------------------------------------------------------------
 // The plan
 
-// A Plan is what Apply will do, as the dry run and the JSON envelope show it and the fingerprint covers it: whether a daemon runs to restart (none: one starts), its build (From, the legacy wtm's when Legacy) and the one it restarts as (To); the jobs that come back on the new daemon (Back), the stacks it takes over (TakenOver), the tasks the shutdown cuts, not run again (Tasks), the jobs its index has no record of, which cannot come back (Unrecorded); and whether a surface asks to confirm it (Confirm: a job is cut, if only for a moment); then the recap, which the fingerprint leaves out.
+// A Plan is what Apply will do, as the dry run and the JSON envelope show it and the fingerprint covers it: whether a daemon runs to restart (none: one starts), its build (From, the legacy wtm's when Legacy, a newer wtm's when Downgrade: its index is) and the one it restarts as (To); the jobs that come back on the new daemon (Back), the stacks it takes over (TakenOver), the tasks the shutdown cuts, not run again (Tasks), the jobs its index has no record of, which cannot come back (Unrecorded), and those whose worktree was removed (Gone); and whether a surface asks to confirm it (Confirm: a job is cut, if only for a moment); then the recap, which the fingerprint leaves out.
 type Plan struct {
 	Running    bool           `json:"running"`
 	From       string         `json:"from,omitempty"`
 	Legacy     bool           `json:"legacy,omitempty"`
+	Downgrade  bool           `json:"downgrade,omitempty"`
 	To         string         `json:"to"`
 	Back       []run.HeldRepo `json:"back"`
 	TakenOver  []run.HeldRepo `json:"taken_over"`
 	Tasks      []run.HeldRepo `json:"tasks"`
 	Unrecorded []run.HeldRepo `json:"unrecorded"`
+	Gone       []run.HeldRepo `json:"gone"`
 	Confirm    bool           `json:"confirm"`
 	domain.Recapped
 	starts        []run.Spec
@@ -190,6 +210,9 @@ func (p Plan) recap() []domain.RecapRow {
 	for _, name := range run.Names(p.Unrecorded) {
 		notBack = append(notBack, name+" — no record of it")
 	}
+	for _, name := range run.Names(p.Gone) {
+		notBack = append(notBack, name+" — its worktree is gone")
+	}
 	add("not_back", "Not back", notBack)
 	return rows
 }
@@ -199,6 +222,8 @@ func (p Plan) daemon() string {
 	switch {
 	case !p.Running:
 		return "none runs: one starts, as " + p.To
+	case p.Downgrade:
+		return cmp.Or(p.From, "a newer wtm's") + " → " + p.To + ", a downgrade"
 	case p.Legacy:
 		return "the legacy wtm's " + cmp.Or(p.From, "(older)") + " → " + p.To
 	}

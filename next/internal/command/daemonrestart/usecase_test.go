@@ -2,6 +2,7 @@ package daemonrestart_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/daemonrestart"
@@ -14,7 +15,7 @@ import (
 
 // N4: legacy's restart, and next's before, brought no service back.
 func TestARestartBringsTheServicesBackTheStacksTakenOverATaskNotRunAgain(t *testing.T) {
-	plan, _ := daemonrestart.Decide(daemonrestart.Facts{Daemon: running("0.30.9", web, db, dbHeld, migrate, stack, api).status, Records: running("0.30.9", web, db, dbHeld, migrate, stack, api).records, Version: build})
+	plan, _ := decide(t, running("0.30.9", web, db, dbHeld, migrate, stack, api), daemonrestart.Request{})
 
 	assert.Equal(t, []string{"db (main · acme)", "web (main · acme)", "api (feat/a · acme)", "db (feat/a · acme)"}, run.Names(plan.Back))
 	assert.Equal(t, []string{"mail (main · acme)"}, run.Names(plan.TakenOver))
@@ -107,7 +108,7 @@ func TestWithAFrozenIndexNothingComesBackAndItIsSaid(t *testing.T) {
 	d := running("0.30.9", web, stack)
 	d.records, d.status.IndexFrozen = nil, true
 
-	plan, warnings := daemonrestart.Decide(daemonrestart.Facts{Daemon: d.status, Records: d.records, Version: build})
+	plan, warnings := decide(t, d, daemonrestart.Request{Force: true})
 
 	assert.Equal(t, []string{"mail (main · acme)", "web (main · acme)"}, run.Names(plan.Unrecorded))
 	assert.Empty(t, plan.Back)
@@ -120,7 +121,7 @@ func TestADaemonOfAnotherProtocolHasItsJobsReadFromItsIndex(t *testing.T) {
 	d := running("0.40.0", web, stack)
 	d.status.Skew, d.status.Jobs = run.SkewProtocol, nil
 
-	plan, _ := daemonrestart.Decide(daemonrestart.Facts{Daemon: d.status, Records: d.records, Version: build})
+	plan, _ := decide(t, d, daemonrestart.Request{})
 
 	assert.Equal(t, []string{"web (main · acme)"}, run.Names(plan.Back))
 	assert.Equal(t, []string{"mail (main · acme)"}, run.Names(plan.TakenOver))
@@ -141,7 +142,7 @@ func TestAClaimWhoseSharedJobHasNoRecordDoesNotComeBack(t *testing.T) {
 	d := running("0.30.9", db, dbHeld)
 	d.records = d.records[1:]
 
-	plan, _ := daemonrestart.Decide(daemonrestart.Facts{Daemon: d.status, Records: d.records, Version: build})
+	plan, _ := decide(t, d, daemonrestart.Request{})
 
 	assert.Equal(t, []string{"db (main · acme)", "db (feat/a · acme)"}, run.Names(plan.Unrecorded))
 	assert.Empty(t, plan.Back)
@@ -158,7 +159,8 @@ func TestAClaimTheLegacyWtmRecordedWithNoOriginComesBackForItsWorktree(t *testin
 	assert.Equal(t, &run.Origin{Root: main, Branch: "feat/a", CorrelationID: "restart-1"}, claim.Origin)
 }
 
-func TestARestartInterruptedOnceItsDaemonStoppedStillBringsTheJobsBack(t *testing.T) {
+// R3: interrupted while its daemon stopped, a restart once left every service down, recorded nowhere.
+func TestARestartInterruptedWhileItsDaemonStopsStillBringsTheJobsBack(t *testing.T) {
 	d := running("0.30.9", web)
 	ctx, cancel := context.WithCancel(t.Context())
 	d.stopped = cancel
@@ -168,4 +170,63 @@ func TestARestartInterruptedOnceItsDaemonStoppedStillBringsTheJobsBack(t *testin
 	require.NoError(t, err)
 	assert.Equal(t, domain.StatusDone, outcome.Result.Items[0].Status, outcome.Result.Items[0].Err)
 	assert.Equal(t, []string{"shutdown", "ensure", "start web " + main}, d.calls)
+}
+
+func TestADaemonSlowToStopIsWaitedForAndTheJobsComeBack(t *testing.T) {
+	d := running("0.30.9", web)
+	d.shutdown = &run.Error{Code: run.CodeStopTimeout, Message: "wtm's daemon did not stop within 30s"}
+
+	_, item := restarted(t, d, domain.RunOptions{})
+
+	assert.Equal(t, domain.StatusDone, item.Status, item.Err)
+	assert.Equal(t, []string{"shutdown", "ensure", "start web " + main}, d.calls)
+}
+
+// A daemon that died left its services in its index: the restart once planned none of them, and the new daemon reaped them unasked.
+func TestTheServicesADaemonThatDiedLeftComeBackWithTheirClaims(t *testing.T) {
+	d := running("0.30.9", web, db, dbHeld, stack)
+	d.status = run.Daemon{Jobs: []run.Job{dbHeld, stack}, Left: []run.Job{web, db}}
+
+	outcome, item := restarted(t, d, domain.RunOptions{})
+
+	assert.True(t, outcome.Plan.Confirm)
+	assert.Equal(t, []string{"db (main · acme)", "web (main · acme)", "db (feat/a · acme)"}, run.Names(outcome.Plan.Back))
+	assert.Equal(t, []string{"mail (main · acme)"}, run.Names(outcome.Plan.TakenOver))
+	assert.Equal(t, domain.StatusDone, item.Status, item.Err)
+	assert.Equal(t, []string{"ensure", "start web " + main, "start db " + featA}, d.calls)
+}
+
+func TestARestartOfANewerWtmsDaemonIsRefusedUnlessForced(t *testing.T) {
+	d := running("0.32.0", web)
+	d.status.IndexFrozen = true
+
+	_, _, err := daemonrestart.Decide(daemonrestart.Facts{Daemon: d.status, Records: d.records, Version: build, Exists: exists}, daemonrestart.Request{})
+
+	refused, ok := errors.AsType[*domain.Error](err)
+	require.True(t, ok, err)
+	assert.Equal(t, domain.KindRefused, refused.Kind)
+	assert.Equal(t, daemonrestart.CodeDowngrade, refused.Code)
+	assert.Equal(t, []domain.Answered{{Path: daemonrestart.PathForce, Values: []string{"true"}}}, refused.FollowUp.Answers)
+}
+
+func TestAForcedRestartOfANewerWtmsDaemonIsConfirmedAsADowngrade(t *testing.T) {
+	d := running("0.32.0", stack)
+	d.status.IndexFrozen = true
+
+	plan, _ := decide(t, d, daemonrestart.Request{Force: true})
+
+	assert.True(t, plan.Confirm, "a downgrade is confirmed though nothing it runs is cut")
+	assert.Equal(t, "0.32.0 → "+build+", a downgrade", plan.Recap[0].Values[0].Text)
+}
+
+func TestAJobWhoseWorktreeWasRemovedIsNotBackAndFailsNothing(t *testing.T) {
+	removed := web
+	removed.WorkDir = "/gone/feat-x"
+	d := running("0.30.9", removed, api)
+
+	outcome, item := restarted(t, d, domain.RunOptions{})
+
+	assert.Equal(t, []string{"web (main · acme)"}, run.Names(outcome.Plan.Gone))
+	assert.Equal(t, domain.StatusDone, item.Status, item.Err)
+	assert.Equal(t, []string{"shutdown", "ensure", "start api " + featA}, d.calls)
 }

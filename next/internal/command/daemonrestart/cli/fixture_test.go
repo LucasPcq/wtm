@@ -61,5 +61,5 @@ func (w world) env() uicli.Env {
 
 func (w world) open(context.Context, string) (daemonrestart.UseCase, error) {
 	locks := &operationtest.Locks{}
-	return daemonrestart.UseCase{Operations: operation.Service{Locker: locks, Publisher: locks, NewOpID: func() string { return "op-1" }, Now: time.Now}, Daemon: w.daemon, Version: "0.31.0"}, nil
+	return daemonrestart.UseCase{Operations: operation.Service{Locker: locks, Publisher: locks, NewOpID: func() string { return "op-1" }, Now: time.Now}, Daemon: w.daemon, Shield: func(ctx context.Context) (context.Context, func()) { return ctx, func() {} }, Exists: func(string) bool { return true }, Version: "0.31.0"}, nil
 }

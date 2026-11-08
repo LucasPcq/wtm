@@ -3,17 +3,14 @@ package main
 import (
 	"context"
 
-	"github.com/LucasPcq/wtm/next/internal/command/daemonstopjobs"
-
-	"github.com/LucasPcq/wtm/next/internal/command/daemonrestart"
-
-	"github.com/LucasPcq/wtm/next/internal/command/daemonstatus"
-	"github.com/LucasPcq/wtm/next/internal/command/daemonstop"
-
 	"github.com/LucasPcq/wtm/next/internal/api"
 	"github.com/LucasPcq/wtm/next/internal/command/checkout"
 	"github.com/LucasPcq/wtm/next/internal/command/clean"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
+	"github.com/LucasPcq/wtm/next/internal/command/daemonrestart"
+	"github.com/LucasPcq/wtm/next/internal/command/daemonstatus"
+	"github.com/LucasPcq/wtm/next/internal/command/daemonstop"
+	"github.com/LucasPcq/wtm/next/internal/command/daemonstopjobs"
 	"github.com/LucasPcq/wtm/next/internal/command/events"
 	"github.com/LucasPcq/wtm/next/internal/command/exec"
 	"github.com/LucasPcq/wtm/next/internal/command/extract"

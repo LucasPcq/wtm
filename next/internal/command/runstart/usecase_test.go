@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/runstart"
@@ -415,4 +416,13 @@ func TestARestartFromAClaimCountsAMainCheckoutADaemonOfAnotherBuildCannotTellAsH
 	planned, _ := w.plan(t, req)
 
 	assert.Equal(t, []string{"main", featA}, planned.HeldBy)
+}
+
+func TestAStartOnAnIndexANewerWtmWroteIsWarnedOf(t *testing.T) {
+	w := newWorld(t)
+	w.usecase.Repository.FrozenIndex = func() string { return "/cfg/wtm/jobs.json" }
+
+	_, warnings := w.plan(t, starting("api", featA))
+
+	assert.True(t, slices.ContainsFunc(warnings, func(w domain.Warning) bool { return w.Code == runstart.Name+domain.IndexFrozen }))
 }

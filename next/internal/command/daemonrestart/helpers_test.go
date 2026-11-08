@@ -1,6 +1,8 @@
 package daemonrestart_test
 
 import (
+	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -16,7 +18,17 @@ const build = "0.31.0"
 
 // usecase is daemon restart over d, under ops.
 func usecase(d *daemon, ops operation.Service) daemonrestart.UseCase {
-	return daemonrestart.UseCase{Operations: ops, Daemon: d, Version: build}
+	return daemonrestart.UseCase{Operations: ops, Daemon: d, Shield: shielded, Exists: exists, Version: build}
+}
+
+// exists is every directory there but those under /gone.
+func exists(path string) bool {
+	return !strings.HasPrefix(path, "/gone")
+}
+
+// shielded is a shield as the process's: the first cancel does not reach the section.
+func shielded(ctx context.Context) (context.Context, func()) {
+	return context.WithoutCancel(ctx), func() {}
 }
 
 // operations is an operations service over in-memory locks and events.
@@ -33,4 +45,12 @@ func restarted(t *testing.T, d *daemon, opts domain.RunOptions) (daemonrestart.O
 	require.NotNil(t, outcome.Result)
 	require.Len(t, outcome.Result.Items, 1)
 	return outcome, outcome.Result.Items[0]
+}
+
+// decide is the plan of a restart of d for req, which it does not refuse.
+func decide(t *testing.T, d *daemon, req daemonrestart.Request) (daemonrestart.Plan, []domain.Warning) {
+	t.Helper()
+	plan, warnings, err := daemonrestart.Decide(daemonrestart.Facts{Daemon: d.status, Records: d.records, Version: build, Exists: exists}, req)
+	require.NoError(t, err)
+	return plan, warnings
 }

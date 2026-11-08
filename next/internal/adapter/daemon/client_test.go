@@ -517,7 +517,9 @@ func TestWithNoDaemonTheStatusIsTheStacksItsIndexHolds(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.False(t, got.Answering)
-	require.Len(t, got.Jobs, 1, "a foreground service left in the index runs with no daemon nowhere")
+	require.Len(t, got.Jobs, 1)
 	assert.Equal(t, run.HoldDetached, got.Jobs[0].Hold)
+	require.Len(t, got.Left, 1, "a foreground service left in the index is a dead daemon's")
+	assert.Equal(t, "web", got.Left[0].Name)
 	assert.False(t, got.IndexFrozen)
 }

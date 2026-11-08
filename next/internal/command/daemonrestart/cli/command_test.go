@@ -63,5 +63,5 @@ func TestWithNoDaemonRunningARestartStartsOne(t *testing.T) {
 }
 
 func TestARestartFollowUpIsSpelledAsItsCommandLine(t *testing.T) {
-	assert.Equal(t, []string{"wtm-next", "daemon", "restart"}, Line(domain.FollowUp{Command: domain.CommandDaemonRestart}))
+	assert.Equal(t, []string{"wtm-next", "daemon", "restart"}, Line(domain.FollowUp{Command: "daemon-restart"}))
 }

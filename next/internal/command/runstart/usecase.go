@@ -146,6 +146,10 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 	if err != nil {
 		return Plan{}, nil, err
 	}
+	// What starts on a daemon whose index a newer wtm wrote is recorded nowhere: no restart brings it back.
+	if frozen := u.Repository.FrozenIndex; frozen != nil && frozen() != "" {
+		warnings = append(warnings, domain.IndexFrozenWarning(Name, frozen()))
+	}
 	planned.Recap, planned.Empty = planned.recap(), planned.unchanged()
 	return planned, warnings, nil
 }

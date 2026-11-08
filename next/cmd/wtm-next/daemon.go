@@ -7,12 +7,11 @@ import (
 	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/spf13/cobra"
-
-	"path/filepath"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/config"
 	"github.com/LucasPcq/wtm/next/internal/adapter/daemon"
@@ -65,10 +64,7 @@ func daemonServeCmd(streams *output.Streams) *cobra.Command {
 			port, problem := proxyPort(cmd)
 			socket := daemon.SocketPath()
 			err := serveDaemon(cmd.Context(), daemonParams{Socket: socket, ProxyPort: port, ProxyProblem: problem, Stderr: cmd.ErrOrStderr()})
-			if errors.Is(err, daemon.ErrRunning) {
-				err = &domain.Error{Kind: domain.KindConflict, Code: run.CodeRunning, Message: "wtm's daemon already runs on " + socket + ": this one stops"}
-			}
-			if failure := domain.AsError(domain.AsErrorParams{Err: err}); failure != nil {
+			if failure := serveFailure(err, socket); failure != nil {
 				failing := cli.Run{Command: "daemon serve", Streams: streams}
 				return failing.FailWith(failure, nil)
 			}
@@ -77,6 +73,14 @@ func daemonServeCmd(streams *output.Streams) *cobra.Command {
 	}
 	cmd.Flags().Int(flagProxyPort, 0, "Port the proxy serves named job URLs on (0 turns it off); the global config's when not given")
 	return cmd
+}
+
+// serveFailure is why a daemon serving socket stopped, nil when it idled out: another daemon holding its lock is a conflict, daemon.running.
+func serveFailure(err error, socket string) *domain.Error {
+	if errors.Is(err, daemon.ErrRunning) {
+		return &domain.Error{Kind: domain.KindConflict, Code: run.CodeRunning, Message: "wtm's daemon already runs on " + socket + ": this one stops"}
+	}
+	return domain.AsError(domain.AsErrorParams{Err: err})
 }
 
 // proxyPort returns the port the daemon's proxy is to serve on: the flag's, else the global config's; 0 with why when that config cannot be read: a daemon refusing to start would refuse every job.
@@ -177,7 +181,7 @@ func openDaemonStatus(context.Context, string) (daemonstatus.UseCase, error) {
 
 // openDaemonRestart is daemon restart over wtm's daemon of this machine, whatever the directory, the new daemon of this build.
 func openDaemonRestart(context.Context, string) (daemonrestart.UseCase, error) {
-	return daemonrestart.UseCase{Operations: machineOperations(), Daemon: wtmDaemon(), Version: version}, nil
+	return daemonrestart.UseCase{Operations: machineOperations(), Daemon: wtmDaemon(), Shield: shell.Shield, Exists: dirExists, Version: version}, nil
 }
 
 // openDaemonStopJobs is daemon stop-jobs over wtm's daemon of this machine, whatever the directory, a repository it narrows to found by its main worktree.

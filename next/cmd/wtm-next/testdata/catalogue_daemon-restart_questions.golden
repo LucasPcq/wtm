@@ -1,4 +1,14 @@
 {
-  "fields": [],
+  "fields": [
+    {
+      "kind": "confirm",
+      "path": "force",
+      "skip": "flag_only",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    }
+  ],
   "problems": []
 }

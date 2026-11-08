@@ -17,7 +17,6 @@ func TestEveryJobOfEveryRepositoryStopsASharedOneThroughItsHolders(t *testing.T)
 	plan, _, err := usecase(d, operations()).Plan(t.Context(), daemonstopjobs.Request{})
 
 	require.NoError(t, err)
-	assert.True(t, plan.Confirm)
 	assert.Equal(t, map[string][]string{
 		"main (acme)":   {"web:stop", "mail:stop", "api:clear"},
 		"feat/a (acme)": {"db:stop:held", "worker:stop"},
@@ -59,7 +58,6 @@ func TestNothingRunningIsAnEmptyPlan(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.True(t, plan.Empty)
-	assert.False(t, plan.Confirm)
 }
 
 func TestADaemonWhoseJobsCannotBeReadIsRefused(t *testing.T) {

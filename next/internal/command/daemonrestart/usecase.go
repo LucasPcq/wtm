@@ -14,12 +14,14 @@ import (
 // The use case
 
 // Name is the command's name, the one its surfaces and its codes spell; its command line is `daemon restart`.
-const Name = domain.CommandDaemonRestart
+const Name = "daemon-restart"
 
-// A UseCase restarts wtm's daemon through Daemon, under Operations; Version is this wtm's build, the one the new daemon runs.
+// A UseCase restarts wtm's daemon through Daemon, under Operations, its apply under Shield; Version is this wtm's build, the one the new daemon runs.
 type UseCase struct {
 	Operations operation.Service
 	Daemon     Daemon
+	Shield     Shield
+	Exists     Exists
 	Version    string
 }
 
@@ -35,10 +37,10 @@ type Item = domain.Unit[Detail]
 // ----------------------------------------------------------------------------
 // Run
 
-// Run carries out the request under its operation: the daemon is the machine's, so it takes no lock; it plans, fingerprints the plan, stops on a dry run, refuses a stale plan and applies it between the operation's started and finished events. An error returned is a refusal before the apply; a daemon that did not start, or a job that did not come back, is in the Outcome's Result.
+// Run carries out the request under its operation, which takes the machine's lock; it plans, fingerprints the plan, stops on a dry run, refuses a stale plan and applies it between the operation's started and finished events. An error returned is a refusal before the apply; a daemon that did not start, or a job that did not come back, is in the Outcome's Result.
 func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (Outcome, error) {
-	// 1. Begin the operation; the daemon is no repository's, so it takes no lock.
-	op, err := u.Operations.Begin(Name, nil, opts)
+	// 1. Begin the operation under the machine's lock: the daemon is no repository's.
+	op, err := u.Operations.Begin(Name, domain.MachineLocks(), opts)
 	if err != nil {
 		return Outcome{Op: op.ID}, err
 	}
@@ -77,14 +79,13 @@ func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (
 // Plan
 
 // Plan decides what the restart does as the daemon and its index stand, changing nothing: the plan and its warnings.
-func (u UseCase) Plan(ctx context.Context, _ Request) (Plan, []domain.Warning, error) {
+func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning, error) {
 	daemon, err := u.Daemon.Status(ctx)
 	if err != nil {
 		return Plan{}, nil, err
 	}
 
-	plan, warnings := Decide(Facts{Daemon: daemon, Records: u.Daemon.Records(), Version: u.Version})
-	return plan, warnings, nil
+	return Decide(Facts{Daemon: daemon, Records: u.Daemon.Records(), Version: u.Version, Exists: u.Exists}, req)
 }
 
 // ----------------------------------------------------------------------------
@@ -107,14 +108,16 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 
 func (u UseCase) restart(ctx context.Context, plan Plan, report domain.Report) Item {
 	item := Item{Subject: subject, Status: domain.StatusDone, Detail: &Detail{Back: []Back{}}}
+	// Shielded from the shutdown on: a daemon asked to stop stops whatever its client does, and a restart cut short would leave the jobs it stopped down, recorded nowhere.
+	ctx, release := u.Shield(ctx)
+	defer release()
 	if plan.Running {
-		if err := u.Daemon.Shutdown(ctx); err != nil {
+		// A daemon slow to stop is waited for by Ensure, which starts the next once the lock is free.
+		if err := u.Daemon.Shutdown(ctx); err != nil && !isStopTimeout(err) {
 			item.Status, item.Err = domain.StatusFailed, domain.AsError(domain.AsErrorParams{Err: err, Code: CodeShutdownFailed, Message: "couldn't stop wtm's daemon"})
 			return item
 		}
 	}
-	// A restart whose daemon stopped is let finish: cut short, it would leave the jobs it stopped down, recorded nowhere.
-	ctx = context.WithoutCancel(ctx)
 	if err := u.Daemon.Ensure(ctx); err != nil {
 		item.Status, item.Err = domain.StatusFailed, domain.AsError(domain.AsErrorParams{Err: err, Code: CodeStartFailed, Message: "the new daemon didn't start"})
 		return item
@@ -140,6 +143,12 @@ func (u UseCase) restart(ctx context.Context, plan Plan, report domain.Report) I
 	return notBack(item)
 }
 
+// isStopTimeout reports whether err is a daemon that did not stop in time.
+func isStopTimeout(err error) bool {
+	refused, ok := errors.AsType[*run.Error](err)
+	return ok && refused.Code == run.CodeStopTimeout
+}
+
 // withCorrelation is origin with the restart's correlation ID, nil left nil.
 func withCorrelation(origin *run.Origin, id string) *run.Origin {
 	if origin == nil {
@@ -154,6 +163,6 @@ func withCorrelation(origin *run.Origin, id string) *run.Origin {
 // Questions
 
 // Questions is daemon restart's form: it asks nothing.
-func (u UseCase) Questions(context.Context, Request) (Questions, error) {
-	return Questions{}, nil
+func (u UseCase) Questions(_ context.Context, req Request) (Questions, error) {
+	return Questions{Request: req}, nil
 }

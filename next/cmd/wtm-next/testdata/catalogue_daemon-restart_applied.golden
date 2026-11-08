@@ -52,6 +52,7 @@
     "taken_over": [],
     "tasks": [],
     "unrecorded": [],
+    "gone": [],
     "confirm": true,
     "recap": [
       {

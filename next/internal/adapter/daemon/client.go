@@ -149,26 +149,26 @@ func (d Daemon) recorded(jobs []run.Job) []run.Job {
 // indexed returns the jobs the index says are up with no daemon to ask; a
 // foreground service left in it fails it with run.ErrUnknown.
 func (d Daemon) indexed() ([]run.Job, error) {
-	jobs, foreground := d.held()
-	if foreground {
+	jobs, left := d.held()
+	if len(left) > 0 {
 		return nil, run.ErrUnknown
 	}
 	return jobs, nil
 }
 
 // held returns the stacks and the claims the index holds, which run with no
-// daemon, and whether it also holds a foreground service, which a daemon that
-// died left.
-func (d Daemon) held() (jobs []run.Job, foreground bool) {
+// daemon, and the foreground services it holds, which a daemon that died left:
+// whether they still run only a daemon taking them over can tell.
+func (d Daemon) held() (jobs, left []run.Job) {
 	for _, record := range d.Records() {
 		spec, hold := record.Spec, record.Hold()
-		if hold == run.HoldOwn {
-			foreground = true
-			continue
-		}
 		job := run.Job{Name: spec.Job.Name, WorkDir: spec.WorkDir, Up: true, Kind: spec.Job.Kind, Hold: hold, SharedDir: record.SharedDir, MainHolds: record.MainHolds}
 		if spec.Origin != nil {
 			job.Repo, job.Branch = spec.Origin.Root, spec.Origin.Branch
+		}
+		if hold == run.HoldOwn {
+			left = append(left, job)
+			continue
 		}
 		if hold == run.HoldDetached {
 			job.State, job.StartedAt, job.StopCommand = run.Running, record.StartedAt, spec.Job.Stop
@@ -176,7 +176,7 @@ func (d Daemon) held() (jobs []run.Job, foreground bool) {
 		jobs = append(jobs, job)
 	}
 
-	return jobs, foreground
+	return jobs, left
 }
 
 // Records returns the records of the daemon's index: every job up it
@@ -201,7 +201,7 @@ func (d Daemon) Status(ctx context.Context) (run.Daemon, error) {
 	status := run.Daemon{Socket: d.SocketPath, Index: IndexPath(d.SocketPath), IndexFrozen: d.IndexFrozen()}
 	listing, err := d.exchange(ctx, exchangeParams{Request: request{Action: actionList}, Timeout: listTimeout})
 	if errors.Is(err, errNoDaemon) {
-		status.Jobs, _ = d.held()
+		status.Jobs, status.Left = d.held()
 		return status, nil
 	}
 	if err != nil {

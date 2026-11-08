@@ -27,7 +27,9 @@ const (
 		"nor a job its index has no record of; the restart names each, and each job that\n" +
 		"did not come back.\n\n" +
 		"It asks first when a service would stop, if only for a moment; --yes restarts\n" +
-		"without asking. With no daemon running, it starts one."
+		"without asking. With no daemon running, it starts one, and brings back the\n" +
+		"services a daemon that died left. A newer wtm's daemon is not replaced without\n" +
+		"--force: this build would leave its stacks untracked."
 	restartExample = `  wtm daemon restart
 
   # For a script or an agent

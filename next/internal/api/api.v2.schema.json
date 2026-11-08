@@ -1066,7 +1066,34 @@
       }
     },
     "daemon-restart.request": {
-      "maxItems": 0,
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "force"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          }
+        ]
+      },
       "type": "array"
     },
     "daemon-status.envelope": {
@@ -1263,11 +1290,27 @@
         "confirm": {
           "type": "boolean"
         },
+        "downgrade": {
+          "type": "boolean"
+        },
         "empty": {
           "type": "boolean"
         },
         "from": {
           "type": "string"
+        },
+        "gone": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/run.HeldRepo"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "legacy": {
           "type": "boolean"
@@ -1337,6 +1380,7 @@
         "taken_over",
         "tasks",
         "unrecorded",
+        "gone",
         "confirm"
       ],
       "type": "object"
@@ -1358,6 +1402,12 @@
         },
         "jobs_unreadable": {
           "type": "boolean"
+        },
+        "left": {
+          "items": {
+            "$ref": "#/$defs/run.HeldRepo"
+          },
+          "type": "array"
         },
         "pid": {
           "type": "integer"
@@ -1500,9 +1550,6 @@
     "daemonstopjobs.Plan": {
       "additionalProperties": false,
       "properties": {
-        "confirm": {
-          "type": "boolean"
-        },
         "empty": {
           "type": "boolean"
         },
@@ -1536,8 +1583,7 @@
         }
       },
       "required": [
-        "repos",
-        "confirm"
+        "repos"
       ],
       "type": "object"
     },

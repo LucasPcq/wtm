@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/daemonstatus"
-	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 
@@ -30,7 +29,7 @@ func TestADaemonOfAnotherBuildIsWarnedOfWithTheRestartThatHandsItsJobsOver(t *te
 	got := read(t, answering(run.Stamp{Protocol: run.ProtocolVersion, Version: "0.30.9", PID: 42}, run.SkewBuild))
 
 	assert.Equal(t, []string{daemonstatus.CodeDaemonSkew}, codes(got.Warnings))
-	assert.Equal(t, domain.CommandDaemonRestart, got.Warnings[0].FollowUp.Command)
+	assert.Equal(t, "daemon-restart", got.Warnings[0].FollowUp.Command)
 	assert.Equal(t, run.SkewBuild, got.Items[0].Detail.Skew)
 	assert.Equal(t, "0.30.9", got.Items[0].Detail.Daemon)
 }
@@ -72,4 +71,14 @@ func TestAnIndexANewerWtmWroteIsWarnedOfRunningOrNot(t *testing.T) {
 			assert.True(t, got.Items[0].Detail.IndexFrozen)
 		})
 	}
+}
+
+func TestTheServicesADaemonThatDiedLeftAreShownWithTheRestartThatBringsThemBack(t *testing.T) {
+	left := run.Job{Name: "web", Repo: "/acme", Branch: "main", WorkDir: "/acme", Up: true, Kind: project.Service, Hold: run.HoldOwn}
+
+	got := read(t, run.Daemon{Left: []run.Job{left}, Index: "/i"})
+
+	assert.Equal(t, []string{"web (main · acme)"}, run.Names(got.Items[0].Detail.Left))
+	assert.Equal(t, []string{daemonstatus.CodeJobsLeft}, codes(got.Warnings))
+	assert.Equal(t, "daemon-restart", got.Warnings[0].FollowUp.Command)
 }

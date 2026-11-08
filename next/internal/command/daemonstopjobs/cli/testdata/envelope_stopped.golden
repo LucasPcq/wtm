@@ -118,7 +118,6 @@
         ]
       }
     ],
-    "confirm": true,
     "recap": [
       {
         "key": "jobs:main (acme)",

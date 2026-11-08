@@ -525,3 +525,12 @@ func TestTheOutcomesPlanOfAWorktreeTheStartNumberedNamesItsPorts(t *testing.T) {
 	assert.Equal(t, map[string]int{"PORT": 4030}, planned.Jobs[2].Ports)
 	assert.Equal(t, "app_feat-fresh", planned.Jobs[1].Namespace)
 }
+
+func TestAStartOnAnIndexANewerWtmWroteIsWarnedOf(t *testing.T) {
+	w := newWorld(t)
+	w.usecase.Repository.FrozenIndex = func() string { return "/cfg/wtm/jobs.json" }
+
+	_, warnings := w.plan(t, starting("", featA))
+
+	assert.Contains(t, codes(warnings), runup.Name+domain.IndexFrozen)
+}

@@ -51,6 +51,9 @@ func drawDaemon(w io.Writer, d daemonstatus.Detail) {
 			field("", "  "+pad(cmp.Or(wt.Branch, wt.Path), width)+"  "+jobsOf(wt.Jobs))
 		}
 	}
+	if len(d.Left) > 0 {
+		field("left", strings.Join(run.Names(d.Left), ", ")+" — by a daemon that died")
+	}
 	if d.Proxy != nil {
 		field("proxy", proxy(*d.Proxy))
 	}

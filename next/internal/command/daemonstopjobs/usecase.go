@@ -37,10 +37,10 @@ type Detail = runjobs.StopDetail
 // ----------------------------------------------------------------------------
 // Run
 
-// Run carries out the request under its operation: the daemon is the machine's, so it takes no lock (shortcut: a stop-jobs and a run up of one worktree do not take turns; lock each worktree once the locks span repositories); it plans, fingerprints the plan, stops on a dry run, refuses a stale plan and applies it between the operation's started and finished events. An error returned is a refusal before the apply; a stop that fails is in the Outcome's Result.
+// Run carries out the request under its operation, which takes the machine's lock (shortcut: a stop-jobs and a run up of one worktree do not take turns; lock each worktree once the locks span repositories); it plans, fingerprints the plan, stops on a dry run, refuses a stale plan and applies it between the operation's started and finished events. An error returned is a refusal before the apply; a stop that fails is in the Outcome's Result.
 func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (Outcome, error) {
-	// 1. Begin the operation; the daemon is no repository's, so it takes no lock.
-	op, err := u.Operations.Begin(Name, nil, opts)
+	// 1. Begin the operation under the machine's lock: the daemon is no repository's.
+	op, err := u.Operations.Begin(Name, domain.MachineLocks(), opts)
 	if err != nil {
 		return Outcome{Op: op.ID}, err
 	}

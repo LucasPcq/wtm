@@ -20,7 +20,7 @@ func (w world) env() uicli.Env {
 }
 
 func (w world) open(context.Context, string) (daemonstatus.UseCase, error) {
-	return daemonstatus.UseCase{Daemon: func(context.Context) (run.Daemon, error) { return w.Daemon, nil }, Version: "0.31.0", Restart: &domain.FollowUp{Command: domain.CommandDaemonRestart}}, nil
+	return daemonstatus.UseCase{Daemon: func(context.Context) (run.Daemon, error) { return w.Daemon, nil }, Version: "0.31.0", Restart: &domain.FollowUp{Command: "daemon-restart"}}, nil
 }
 
 // running is a daemon of stamp holding the jobs of two repositories.

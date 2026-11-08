@@ -12,12 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/LucasPcq/wtm/next/internal/command/daemonstopjobs"
-	daemonstopjobscli "github.com/LucasPcq/wtm/next/internal/command/daemonstopjobs/cli"
-
-	"github.com/LucasPcq/wtm/next/internal/command/daemonrestart"
-	daemonrestartcli "github.com/LucasPcq/wtm/next/internal/command/daemonrestart/cli"
-
 	"github.com/LucasPcq/wtm/next/internal/adapter/config"
 	"github.com/LucasPcq/wtm/next/internal/adapter/daemon"
 	bus "github.com/LucasPcq/wtm/next/internal/adapter/events"
@@ -34,6 +28,10 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/clean"
 	cleancli "github.com/LucasPcq/wtm/next/internal/command/clean/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
+	"github.com/LucasPcq/wtm/next/internal/command/daemonrestart"
+	daemonrestartcli "github.com/LucasPcq/wtm/next/internal/command/daemonrestart/cli"
+	"github.com/LucasPcq/wtm/next/internal/command/daemonstopjobs"
+	daemonstopjobscli "github.com/LucasPcq/wtm/next/internal/command/daemonstopjobs/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/events"
 	"github.com/LucasPcq/wtm/next/internal/command/exec"
 	execcli "github.com/LucasPcq/wtm/next/internal/command/exec/cli"

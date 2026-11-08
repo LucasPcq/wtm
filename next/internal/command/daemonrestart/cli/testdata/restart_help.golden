@@ -11,7 +11,9 @@
   did not come back.
 
   It asks first when a service would stop, if only for a moment; --yes restarts
-  without asking. With no daemon running, it starts one.
+  without asking. With no daemon running, it starts one, and brings back the
+  services a daemon that died left. A newer wtm's daemon is not replaced without
+  --force: this build would leave its stacks untracked.
 
   Usage:
     wtm-next daemon restart [flags]
@@ -26,6 +28,7 @@
         --ask                         Ask again the questions this repository remembers an answer to, to change or forget it
     -n, --dry-run                     Show the plan and its fingerprint, apply nothing
         --expect-fingerprint string   Apply only if the facts still have this fingerprint, the one --dry-run printed
+        --force                       Restart a newer wtm's daemon as this build all the same, its stacks left untracked
     -h, --help                        help for restart
         --output string               Output format: text or json (default "text")
     -y, --yes                         Restart without asking

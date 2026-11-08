@@ -24,16 +24,22 @@ func (d *daemon) Status(context.Context) (run.Daemon, error) { return d.status, 
 
 func (d *daemon) Records() []run.Record { return d.records }
 
-func (d *daemon) Shutdown(context.Context) error {
+func (d *daemon) Shutdown(ctx context.Context) error {
 	d.calls = append(d.calls, "shutdown")
 	if d.stopped != nil {
 		d.stopped()
 	}
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
 	return d.shutdown
 }
 
-func (d *daemon) Ensure(context.Context) error {
+func (d *daemon) Ensure(ctx context.Context) error {
 	d.calls = append(d.calls, "ensure")
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
 	return d.ensure
 }
 

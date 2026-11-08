@@ -3,6 +3,6 @@
   Stops in main (acme)    web, api (crashed: nothing to stop)
   Stops in feat/a (acme)  db (held), mail (a stack, by its stop command)
   Stops in main (wtm)     docs
-  fingerprint  4b2ea9cf5b8b787effc15507
-  → wtm-next daemon stop-jobs --expect-fingerprint 4b2ea9cf5b8b787effc15507   apply this plan
+  fingerprint  ce8fe180837b3b4a68965fea
+  → wtm-next daemon stop-jobs --expect-fingerprint ce8fe180837b3b4a68965fea   apply this plan
 
