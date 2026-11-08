@@ -1,0 +1,16 @@
+
+  Step 1/2 • Profile or job
+
+  Select a profile or a job of feat/a
+
+▌› dev                                                                     default running  3 jobs
+   full                                                                                     5 jobs
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   web                                                                            service  running
+   api                                                                            service  crashed
+   migrate                                                                           task  stopped
+   db                                                                             service  running
+   cache                                                                      service  not started
+   stack                                                                      service  not started
+
+  ↑↓ navigate • / filter • enter confirm • esc cancel

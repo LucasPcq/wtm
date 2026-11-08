@@ -1,0 +1,86 @@
+{
+  "v": 2,
+  "command": "run-list",
+  "ok": true,
+  "items": [
+    {
+      "subject": "main",
+      "status": "done",
+      "detail": {
+        "branch": "main",
+        "path": "<root>/main",
+        "profile": "",
+        "profiles": [],
+        "jobs": [
+          {
+            "name": "seed",
+            "kind": "task",
+            "state": "stopped",
+            "command": "true",
+            "actions": [
+              {
+                "command": "run-start",
+                "answers": [
+                  {
+                    "path": "worktree",
+                    "values": [
+                      "main"
+                    ]
+                  },
+                  {
+                    "path": "job",
+                    "values": [
+                      "seed"
+                    ]
+                  }
+                ],
+                "code": "run-list.start",
+                "message": "start the job"
+              },
+              {
+                "command": "run-stop",
+                "answers": [
+                  {
+                    "path": "worktree",
+                    "values": [
+                      "main"
+                    ]
+                  },
+                  {
+                    "path": "job",
+                    "values": [
+                      "seed"
+                    ]
+                  }
+                ],
+                "code": "run-list.stop",
+                "message": "stop the job"
+              },
+              {
+                "command": "run-logs",
+                "answers": [
+                  {
+                    "path": "worktree",
+                    "values": [
+                      "main"
+                    ]
+                  },
+                  {
+                    "path": "job",
+                    "values": [
+                      "seed"
+                    ]
+                  }
+                ],
+                "code": "run-list.logs",
+                "message": "read its output"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}

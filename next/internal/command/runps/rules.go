@@ -309,7 +309,7 @@ func (p Project) jobOf(job run.Job, offset *int) Job {
 	}
 	for _, name := range declared.Runs {
 		child := p.declared(name)
-		found.Services = append(found.Services, Service{Name: name, Address: addressOf(child, portsAt(child, offset))})
+		found.Services = append(found.Services, Service{Name: name, Address: addressOf(child, env.PortsAt(child, offset))})
 	}
 	return found
 }
@@ -330,21 +330,6 @@ func (p Project) offset(path string) *int {
 		return nil
 	}
 	return env.OffsetOf(env.OffsetParams{Worktree: *w, Worktrees: p.Worktrees, Records: p.Records, Run: p.Run})
-}
-
-// portsAt are the ports job binds in a worktree whose ports sit offset above the main worktree's, by the names it declares them under: the base of a shared job's; none when the offset is not known.
-func portsAt(job project.Job, offset *int) map[string]int {
-	if offset == nil && job.Scope != project.Shared {
-		return nil
-	}
-	ports := map[string]int{}
-	for name, base := range job.Ports {
-		ports[name] = base
-		if job.Scope != project.Shared {
-			ports[name] += *offset
-		}
-	}
-	return ports
 }
 
 // addressOf is where job answers on this machine, given the ports it binds: localhost at its url's port, else at its one port; "" when it binds none, or several and no url names one.

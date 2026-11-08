@@ -118,6 +118,21 @@ func OffsetOf(params OffsetParams) *int {
 	return &offset
 }
 
+// PortsAt are the ports job binds in a worktree whose ports sit offset above the main worktree's, by the names it declares them under: a shared job's at their base; none when the offset is not known (nil) and the job is not shared.
+func PortsAt(job project.Job, offset *int) map[string]int {
+	if offset == nil && job.Scope != project.Shared {
+		return nil
+	}
+	ports := map[string]int{}
+	for name, base := range job.Ports {
+		ports[name] = base
+		if job.Scope != project.Shared {
+			ports[name] += *offset
+		}
+	}
+	return ports
+}
+
 const defaultOffsetBlock = 10
 
 // OffsetBlock returns how many ports apart two consecutive worktrees sit: run.toml's port_offset_block, else 10.

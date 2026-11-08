@@ -42,6 +42,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/resolve"
 	"github.com/LucasPcq/wtm/next/internal/command/rundown"
 	rundowncli "github.com/LucasPcq/wtm/next/internal/command/rundown/cli"
+	"github.com/LucasPcq/wtm/next/internal/command/runlist"
 	"github.com/LucasPcq/wtm/next/internal/command/runlogs"
 	runlogscli "github.com/LucasPcq/wtm/next/internal/command/runlogs/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/runps"
@@ -95,6 +96,7 @@ type app struct {
 	RunStart    runstart.UseCase
 	RunStop     runstop.UseCase
 	RunPs       runps.UseCase
+	RunList     runlist.UseCase
 }
 
 // wire builds each adapter of the repository params locates once and injects it into every use case.
@@ -294,6 +296,14 @@ func wire(params wireParams) app {
 			Jobs:       starts,
 		},
 		RunPs: runPs(),
+		RunList: runlist.UseCase{
+			Git:        repo,
+			Meta:       meta,
+			Jobs:       jobs,
+			ReadLog:    joblog.Tail,
+			StateDir:   params.StateDir,
+			Repository: facts,
+		},
 		RunStop: runstop.UseCase{
 			Repository: facts,
 			Operations: operations,

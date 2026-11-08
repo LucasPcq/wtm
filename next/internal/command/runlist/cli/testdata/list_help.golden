@@ -1,0 +1,26 @@
+
+  List the profiles and the jobs run.toml declares, as a worktree runs them: each
+  job's state there, the ports it binds there, its folder and its command. It
+  changes nothing and never starts wtm's daemon.
+
+  On a terminal it opens a picker: choose a profile or a job, then what to do with
+  it, and the command that does it is printed. With no worktree named, a terminal
+  asks which one, the one you stand in first; anywhere else it is that one.
+
+  Usage:
+    wtm-next run list [worktree] [flags]
+
+  Examples:
+    # Pick a profile or a job, then what to do with it
+    wtm run list
+
+    # feat/a's jobs and profiles, as JSON
+    wtm run list feat/a --output json
+
+  Flags:
+    -h, --help            help for list
+        --output string   Output format: text or json (default "text")
+
+  Global Flags:
+    -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+

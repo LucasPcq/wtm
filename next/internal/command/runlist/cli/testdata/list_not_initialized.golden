@@ -1,0 +1,4 @@
+
+  ✗ no run.toml: no job is declared
+  → wtm run init   declare the jobs
+

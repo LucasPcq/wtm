@@ -27,6 +27,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/reparent"
 	"github.com/LucasPcq/wtm/next/internal/command/resolve"
 	"github.com/LucasPcq/wtm/next/internal/command/rundown"
+	"github.com/LucasPcq/wtm/next/internal/command/runlist"
 	"github.com/LucasPcq/wtm/next/internal/command/runlogs"
 	"github.com/LucasPcq/wtm/next/internal/command/runps"
 	"github.com/LucasPcq/wtm/next/internal/command/runstart"
@@ -67,6 +68,7 @@ var (
 	openRunDown     = opener(func(a app) rundown.UseCase { return a.RunDown })
 	openRunStart    = opener(func(a app) runstart.UseCase { return a.RunStart })
 	openRunStop     = opener(func(a app) runstop.UseCase { return a.RunStop })
+	openRunList     = opener(func(a app) runlist.UseCase { return a.RunList })
 )
 
 // openRunPs opens run ps, which reads the jobs of the whole machine: from any directory, in a repository or not.

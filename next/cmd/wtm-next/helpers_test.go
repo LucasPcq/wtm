@@ -40,6 +40,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
 	"github.com/LucasPcq/wtm/next/internal/command/rundown"
 	rundowncli "github.com/LucasPcq/wtm/next/internal/command/rundown/cli"
+	"github.com/LucasPcq/wtm/next/internal/command/runlist"
 	"github.com/LucasPcq/wtm/next/internal/command/runlogs"
 	runlogscli "github.com/LucasPcq/wtm/next/internal/command/runlogs/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/runps"
@@ -208,8 +209,8 @@ func keepsTheMutationContract(t *testing.T, m mutation) {
 func keepsTheReadContract(t *testing.T, name string) {
 	t.Helper()
 	main, c, shape := drive(t, name)
-	if name == runlogs.Name {
-		// run logs reads the jobs of run.toml: one that ran, its log left behind.
+	if name == runlogs.Name || name == runlist.Name {
+		// run logs and run list read the jobs of run.toml: one that ran, its log left behind.
 		writeRun(t, main, seedJob)
 		logs := filepath.Join(main, ".git", "wtm", "logs", "main")
 		require.NoError(t, os.MkdirAll(logs, 0o700))

@@ -1,0 +1,13 @@
+
+  Profiles · main
+    dev   default  db, api, web
+    full           migrate, db, stack, api, web
+
+  Jobs
+    web      service  not started  PORT=3000             pnpm dev
+    api      service  not started  API_PORT=4000         pnpm dev
+    migrate  task     stopped                            pnpm migrate
+    db       service  not started  DB_PORT=5432  shared  postgres
+    cache    service  not started  CACHE_PORT=6379       true
+    stack    service  not started                        docker compose up -d
+
