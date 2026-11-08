@@ -18,9 +18,10 @@ import (
 type Facts struct {
 	worktree.Repository
 	repository.Asked
-	Target  worktree.Worktree
-	Records map[string]worktree.Meta
-	Logged  map[string]bool // by job
+	Target     worktree.Worktree
+	Records    map[string]worktree.Meta
+	RecordErrs map[string]error // by branch: a record that exists and does not read
+	Logged     map[string]bool  // by job
 }
 
 // ----------------------------------------------------------------------------
@@ -68,6 +69,9 @@ const (
 	CodeLogs  = Name + ".logs"
 )
 
+// CodeMetaUnreadable warns of a worktree whose meta record does not read: the ports its jobs bind are not known.
+const CodeMetaUnreadable = Name + ".meta_unreadable"
+
 // The paths the commands an entry's actions follow up with answer a profile and a job by.
 const (
 	pathProfile = "profile"
@@ -103,7 +107,11 @@ func List(f Facts) (domain.Unit[Detail], []domain.Warning) {
 		d.Jobs = append(d.Jobs, found)
 	}
 
-	return domain.Unit[Detail]{Subject: name, Status: domain.StatusDone, Detail: &d}, f.Warnings(Name)
+	item := domain.Unit[Detail]{Subject: name, Status: domain.StatusDone, Detail: &d}
+	if err := f.RecordErrs[d.Branch]; err != nil {
+		item.Warnings = []domain.Warning{{Code: CodeMetaUnreadable, Message: "couldn't read the record of " + d.Branch + ": the ports its jobs bind are not known: " + err.Error(), Params: domain.Params{"branch": d.Branch}}}
+	}
+	return item, f.Warnings(Name)
 }
 
 // standing is where the job called name stands in the worktree read, what of it the daemon holds, and its url while it is up: the daemon's state, a claim reading as the shared job it holds, a job a runner starts itself as that runner; else stopped once its log holds a line, not_started when it never ran; nil when the daemon cannot tell.

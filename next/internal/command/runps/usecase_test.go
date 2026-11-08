@@ -2,6 +2,7 @@ package runps_test
 
 import (
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -122,4 +123,27 @@ func TestADaemonThatCannotTellWhichJobsAreUpIsWarned(t *testing.T) {
 
 	assert.Empty(t, read.Items)
 	assert.Equal(t, []string{runps.Name + domain.JobsUnknown}, codes(read))
+}
+
+func TestAWorktreeWhoseEveryJobEndedKeepsItsProfile(t *testing.T) {
+	ended := slices.DeleteFunc(jobs(), func(job run.Job) bool { return job.WorkDir == billingPath && job.Up })
+
+	billing := group(t, read(t, seed{Jobs: ended, Projects: []runps.Project{acme()}}, runps.Request{}), "feat/billing")
+
+	assert.Equal(t, "dev", billing.Profile)
+	assert.Equal(t, []string{"worker:crashed", "migrate:exited", "web:not_started", "api:not_started"}, names(billing.Jobs))
+}
+
+func TestAWorktreeWhoseRecordDoesNotReadIsWarnedOnItsGroup(t *testing.T) {
+	p := acme()
+	p.RecordErrs = map[string]error{"fix/login": errors.New("bad json")}
+
+	read := read(t, seed{Jobs: jobs(), Projects: []runps.Project{p}}, runps.Request{})
+
+	for _, item := range read.Items {
+		if item.Subject == "fix/login" {
+			require.Len(t, item.Warnings, 1)
+			assert.Equal(t, runps.CodeMetaUnreadable, item.Warnings[0].Code)
+		}
+	}
 }

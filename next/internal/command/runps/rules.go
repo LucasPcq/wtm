@@ -31,8 +31,9 @@ type Facts struct {
 // A Project is one repository as run ps reads it: its config, run.toml and worktrees, the meta record of each worktree by branch, and where wtm keeps its state.
 type Project struct {
 	worktree.Repository
-	Records  map[string]worktree.Meta
-	StateDir string
+	Records    map[string]worktree.Meta
+	RecordErrs map[string]error // by branch: a record that exists and does not read
+	StateDir   string
 }
 
 // A LogKey names one job's log: the worktree it runs in, and the job.
@@ -66,6 +67,8 @@ func Unlisted(projects []Project, jobs []run.Job) map[LogKey]run.LogFile {
 const (
 	// CodeRepoUnreadable warns of jobs whose repository could not be read: they are listed without what run.toml says of them.
 	CodeRepoUnreadable = Name + ".repo_unreadable"
+	// CodeMetaUnreadable warns of a worktree whose meta record does not read: the ports of the services its runners start are not known.
+	CodeMetaUnreadable = Name + ".meta_unreadable"
 )
 
 // A Detail is one group of jobs as the JSON envelope reports it: the jobs one worktree runs for itself, or a repository's shared services (Shared), with the repository's main checkout, the worktree's branch (none for the shared services or a worktree on no branch) and path (the main checkout for the shared services), the profile its jobs were started under, how many of its jobs stand in each state, and its jobs, those to see first first.
@@ -139,7 +142,11 @@ func List(f Facts) ([]domain.Unit[Detail], []domain.Warning) {
 	for _, p := range f.Projects {
 		var groups []domain.Unit[Detail]
 		for _, g := range groupsOf(p, f.Jobs) {
-			groups = append(groups, unit(p.group(g, f)))
+			item := unit(p.group(g, f))
+			if err := p.RecordErrs[item.Detail.Branch]; err != nil {
+				item.Warnings = []domain.Warning{{Code: CodeMetaUnreadable, Message: "couldn't read the record of " + item.Detail.Branch + ": the ports of the services its runners start are not known: " + err.Error(), Params: domain.Params{"branch": item.Detail.Branch}}}
+			}
+			groups = append(groups, item)
 		}
 		slices.SortStableFunc(groups, func(a, b domain.Unit[Detail]) int {
 			return cmp.Compare(rank(a.Detail.Counts.Crashed > 0), rank(b.Detail.Counts.Crashed > 0))
@@ -229,7 +236,7 @@ func (p Project) branchAt(path string) string {
 
 // group is the jobs the worktree of g runs for itself, then those of its profile the daemon does not list there.
 func (p Project) group(g group, f Facts) Detail {
-	d := Detail{Repository: p.MainPath, Branch: p.branchAt(g.path), Path: g.path, Profile: run.ProfileIn(f.Jobs, g.path), Jobs: []Job{}}
+	d := Detail{Repository: p.MainPath, Branch: p.branchAt(g.path), Path: g.path, Profile: profileIn(f.Jobs, g.path), Jobs: []Job{}}
 	offset := p.offset(g.path)
 	for _, job := range f.Jobs {
 		if job.WorkDir == g.path && run.Own(job) && p.owns(job) {
@@ -249,9 +256,19 @@ func (p Project) group(g group, f Facts) Detail {
 	return d
 }
 
+// profileIn is the profile the jobs the worktree at path runs for itself were started under, up or ended: a worktree whose every job crashed keeps it; "" when none says one.
+func profileIn(jobs []run.Job, path string) string {
+	for _, job := range jobs {
+		if job.WorkDir == path && run.Own(job) && job.Profile != "" {
+			return job.Profile
+		}
+	}
+	return ""
+}
+
 // declaredIdle are the jobs of the profile the worktree at path runs that the daemon does not list there, in run.toml's order: neither a shared service (listed with the shared services) nor a job a runner listed there starts itself.
 func (p Project) declaredIdle(path string, jobs []run.Job) []project.Job {
-	profile := run.ProfileIn(jobs, path)
+	profile := profileIn(jobs, path)
 	at := slices.IndexFunc(p.Run.Profiles, func(pr project.Profile) bool { return pr.Name == profile })
 	if profile == "" || at < 0 || p.RunErr != nil {
 		return nil
@@ -397,7 +414,6 @@ func (p Project) shared(jobs []run.Job) Detail {
 			continue
 		}
 		found := p.jobOf(job, nil)
-		found.Address = addressOf(p.declared(job.Name), job.Ports)
 		found.Holders = p.holdersOf(job, jobs)
 		for _, h := range found.Holders {
 			holders[h.Path] = true

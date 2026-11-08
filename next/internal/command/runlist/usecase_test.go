@@ -106,3 +106,13 @@ func TestAWorktreeNamedThatDoesNotExistIsAProblemOfItsField(t *testing.T) {
 	require.Len(t, refused.Fields, 1)
 	assert.Equal(t, domain.PathWorktree, refused.Fields[0].Path)
 }
+
+func TestAWorktreeWhoseRecordDoesNotReadIsWarnedItsPortsUnknown(t *testing.T) {
+	outcome, err := usecase(seed{Run: declared, Unread: true}).Run(t.Context(), runlist.Request{}.From(domain.Caller{Cwd: featA}), domain.RunOptions{})
+
+	require.NoError(t, err)
+	item := outcome.Items[0]
+	require.Len(t, item.Warnings, 1)
+	assert.Equal(t, runlist.CodeMetaUnreadable, item.Warnings[0].Code)
+	assert.Nil(t, item.Detail.Jobs[0].Ports)
+}

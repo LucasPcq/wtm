@@ -90,8 +90,8 @@ func openProject(ctx context.Context, dir string) (runps.Project, error) {
 		return runps.Project{}, err
 	}
 
-	records, _ := repository.Records(store.Meta{StateDir: params.StateDir}, repo.Live())
-	return runps.Project{Repository: repo, Records: records, StateDir: params.StateDir}, nil
+	records, unread := repository.Records(store.Meta{StateDir: params.StateDir}, repo.Live())
+	return runps.Project{Repository: repo, Records: records, RecordErrs: unread, StateDir: params.StateDir}, nil
 }
 
 // opener returns the function that opens the use case useCase picks out of the app wired on the repository of a directory.

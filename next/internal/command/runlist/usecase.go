@@ -98,7 +98,7 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	}
 
 	facts := Facts{Repository: repo, Target: target, Logged: map[string]bool{}}
-	facts.Records, _ = repository.Records(u.Meta, repo.Live())
+	facts.Records, facts.RecordErrs = repository.Records(u.Meta, repo.Live())
 	facts.Asked = repository.Ask(ctx, repository.AskParams{Jobs: u.Jobs, Restart: u.Repository.Restart}, func() {})
 	if dir := run.LogDir(u.StateDir, target.Branch()); dir != "" && facts.JobsErr == nil {
 		for _, job := range repo.Run.Jobs {

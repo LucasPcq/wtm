@@ -43,11 +43,16 @@ type seed struct {
 	Jobs    []run.Job
 	JobsErr error
 	Logged  []string
+	Unread  bool // feat/a's record does not read
 }
 
 func usecase(s seed) runlist.UseCase {
 	git := gittest.NewFake(gittest.FakeParams{Main: mainPath, Branch: "main", Worktrees: []worktree.Worktree{{Path: featA, State: worktree.OnBranch{Branch: "feat/a"}}}})
-	store := storetest.NewFake(storetest.FakeParams{Meta: map[string]worktree.Meta{"feat/a": {Ordinal: 1}}})
+	var unread []string
+	if s.Unread {
+		unread = []string{"feat/a"}
+	}
+	store := storetest.NewFake(storetest.FakeParams{Meta: map[string]worktree.Meta{"feat/a": {Ordinal: 1}}, Unreadable: unread})
 	config := project.Config{Worktrees: project.Worktrees{BasePath: "../.trees", BaseBranch: "main"}}
 	return runlist.UseCase{
 		Git:  git,
