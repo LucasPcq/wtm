@@ -82,6 +82,9 @@ export function LogLines({
             <LogRow
               key={lineKey(line, row.line)}
               line={line}
+              // a mark after any line of the log (its number in the whole log, else its place among the lines held) ends
+              // a run before it; the daemon gives no other sign, so a mark whose run before is gone reads Started
+              first={(line.n ?? row.line + 1) === 1}
               on={on}
               onCurrent={on ? onCurrent : undefined}
               matched={matched.has(row.line)}
@@ -99,6 +102,7 @@ export function LogLines({
 // a line printed renders once: a job printing on re-renders only its new rows, keyed by the line, not its place
 const LogRow = memo(function LogRow({
   line,
+  first,
   on,
   onCurrent,
   matched,
@@ -107,6 +111,7 @@ const LogRow = memo(function LogRow({
   wrap,
 }: {
   line: LogLine
+  first: boolean
   on: boolean
   onCurrent: ((row: HTMLDivElement | null) => void) | undefined
   matched: boolean
@@ -114,6 +119,20 @@ const LogRow = memo(function LogRow({
   stamps: boolean
   wrap: boolean
 }) {
+  // the daemon's mark where a run begins: below a run before it, the job started again
+  if (line.mark)
+    return (
+      <div
+        ref={onCurrent}
+        aria-current={on ? 'true' : undefined}
+        className={cn('flex items-center gap-4 px-6 py-2 text-xs text-muted-foreground', on && 'bg-amber-500/20')}
+      >
+        <span className="h-px flex-1 bg-border" />
+        {first ? 'Started' : 'Restarted'} {clock(line.at)}
+        <span className="h-px flex-1 bg-border" />
+      </div>
+    )
+
   return (
     <div
       ref={onCurrent}

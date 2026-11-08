@@ -191,6 +191,10 @@ run_side() {
     scenario 13-dry-run run stop feat/a --job api --dry-run
     quietly run up feat/b --profile stuck -d --yes
     scenario 14-stop-fails run stop feat/b --job stuck --yes
+    # next only: a shared service restarted from a worktree holding it
+    quietly run start feat/a --job db -d --yes
+    quietly run start feat/b --job db -d --yes
+    scenario 15-restart-shared run start feat/a --job db --restart -d --yes
     touch "$HOME/unstick"
     quietly run down feat/b --yes
   )

@@ -62,7 +62,8 @@ func (f Facts) Planned(t Target, jobs []project.Job, ordinal int) Target {
 			planned.Ports = nonEmpty(params.JobPorts(f.effective(job)))
 		}
 		switch {
-		case job.Scope == project.Shared && !t.Main:
+		// The main checkout joins a shared service it runs for the others alone, which takes its own hold on it.
+		case job.Scope == project.Shared && (!t.Main || f.runsForOthers(t.Path, job.Name)):
 			planned.Action, planned.SharedIn, planned.Ports = ActionJoin, main, nil
 			if namespace, ok, _ := env.NamespaceFor(job, jobEnv); ok && t.Numbered {
 				planned.Namespace = namespace.Name
@@ -80,6 +81,13 @@ func (f Facts) Planned(t Target, jobs []project.Job, ordinal int) Target {
 		t.Jobs = append(t.Jobs, planned)
 	}
 	return t
+}
+
+// runsForOthers reports whether the main checkout at dir runs the shared service name for the other worktrees alone, holding none of it.
+func (f Facts) runsForOthers(dir, name string) bool {
+	return slices.ContainsFunc(f.Jobs, func(job run.Job) bool {
+		return job.Name == name && job.WorkDir == dir && job.Up && !job.MainHolds && !job.MainHoldsUnknown
+	})
 }
 
 // NotStarted is each job of t's plan as its result reports it before its start: none started.

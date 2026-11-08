@@ -15,6 +15,9 @@ const MaxTail = 1000
 // (a progress bar) must not grow it without end.
 const maxPending = 64 << 10
 
+// Mark is the line the daemon writes into a job's log, and hands its readers, each time it starts a process for it: a restart's log, which continues the run before, reads where the new run begins.
+const Mark = "[wtm] started"
+
 // A Line is one line a job printed, as the daemon read it: when, and its text,
 // its terminal escapes, carriage-return redraws and control characters gone.
 // A job's stdout and stderr are one stream, a terminal's.

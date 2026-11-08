@@ -9,6 +9,7 @@ import { ffPlan, ffQuestions, ffRun } from '@/test/fast-forward'
 import { envelope, followUp, offers, statusDetail, treeDetail } from '@/test/fixtures'
 import { prunePlan, pruneRun } from '@/test/prune'
 import { answeringReparent } from '@/test/reparent'
+import { runJobsHandlers } from '@/test/run-jobs'
 import { answeringRunLogs } from '@/test/run-logs'
 import { answeringRunUp } from '@/test/run-up'
 import { line, streamed } from '@/test/stream'
@@ -178,6 +179,7 @@ const handlers = [
   ...answeringSync(),
   ...answeringRunUp(),
   ...answeringRunLogs(),
+  ...runJobsHandlers(),
   ...answeringCheckout(),
   http.post('/api/repos/r1/commands/create/questions', async ({ request }) =>
     HttpResponse.json(questionsOf(((await request.json()) as WebCall).answers)),

@@ -22,16 +22,14 @@ import {
   patternOf,
 } from '@/features/worktrees/running/utils/log-search'
 
-export type LogLine = { at?: string; text: string; n?: number; seq?: number }
+export type LogLine = { at?: string; text: string; n?: number; seq?: number; mark?: boolean }
 
-// actions holds what acts on the job (Restart, Stop, Release): the panel places them left of its ⋯ menu
 export function JobPanel({
   repo,
   worktree,
   profile,
   job,
   now,
-  actions,
   switcher,
 }: {
   repo: string
@@ -39,7 +37,6 @@ export function JobPanel({
   profile: string | undefined
   job: ListJob
   now: number
-  actions?: ReactNode
   switcher?: ReactNode
 }) {
   const [view, dispatch] = useLogView()
@@ -158,15 +155,7 @@ export function JobPanel({
       className="@container/panel flex min-h-0 min-w-0 flex-1 flex-col"
     >
       {switcher}
-      <JobHeader
-        repo={repo}
-        worktree={worktree}
-        profile={profile}
-        job={job}
-        facts={facts}
-        now={now}
-        actions={actions}
-      />
+      <JobHeader repo={repo} worktree={worktree} profile={profile} job={job} facts={facts} now={now} />
       <div className="flex flex-col gap-3 px-6">
         {crashed && (
           <Alert

@@ -70,3 +70,13 @@ export function groupLine({ profile, counts, starting }: RunningGroup) {
     .filter(Boolean)
     .join(' · ')
 }
+
+// the job the address names as the read lists it, its row gone from the list once it stopped or exited: the panel
+// stays on it
+export function listedJob(read: Read<'list'>, worktree: string | undefined, job: string | undefined) {
+  const item = read.items.find(({ subject }) => subject === worktree)
+  const listed = item?.detail?.jobs?.find((one) => one.name === job && one.hold !== 'claim')
+  return item && listed
+    ? { group: { worktree: item.subject, profile: item.detail?.profile || undefined }, job: listed }
+    : undefined
+}

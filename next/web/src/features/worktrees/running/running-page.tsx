@@ -13,11 +13,13 @@ import { clockEvery, useRun } from '@/features/worktrees/hooks/use-run'
 import { openRunDown } from '@/features/worktrees/hooks/use-run-down-dialog'
 import { openRunUp, useRunUpDialog } from '@/features/worktrees/hooks/use-run-up-dialog'
 import { RunDownDialog } from '@/features/worktrees/run-down/run-down-dialog'
+import { RunStartDialog } from '@/features/worktrees/run-start/run-start-dialog'
+import { RunStopDialog } from '@/features/worktrees/run-stop/run-stop-dialog'
 import { RunUpDialog } from '@/features/worktrees/run-up/run-up-dialog'
 import { JobPanel } from '@/features/worktrees/running/components/job-panel'
 import { JobSwitcher } from '@/features/worktrees/running/components/job-switcher'
 import { RunGroup } from '@/features/worktrees/running/components/run-group'
-import { groupsOf, type RunningGroup } from '@/features/worktrees/running/utils/groups'
+import { groupsOf, listedJob, type RunningGroup } from '@/features/worktrees/running/utils/groups'
 import type { RunningSearch } from '@/features/worktrees/running/utils/search'
 import { plural } from '@/lib/plural'
 import { repoName } from '@/lib/repo'
@@ -36,9 +38,10 @@ export function RunningPage({ repo, search }: { repo: string; search: RunningSea
   const ended = progress?.endedAt
   const overlay = running || (ended !== undefined && list.dataUpdatedAt < ended) ? progress : undefined
   const groups = list.data ? groupsOf({ read: list.data, progress: overlay, plan }) : []
-  // the job asked for, else the first the list shows
+  // the job asked for, shown or stopped, else the first the list shows
   const picked =
     pick(groups, search.worktree, search.job) ??
+    (list.data && search.job ? listedJob(list.data, search.worktree, search.job) : undefined) ??
     groups.flatMap((group) => pick([group], group.worktree, undefined) ?? [])[0]
   const up = groups.reduce((count, group) => count + group.counts.running, 0)
   const crashed = groups.reduce((count, group) => count + group.counts.crashed, 0)
@@ -60,7 +63,7 @@ export function RunningPage({ repo, search }: { repo: string; search: RunningSea
   const body = () => {
     if (list.isError) return <ReadFailed message={list.error.message} />
     if (!list.data) return <Skeletons />
-    if (groups.length === 0)
+    if (groups.length === 0 && !picked)
       return (
         <Centered>
           <StatePage icon={<Activity />} title="Nothing is running">
@@ -131,6 +134,8 @@ export function RunningPage({ repo, search }: { repo: string; search: RunningSea
       />
       <RunUpDialog repo={repo} />
       <RunDownDialog repo={repo} />
+      <RunStartDialog repo={repo} />
+      <RunStopDialog repo={repo} />
       <div className="min-h-0 flex-1 overflow-hidden" aria-busy={!list.data}>
         {body()}
       </div>

@@ -47,13 +47,14 @@ type Outcome = domain.Read[Detail]
 // An Item is one worktree and the jobs read there.
 type Item = domain.Unit[Detail]
 
-// An Entry is one line a job of a worktree printed, as Watch streams it, numbered in the whole log when it was read whole.
+// An Entry is one line a job of a worktree printed, as Watch streams it, numbered in the whole log when it was read whole, Mark when it is the daemon's run mark.
 type Entry struct {
 	Worktree string    `json:"worktree"`
 	Job      string    `json:"job"`
 	At       time.Time `json:"at,omitzero"`
 	Text     string    `json:"text"`
 	N        int       `json:"n,omitempty"`
+	Mark     bool      `json:"mark,omitempty"`
 }
 
 // An Absent is what Watch has no line of: a worktree where no job ran (Job empty), or the job a request named, which never ran there.
@@ -233,7 +234,7 @@ func (u UseCase) follow(s *stream, src Source, keeps func(run.Line) bool) {
 			}
 			last = &line
 			if keeps(line) {
-				s.emit(src, Line{At: line.At, Text: line.Text})
+				s.emit(src, lineOf(line, 0))
 			}
 		})
 		if resume != nil && resume.Gap {
@@ -285,7 +286,7 @@ func (s *stream) emit(src Source, lines ...Line) {
 		if s.ctx.Err() != nil {
 			return
 		}
-		if err := s.out.Emit(Entry{Worktree: src.Target.Worktree, Job: src.Name, At: line.At, Text: line.Text, N: line.N}); err != nil {
+		if err := s.out.Emit(Entry{Worktree: src.Target.Worktree, Job: src.Name, At: line.At, Text: line.Text, N: line.N, Mark: line.Mark}); err != nil {
 			s.cancel(err)
 		}
 	}
