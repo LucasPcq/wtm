@@ -162,9 +162,12 @@ func (p Plan) targets() []runjobs.StopTarget {
 // ----------------------------------------------------------------------------
 // The recap
 
-// recap is the plan row by row: what stops in each worktree, a stack by its stop command, a hold on a shared service, a crashed job cleared.
+// recap is the plan row by row: the repository it narrows to, then what stops in each worktree, a stack by its stop command, a hold on a shared service, a crashed job cleared.
 func (p Plan) recap() []domain.RecapRow {
 	var rows []domain.RecapRow
+	if p.Repo != "" {
+		rows = append(rows, domain.RecapRow{Key: "repo", Label: "Repository", Path: domain.PathRepo, Values: domain.RecapValues([]string{p.Repo})})
+	}
 	for _, t := range p.targets() {
 		var jobs []string
 		for _, job := range t.Jobs {
@@ -182,6 +185,8 @@ func words(job runjobs.StopJob) string {
 		return job.Name + " (crashed: nothing to stop)"
 	case job.Hold == run.HoldDetached:
 		return job.Name + " (a stack, by its stop command)"
+	case job.Hold == run.HoldClaim:
+		return job.Name + " (held)"
 	case job.Shared():
 		return job.Name + " (shared)"
 	}

@@ -42,6 +42,7 @@ func TestARepositoryNamedByAPathInItNarrowsTheStop(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "/src/acme", plan.Repo)
 	assert.Equal(t, map[string][]string{"main (acme)": {"web:stop"}}, worktrees(plan))
+	assert.Equal(t, "repo", plan.Recap[0].Key, "the recap names the repository it narrows to")
 }
 
 func TestAPathInNoRepositoryIsAProblemOfItsField(t *testing.T) {

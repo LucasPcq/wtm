@@ -3,7 +3,7 @@
 
   build   0.31.0
   jobs    acme
-            main    web, db (shared)
+            main    db (shared), web
             feat/a  db (held), mail (detached)
           wtm
             main    docs

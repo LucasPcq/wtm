@@ -2,6 +2,6 @@
   ✓ daemon stop-jobs: 3 done
 
   Stops in main (acme)    web, api (crashed: nothing to stop)
-  Stops in feat/a (acme)  db (shared), mail (a stack, by its stop command)
+  Stops in feat/a (acme)  db (held), mail (a stack, by its stop command)
   Stops in main (wtm)     docs
 

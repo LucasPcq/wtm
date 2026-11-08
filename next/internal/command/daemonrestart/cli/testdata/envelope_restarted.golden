@@ -36,15 +36,15 @@
             "path": "/src/acme",
             "jobs": [
               {
-                "name": "web",
-                "kind": "service",
-                "hold": "own"
-              },
-              {
                 "name": "db",
                 "kind": "service",
                 "hold": "own",
                 "shared": true
+              },
+              {
+                "name": "web",
+                "kind": "service",
+                "hold": "own"
               }
             ]
           },
@@ -116,12 +116,12 @@
         "label": "Come back",
         "values": [
           {
-            "value": "web (main · acme)",
-            "text": "web (main · acme)"
-          },
-          {
             "value": "db (main · acme)",
             "text": "db (main · acme)"
+          },
+          {
+            "value": "web (main · acme)",
+            "text": "web (main · acme)"
           },
           {
             "value": "db (feat/a · acme)",

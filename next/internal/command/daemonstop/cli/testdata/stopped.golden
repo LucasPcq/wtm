@@ -1,7 +1,7 @@
 
   ✓ daemon stop: 1 done
 
-  Stops    web (main · acme), db (main · acme), the daemon
+  Stops    db (main · acme), web (main · acme), the daemon
   Runs on  mail (feat/a · acme)
   Lets go  db (feat/a · acme)
 

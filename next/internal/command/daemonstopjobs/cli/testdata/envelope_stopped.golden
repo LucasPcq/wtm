@@ -139,8 +139,8 @@
         "label": "Stops in feat/a (acme)",
         "values": [
           {
-            "value": "db (shared)",
-            "text": "db (shared)"
+            "value": "db (held)",
+            "text": "db (held)"
           },
           {
             "value": "mail (a stack, by its stop command)",

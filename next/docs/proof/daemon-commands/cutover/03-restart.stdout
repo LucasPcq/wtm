@@ -2,6 +2,6 @@
   ✓ daemon restart: 1 done
 
   Daemon      the legacy wtm's dev → <build>
-  Come back   api (main · acme), web (main · acme), db (main · acme), api (feat/a · acme), web (feat/a · acme), db (feat/a · acme)
+  Come back   api (main · acme), db (main · acme), web (main · acme), api (feat/a · acme), db (feat/a · acme), web (feat/a · acme)
   Taken over  stack (main · acme), stack (feat/a · acme)
 

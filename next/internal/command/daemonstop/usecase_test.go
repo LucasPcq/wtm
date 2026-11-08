@@ -15,7 +15,7 @@ func TestAStopSaysWhatStopsWhatRunsOnAndWhatItsHoldersLetGo(t *testing.T) {
 	plan := daemonstop.Decide(running(web, db, dbHeld, cache, cacheHeld).status)
 
 	assert.True(t, plan.Confirm)
-	assert.Equal(t, []string{"web (main · acme)", "db (main · acme)"}, run.Names(plan.Stops))
+	assert.Equal(t, []string{"db (main · acme)", "web (main · acme)"}, run.Names(plan.Stops))
 	assert.Equal(t, []string{"cache (main · acme)", "cache (feat/a · acme)"}, run.Names(plan.Kept))
 	assert.Equal(t, []string{"db (feat/a · acme)"}, run.Names(plan.Lost))
 }

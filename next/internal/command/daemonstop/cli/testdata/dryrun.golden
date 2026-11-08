@@ -1,8 +1,8 @@
 
   daemon stop · dry run, nothing applied
-  Stops    web (main · acme), db (main · acme), the daemon
+  Stops    db (main · acme), web (main · acme), the daemon
   Runs on  mail (feat/a · acme)
   Lets go  db (feat/a · acme)
-  fingerprint  ec3ea4fec239e309a447eadc
-  → wtm-next daemon stop --expect-fingerprint ec3ea4fec239e309a447eadc   apply this plan
+  fingerprint  60261abd5130404a247abb26
+  → wtm-next daemon stop --expect-fingerprint 60261abd5130404a247abb26   apply this plan
 

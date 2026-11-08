@@ -31,12 +31,11 @@ type HeldJob struct {
 }
 
 // Held returns jobs by repository, the repositories and, in each, the
-// worktrees in the order of their paths, a worktree's jobs in the order given;
-// never nil.
+// worktrees in the order of their paths, a worktree's jobs by name; never nil.
 func Held(jobs []Job) []HeldRepo {
 	sorted := Placed(jobs)
 	slices.SortStableFunc(sorted, func(a, b Job) int {
-		return cmp.Or(cmp.Compare(a.Repo, b.Repo), cmp.Compare(a.WorkDir, b.WorkDir))
+		return cmp.Or(cmp.Compare(a.Repo, b.Repo), cmp.Compare(a.WorkDir, b.WorkDir), cmp.Compare(a.Name, b.Name))
 	})
 	repos := []HeldRepo{}
 	for _, job := range sorted {

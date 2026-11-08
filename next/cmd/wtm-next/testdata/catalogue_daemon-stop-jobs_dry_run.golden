@@ -28,6 +28,17 @@
     "confirm": true,
     "recap": [
       {
+        "key": "repo",
+        "label": "Repository",
+        "path": "repo",
+        "values": [
+          {
+            "value": "<root>/main",
+            "text": "<root>/main"
+          }
+        ]
+      },
+      {
         "key": "jobs:main (main)",
         "label": "Stops in main (main)",
         "values": [

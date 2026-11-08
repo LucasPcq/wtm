@@ -54,7 +54,7 @@ PY
 [[job]]
   name = "stack"
   kind = "service"
-  cmd = "nohup sleep 600 >/dev/null 2>&1 & echo \$! > \"\$HOME/stack-\$(basename \$PWD).pid\"; echo stack up"
+  cmd = "kill -0 \$(cat \"\$HOME/stack-\$(basename \$PWD).pid\" 2>/dev/null) 2>/dev/null || { nohup sleep 600 >/dev/null 2>&1 & echo \$! > \"\$HOME/stack-\$(basename \$PWD).pid\"; }; echo stack up"
   stop = "kill \$(cat \"\$HOME/stack-\$(basename \$PWD).pid\") && echo stack down"
 
 [[profile]]

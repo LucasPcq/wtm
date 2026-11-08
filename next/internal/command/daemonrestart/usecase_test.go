@@ -16,7 +16,7 @@ import (
 func TestARestartBringsTheServicesBackTheStacksTakenOverATaskNotRunAgain(t *testing.T) {
 	plan, _ := daemonrestart.Decide(daemonrestart.Facts{Daemon: running("0.30.9", web, db, dbHeld, migrate, stack, api).status, Records: running("0.30.9", web, db, dbHeld, migrate, stack, api).records, Version: build})
 
-	assert.Equal(t, []string{"web (main · acme)", "db (main · acme)", "api (feat/a · acme)", "db (feat/a · acme)"}, run.Names(plan.Back))
+	assert.Equal(t, []string{"db (main · acme)", "web (main · acme)", "api (feat/a · acme)", "db (feat/a · acme)"}, run.Names(plan.Back))
 	assert.Equal(t, []string{"mail (main · acme)"}, run.Names(plan.TakenOver))
 	assert.Equal(t, []string{"migrate (main · acme)"}, run.Names(plan.Tasks))
 	assert.Empty(t, plan.Unrecorded)
@@ -109,7 +109,7 @@ func TestWithAFrozenIndexNothingComesBackAndItIsSaid(t *testing.T) {
 
 	plan, warnings := daemonrestart.Decide(daemonrestart.Facts{Daemon: d.status, Records: d.records, Version: build})
 
-	assert.Equal(t, []string{"web (main · acme)", "mail (main · acme)"}, run.Names(plan.Unrecorded))
+	assert.Equal(t, []string{"mail (main · acme)", "web (main · acme)"}, run.Names(plan.Unrecorded))
 	assert.Empty(t, plan.Back)
 	assert.Empty(t, plan.TakenOver, "the new daemon reads no index a newer wtm wrote")
 	require.Len(t, warnings, 1)

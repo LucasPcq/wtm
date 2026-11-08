@@ -1,7 +1,7 @@
 
   daemon stop-jobs · dry run, nothing applied
   Stops in main (acme)    api, db (shared), stack (a stack, by its stop command), web
-  Stops in feat/a (acme)  api, db (shared), stack (a stack, by its stop command), web
+  Stops in feat/a (acme)  api, db (held), stack (a stack, by its stop command), web
   fingerprint  <fingerprint>
   → wtm-next daemon stop-jobs --expect-fingerprint <fingerprint>   apply this plan
 

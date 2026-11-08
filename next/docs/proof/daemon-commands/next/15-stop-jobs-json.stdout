@@ -133,6 +133,17 @@
     "confirm": true,
     "recap": [
       {
+        "key": "repo",
+        "label": "Repository",
+        "path": "repo",
+        "values": [
+          {
+            "value": "<root>/acme",
+            "text": "<root>/acme"
+          }
+        ]
+      },
+      {
         "key": "jobs:main (acme)",
         "label": "Stops in main (acme)",
         "values": [
@@ -163,8 +174,8 @@
             "text": "api"
           },
           {
-            "value": "db (shared)",
-            "text": "db (shared)"
+            "value": "db (held)",
+            "text": "db (held)"
           },
           {
             "value": "stack (a stack, by its stop command)",

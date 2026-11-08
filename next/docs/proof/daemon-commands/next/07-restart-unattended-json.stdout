@@ -83,14 +83,14 @@
                 "hold": "own"
               },
               {
-                "name": "web",
-                "kind": "service",
-                "hold": "own"
-              },
-              {
                 "name": "db",
                 "kind": "service",
                 "hold": "claim"
+              },
+              {
+                "name": "web",
+                "kind": "service",
+                "hold": "own"
               }
             ]
           }
@@ -161,12 +161,12 @@
             "text": "api (feat/a · acme)"
           },
           {
-            "value": "web (feat/a · acme)",
-            "text": "web (feat/a · acme)"
-          },
-          {
             "value": "db (feat/a · acme)",
             "text": "db (feat/a · acme)"
+          },
+          {
+            "value": "web (feat/a · acme)",
+            "text": "web (feat/a · acme)"
           }
         ]
       },
