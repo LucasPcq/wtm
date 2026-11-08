@@ -15,6 +15,10 @@
             "status": "stopped"
           },
           {
+            "name": "db",
+            "status": "stopped"
+          },
+          {
             "name": "api",
             "status": "stopped"
           }
@@ -67,6 +71,16 @@
                 "kind": "service",
                 "hold": "own",
                 "fate": "stop"
+              },
+              {
+                "name": "db",
+                "kind": "service",
+                "hold": "own",
+                "fate": "stop",
+                "shared_in": "/src/acme",
+                "held_by": [
+                  "feat/a"
+                ]
               },
               {
                 "name": "api",
@@ -126,6 +140,10 @@
           {
             "value": "web",
             "text": "web"
+          },
+          {
+            "value": "db (shared)",
+            "text": "db (shared)"
           },
           {
             "value": "api (crashed: nothing to stop)",

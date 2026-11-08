@@ -11,18 +11,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestEveryJobOfEveryRepositoryStopsASharedOneThroughItsHolders(t *testing.T) {
+func TestEveryJobOfEveryRepositoryStopsASharedOneLetGoByEachHold(t *testing.T) {
 	d := running(web, db, dbHeld, stack, api, worker, docs)
 
 	plan, _, err := usecase(d, operations()).Plan(t.Context(), daemonstopjobs.Request{})
 
 	require.NoError(t, err)
 	assert.Equal(t, map[string][]string{
-		"main (acme)":   {"web:stop", "mail:stop", "api:clear"},
+		"main (acme)":   {"web:stop", "db:stop:held", "mail:stop", "api:clear"},
 		"feat/a (acme)": {"db:stop:held", "worker:stop"},
 		"main (wtm)":    {"docs:stop"},
 	}, worktrees(plan))
 	assert.Equal(t, []string{"/src/acme", "/src/wtm"}, []string{plan.Repos[0].Root, plan.Repos[1].Root})
+	assert.Equal(t, []string{"feat/a"}, plan.Repos[0].Worktrees[0].Jobs[1].HeldBy, "a shared service names the worktrees that lose it")
 }
 
 func TestASharedServiceItsMainCheckoutHoldsStopsAsItsHold(t *testing.T) {
@@ -98,5 +99,5 @@ func TestAClaimRecordedForNoRepositoryStopsWithItsWorktreesRepository(t *testing
 	plan, _, err := usecase(running(db, claim, worker), operations()).Plan(t.Context(), daemonstopjobs.Request{Repo: "/src/acme"})
 
 	require.NoError(t, err)
-	assert.Equal(t, map[string][]string{"feat/a (acme)": {"db:stop:held", "worker:stop"}}, worktrees(plan))
+	assert.Equal(t, map[string][]string{"main (acme)": {"db:stop:held"}, "feat/a (acme)": {"db:stop:held", "worker:stop"}}, worktrees(plan))
 }

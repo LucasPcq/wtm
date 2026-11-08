@@ -159,7 +159,7 @@ type StopTarget struct {
 	Jobs     []StopJob `json:"jobs"`
 }
 
-// A StopJob is how one job of a worktree stops: its kind, what of it the daemon holds, its fate, the worktrees that keep holding a shared service it releases, the command a stack stops with as the daemon recorded it, and the main checkout a shared service runs in.
+// A StopJob is how one job of a worktree stops: its kind, what of it the daemon holds, its fate, the worktrees that keep holding a shared service it releases, the command a stack stops with as the daemon recorded it, the main checkout a shared service runs in, and, for a shared service's own run whose every hold the stop lets go of, the worktrees that lose it (HeldBy).
 type StopJob struct {
 	Name        string          `json:"name"`
 	Kind        project.JobKind `json:"kind,omitempty"`
@@ -168,6 +168,7 @@ type StopJob struct {
 	KeptBy      []string        `json:"kept_by,omitempty"`
 	StopCommand string          `json:"stop_command,omitempty"`
 	SharedIn    string          `json:"shared_in,omitempty"`
+	HeldBy      []string        `json:"held_by,omitempty"`
 }
 
 // Shared reports whether the job is a hold on a shared service, let go of after the worktree's own jobs.

@@ -18,7 +18,7 @@ func TestJobsAreHeldByRepositoryEachWorktreesTogether(t *testing.T) {
 
 	assert.Equal(t, []HeldRepo{
 		{Root: "/a", Worktrees: []HeldWorktree{
-			{Branch: "main", Path: "/a", Jobs: []HeldJob{{Name: "db", Hold: HoldOwn, Shared: true}}},
+			{Branch: "main", Path: "/a", Jobs: []HeldJob{{Name: "db", Hold: HoldOwn, Shared: true, HeldBy: []string{"x"}}}},
 			{Branch: "x", Path: "/a/.trees/x", Jobs: []HeldJob{{Name: "api", Hold: HoldOwn}, {Name: "db", Hold: HoldClaim}}},
 		}},
 		{Root: "/b", Worktrees: []HeldWorktree{{Branch: "main", Path: "/b", Jobs: []HeldJob{{Name: "web", Hold: HoldOwn}}}}},
@@ -41,7 +41,7 @@ func TestAClaimRecordedForNoRepositoryIsPlacedBesideItsWorktreesJobs(t *testing.
 	}
 
 	assert.Equal(t, []HeldRepo{{Root: "/a", Worktrees: []HeldWorktree{
-		{Branch: "main", Path: "/a", Jobs: []HeldJob{{Name: "db", Hold: HoldOwn, Shared: true}}},
+		{Branch: "main", Path: "/a", Jobs: []HeldJob{{Name: "db", Hold: HoldOwn, Shared: true, HeldBy: []string{"x", "/a/.trees/y"}}}},
 		{Branch: "x", Path: "/a/.trees/x", Jobs: []HeldJob{{Name: "api", Hold: HoldOwn}, {Name: "db", Hold: HoldClaim}}},
 		{Path: "/a/.trees/y", Jobs: []HeldJob{{Name: "db", Hold: HoldClaim}}},
 	}}}, Held(jobs))

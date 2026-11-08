@@ -5719,6 +5719,12 @@
     "run.HeldJob": {
       "additionalProperties": false,
       "properties": {
+        "held_by": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "hold": {
           "$ref": "#/$defs/run.Hold"
         },
@@ -6092,6 +6098,12 @@
       "properties": {
         "fate": {
           "$ref": "#/$defs/run.Fate"
+        },
+        "held_by": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
         "hold": {
           "$ref": "#/$defs/run.Hold"

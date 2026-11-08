@@ -32,6 +32,8 @@ type Params struct {
 	Logs api.Stream
 	// LogFile returns the path of a job's log file, "" when it keeps none; nil serves none.
 	LogFile func(ctx context.Context, job JobLog) (string, error)
+	// DaemonLog returns the path of the log of wtm's daemon, where a daemon that did not start says why; nil serves none.
+	DaemonLog func() string
 	// Repos lists the repositories wtm knows, dropping those no longer initialized.
 	Repos   func(ctx context.Context) ([]domain.Repo, error)
 	Version string
@@ -86,6 +88,7 @@ func New(params Params) *Server {
 	mux.HandleFunc("GET /api/events", s.events)
 	mux.HandleFunc("GET /api/repos/{repo}/jobs/{job}/logs", s.jobLines)
 	mux.HandleFunc("GET /api/repos/{repo}/jobs/{job}/log", s.jobLog)
+	mux.HandleFunc("GET /api/daemon/log", s.daemonLog)
 	mux.HandleFunc("GET /api/schema", s.schema)
 	mux.HandleFunc("POST /api/stop", s.stopAsked)
 	mux.HandleFunc("POST /api/command-line", s.commandLine)
@@ -485,9 +488,28 @@ func (s *Server) jobLog(w http.ResponseWriter, r *http.Request) {
 		writeEnvelope(w, domain.Envelope{Err: domain.AsError(domain.AsErrorParams{Err: err})})
 		return
 	}
-	file, err := os.Open(path)
-	if path == "" || err != nil {
-		writeError(w, http.StatusNotFound, &domain.Error{Kind: domain.KindInvalid, Code: CodeLogMissing, Message: job + " keeps no log"})
+	serveLog(w, r, logParams{Path: path, Name: job})
+}
+
+// daemonLog answers the log of wtm's daemon, to save: 404 when it keeps none.
+func (s *Server) daemonLog(w http.ResponseWriter, r *http.Request) {
+	if s.params.DaemonLog == nil {
+		writeError(w, http.StatusNotFound, &domain.Error{Kind: domain.KindInvalid, Code: CodeNotFound, Message: "this server serves no daemon's log"})
+		return
+	}
+	serveLog(w, r, logParams{Path: s.params.DaemonLog(), Name: "daemon"})
+}
+
+// logParams is a log to save: the file at Path, saved as Name.log; one at no path, or gone, is said missing.
+type logParams struct {
+	Path string
+	Name string
+}
+
+func serveLog(w http.ResponseWriter, r *http.Request, params logParams) {
+	file, err := os.Open(params.Path)
+	if params.Path == "" || err != nil {
+		writeError(w, http.StatusNotFound, &domain.Error{Kind: domain.KindInvalid, Code: CodeLogMissing, Message: params.Name + " keeps no log"})
 		return
 	}
 	defer file.Close()
@@ -498,8 +520,8 @@ func (s *Server) jobLog(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": job + ".log"}))
-	http.ServeContent(w, r, job+".log", info.ModTime(), file)
+	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": params.Name + ".log"}))
+	http.ServeContent(w, r, params.Name+".log", info.ModTime(), file)
 }
 
 // A warning is what kept the event stream from a line or a repository for a while, the data of an event named warning.

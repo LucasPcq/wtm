@@ -140,6 +140,7 @@ func webParams(token string, idle time.Duration) web.Params {
 		Events:      eventsStream(),
 		Logs:        jobLines(),
 		LogFile:     jobLogFile,
+		DaemonLog:   func() string { return daemon.LogPath(daemon.SocketPath()) },
 		Repos:       knownRepos(reposjson.Path(), daemon.SocketPath()).Prune,
 		Version:     version,
 		Token:       token,

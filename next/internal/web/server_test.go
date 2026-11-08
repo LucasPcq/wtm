@@ -577,3 +577,23 @@ func TestALogFileThatCannotBeServedIsRefused(t *testing.T) {
 		})
 	}
 }
+
+func TestTheDaemonsLogIsServedToSave(t *testing.T) {
+	log := filepath.Join(t.TempDir(), "daemon.log")
+	require.NoError(t, os.WriteFile(log, []byte("proxy: cannot serve on port 11080\n"), 0o600))
+
+	response := do(t, serving(t, Params{DaemonLog: func() string { return log }}), req{method: http.MethodGet, path: "/api/daemon/log"})
+
+	require.Equal(t, http.StatusOK, response.StatusCode)
+	body, err := io.ReadAll(response.Body)
+	require.NoError(t, err)
+	assert.Equal(t, "proxy: cannot serve on port 11080\n", string(body))
+	assert.Equal(t, `attachment; filename=daemon.log`, response.Header.Get("Content-Disposition"))
+}
+
+func TestADaemonThatKeepsNoLogHasNoneToSave(t *testing.T) {
+	response := do(t, serving(t, Params{DaemonLog: func() string { return "/no/such/daemon.log" }}), req{method: http.MethodGet, path: "/api/daemon/log"})
+
+	assert.Equal(t, http.StatusNotFound, response.StatusCode)
+	assert.Equal(t, CodeLogMissing, decoded[envelope](t, response).Error.Code)
+}
