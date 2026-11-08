@@ -32,6 +32,14 @@ func TestAWorktreeNamedIsTheOneListedItsPortsItsOwn(t *testing.T) {
 	formtest.Golden(t, "list_main", got.Stdout)
 }
 
+func TestAtATerminalYesListsTheWorktreeYouStandInWithNoPicker(t *testing.T) {
+	got := runListAt(t, world{}, "--yes")
+
+	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
+	assert.NotContains(t, got.Stderr, entryLabel)
+	assert.Contains(t, got.Stdout, "Profiles · feat/a")
+}
+
 func TestARepositoryWithNoRunTomlIsFollowedUpByRunInit(t *testing.T) {
 	got := runList(t, world{Bare: true})
 

@@ -20,6 +20,7 @@
   Flags:
     -h, --help            help for list
         --output string   Output format: text or json (default "text")
+    -y, --yes             Ask nothing: list the worktree you stand in, with no picker
 
   Global Flags:
     -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document

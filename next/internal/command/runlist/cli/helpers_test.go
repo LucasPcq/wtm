@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/runlist"
@@ -17,6 +18,20 @@ import (
 func runList(t *testing.T, w world, words ...string) formtest.Printed {
 	t.Helper()
 	return formtest.Run(t.Context(), func(streams *output.Streams) *cobra.Command {
+		parent := &cobra.Command{Use: "run"}
+		parent.AddCommand(New(streams, w.env(), w.open, formtest.CommandLine))
+		return parent
+	}, append([]string{"run", "list"}, words...)...)
+}
+
+// runListAt runs run list at a terminal on which the user types nothing.
+func runListAt(t *testing.T, w world, words ...string) formtest.Printed {
+	t.Helper()
+	return formtest.Run(t.Context(), func(streams *output.Streams) *cobra.Command {
+		streams.In = strings.NewReader("")
+		streams.SetStdinTerminal(true)
+		streams.Out.SetTerminal(true)
+		streams.Err.SetTerminal(true)
 		parent := &cobra.Command{Use: "run"}
 		parent.AddCommand(New(streams, w.env(), w.open, formtest.CommandLine))
 		return parent

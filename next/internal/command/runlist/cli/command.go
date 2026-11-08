@@ -23,6 +23,7 @@ const (
 		"On a terminal it opens a picker: choose a profile or a job, then what to do with\n" +
 		"it, and the command that does it is printed. With no worktree named, a terminal\n" +
 		"asks which one, the one you stand in first; anywhere else it is that one."
+	yesUsage    = "Ask nothing: list the worktree you stand in, with no picker"
 	listExample = `  # Pick a profile or a job, then what to do with it
   wtm run list
 
@@ -44,8 +45,15 @@ func New(streams *output.Streams, env uicli.Env, open func(ctx context.Context, 
 		Open: func(ctx context.Context, dir string) (form.Reader[runlist.Request, runlist.Questions, runlist.Outcome], error) {
 			return open(ctx, dir)
 		},
-		Draw: drawList,
-		Pick: pick,
+		Draw:     drawList,
+		YesUsage: yesUsage,
+	}
+	// --yes asks nothing: no worktree, and no picker.
+	q.Pick = func(ctx context.Context, read runlist.Outcome, req runlist.Request, run *uicli.Run) (runlist.Outcome, error) {
+		if q.Yes() {
+			return read, nil
+		}
+		return pick(ctx, read, req, run)
 	}
 	cmd := &cobra.Command{Use: "list [worktree]", Short: listShort, Long: listLong, Example: listExample, Args: cobra.MaximumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
 		return q.Launch(cmd, args)

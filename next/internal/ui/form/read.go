@@ -49,6 +49,11 @@ type Query[R Request[R], Q Questions, O ReadOutcome] struct {
 	yes bool
 }
 
+// Yes reports whether the command line said --yes: a Pick that asks the user something asks nothing then.
+func (q *Query[R, Q, O]) Yes() bool {
+	return q.yes
+}
+
 func (q *Query[R, Q, O]) schema() []worded {
 	return wordedSchema(q.Words)
 }
