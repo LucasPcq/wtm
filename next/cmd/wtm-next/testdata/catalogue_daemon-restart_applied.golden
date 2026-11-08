@@ -53,6 +53,7 @@
     "tasks": [],
     "unrecorded": [],
     "gone": [],
+    "unheld": [],
     "confirm": true,
     "recap": [
       {

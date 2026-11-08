@@ -108,11 +108,16 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 
 func (u UseCase) restart(ctx context.Context, plan Plan, report domain.Report) Item {
 	item := Item{Subject: subject, Status: domain.StatusDone, Detail: &Detail{Back: []Back{}}}
+	// Cancelled before anything stopped, it restarts nothing.
+	if err := ctx.Err(); err != nil {
+		item.Status, item.Reason = domain.StatusCancelled, domain.ReasonInterrupted
+		return item
+	}
 	// Shielded from the shutdown on: a daemon asked to stop stops whatever its client does, and a restart cut short would leave the jobs it stopped down, recorded nowhere.
 	ctx, release := u.Shield(ctx)
 	defer release()
 	if plan.Running {
-		// A daemon slow to stop is waited for by Ensure, which starts the next once the lock is free.
+		// A daemon slow to stop is waited for by Ensure, which starts the next once its lock is free.
 		if err := u.Daemon.Shutdown(ctx); err != nil && !isStopTimeout(err) {
 			item.Status, item.Err = domain.StatusFailed, domain.AsError(domain.AsErrorParams{Err: err, Code: CodeShutdownFailed, Message: "couldn't stop wtm's daemon"})
 			return item
@@ -120,6 +125,10 @@ func (u UseCase) restart(ctx context.Context, plan Plan, report domain.Report) I
 	}
 	if err := u.Daemon.Ensure(ctx); err != nil {
 		item.Status, item.Err = domain.StatusFailed, domain.AsError(domain.AsErrorParams{Err: err, Code: CodeStartFailed, Message: "the new daemon didn't start"})
+		// What the restart stopped is named: it stays down until a daemon starts.
+		for _, spec := range plan.starts {
+			item.Detail.Back = append(item.Detail.Back, Back{Name: spec.Job.Name, Path: spec.WorkDir, Message: "the new daemon didn't start"})
+		}
 		return item
 	}
 

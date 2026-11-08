@@ -33,6 +33,9 @@ const (
 	logName       = "daemon.log"
 )
 
+// stoppingWait is how long a daemon that stopped answering may hold its lock while its jobs halt before a new one is started.
+var stoppingWait = 2 * time.Minute
+
 // startWait is how long a daemon started has to answer, and a process on the socket that is not wtm's daemon to go.
 var startWait = 5 * time.Second
 
@@ -446,6 +449,10 @@ func (d Daemon) skewed(a answer) error {
 func (d Daemon) Ensure(ctx context.Context) error {
 	listing, err := d.exchange(ctx, exchangeParams{Request: request{Action: actionList}, Timeout: listTimeout})
 	if errors.Is(err, errNoDaemon) {
+		// A daemon stopping closed its listener and still holds its lock while its jobs halt: the next one would lose the lock to it and exit.
+		if err := d.poll(ctx, pollParams{Within: stoppingWait, Done: d.unlocked}); err != nil {
+			return &run.Error{Code: run.CodeBusy, Message: fmt.Sprintf("a daemon still stopping holds the lock beside %s after %v: its jobs take long to halt", d.SocketPath, stoppingWait)}
+		}
 		return d.launch(ctx)
 	}
 	if err != nil {

@@ -1,0 +1,10 @@
+version 99
+acme                     api    own    pid
+acme                     db     own    pid
+acme                     stack  stack  pid
+acme                     web    own    pid
+acme.trees/feat-a        api    own    pid
+acme.trees/feat-a        db     claim  -
+acme.trees/feat-a        stack  stack  pid
+acme.trees/feat-a        web    own    pid
+socket: yes

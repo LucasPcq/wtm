@@ -90,6 +90,7 @@ func TestANewDaemonThatDoesNotStartFailsTheRestart(t *testing.T) {
 	assert.Equal(t, domain.StatusFailed, item.Status)
 	assert.Equal(t, daemonrestart.CodeStartFailed, item.Err.Code)
 	assert.Equal(t, []string{"shutdown", "ensure"}, d.calls)
+	assert.Equal(t, []daemonrestart.Back{{Name: "web", Path: main, Message: "the new daemon didn't start"}}, item.Detail.Back, "what stopped is named, down")
 }
 
 func TestWithNoDaemonRunningOneStarts(t *testing.T) {
@@ -190,6 +191,8 @@ func TestTheServicesADaemonThatDiedLeftComeBackWithTheirClaims(t *testing.T) {
 	outcome, item := restarted(t, d, domain.RunOptions{})
 
 	assert.True(t, outcome.Plan.Confirm)
+	assert.True(t, outcome.Plan.Left)
+	assert.Contains(t, outcome.Plan.Recap[0].Values[0].Text, "stops first what a daemon that died left running")
 	assert.Equal(t, []string{"db (main · acme)", "web (main · acme)", "db (feat/a · acme)"}, run.Names(outcome.Plan.Back))
 	assert.Equal(t, []string{"mail (main · acme)"}, run.Names(outcome.Plan.TakenOver))
 	assert.Equal(t, domain.StatusDone, item.Status, item.Err)
@@ -229,4 +232,28 @@ func TestAJobWhoseWorktreeWasRemovedIsNotBackAndFailsNothing(t *testing.T) {
 	assert.Equal(t, []string{"web (main · acme)"}, run.Names(outcome.Plan.Gone))
 	assert.Equal(t, domain.StatusDone, item.Status, item.Err)
 	assert.Equal(t, []string{"shutdown", "ensure", "start api " + featA}, d.calls)
+}
+
+func TestARestartCancelledBeforeItsShutdownRestartsNothing(t *testing.T) {
+	d := running("0.30.9", web)
+	ctx, cancel := context.WithCancel(t.Context())
+	planned, _, err := usecase(d, operations()).Plan(ctx, daemonrestart.Request{})
+	require.NoError(t, err)
+	cancel()
+
+	result := usecase(d, operations()).Apply(ctx, planned, func(domain.Event) {})
+
+	assert.Equal(t, domain.StatusCancelled, result.Items[0].Status)
+	assert.Empty(t, d.calls)
+}
+
+func TestASharedJobEveryHoldersWorktreeWasRemovedFromIsSaidSo(t *testing.T) {
+	removed := dbHeld
+	removed.WorkDir = "/gone/feat-a"
+	d := running("0.30.9", db, removed)
+
+	plan, _ := decide(t, d, daemonrestart.Request{})
+
+	assert.Equal(t, []string{"db (main · acme)"}, run.Names(plan.Unheld))
+	assert.Empty(t, plan.Unrecorded)
 }

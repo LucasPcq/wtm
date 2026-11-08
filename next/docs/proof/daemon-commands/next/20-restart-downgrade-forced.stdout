@@ -1,0 +1,10 @@
+
+  daemon restart · dry run, nothing applied
+  Daemon    <build> → <build>, a downgrade
+  Not back  api (main · acme) — no record of it, db (main · acme) — no record of it, stack (main · acme) — no record of it, web (main · acme) — no record of it, api (feat/a · acme) — no record of it, db (feat/a · acme) — no record of it, stack (feat/a · acme) — no record of it, web (feat/a · acme) — no record of it
+
+  ! the index of jobs <root>/home/Library/Application Support/wtm/jobs.json was written by a newer wtm: nothing started here is recorded, so no restart brings it back — run the newer wtm, or remove the file once nothing runs
+
+  fingerprint  <fingerprint>
+  → wtm-next daemon restart --force --expect-fingerprint <fingerprint>   apply this plan
+

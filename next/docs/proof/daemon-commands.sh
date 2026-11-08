@@ -174,6 +174,25 @@ side() {
     scenario 14-stop-jobs-dry-run daemon stop-jobs --dry-run
     scenario 15-stop-jobs-json daemon stop-jobs --repo . --yes --output json
     scenario 16-status-after-stop-jobs daemon status
+    # A newer wtm's index: restarting its daemon as this build is a downgrade, refused unless forced.
+    up "$bin"
+    index_file="$HOME/Library/Application Support/wtm/jobs.json"
+    cp "$index_file" "$root/index.json"
+    python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); d["version"]=99; json.dump(d,open(sys.argv[1],"w"))' "$index_file"
+    scenario 19-restart-downgrade-refused daemon restart --yes
+    scenario 20-restart-downgrade-forced daemon restart --force --dry-run
+    cp "$root/index.json" "$index_file"
+    # A daemon that died: its jobs left in its index are shown, then a restart takes them back. Its pid is the one the
+    # sandbox's own daemon answers, checked to be that daemon's process before it is killed; never one read from a file.
+    pid=$("$bin" daemon status --output json | jq -r '.items[0].detail.pid')
+    if [[ $(ps -o command= -p "$pid") == "$bin daemon serve"* ]]; then
+      kill -9 "$pid"
+      sleep 1
+      scenario 21-status-left daemon status
+      snapshot
+      scenario 22-restart-left daemon restart --yes
+      pids >"$dir/22-restart-left.pids"
+    fi
   fi
   # A newer wtm's index: the daemon records nothing, and says so.
   teardown

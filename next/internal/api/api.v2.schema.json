@@ -1316,6 +1316,9 @@
             }
           ]
         },
+        "left": {
+          "type": "boolean"
+        },
         "legacy": {
           "type": "boolean"
         },
@@ -1363,6 +1366,19 @@
         "to": {
           "type": "string"
         },
+        "unheld": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/run.HeldRepo"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "unrecorded": {
           "anyOf": [
             {
@@ -1385,6 +1401,7 @@
         "tasks",
         "unrecorded",
         "gone",
+        "unheld",
         "confirm"
       ],
       "type": "object"

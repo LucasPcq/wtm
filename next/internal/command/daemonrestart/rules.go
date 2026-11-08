@@ -118,11 +118,12 @@ func Decide(f Facts, req Request) (Plan, []domain.Warning, error) {
 			own = append(own, spec)
 		}
 	}
-	served := map[string]bool{}
+	served, holderGone := map[string]bool{}, map[string]bool{}
 	for _, claim := range shutdown.Lost {
 		spec, startable := f.startOf(f.recordOf(claim))
 		if !f.Exists(claim.WorkDir) {
 			gone = append(gone, claim)
+			holderGone[claim.SharedDir+"\x00"+claim.Name] = true
 			continue
 		}
 		if !startable {
@@ -133,10 +134,14 @@ func Decide(f Facts, req Request) (Plan, []domain.Warning, error) {
 		holds = append(holds, spec)
 		served[claim.SharedDir+"\x00"+claim.Name] = true
 	}
+	var unheld []run.Job
 	for _, job := range held {
-		if served[job.WorkDir+"\x00"+job.Name] {
+		switch k := job.WorkDir + "\x00" + job.Name; {
+		case served[k]:
 			back = append(back, job)
-		} else {
+		case holderGone[k]:
+			unheld = append(unheld, job)
+		default:
 			unrecorded = append(unrecorded, job)
 		}
 	}
@@ -146,7 +151,8 @@ func Decide(f Facts, req Request) (Plan, []domain.Warning, error) {
 		// The new daemon reads no index a newer wtm wrote: the stacks run on, untracked.
 		unrecorded, kept = append(unrecorded, kept...), nil
 	}
-	plan.Back, plan.TakenOver, plan.Tasks, plan.Unrecorded, plan.Gone = run.Held(back), run.Held(kept), run.Held(tasks), run.Held(unrecorded), run.Held(gone)
+	plan.Back, plan.TakenOver, plan.Tasks, plan.Unrecorded, plan.Gone, plan.Unheld = run.Held(back), run.Held(kept), run.Held(tasks), run.Held(unrecorded), run.Held(gone), run.Held(unheld)
+	plan.Left = !d.Answering && len(d.Left) > 0
 	plan.starts = append(own, holds...)
 	plan.Confirm = len(shutdown.Cut) > 0 || downgrade
 	plan.Recap = plan.recap()
@@ -161,7 +167,7 @@ func Decide(f Facts, req Request) (Plan, []domain.Warning, error) {
 // ----------------------------------------------------------------------------
 // The plan
 
-// A Plan is what Apply will do, as the dry run and the JSON envelope show it and the fingerprint covers it: whether a daemon runs to restart (none: one starts), its build (From, the legacy wtm's when Legacy, a newer wtm's when Downgrade: its index is) and the one it restarts as (To); the jobs that come back on the new daemon (Back), the stacks it takes over (TakenOver), the tasks the shutdown cuts, not run again (Tasks), the jobs its index has no record of, which cannot come back (Unrecorded), and those whose worktree was removed (Gone); and whether a surface asks to confirm it (Confirm: a job is cut, if only for a moment); then the recap, which the fingerprint leaves out.
+// A Plan is what Apply will do, as the dry run and the JSON envelope show it and the fingerprint covers it: whether a daemon runs to restart (none: one starts), its build (From, the legacy wtm's when Legacy, a newer wtm's when Downgrade: its index is) and the one it restarts as (To); the jobs that come back on the new daemon (Back), the stacks it takes over (TakenOver), the tasks the shutdown cuts, not run again (Tasks), the jobs its index has no record of, which cannot come back (Unrecorded), those whose worktree was removed (Gone), the shared jobs every worktree holding them was removed from (Unheld), and whether what a daemon that died left running is stopped first (Left); and whether a surface asks to confirm it (Confirm: a job is cut, if only for a moment); then the recap, which the fingerprint leaves out.
 type Plan struct {
 	Running    bool           `json:"running"`
 	From       string         `json:"from,omitempty"`
@@ -173,6 +179,8 @@ type Plan struct {
 	Tasks      []run.HeldRepo `json:"tasks"`
 	Unrecorded []run.HeldRepo `json:"unrecorded"`
 	Gone       []run.HeldRepo `json:"gone"`
+	Unheld     []run.HeldRepo `json:"unheld"`
+	Left       bool           `json:"left,omitempty"`
 	Confirm    bool           `json:"confirm"`
 	domain.Recapped
 	starts        []run.Spec
@@ -213,6 +221,9 @@ func (p Plan) recap() []domain.RecapRow {
 	for _, name := range run.Names(p.Gone) {
 		notBack = append(notBack, name+" — its worktree is gone")
 	}
+	for _, name := range run.Names(p.Unheld) {
+		notBack = append(notBack, name+" — the worktrees holding it are gone")
+	}
 	add("not_back", "Not back", notBack)
 	return rows
 }
@@ -220,6 +231,8 @@ func (p Plan) recap() []domain.RecapRow {
 // daemon says what becomes of the daemon: none running starts, one running restarts as this build.
 func (p Plan) daemon() string {
 	switch {
+	case !p.Running && p.Left:
+		return "none runs: one starts, as " + p.To + ", and stops first what a daemon that died left running"
 	case !p.Running:
 		return "none runs: one starts, as " + p.To
 	case p.Downgrade:

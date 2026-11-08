@@ -10,7 +10,7 @@ import (
 // restartForm is daemon restart over the ui/form engine.
 type restartForm = form.Command[daemonrestart.Request, daemonrestart.Questions, daemonrestart.Outcome]
 
-// restartFlags spells each field path of the request as its flag: daemon restart has none.
+// restartFlags spells each field path of the request as its flag: --force.
 var restartFlags = newForm(nil).Flags()
 
 func newForm(open func(ctx context.Context, dir string) (daemonrestart.UseCase, error)) *restartForm {

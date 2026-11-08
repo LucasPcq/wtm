@@ -2,14 +2,18 @@ package daemon_test
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/daemon"
+	"github.com/LucasPcq/wtm/next/internal/adapter/statefile"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 
@@ -522,4 +526,40 @@ func TestWithNoDaemonTheStatusIsTheStacksItsIndexHolds(t *testing.T) {
 	require.Len(t, got.Left, 1, "a foreground service left in the index is a dead daemon's")
 	assert.Equal(t, "web", got.Left[0].Name)
 	assert.False(t, got.IndexFrozen)
+}
+
+// A daemon slow to stop closed its listener but held its lock: the next one, started at once, lost the lock to it and exited.
+func TestEnsureWaitsForADaemonStillStoppingBeforeItStartsTheNext(t *testing.T) {
+	socket := filepath.Join(socketDir(t), "wtm.sock")
+	stopping := holdLock(t, filepath.Join(filepath.Dir(socket), "wtm.lock"))
+	time.AfterFunc(300*time.Millisecond, func() { _ = stopping.Close() })
+	var startedLocked atomic.Bool
+	d := daemon.Daemon{SocketPath: socket, Version: "1.0", StartDaemon: func() error {
+		lock, err := statefile.TryLock(filepath.Join(filepath.Dir(socket), "wtm.lock"), domain.LockExclusive)
+		startedLocked.Store(err != nil)
+		if err == nil {
+			_ = lock.Close()
+		}
+		servedAt(t, socket, &jobs{}, "1.0")
+		return nil
+	}}
+
+	require.NoError(t, d.Ensure(t.Context()))
+
+	assert.False(t, startedLocked.Load(), "the next daemon was started while the one stopping held the lock")
+}
+
+func TestEnsureRefusesWhileADaemonStoppingNeverLetsItsLockGo(t *testing.T) {
+	defer daemon.ShortenStoppingWait(200 * time.Millisecond)()
+	socket := filepath.Join(socketDir(t), "wtm.sock")
+	holdLock(t, filepath.Join(filepath.Dir(socket), "wtm.lock"))
+	started := false
+	d := daemon.Daemon{SocketPath: socket, Version: "1.0", StartDaemon: func() error { started = true; return nil }}
+
+	err := d.Ensure(t.Context())
+
+	refused, ok := errors.AsType[*run.Error](err)
+	require.True(t, ok, err)
+	assert.Equal(t, run.CodeBusy, refused.Code)
+	assert.False(t, started)
 }

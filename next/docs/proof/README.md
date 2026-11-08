@@ -875,6 +875,10 @@ The reference is the legacy `wtm run ps` and `wtm run list` of 0.30.1. next spea
   16. `status` after it: the daemon up, running nothing
   17. `status` over an index a newer wtm wrote (`version: 99`)
   18. `tree` over it (next only)
+  19. next only: `restart --yes` over a newer wtm's index: refused, a downgrade (`daemon-restart.downgrade`, exit 23), followed by `--force`
+  20. next only: `restart --force --dry-run` over it: the downgrade confirmed
+  21. next only: `status` once the daemon was killed (`kill -9` of the pid the sandbox's own daemon answers, checked against its command line): the jobs it left in its index
+  22. next only: `restart --yes` then: what it left is reaped and started again (its `.pids`)
 - `cutover/`: a legacy daemon holding the jobs of both worktrees, read by `wtm-next daemon status` (1), `wtm-next run up` refused (2), then `wtm-next daemon restart --yes` (3, its `.pids`: every service under a new process on next's daemon, the stacks the same processes, the claim kept), `status` after it (4).
 - `<side>/tty-1-confirm.txt`, `tty-2-declined.txt`: `restart` at a terminal in tmux at 110×32, then Esc.
 - The differences, all deliberate (the spec's departures, approved by the owner):

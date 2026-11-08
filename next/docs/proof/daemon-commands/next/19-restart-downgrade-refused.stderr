@@ -1,0 +1,4 @@
+
+  ✗ nothing restarted: wtm's daemon is a newer wtm's (its index is), and this build taking its place would leave its stacks untracked
+  → wtm-next daemon restart --force   restart it as this build all the same
+

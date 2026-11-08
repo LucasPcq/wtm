@@ -1,0 +1,14 @@
+
+  = wtm's daemon is not running
+
+  build   <build>
+  jobs    acme
+            main    stack (detached)
+            feat/a  db (held), stack (detached)
+  left    api (main · acme), db (main · acme), web (main · acme), api (feat/a · acme), web (feat/a · acme) — by a daemon that died
+  socket  <root>/home/Library/Application Support/wtm/wtm.sock
+  index   <root>/home/Library/Application Support/wtm/jobs.json
+  ! a daemon that died left jobs in its index: whether they still run can't be told
+
+  → wtm-next daemon restart   restart it: they come back on a daemon of this build
+

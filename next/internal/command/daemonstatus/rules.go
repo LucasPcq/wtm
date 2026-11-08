@@ -87,7 +87,7 @@ func Report(f Facts, params ReportParams) Outcome {
 		warnings = append(warnings, domain.IndexFrozenWarning(Name, d.Index))
 	}
 	if len(d.Left) > 0 {
-		warnings = append(warnings, domain.Warning{Code: CodeJobsLeft, Message: "a daemon that died left services in its index: whether they still run can't be told", FollowUp: leftRestart(params.Restart)})
+		warnings = append(warnings, domain.Warning{Code: CodeJobsLeft, Message: "a daemon that died left jobs in its index: whether they still run can't be told", FollowUp: leftRestart(params.Restart)})
 	}
 	if d.Answering && d.Skew != run.SkewNone {
 		warnings = append(warnings, domain.SkewWarning(domain.SkewWarningParams{Command: Name, Skewed: &run.Skewed{Skew: d.Skew, Daemon: d.Stamp.Version}, Restart: params.Restart}))
