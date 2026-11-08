@@ -34,7 +34,7 @@ type HeldJob struct {
 // worktrees in the order of their paths, a worktree's jobs in the order given;
 // never nil.
 func Held(jobs []Job) []HeldRepo {
-	sorted := slices.Clone(jobs)
+	sorted := Placed(jobs)
 	slices.SortStableFunc(sorted, func(a, b Job) int {
 		return cmp.Or(cmp.Compare(a.Repo, b.Repo), cmp.Compare(a.WorkDir, b.WorkDir))
 	})
@@ -51,6 +51,24 @@ func Held(jobs []Job) []HeldRepo {
 		wt.Jobs = append(wt.Jobs, HeldJob{Name: job.Name, Kind: job.Kind, Hold: job.Hold, Shared: job.SharedDir != "" && job.Hold != HoldClaim})
 	}
 	return repos
+}
+
+// Placed returns jobs, each one started for no repository (a claim the legacy wtm recorded with no origin) placed in the repository and on the branch of another job of its worktree, else in the repository of the shared job it holds.
+func Placed(jobs []Job) []Job {
+	placed := slices.Clone(jobs)
+	for i, job := range placed {
+		if job.Repo != "" {
+			continue
+		}
+		if at := slices.IndexFunc(jobs, func(other Job) bool { return other.Repo != "" && other.WorkDir == job.WorkDir }); at >= 0 {
+			placed[i].Repo, placed[i].Branch = jobs[at].Repo, cmp.Or(job.Branch, jobs[at].Branch)
+			continue
+		}
+		if at := slices.IndexFunc(jobs, func(other Job) bool { return other.Repo != "" && job.SharedDir != "" && other.WorkDir == job.SharedDir }); at >= 0 {
+			placed[i].Repo = jobs[at].Repo
+		}
+	}
+	return placed
 }
 
 // Count returns how many jobs repos hold.

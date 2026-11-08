@@ -46,7 +46,7 @@ func drawDaemon(w io.Writer, d daemonstatus.Detail) {
 		if i == 0 {
 			label = "jobs"
 		}
-		field(label, cmp.Or(filepath.Base(repo.Root), "(no repository)"))
+		field(label, repoName(repo.Root))
 		for _, wt := range repo.Worktrees {
 			field("", "  "+pad(cmp.Or(wt.Branch, wt.Path), width)+"  "+jobsOf(wt.Jobs))
 		}
@@ -119,4 +119,12 @@ func branchWidth(repos []run.HeldRepo) int {
 
 func pad(name string, width int) string {
 	return name + strings.Repeat(" ", width-len(name))
+}
+
+// repoName is a repository by the name of its main checkout's directory.
+func repoName(root string) string {
+	if root == "" {
+		return "(no repository)"
+	}
+	return filepath.Base(root)
 }

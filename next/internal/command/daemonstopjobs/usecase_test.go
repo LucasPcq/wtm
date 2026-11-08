@@ -91,3 +91,13 @@ func TestARelativeRepositoryIsReadFromWhereTheCallerStands(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "/src/acme", plan.Repo)
 }
+
+func TestAClaimRecordedForNoRepositoryStopsWithItsWorktreesRepository(t *testing.T) {
+	claim := dbHeld
+	claim.Repo, claim.Branch = "", ""
+
+	plan, _, err := usecase(running(db, claim, worker), operations()).Plan(t.Context(), daemonstopjobs.Request{Repo: "/src/acme"})
+
+	require.NoError(t, err)
+	assert.Equal(t, map[string][]string{"feat/a (acme)": {"db:stop:held", "worker:stop"}}, worktrees(plan))
+}

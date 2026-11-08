@@ -38,6 +38,12 @@ func (f Facts) startOf(record *run.Record) (run.Spec, bool) {
 		return run.Spec{}, false
 	}
 	spec := record.Spec
+	if spec.Origin == nil {
+		// The legacy wtm recorded a claim with no origin: the worktree's other jobs name it.
+		if at := slices.IndexFunc(f.Records, func(r run.Record) bool { return r.Spec.Origin != nil && r.Spec.WorkDir == spec.WorkDir }); at >= 0 {
+			spec.Origin = f.Records[at].Spec.Origin
+		}
+	}
 	if spec.Job.Scope != project.Shared || spec.Shared != nil {
 		return spec, true
 	}

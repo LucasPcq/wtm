@@ -56,11 +56,12 @@ func Decide(f Facts, req Request) (Plan, []domain.Warning, error) {
 	}
 
 	plan := Plan{Repo: f.Repo, Repos: []Repo{}}
-	for _, job := range d.Jobs {
+	jobs := run.Placed(d.Jobs)
+	for _, job := range jobs {
 		if f.Repo != "" && job.Repo != f.Repo {
 			continue
 		}
-		stop, ok := stopOf(job, d.Jobs)
+		stop, ok := stopOf(job, jobs)
 		if !ok {
 			continue
 		}

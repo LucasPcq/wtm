@@ -144,3 +144,14 @@ func TestAClaimWhoseSharedJobHasNoRecordDoesNotComeBack(t *testing.T) {
 	assert.Equal(t, []string{"db (main · acme)", "db (feat/a · acme)"}, run.Names(plan.Unrecorded))
 	assert.Empty(t, plan.Back)
 }
+
+func TestAClaimTheLegacyWtmRecordedWithNoOriginComesBackForItsWorktree(t *testing.T) {
+	d := running("0.30.9", db, dbHeld, api)
+	d.records[1].Spec.Origin = nil
+
+	restarted(t, d, domain.RunOptions{CorrelationID: "restart-1"})
+
+	claim := d.started[len(d.started)-1]
+	require.Equal(t, featA, claim.WorkDir)
+	assert.Equal(t, &run.Origin{Root: main, Branch: "feat/a", CorrelationID: "restart-1"}, claim.Origin)
+}
