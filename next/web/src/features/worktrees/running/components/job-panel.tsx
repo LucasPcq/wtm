@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Info } from 'lucide-react'
-import { type ReactNode, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { readQuery } from '@/api/queries/commands'
 import { jobLinesQuery } from '@/api/queries/job-logs'
 import type { DomainAnswered, RunpsJob } from '@/api/types.gen'
@@ -30,14 +30,12 @@ export function JobPanel({
   profile,
   job,
   now,
-  switcher,
 }: {
   repo: string
   worktree: string
   profile: string | undefined
   job: RunpsJob
   now: number
-  switcher?: ReactNode
 }) {
   const [view, dispatch] = useLogView()
   const [timeOpen, setTimeOpen] = useState(false)
@@ -154,7 +152,6 @@ export function JobPanel({
       aria-label={`${job.name} in ${worktree}`}
       className="@container/panel flex min-h-0 min-w-0 flex-1 flex-col"
     >
-      {switcher}
       <JobHeader repo={repo} worktree={worktree} profile={profile} job={job} facts={facts} now={now} />
       <div className="flex flex-col gap-3 px-6">
         {crashed && (

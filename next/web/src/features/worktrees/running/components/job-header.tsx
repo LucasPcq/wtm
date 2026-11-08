@@ -1,5 +1,5 @@
-import { ChevronRight, CircleDot, Copy, ExternalLink, GitBranch, LoaderCircle, Pin, PinOff } from 'lucide-react'
-import type { RunlogsJob, RunpsJob } from '@/api/types.gen'
+import { ChevronRight, Copy, ExternalLink, GitBranch, LoaderCircle, Pin, PinOff } from 'lucide-react'
+import type { RunlogsJob, RunpsJob, RunState } from '@/api/types.gen'
 import { Button } from '@/components/ui/button'
 import { toneIcon } from '@/features/worktrees/components/glyph'
 import { JobActions } from '@/features/worktrees/running/components/job-actions'
@@ -117,7 +117,7 @@ export function JobHeader({
           </p>
           {job.services.map((service) => (
             <p key={service.name} className="flex items-center gap-2 text-[13px]">
-              <CircleDot className={cn(toneIcon({ tone: look.tone }), 'size-4')} aria-hidden="true" />
+              <ServiceGlyph state={service.state} />
               <span className="font-medium">{service.name}</span>
               {service.address && <span className="font-mono text-xs text-muted-foreground">{service.address}</span>}
             </p>
@@ -141,4 +141,9 @@ export function JobHeader({
       ) : null}
     </header>
   )
+}
+
+function ServiceGlyph({ state }: { state: RunState }) {
+  const { icon: Icon, tone } = jobLook[state]
+  return <Icon className={cn(toneIcon({ tone }), 'size-4')} aria-hidden="true" />
 }

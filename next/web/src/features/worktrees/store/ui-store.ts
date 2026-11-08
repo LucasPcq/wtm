@@ -48,7 +48,9 @@ export const useUi = create<Ui>()(
       filter: (repo, change) =>
         set((ui) => {
           const { [repo]: _, ...others } = ui.running
-          return { running: change ? { ...others, [repo]: { ...(ui.running[repo] ?? calm), ...change } } : others }
+          return {
+            running: change ? { ...others, [repo]: { ...(sound(ui.running[repo]) ?? calm), ...change } } : others,
+          }
         }),
     }),
     {
@@ -101,8 +103,21 @@ export function useMarks(kind: 'folded' | 'pinned' | 'quiet', repo: string) {
   }
 }
 
+const chips: readonly Chip[] = ['all', 'running', 'crashed']
+const shownStates: readonly ShownState[] = ['running', 'crashed', 'ended']
+
+// a stored filter another version wrote, or a hand broke, is the calm default
+const sound = (stored: unknown): RunFilter | undefined => {
+  if (typeof stored !== 'object' || stored === null) return undefined
+  const { chip, worktree, states } = stored as Record<string, unknown>
+  const chipOk = chips.find((one) => one === chip)
+  if (!chipOk || !(worktree === undefined || typeof worktree === 'string') || !Array.isArray(states)) return undefined
+  const known = shownStates.filter((one) => states.includes(one))
+  return known.length === states.length ? { chip: chipOk, worktree, states: known } : undefined
+}
+
 export function useRunFilter(repo: string) {
-  const stored = useUi((ui) => ui.running[repo])
+  const stored = sound(useUi((ui) => ui.running[repo]))
   const filter = useUi((ui) => ui.filter)
 
   return {

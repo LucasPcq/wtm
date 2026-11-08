@@ -1,4 +1,5 @@
 import { ListFilter, Search } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -14,8 +15,10 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/in
 import { Kbd } from '@/components/ui/kbd'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { chipLabel, shownLabel } from '@/features/worktrees/running/utils/list-words'
+import { hereFilter } from '@/features/worktrees/running/utils/visible'
 import type { Chip, RunFilter, ShownState } from '@/features/worktrees/store/ui-store'
 import { focusOnSlash } from '@/features/worktrees/utils/slash'
+import { cn } from '@/lib/utils'
 
 const chips: Chip[] = ['all', 'running', 'crashed']
 const states: ShownState[] = ['running', 'crashed', 'ended']
@@ -34,6 +37,7 @@ export function RunningToolbar({
   hidden,
   worktrees,
   here,
+  switcher,
 }: {
   search: string
   onSearch: (search: string) => void
@@ -43,12 +47,16 @@ export function RunningToolbar({
   counts: Record<Chip, number>
   stateCounts: Record<ShownState, number>
   hidden: number
-  worktrees: string[]
+  worktrees: { key: string; label: string }[]
   here: string | undefined
+  switcher: ReactNode
 }) {
+  // a window too narrow for the list beside a job's log folds the list into the switcher, beside Crashed and Filter
+  const folds = switcher ? '@max-[1100px]/page:hidden' : undefined
   return (
     <div className="flex flex-wrap items-center gap-3 border-b px-8 py-3">
-      <InputGroup className="w-60">
+      {switcher}
+      <InputGroup className={cn('w-60', folds)}>
         <InputGroupAddon>
           <Search />
         </InputGroupAddon>
@@ -76,7 +84,7 @@ export function RunningToolbar({
         }}
       >
         {chips.map((chip) => (
-          <ToggleGroupItem key={chip} value={chip} className="rounded-full px-3">
+          <ToggleGroupItem key={chip} value={chip} className={cn('rounded-full px-3', chip !== 'crashed' && folds)}>
             {chipLabel[chip]}
             <span className="text-xs text-muted-foreground tabular-nums">{counts[chip]}</span>
           </ToggleGroupItem>
@@ -107,17 +115,16 @@ export function RunningToolbar({
           >
             <DropdownMenuRadioItem value={all}>All worktrees</DropdownMenuRadioItem>
             {here && (
-              <DropdownMenuRadioItem value="here" className="flex-col items-start gap-0">
+              <DropdownMenuRadioItem value={hereFilter} className="flex-col items-start gap-0">
                 This worktree
                 <span className="text-xs text-muted-foreground">{here}, where this page was opened</span>
               </DropdownMenuRadioItem>
             )}
-            {worktrees.map((worktree) => (
-              <DropdownMenuRadioItem key={worktree} value={worktree}>
-                {worktree}
+            {worktrees.map(({ key, label }) => (
+              <DropdownMenuRadioItem key={key} value={key}>
+                {label}
               </DropdownMenuRadioItem>
             ))}
-            <DropdownMenuRadioItem value="shared">Shared services</DropdownMenuRadioItem>
           </DropdownMenuRadioGroup>
           <DropdownMenuSeparator />
           <DropdownMenuLabel className="text-xs text-muted-foreground">State</DropdownMenuLabel>

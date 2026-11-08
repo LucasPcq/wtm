@@ -14,7 +14,6 @@ import { toneIcon } from '@/features/worktrees/components/glyph'
 import type { RunningGroup } from '@/features/worktrees/running/utils/groups'
 import { jobLook } from '@/features/worktrees/running/utils/job-look'
 import type { Pinned } from '@/features/worktrees/running/utils/visible'
-import { cn } from '@/lib/utils'
 
 // a window too narrow for the list beside the log folds the list into this: the job shown, and every other to pick
 export function JobSwitcher({
@@ -23,6 +22,7 @@ export function JobSwitcher({
   groups,
   worktree,
   job,
+  state,
   className,
 }: {
   repo: string
@@ -30,8 +30,10 @@ export function JobSwitcher({
   groups: RunningGroup[]
   worktree: string
   job: string
+  state: RunState
   className?: string
 }) {
+  const { icon: Shown, tone: shownTone } = jobLook[state]
   const item = (at: string, name: string, state: RunState) => {
     const { icon: Icon, tone } = jobLook[state]
     return (
@@ -50,12 +52,13 @@ export function JobSwitcher({
   }
 
   return (
-    <div className={cn('px-6 pt-4', className)}>
+    <div className={className}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" aria-label="Switch job">
             <span className="text-muted-foreground">{worktree}</span>
             <ChevronRight className="text-muted-foreground" aria-hidden="true" />
+            <Shown className={toneIcon({ tone: shownTone })} aria-hidden="true" />
             {job}
             <ChevronDown aria-hidden="true" />
           </Button>

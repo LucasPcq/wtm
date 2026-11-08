@@ -42,4 +42,8 @@ test('a job says how long it runs, or how it ended and when', () => {
     'crashed · exit 1 · 2 min. ago',
   )
   expect(jobSince(psJob('migrate', { state: 'exited', exit_code: 0 }), now)).toBe('exited 0')
+  expect(
+    jobSince(psJob('api', { state: 'stopped', last_line: { at: '2026-10-25T11:55:00Z', text: 'bye' } }), now),
+    'a job the daemon no longer lists is dated by its last line',
+  ).toBe('stopped · 5 min. ago')
 })

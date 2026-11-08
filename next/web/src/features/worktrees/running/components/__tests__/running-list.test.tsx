@@ -82,7 +82,7 @@ test("a group closes on its ended jobs, shown on demand, and a worker's crash sh
 
   expect(within(billing).getByText("Cannot find module 'send-invoice'")).toBeDefined()
   expect(within(billing).getByText('1 exited · migrate')).toBeDefined()
-  await user.click(within(billing).getByRole('button', { name: 'Show' }))
+  await user.click(within(billing).getByRole('button', { name: 'Show the ended jobs of feat/billing' }))
 
   expect(names(billing)).toEqual(['worker', 'web', 'migrate'])
   expect(within(billing).getByText('Exited jobs shown')).toBeDefined()
@@ -115,7 +115,9 @@ test('a group folded stays folded, kept in this browser for the repository', asy
 
   expect(within(login).queryByRole('listitem')).toBeNull()
   expect(within(login).getByText('profile full · 2 up')).toBeDefined()
-  expect(JSON.parse(localStorage.getItem('wtm.ui') ?? '{}').state.folded).toEqual({ r1: ['fix/login'] })
+  expect(JSON.parse(localStorage.getItem('wtm.ui') ?? '{}').state.folded).toEqual({
+    r1: ['/acme:/acme.trees/fix-login'],
+  })
 })
 
 test('a job pinned from its panel sits on top, out of its group', async () => {
@@ -163,4 +165,23 @@ test('the Pinned group unpins them all from its menu', async () => {
 
   await waitFor(() => expect(screen.queryByRole('region', { name: 'Pinned' })).toBeNull())
   expect(names(screen.getByRole('region', { name: 'fix/login' }))).toEqual(['web', 'stack'])
+})
+
+test('the header counts the worktrees running something, those holding a shared service included', async () => {
+  acme()
+  await renderApp('/r/r1/running')
+
+  expect(await screen.findByText('4 jobs up in 3 worktrees · 1 crashed')).toBeDefined()
+})
+
+test('a filter stored broken is the calm default', async () => {
+  localStorage.setItem(
+    'wtm.ui',
+    JSON.stringify({ state: { running: { r1: { chip: 'nope', states: 7 } } }, version: 0 }),
+  )
+  acme()
+  await renderApp('/r/r1/running')
+
+  expect(await screen.findByRole('region', { name: 'fix/login' })).toBeDefined()
+  expect(screen.getByRole('radio', { name: /All/ }).getAttribute('aria-checked')).toBe('true')
 })

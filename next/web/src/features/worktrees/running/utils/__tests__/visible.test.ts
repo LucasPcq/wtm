@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import { groupsOf } from '@/features/worktrees/running/utils/groups'
-import { pinOf, visible } from '@/features/worktrees/running/utils/visible'
+import { hereFilter, pinOf, visible } from '@/features/worktrees/running/utils/visible'
 import { calm } from '@/features/worktrees/store/ui-store'
 import { psGroup, psJob, read } from '@/test/fixtures'
 
@@ -46,9 +46,9 @@ test('a pinned job leaves its group for the top', () => {
 })
 
 test('a group asked to show its ended jobs lists them, and the Stopped and exited state lists them everywhere', () => {
-  expect(shown({ quiet: (key) => key === 'feat/billing' }).groups[0]?.endedShown.map((job) => job.name)).toEqual([
-    'migrate',
-  ])
+  expect(
+    shown({ quiet: (key) => key === '/acme:/acme.trees/feat-billing' }).groups[0]?.endedShown.map((job) => job.name),
+  ).toEqual(['migrate'])
 
   const everything = shown({ filter: { ...calm, states: ['running', 'crashed', 'ended'] } })
   expect(everything.groups.map((group) => group.worktree)).toEqual(['feat/billing', 'fix/login', 'feat/old'])
@@ -56,7 +56,59 @@ test('a group asked to show its ended jobs lists them, and the Stopped and exite
 })
 
 test('this worktree is the one the page was opened from, by its path', () => {
-  const { groups: listed } = shown({ filter: { ...calm, worktree: 'here' }, here: '/acme.trees/fix-login' })
+  const { groups: listed } = shown({ filter: { ...calm, worktree: hereFilter }, here: '/acme.trees/fix-login' })
 
   expect(listed.map((group) => group.worktree)).toEqual(['fix/login'])
+})
+
+// A worktree on a branch called shared took the shared services' key: folding one folded both, and the filter took one
+// for the other.
+test('a group is keyed by its repository and path, so a branch called shared or here is its own group', () => {
+  const tricky = groupsOf({
+    read: read('run-ps', [
+      psGroup('shared', [psJob('web')]),
+      psGroup('here', [psJob('api')]),
+      psGroup('main', [psJob('db')], { shared: true, profile: '' }),
+    ]),
+    progress: undefined,
+    plan: undefined,
+  })
+  const [branchShared, branchHere, services] = tricky
+
+  expect(new Set(tricky.map((group) => group.key)).size).toBe(3)
+  expect(services?.key).toBe('shared')
+  const only = (worktree: string) =>
+    visible({
+      groups: tricky,
+      filter: { ...calm, worktree },
+      search: '',
+      here: undefined,
+      pinned: none,
+      quiet: none,
+    }).groups.map((group) => group.key)
+  expect(only('shared')).toEqual(['shared'])
+  expect(only(branchShared?.key ?? '')).toEqual([branchShared?.key])
+  expect(only(hereFilter), 'this worktree is unknown: nothing is it').toEqual([])
+  expect(branchHere?.worktree).toBe('here')
+})
+
+test('a pinned job that ended stays on top, and a job starting counts as running', () => {
+  const { pinned } = shown({ pinned: (id) => id === pinOf('feat/billing', 'migrate') })
+  expect(pinned.map(({ row }) => `${row.name} ${row.job.state}`)).toEqual(['migrate exited'])
+
+  const starting = groupsOf({
+    read: read('run-ps', [psGroup('feat/x', [psJob('web', { state: 'starting' })])]),
+    progress: undefined,
+    plan: undefined,
+  })
+  const { counts, states } = visible({
+    groups: starting,
+    filter: calm,
+    search: '',
+    here: undefined,
+    pinned: none,
+    quiet: none,
+  })
+  expect(counts.running).toBe(1)
+  expect(states.running).toBe(1)
 })

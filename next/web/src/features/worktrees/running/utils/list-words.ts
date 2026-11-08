@@ -60,7 +60,9 @@ const capital = (word: string) => word.charAt(0).toUpperCase() + word.slice(1)
 
 // where a job stands, with its time: "up 12 min", "crashed · exit 1 · 2 min ago", "exited 0 · 12 min ago"
 export function jobSince(job: RunpsJob, now: number): string {
-  const when = job.ended_at ? ago(job.ended_at, now) : undefined
+  // a job the daemon no longer lists has no end of its own: its last line's time is the only one known
+  const ended = job.ended_at ?? (job.state === 'stopped' ? job.last_line?.at : undefined)
+  const when = ended ? ago(ended, now) : undefined
   switch (job.state) {
     case 'running':
       return job.started_at ? `up ${uptime(job.started_at, now)}` : 'running'

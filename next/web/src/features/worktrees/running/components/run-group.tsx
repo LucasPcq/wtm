@@ -121,7 +121,9 @@ export function RunGroup({
               selected={row.name === selected}
             />
           ))}
-          {group.ended.length > 0 && <QuietRow ended={group.ended} shown={endedShown.length > 0} onToggle={onQuiet} />}
+          {group.ended.length > 0 && (
+            <QuietRow of={title} ended={group.ended} shown={endedShown.length > 0} onToggle={onQuiet} />
+          )}
         </Rail>
       )}
     </section>

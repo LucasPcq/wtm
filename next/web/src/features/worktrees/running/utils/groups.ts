@@ -7,7 +7,9 @@ import { underWay } from '@/features/worktrees/utils/run-words'
 // a job the read lists, or one a start of this page is bringing up that the read does not list yet
 export type RunningRow = { name: string } & ({ job: RunpsJob } | { said: string })
 
-// a worktree's jobs, or the repository's shared services (`shared`), which run in `worktree` too: the main checkout
+// a worktree's jobs, or the repository's shared services (`shared`), which run in `worktree` too: the main checkout; a
+// group is keyed by its repository and path (`shared` for the shared services), never by its branch, which `shared`
+// or a filter's word could be
 export type RunningGroup = {
   key: string
   worktree: string
@@ -34,7 +36,7 @@ export function groupsOf({
   progress: Progress<'run-up'> | undefined
   plan: RunupPlan | undefined
 }): RunningGroup[] {
-  const groups = read.items.flatMap(({ subject, detail }) => {
+  const groups = read.items.flatMap(({ detail }) => {
     if (!detail) return []
     const worktree = detail.branch || detail.path
     const jobs = detail.jobs ?? []
@@ -43,7 +45,7 @@ export function groupsOf({
 
     return [
       {
-        key: subject,
+        key: detail.shared ? 'shared' : `${detail.repository}:${detail.path}`,
         worktree,
         path: detail.path,
         shared: detail.shared,
