@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/env"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 )
@@ -92,6 +93,7 @@ type job struct {
 	reaped   bool
 	adopted  bool
 	exitCode *int
+	ended    time.Time
 	process  Process
 	output   *output
 	terminal *terminal
@@ -335,6 +337,7 @@ func (d *Daemon) settle(j *job, code int) {
 	d.mu.Lock()
 	j.process = nil
 	j.exitCode = &code
+	j.ended = d.params.Now()
 	switch {
 	case j.stopped:
 		j.state = run.Stopped
@@ -469,6 +472,7 @@ func (d *Daemon) stopStack(j *job, out func(run.Line)) error {
 
 	d.mu.Lock()
 	j.state = run.Stopped
+	j.ended = d.params.Now()
 	d.withdrawLocked(j)
 	d.dropDanglingClaimsLocked()
 	d.mu.Unlock()
@@ -803,8 +807,15 @@ func (j *job) viewLocked(public int) run.Job {
 	if view.Hold == run.HoldDetached {
 		view.StopCommand = spec.Job.Stop
 	}
-	if view.Up {
+	// An ended job keeps when it started beside when it ended, which together say how long it ran.
+	switch {
+	case view.Up:
 		view.StartedAt = j.record.StartedAt
+	case !j.ended.IsZero():
+		view.StartedAt, view.EndedAt = j.record.StartedAt, j.ended
+	}
+	if spec.Job.Scope == project.Shared && (j.record.Claim || j.record.MainHolds) {
+		view.Namespace = namespaceOf(spec)
 	}
 	view.LastLine = j.last
 	if j.output != nil {
@@ -816,6 +827,16 @@ func (j *job) viewLocked(public int) run.Job {
 	}
 
 	return view
+}
+
+// namespaceOf is the name of the namespace spec's shared job makes for the
+// worktree spec starts it for, empty when it makes none.
+func namespaceOf(spec run.Spec) string {
+	namespace, _, err := env.NamespaceFor(spec.Job, spec.Env)
+	if err != nil {
+		return ""
+	}
+	return namespace.Name
 }
 
 // up reports whether the job is up: running, or a claim on a shared job.

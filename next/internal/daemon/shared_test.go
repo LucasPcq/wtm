@@ -110,6 +110,7 @@ func TestEachWorktreesNamespaceIsCreatedRetriedWhileTheServiceComesUpAndNoted(t 
 	_, err = w.Lines(t.Context(), run.Tail{Name: "db", WorkDir: "/wt/a"}, func(line run.Line) { lines = append(lines, line.Text) })
 	require.NoError(t, err)
 	assert.Contains(t, lines, "[wtm] namespace app_a ready for a", "a claim's lines are its service's")
+	assert.Equal(t, "app_a", w.List("/wt/a")[0].Namespace, "a claim lists the namespace it holds")
 }
 
 func TestANamespaceThatCannotBeMadeTakesTheHoldBackAndTheJobWithIt(t *testing.T) {

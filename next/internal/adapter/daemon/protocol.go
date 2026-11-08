@@ -98,6 +98,8 @@ type job struct {
 	Reaped    bool           `json:"reaped,omitempty"`
 	PID       int            `json:"pid,omitempty"`
 	StartedAt stamp          `json:"started_at,omitzero"`
+	EndedAt   stamp          `json:"ended_at,omitzero"`
+	Namespace string         `json:"namespace,omitempty"`
 	ExitCode  *int           `json:"exit_code,omitempty"`
 	URL       string         `json:"url,omitempty"`
 	Ports     map[string]int `json:"ports,omitempty"`
@@ -135,7 +137,7 @@ func (s *stamp) UnmarshalJSON(data []byte) error {
 }
 
 func jobOf(j run.Job) job {
-	wire := job{Name: j.Name, Kind: string(j.Kind), WorkDir: j.WorkDir, Profile: j.Profile, SharedDir: j.SharedDir, MainHolds: j.MainHolds, Repo: j.Repo, Stop: j.StopCommand, State: string(j.State), Hold: string(j.Hold), Reaped: j.Reaped, PID: j.PID, StartedAt: stamp(j.StartedAt), ExitCode: j.ExitCode, URL: j.URL, Ports: j.Ports, Status: legacyStatus(j)}
+	wire := job{Name: j.Name, Kind: string(j.Kind), WorkDir: j.WorkDir, Profile: j.Profile, SharedDir: j.SharedDir, MainHolds: j.MainHolds, Repo: j.Repo, Stop: j.StopCommand, State: string(j.State), Hold: string(j.Hold), Reaped: j.Reaped, PID: j.PID, StartedAt: stamp(j.StartedAt), EndedAt: stamp(j.EndedAt), Namespace: j.Namespace, ExitCode: j.ExitCode, URL: j.URL, Ports: j.Ports, Status: legacyStatus(j)}
 	if j.LastLine != nil {
 		wire.LastLine = &line{At: stamp(j.LastLine.At), Text: j.LastLine.Text}
 	}
@@ -167,7 +169,7 @@ func (j job) runJob(legacy bool) run.Job {
 	}
 
 	hold, state := run.Hold(j.Hold), run.State(j.State)
-	read := run.Job{Name: j.Name, WorkDir: j.WorkDir, Profile: j.Profile, Up: hold == run.HoldClaim || state == run.Running, Kind: project.JobKind(j.Kind), State: state, Hold: hold, Reaped: j.Reaped, PID: j.PID, URL: j.URL, Ports: j.Ports, ExitCode: j.ExitCode, StartedAt: time.Time(j.StartedAt), SharedDir: j.SharedDir, MainHolds: j.MainHolds, Repo: j.Repo, StopCommand: j.Stop}
+	read := run.Job{Name: j.Name, WorkDir: j.WorkDir, Profile: j.Profile, Up: hold == run.HoldClaim || state == run.Running, Kind: project.JobKind(j.Kind), State: state, Hold: hold, Reaped: j.Reaped, PID: j.PID, URL: j.URL, Ports: j.Ports, ExitCode: j.ExitCode, StartedAt: time.Time(j.StartedAt), EndedAt: time.Time(j.EndedAt), Namespace: j.Namespace, SharedDir: j.SharedDir, MainHolds: j.MainHolds, Repo: j.Repo, StopCommand: j.Stop}
 	if j.LastLine != nil {
 		read.LastLine = &run.Line{At: time.Time(j.LastLine.At), Text: j.LastLine.Text}
 	}
