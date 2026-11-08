@@ -65,54 +65,44 @@ const (
 	NotStarted State = "not_started"
 )
 
-// StandingParams are what tells where a job run.toml declares stands in a worktree: the jobs the daemon lists, the worktree's directory, the job's name, and run.toml's jobs (whose runners start some of the others).
+// StandingParams are what tells where a job run.toml declares stands in a worktree: the jobs the daemon lists, the worktree's directory, the job's name, and run.toml (whose runners start some of its jobs).
 type StandingParams struct {
 	Jobs     []Job
 	Dir      string
 	Name     string
-	Declared []project.Job
+	Declared project.Run
 }
 
-// StandingIn is what the daemon lists of the job run.toml declares under params.Name in the worktree at params.Dir: the job itself (its own, or its claim on a shared one), else a runner listed there that starts it itself (run.toml's runs); false when it lists neither, its log then telling whether it ran (Unlisted).
-func StandingIn(params StandingParams) (Job, bool) {
-	listed := func(match func(Job) bool) (Job, bool) {
-		at := slices.IndexFunc(params.Jobs, func(job Job) bool { return job.WorkDir == params.Dir && match(job) })
-		if at < 0 {
-			return Job{}, false
+// A Standing is what the daemon lists of a job run.toml declares in a worktree: the job itself (Runner empty: its own, or its claim on a shared one), or a runner listed there that starts it, its runners' own included (Runner its name, Job the runner).
+type Standing struct {
+	Job    Job
+	Runner string
+}
+
+// StandingIn is what the daemon lists of the job run.toml declares under params.Name in the worktree at params.Dir: the job itself, else a runner listed there that starts it, one up before one that is not; false when it lists neither, the job's log then telling whether it ran (Unlisted).
+func StandingIn(params StandingParams) (Standing, bool) {
+	var runner *Job
+	for i, job := range params.Jobs {
+		if job.WorkDir != params.Dir {
+			continue
 		}
-		return params.Jobs[at], true
-	}
-	if job, ok := listed(func(job Job) bool { return job.Name == params.Name }); ok {
-		return job, true
-	}
-	return listed(func(job Job) bool {
-		at := slices.IndexFunc(params.Declared, func(declared project.Job) bool { return declared.Name == job.Name })
-		return at >= 0 && slices.Contains(params.Declared[at].Runs, params.Name)
-	})
-}
-
-// LastLinesParams name the logs to read: those of the jobs called Names in the worktree of Branch, under wtm's state StateDir, and their reader.
-type LastLinesParams struct {
-	StateDir string
-	Branch   string
-	Names    []string
-	Read     func(file LogFile, n int) ([]Line, error)
-}
-
-// LastLines is the last line each job of params.Names left in its log, nil for one whose log holds none (or does not read): the jobs StandingIn finds nothing of, whose log tells whether they ran; none for a worktree on no branch.
-func LastLines(params LastLinesParams) map[string]*Line {
-	lines := map[string]*Line{}
-	dir := LogDir(params.StateDir, params.Branch)
-	if dir == "" {
-		return lines
-	}
-	for _, name := range params.Names {
-		read, _ := params.Read(LogFile{Dir: dir, Job: name}, 1)
-		if len(read) > 0 {
-			lines[name] = &read[len(read)-1]
+		if job.Name == params.Name {
+			return Standing{Job: job}, true
+		}
+		if (runner == nil || !runner.Up && job.Up) && params.runs(job.Name) {
+			runner = &params.Jobs[i]
 		}
 	}
-	return lines
+	if runner == nil {
+		return Standing{}, false
+	}
+	return Standing{Job: *runner, Runner: runner.Name}, true
+}
+
+// runs reports whether run.toml's job called runner starts the job of params, itself or through a runner it starts.
+func (params StandingParams) runs(runner string) bool {
+	at := slices.IndexFunc(params.Declared.Jobs, func(job project.Job) bool { return job.Name == runner })
+	return at >= 0 && slices.ContainsFunc(params.Declared.Children(params.Declared.Jobs[at]), func(child project.Job) bool { return child.Name == params.Name })
 }
 
 // StartedUnder is the profile the jobs the worktree at dir runs for itself were started under, up or ended, "" when none says one: a worktree whose every job crashed keeps it, where ProfileIn, which counts the jobs up alone, says none.

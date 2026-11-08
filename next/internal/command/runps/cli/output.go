@@ -29,7 +29,7 @@ const (
 // drawPs draws each group read under its title, its jobs one per row with a runner's services and a shared service's holders under it, then what could not be read; the repository names each title once the read spans several.
 func drawPs(w io.Writer, read runps.Outcome, _ runps.Request, _ output.View) {
 	// a daemon that cannot tell what runs says so in its warning, never as nothing running
-	unknown := slices.ContainsFunc(read.Warnings, func(warning domain.Warning) bool { return warning.Code == runps.Name+domain.JobsUnknown })
+	unknown := slices.ContainsFunc(read.Warnings, func(warning domain.Warning) bool { return warning.Code == runps.CodeJobsUnknown })
 	if len(read.Items) == 0 && !unknown {
 		output.UnchangedLine(w, nothingRunning)
 	}

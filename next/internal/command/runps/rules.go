@@ -54,6 +54,8 @@ func repoOf(job run.Job) string {
 const (
 	// CodeRepoUnreadable warns of jobs whose repository could not be read: they are listed without what run.toml says of them.
 	CodeRepoUnreadable = Name + ".repo_unreadable"
+	// CodeJobsUnknown warns that the daemon cannot tell which jobs are up.
+	CodeJobsUnknown = Name + domain.JobsUnknown
 	// CodeMetaUnreadable warns of a worktree whose meta record does not read: the ports of the services its runners start are not known.
 	CodeMetaUnreadable = Name + ".meta_unreadable"
 )
@@ -145,12 +147,11 @@ func List(f Facts) ([]domain.Unit[Detail], []domain.Warning) {
 	})
 
 	warnings := f.Warnings(Name)
-	for _, dir := range slices.Sorted(maps.Keys(f.Unreadable)) {
-		// an interrupted read says so and nothing more, as Asked.Warnings
-		if f.Interrupted {
-			break
+	// an interrupted read says so and nothing more, as Asked.Warnings
+	if !f.Interrupted {
+		for _, dir := range slices.Sorted(maps.Keys(f.Unreadable)) {
+			warnings = append(warnings, domain.Warning{Code: CodeRepoUnreadable, Message: "couldn't read the repository of the jobs in " + dir + ", so run.toml says nothing of them: " + f.Unreadable[dir].Error(), Params: domain.Params{"dir": dir}})
 		}
-		warnings = append(warnings, domain.Warning{Code: CodeRepoUnreadable, Message: "couldn't read the repository of the jobs in " + dir + ", so run.toml says nothing of them: " + f.Unreadable[dir].Error(), Params: domain.Params{"dir": dir}})
 	}
 	return items, warnings
 }
@@ -258,7 +259,7 @@ func (p Project) declaredIdle(path string, jobs []run.Job) []project.Job {
 	var idle []project.Job
 	for _, name := range p.Run.Profiles[at].Jobs {
 		declared := p.declared(name)
-		_, listed := run.StandingIn(run.StandingParams{Jobs: jobs, Dir: path, Name: name, Declared: p.Run.Jobs})
+		_, listed := run.StandingIn(run.StandingParams{Jobs: jobs, Dir: path, Name: name, Declared: p.Run})
 		if !listed && declared.Name != "" && declared.Scope != project.Shared {
 			idle = append(idle, declared)
 		}
@@ -298,9 +299,8 @@ func (p Project) jobOf(job run.Job, offset *int) Job {
 	if job.LastLine != nil {
 		found.LastLine = &Line{At: job.LastLine.At, Text: job.LastLine.Text}
 	}
-	for _, name := range declared.Runs {
-		child := p.declared(name)
-		found.Services = append(found.Services, Service{Name: name, State: job.State, Address: addressOf(child, env.PortsAt(child, offset))})
+	for _, child := range p.Run.Children(declared) {
+		found.Services = append(found.Services, Service{Name: child.Name, State: job.State, Address: addressOf(child, env.PortsAt(child, offset))})
 	}
 	return found
 }

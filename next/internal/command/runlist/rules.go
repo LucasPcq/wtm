@@ -117,9 +117,14 @@ func (f Facts) standing(name string) (*run.State, run.Hold, string) {
 	if f.JobsErr != nil {
 		return nil, "", ""
 	}
-	job, listed := f.standingIn(name)
+	standing, listed := f.standingIn(name)
 	if !listed {
 		return new(run.Unlisted(f.Logged[name] != nil)), "", ""
+	}
+	job := standing.Job
+	// a job its runner starts has its runner's state, never its hold nor its address
+	if standing.Runner != "" {
+		return &job.State, "", ""
 	}
 
 	state := job.State
@@ -134,6 +139,6 @@ func (f Facts) standing(name string) (*run.State, run.Hold, string) {
 }
 
 // standingIn is what the daemon lists of the job called name in the worktree read, or of the runner there that starts it.
-func (f Facts) standingIn(name string) (run.Job, bool) {
-	return run.StandingIn(run.StandingParams{Jobs: f.Jobs, Dir: f.Target.Path, Name: name, Declared: f.Run.Jobs})
+func (f Facts) standingIn(name string) (run.Standing, bool) {
+	return run.StandingIn(run.StandingParams{Jobs: f.Jobs, Dir: f.Target.Path, Name: name, Declared: f.Run})
 }

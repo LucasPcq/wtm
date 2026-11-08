@@ -446,7 +446,6 @@
             "name": "cache",
             "kind": "service",
             "state": "running",
-            "hold": "detached",
             "command": "true",
             "ports": {
               "CACHE_PORT": 24864

@@ -122,11 +122,11 @@ func (u UseCase) logged(facts Facts, targets []worktree.Worktree) map[string]map
 	for _, w := range targets {
 		var names []string
 		for _, job := range facts.Run.Jobs {
-			if _, listed := run.StandingIn(run.StandingParams{Jobs: facts.Jobs, Dir: w.Path, Name: job.Name, Declared: facts.Run.Jobs}); !listed {
+			if _, listed := run.StandingIn(run.StandingParams{Jobs: facts.Jobs, Dir: w.Path, Name: job.Name, Declared: facts.Run}); !listed {
 				names = append(names, job.Name)
 			}
 		}
-		logged[w.Path] = run.LastLines(run.LastLinesParams{StateDir: u.StateDir, Branch: w.Branch(), Names: names, Read: u.ReadLog})
+		logged[w.Path] = repository.LastLines(repository.LastLinesParams{StateDir: u.StateDir, Branch: w.Branch(), Names: names, Read: u.ReadLog})
 	}
 	return logged
 }

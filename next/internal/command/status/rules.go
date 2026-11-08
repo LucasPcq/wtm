@@ -136,13 +136,14 @@ const (
 	PortsUnknown     Ports = "unknown"
 )
 
-// A Job is one job a worktree can run, as wtm's events report it: its state, its url, the port it publishes, the code it crashed with, when it started, and for a shared job the worktree that runs it, when it is another.
+// A Job is one job a worktree can run, as wtm's events report it: its state, its url, the port it publishes, the runner that starts it (RunBy, whose state it has), the code it crashed with, when it started, and for a shared job the worktree that runs it, when it is another.
 type Job struct {
 	Name      string          `json:"name"`
 	Kind      project.JobKind `json:"kind"`
 	State     run.State       `json:"state"`
 	URL       string          `json:"url"`
 	Port      *int            `json:"port,omitempty"`
+	RunBy     string          `json:"run_by,omitempty"`
 	ExitCode  *int            `json:"exit_code,omitempty"`
 	StartedAt *time.Time      `json:"started_at,omitempty"`
 	Shared    bool            `json:"shared,omitempty"`
@@ -416,12 +417,12 @@ func (f Facts) jobs(w worktree.Worktree, offset *int) []Job {
 	for _, job := range declared {
 		at := slices.IndexFunc(held, func(h Job) bool { return h.Name == job.Name })
 		found := Job{Name: job.Name, Kind: job.Kind, State: run.Unlisted(f.Logged[w.Path][job.Name] != nil)}
-		switch runner, listed := run.StandingIn(run.StandingParams{Jobs: f.Jobs, Dir: w.Path, Name: job.Name, Declared: declared}); {
+		switch standing, listed := run.StandingIn(run.StandingParams{Jobs: f.Jobs, Dir: w.Path, Name: job.Name, Declared: project.Run{Jobs: declared}}); {
 		case at >= 0:
 			found = held[at]
-		case listed:
-			// started by a runner listed there, it stands as the runner does
-			found.State = runner.State
+		case listed && standing.Runner != "":
+			// started by a runner listed there, it stands as the runner does, whose state is its own to fix
+			found.State, found.RunBy = standing.Job.State, standing.Runner
 		}
 		found.Port = portOf(job, offset)
 		jobs = append(jobs, found)
@@ -646,7 +647,8 @@ func Problems(params ProblemsParams) []Problem {
 		})
 	}
 	for _, job := range params.Jobs {
-		if job.State != run.Crashed {
+		// a job its runner starts crashed with its runner: the runner's crash is the one to fix
+		if job.State != run.Crashed || job.RunBy != "" {
 			continue
 		}
 		owner := params.Branch

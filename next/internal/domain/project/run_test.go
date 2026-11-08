@@ -63,3 +63,18 @@ func TestIsolationAppliesWhenRunTomlDeclaresSomethingToIsolate(t *testing.T) {
 		})
 	}
 }
+
+func TestARunnersChildrenAreTheJobsItStartsThroughItsOwnRunnersEachOnce(t *testing.T) {
+	r := Run{Jobs: []Job{
+		{Name: "stack", Runs: []string{"proxy", "cache"}},
+		{Name: "proxy", Runs: []string{"cache", "stack"}},
+		{Name: "cache"},
+	}}
+
+	var names []string
+	for _, child := range r.Children(r.Jobs[0]) {
+		names = append(names, child.Name)
+	}
+
+	assert.Equal(t, []string{"proxy", "cache"}, names)
+}

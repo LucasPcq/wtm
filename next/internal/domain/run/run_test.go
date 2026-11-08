@@ -4,6 +4,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -37,4 +39,35 @@ func TestTheProfileOfAWorktreeIsThatOfTheJobsItRunsForItself(t *testing.T) {
 func TestWhyTheJobsAreUnknownNamesTheDaemonsFailure(t *testing.T) {
 	assert.Equal(t, "the run daemon is not running: which jobs are up is unknown", UnknownMessage(ErrUnknown))
 	assert.Equal(t, "couldn't ask the run daemon which jobs are up: refused", UnknownMessage(errors.New("refused")))
+}
+
+func TestAJobAListedRunnerStartsStandsAsItsRunnerNestedOrNot(t *testing.T) {
+	declared := project.Run{Jobs: []project.Job{
+		{Name: "stack", Runs: []string{"proxy"}},
+		{Name: "proxy", Runs: []string{"cache"}},
+		{Name: "cache"},
+		{Name: "web"},
+	}}
+	jobs := []Job{{Name: "stack", WorkDir: "/a", State: Running, Up: true}}
+	standing := func(name string) (Standing, bool) {
+		return StandingIn(StandingParams{Jobs: jobs, Dir: "/a", Name: name, Declared: declared})
+	}
+
+	cache, ok := standing("cache")
+	assert.True(t, ok)
+	assert.Equal(t, "stack", cache.Runner, "the stack starts proxy, which starts cache")
+	stack, ok := standing("stack")
+	assert.True(t, ok)
+	assert.Empty(t, stack.Runner, "a job listed stands as itself")
+	_, ok = standing("web")
+	assert.False(t, ok)
+}
+
+func TestARunnerUpWinsOverOneThatIsNot(t *testing.T) {
+	declared := project.Run{Jobs: []project.Job{{Name: "old", Runs: []string{"cache"}}, {Name: "stack", Runs: []string{"cache"}}, {Name: "cache"}}}
+	jobs := []Job{{Name: "old", WorkDir: "/a", State: Crashed}, {Name: "stack", WorkDir: "/a", State: Running, Up: true}}
+
+	cache, _ := StandingIn(StandingParams{Jobs: jobs, Dir: "/a", Name: "cache", Declared: declared})
+
+	assert.Equal(t, "stack", cache.Runner)
 }

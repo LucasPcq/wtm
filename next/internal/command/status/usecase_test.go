@@ -689,20 +689,50 @@ func TestWhereABranchStandsAgainstTheBaseIsAskedOnceAndSaidUnreadOnceWhenItFails
 	assert.Equal(t, 1, asked, "a count that failed is not asked again")
 }
 
-func TestAServiceAStackRunsStandsAsItsStack(t *testing.T) {
-	run2 := isolating()
-	run2.Jobs = append(run2.Jobs,
+func TestAServiceAStackRunsStandsAsItsStackAndItsCrashIsTheStacks(t *testing.T) {
+	stacked := isolating()
+	stacked.Jobs = append(stacked.Jobs,
 		project.Job{Name: "cache", Kind: project.Service, Cmd: "true"},
 		project.Job{Name: "stack", Kind: project.Service, Cmd: "docker compose up -d", Stop: "docker compose down", Runs: []string{"cache"}},
 	)
-	w := newWorld(seed{Run: run2, Jobs: []run.Job{{Name: "stack", WorkDir: mainPath, State: run.Running, Up: true, Hold: run.HoldDetached}}})
+	exit1 := 1
+	cases := map[string]struct {
+		state    run.State
+		problems []string
+	}{
+		"running": {state: run.Running},
+		"crashed": {state: run.Crashed, problems: []string{"stack"}},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			stack := run.Job{Name: "stack", WorkDir: mainPath, State: c.state, Up: c.state == run.Running, Hold: run.HoldDetached}
+			if c.state == run.Crashed {
+				stack.ExitCode = &exit1
+			}
+			main := only(t, read(t, newWorld(seed{Run: stacked, Jobs: []run.Job{stack}}), status.Request{}))
+
+			byName := map[string]status.Job{}
+			for _, job := range main.Jobs {
+				byName[job.Name] = job
+			}
+			assert.Equal(t, c.state, byName["cache"].State, "the stack runs it")
+			assert.Equal(t, "stack", byName["cache"].RunBy)
+			assert.Equal(t, run.NotStarted, byName["web"].State)
+			var crashed []string
+			for _, problem := range main.Problems {
+				if problem.Code == status.CodeJobCrashed {
+					crashed = append(crashed, problem.Fix.Answers[1].Values[0])
+				}
+			}
+			assert.Equal(t, c.problems, crashed, "one crash, the stack's, started again as a stack")
+		})
+	}
+}
+
+func TestAClaimWhoseSharedJobIsNotListedReadsAsNeverStarted(t *testing.T) {
+	w := newWorld(seed{Run: isolating(), Jobs: []run.Job{{Name: "web", WorkDir: mainPath, SharedDir: "/elsewhere", Up: true, Hold: run.HoldClaim}}})
 
 	main := only(t, read(t, w, status.Request{}))
 
-	states := map[string]run.State{}
-	for _, job := range main.Jobs {
-		states[job.Name] = job.State
-	}
-	assert.Equal(t, run.Running, states["cache"], "the stack runs it")
-	assert.Equal(t, run.NotStarted, states["web"])
+	assert.Equal(t, run.NotStarted, main.Jobs[0].State)
 }

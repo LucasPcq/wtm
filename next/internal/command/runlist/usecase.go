@@ -5,7 +5,6 @@ import (
 	"context"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
-	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
 )
@@ -107,7 +106,7 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 				names = append(names, job.Name)
 			}
 		}
-		facts.Logged = run.LastLines(run.LastLinesParams{StateDir: u.StateDir, Branch: target.Branch(), Names: names, Read: u.ReadLog})
+		facts.Logged = repository.LastLines(repository.LastLinesParams{StateDir: u.StateDir, Branch: target.Branch(), Names: names, Read: u.ReadLog})
 	}
 	return facts, nil
 }

@@ -53,6 +53,7 @@ func TestEachJobSaysWhereItStandsInTheWorktree(t *testing.T) {
 	assert.Equal(t, run.HoldClaim, job(t, d, "db").Hold)
 	assert.Equal(t, run.Stopped, stateOf(t, d, "migrate"), "a job its log says ran, the daemon no longer listing it")
 	assert.Equal(t, run.Running, stateOf(t, d, "cache"), "a job its runner starts reads as its runner")
+	assert.Empty(t, job(t, d, "cache").Hold, "never its runner's hold nor its address")
 	assert.Equal(t, run.NotStarted, stateOf(t, read(t, s, runlist.Request{Worktree: "main"}), "stack"), "a job that never ran")
 	assert.Equal(t, "dev", d.Profile)
 	assert.True(t, d.Profiles[0].Running)

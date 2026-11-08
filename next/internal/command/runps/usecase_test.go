@@ -124,7 +124,7 @@ func TestADaemonThatCannotTellWhichJobsAreUpIsWarned(t *testing.T) {
 	read := read(t, seed{JobsErr: run.ErrUnknown, Projects: []runps.Project{acme()}}, runps.Request{})
 
 	assert.Empty(t, read.Items)
-	assert.Equal(t, []string{runps.Name + domain.JobsUnknown}, codes(read))
+	assert.Equal(t, []string{runps.CodeJobsUnknown}, codes(read))
 }
 
 func TestAWorktreeWhoseEveryJobEndedKeepsItsProfile(t *testing.T) {
@@ -157,13 +157,15 @@ func TestAServiceARunnerStartsIsNoJobOfItsOwnInTheGroup(t *testing.T) {
 }
 
 func TestACrashedSharedServiceComesFirstWhateverItsRepository(t *testing.T) {
-	crashed := slices.Clone(jobs())
+	crashed := slices.DeleteFunc(slices.Clone(jobs()), func(job run.Job) bool { return job.Name == "worker" })
 	crashed[0].State, crashed[0].Up = run.Crashed, false
-	crashed = slices.DeleteFunc(crashed, func(job run.Job) bool { return job.Name == "worker" })
+	tool := len(crashed) - 1
+	crashed[tool].State, crashed[tool].Up = run.Crashed, false
 
 	read := read(t, seed{Jobs: crashed, Projects: []runps.Project{acme(), other()}}, runps.Request{})
 
-	assert.Equal(t, "shared", subjects(read)[0])
+	assert.Equal(t, []string{"shared", "main", "fix/login", "feat/billing"}, subjects(read), "acme's shared db, then other's main, ahead of acme's worktrees running")
+	assert.Equal(t, otherPath, read.Items[1].Detail.Repository)
 }
 
 func TestAJobOfAWorktreeGitNoLongerListsIsGroupedByItsPath(t *testing.T) {

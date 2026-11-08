@@ -89,7 +89,7 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 			for _, job := range p.declaredIdle(g.path, facts.Jobs) {
 				names = append(names, job.Name)
 			}
-			for name, line := range run.LastLines(run.LastLinesParams{StateDir: p.StateDir, Branch: p.branchAt(g.path), Names: names, Read: u.ReadLog}) {
+			for name, line := range repository.LastLines(repository.LastLinesParams{StateDir: p.StateDir, Branch: p.branchAt(g.path), Names: names, Read: u.ReadLog}) {
 				facts.Logged[LogKey{Path: g.path, Job: name}] = line
 			}
 		}
