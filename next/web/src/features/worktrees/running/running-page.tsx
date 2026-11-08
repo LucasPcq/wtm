@@ -62,14 +62,18 @@ export function RunningPage({ repo, search }: { repo: string; search: RunningSea
     key: group.key,
     label: group.shared ? 'Shared services' : group.worktree,
   }))
-  const up = groups.reduce((count, group) => count + group.counts.running, 0)
+  const up = shown.counts.running
   const crashed = groups.reduce((count, group) => count + group.counts.crashed, 0)
   const live = groups.filter((group) => group.rows.length > 0)
   // the worktrees running something: each live group's, and each holder of a shared service
   const worktreesUp = new Set(
     live.flatMap((group) =>
       group.shared
-        ? group.rows.flatMap((row) => ('job' in row ? (row.job.holders ?? []).map((holder) => holder.path) : []))
+        ? group.rows.flatMap((row) => {
+            // a shared service nobody holds any more still runs in the main checkout
+            const holders = 'job' in row ? (row.job.holders ?? []).map((holder) => holder.path) : []
+            return holders.length > 0 ? holders : [group.path ?? group.worktree]
+          })
         : [group.path ?? group.worktree],
     ),
   ).size
@@ -169,6 +173,7 @@ export function RunningPage({ repo, search }: { repo: string; search: RunningSea
               repo={repo}
               worktree={picked.group.worktree}
               profile={picked.group.profile}
+              runsForAll={picked.group.shared}
               job={picked.job}
               now={now}
             />

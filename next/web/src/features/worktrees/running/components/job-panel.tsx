@@ -28,12 +28,14 @@ export function JobPanel({
   repo,
   worktree,
   profile,
+  runsForAll = false,
   job,
   now,
 }: {
   repo: string
   worktree: string
   profile: string | undefined
+  runsForAll?: boolean
   job: RunpsJob
   now: number
 }) {
@@ -152,7 +154,15 @@ export function JobPanel({
       aria-label={`${job.name} in ${worktree}`}
       className="@container/panel flex min-h-0 min-w-0 flex-1 flex-col"
     >
-      <JobHeader repo={repo} worktree={worktree} profile={profile} job={job} facts={facts} now={now} />
+      <JobHeader
+        repo={repo}
+        worktree={worktree}
+        profile={profile}
+        runsForAll={runsForAll}
+        job={job}
+        facts={facts}
+        now={now}
+      />
       <div className="flex flex-col gap-3 px-6">
         {crashed && (
           <Alert

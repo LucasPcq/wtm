@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { HttpResponse, http } from 'msw'
 import { expect, test } from 'vitest'
+import { useUi } from '@/features/worktrees/store/ui-store'
 import { psEnvelope, psGroup, psJob } from '@/test/fixtures'
 import { renderApp } from '@/test/render'
 import { server } from '@/test/server'
@@ -174,14 +175,47 @@ test('the header counts the worktrees running something, those holding a shared 
   expect(await screen.findByText('4 jobs up in 3 worktrees · 1 crashed')).toBeDefined()
 })
 
+const storedFilter = async (stored: object) => {
+  localStorage.setItem('wtm.ui', JSON.stringify({ state: { running: { r1: stored } }, version: 0 }))
+  await useUi.persist.rehydrate()
+  expect(useUi.getState().running.r1, 'the store holds what was stored').toEqual(stored)
+}
+
 test('a filter stored broken is the calm default', async () => {
-  localStorage.setItem(
-    'wtm.ui',
-    JSON.stringify({ state: { running: { r1: { chip: 'nope', states: 7 } } }, version: 0 }),
-  )
+  await storedFilter({ chip: 'nope', states: 7 })
   acme()
   await renderApp('/r/r1/running')
 
   expect(await screen.findByRole('region', { name: 'fix/login' })).toBeDefined()
   expect(screen.getByRole('radio', { name: /All/ }).getAttribute('aria-checked')).toBe('true')
+})
+
+// An older page stored the filter's worktree by its branch, which no group's key spells: the list stayed empty.
+test('a filter stored on a branch is the calm default', async () => {
+  await storedFilter({ chip: 'all', worktree: 'fix/login', states: ['running', 'crashed'] })
+  acme()
+  await renderApp('/r/r1/running')
+
+  expect(await screen.findByRole('region', { name: 'feat/billing' })).toBeDefined()
+  expect(screen.getByRole('region', { name: 'fix/login' })).toBeDefined()
+})
+
+test('a shared service nobody holds any more still runs once, in the main checkout', async () => {
+  server.use(
+    http.post('/api/repos/r1/commands/run-ps', () =>
+      HttpResponse.json(
+        psEnvelope([
+          psGroup('main', [psJob('postgres', { holders: [] })], {
+            shared: true,
+            profile: '',
+            counts: { running: 1, starting: 0, crashed: 0, exited: 0, stopped: 0, not_started: 0, holders: 0 },
+          }),
+        ]),
+      ),
+    ),
+  )
+  await renderApp('/r/r1/running?worktree=main&job=postgres')
+
+  expect(await screen.findByText('1 job up in 1 worktree')).toBeDefined()
+  expect((await screen.findByRole('navigation', { name: 'Where it runs' })).textContent).toBe('Shared services')
 })

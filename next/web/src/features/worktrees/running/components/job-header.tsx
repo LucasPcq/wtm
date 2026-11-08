@@ -18,6 +18,7 @@ export function JobHeader({
   repo,
   worktree,
   profile,
+  runsForAll,
   job,
   facts,
   now,
@@ -25,6 +26,7 @@ export function JobHeader({
   repo: string
   worktree: string
   profile: string | undefined
+  runsForAll: boolean
   job: RunpsJob
   facts: RunlogsJob | undefined
   now: number
@@ -38,7 +40,7 @@ export function JobHeader({
   const { icon: Icon, tone } = doing ? { icon: LoaderCircle, tone: 'busy' as const } : look
 
   // a shared service runs once for every worktree holding it, in the main checkout
-  const forAll = (job.holders?.length ?? 0) > 0
+  const forAll = runsForAll
   const since = () => {
     if (doing) return doingWords[doing]
     if (forAll) return `${jobSince(job, now)} · runs once, in ${worktree}’s checkout`

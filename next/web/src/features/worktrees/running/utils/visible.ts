@@ -1,8 +1,6 @@
 import type { RunpsJob } from '@/api/types.gen'
 import { hasEnded, type RunningGroup, type RunningRow } from '@/features/worktrees/running/utils/groups'
-import type { Chip, RunFilter, ShownState } from '@/features/worktrees/store/ui-store'
-
-export const hereFilter = 'here'
+import { type Chip, hereFilter, type RunFilter, type ShownState } from '@/features/worktrees/store/ui-store'
 
 // a job pinned to the top: its worktree and its name
 export const pinOf = (worktree: string, job: string) => `${worktree}/${job}`

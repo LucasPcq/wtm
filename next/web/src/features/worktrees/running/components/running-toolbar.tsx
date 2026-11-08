@@ -15,8 +15,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/in
 import { Kbd } from '@/components/ui/kbd'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { chipLabel, shownLabel } from '@/features/worktrees/running/utils/list-words'
-import { hereFilter } from '@/features/worktrees/running/utils/visible'
-import type { Chip, RunFilter, ShownState } from '@/features/worktrees/store/ui-store'
+import { type Chip, hereFilter, type RunFilter, type ShownState } from '@/features/worktrees/store/ui-store'
 import { focusOnSlash } from '@/features/worktrees/utils/slash'
 import { cn } from '@/lib/utils'
 

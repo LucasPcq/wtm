@@ -9,6 +9,13 @@ export type ShownState = 'running' | 'crashed' | 'ended'
 // what the Running page shows: a chip, one worktree (`here`, a branch, `shared`) or all, and the states it lists
 export type RunFilter = { chip: Chip; worktree: string | undefined; states: ShownState[] }
 export const calm: RunFilter = { chip: 'all', worktree: undefined, states: ['running', 'crashed'] }
+// the filter's worktree: this worktree, where the page was opened, or a group's key (`shared`, `repository:path`)
+export const hereFilter = 'here'
+const isWorktreeFilter = (worktree: unknown): worktree is string | undefined =>
+  worktree === undefined ||
+  worktree === hereFilter ||
+  worktree === 'shared' ||
+  (typeof worktree === 'string' && worktree.includes(':'))
 
 type Ui = Record<Kind, Record<string, string[]>> & {
   running: Record<string, RunFilter>
@@ -111,7 +118,7 @@ const sound = (stored: unknown): RunFilter | undefined => {
   if (typeof stored !== 'object' || stored === null) return undefined
   const { chip, worktree, states } = stored as Record<string, unknown>
   const chipOk = chips.find((one) => one === chip)
-  if (!chipOk || !(worktree === undefined || typeof worktree === 'string') || !Array.isArray(states)) return undefined
+  if (!chipOk || !isWorktreeFilter(worktree) || !Array.isArray(states)) return undefined
   const known = shownStates.filter((one) => states.includes(one))
   return known.length === states.length ? { chip: chipOk, worktree, states: known } : undefined
 }

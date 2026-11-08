@@ -35,6 +35,7 @@ test('a worktree a start brings up is a group before the read lists its jobs, ea
     { name: 'api', said: 'waits for migrate' },
   ])
   expect(search?.starting).toBe(true)
+  expect(search?.key, 'no branch, nor the Pinned fold, spells a fresh key').toBe('fresh:feat/search')
 })
 
 // A start in a worktree whose last run was stopped showed the stopped rows for its whole run.

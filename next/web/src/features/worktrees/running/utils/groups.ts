@@ -66,7 +66,8 @@ export function groupsOf({
       ? []
       : [
           {
-            key: unit.subject,
+            // no path is known before the read lists it: a key no branch, nor the Pinned fold, can spell
+            key: `fresh:${unit.subject}`,
             worktree: unit.subject,
             path: undefined,
             shared: false,

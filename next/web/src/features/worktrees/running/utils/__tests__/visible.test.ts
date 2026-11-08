@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { groupsOf } from '@/features/worktrees/running/utils/groups'
-import { hereFilter, pinOf, visible } from '@/features/worktrees/running/utils/visible'
-import { calm } from '@/features/worktrees/store/ui-store'
+import { pinOf, visible } from '@/features/worktrees/running/utils/visible'
+import { calm, hereFilter } from '@/features/worktrees/store/ui-store'
 import { psGroup, psJob, read } from '@/test/fixtures'
 
 const groups = groupsOf({
