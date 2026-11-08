@@ -12,6 +12,6 @@
   children     feat/a, feat/b, feat/old, feat/rb
 
   JOBS
-  web  stopped  port 23460
-  api  stopped  port 23461
+  web  not started  port 23460
+  api  not started  port 23461
 

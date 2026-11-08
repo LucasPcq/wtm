@@ -1,0 +1,20 @@
+{
+  "fields": [
+    {
+      "kind": "select",
+      "path": "worktree",
+      "value": "main",
+      "options": [
+        {
+          "value": "main",
+          "tag": "current"
+        }
+      ],
+      "rememberable": false,
+      "remember": false,
+      "refreshable": false,
+      "closed": false
+    }
+  ],
+  "problems": []
+}

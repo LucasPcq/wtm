@@ -5,12 +5,13 @@ import { Section } from '@/features/worktrees/detail/components/section'
 import { ago } from '@/lib/time'
 import { withoutScheme } from '@/lib/url'
 
-const look: Record<RunState, { tone: Tone; up: boolean }> = {
-  starting: { tone: 'muted', up: false },
-  running: { tone: 'ok', up: true },
-  crashed: { tone: 'failed', up: false },
-  exited: { tone: 'muted', up: false },
-  stopped: { tone: 'muted', up: false },
+const look: Record<RunState, { tone: Tone; up: boolean; said: string }> = {
+  starting: { tone: 'muted', up: false, said: 'starting' },
+  running: { tone: 'ok', up: true, said: 'running' },
+  crashed: { tone: 'failed', up: false, said: 'crashed' },
+  exited: { tone: 'muted', up: false, said: 'exited' },
+  stopped: { tone: 'muted', up: false, said: 'stopped' },
+  not_started: { tone: 'muted', up: false, said: 'not started' },
 }
 
 export function RunSection({ detail: { isolation, run, jobs }, now }: { detail: StatusDetail; now: number }) {
@@ -48,7 +49,7 @@ export function RunSection({ detail: { isolation, run, jobs }, now }: { detail: 
             </Glyph>
             {where(job)}
             <span className="text-xs text-muted-foreground">
-              {look[job.state].up && job.started_at ? ago(job.started_at, now) : job.state}
+              {look[job.state].up && job.started_at ? ago(job.started_at, now) : look[job.state].said}
             </span>
           </li>
         ))}

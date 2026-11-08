@@ -40,8 +40,10 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
 	"github.com/LucasPcq/wtm/next/internal/command/rundown"
 	rundowncli "github.com/LucasPcq/wtm/next/internal/command/rundown/cli"
+	"github.com/LucasPcq/wtm/next/internal/command/runlist"
 	"github.com/LucasPcq/wtm/next/internal/command/runlogs"
 	runlogscli "github.com/LucasPcq/wtm/next/internal/command/runlogs/cli"
+	"github.com/LucasPcq/wtm/next/internal/command/runps"
 	"github.com/LucasPcq/wtm/next/internal/command/runstart"
 	runstartcli "github.com/LucasPcq/wtm/next/internal/command/runstart/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/runstop"
@@ -207,8 +209,8 @@ func keepsTheMutationContract(t *testing.T, m mutation) {
 func keepsTheReadContract(t *testing.T, name string) {
 	t.Helper()
 	main, c, shape := drive(t, name)
-	if name == runlogs.Name {
-		// run logs reads the jobs of run.toml: one that ran, its log left behind.
+	if name == runlogs.Name || name == runlist.Name {
+		// run logs and run list read the jobs of run.toml: one that ran, its log left behind.
 		writeRun(t, main, seedJob)
 		logs := filepath.Join(main, ".git", "wtm", "logs", "main")
 		require.NoError(t, os.MkdirAll(logs, 0o700))
@@ -222,7 +224,10 @@ func keepsTheReadContract(t *testing.T, name string) {
 	shape.golden("read", read.Envelope)
 
 	require.Nil(t, read.Envelope.Err)
-	require.NotEmpty(t, read.Envelope.Items)
+	// run ps reads the jobs of the machine, and no daemon runs any for the test
+	if name != runps.Name {
+		require.NotEmpty(t, read.Envelope.Items)
+	}
 	assert.Empty(t, read.Envelope.Op)
 	assert.Empty(t, read.Envelope.Fingerprint)
 	assert.Nil(t, read.Envelope.Plan)

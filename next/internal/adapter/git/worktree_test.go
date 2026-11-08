@@ -327,6 +327,21 @@ func TestTheCommonDirIsTheMainRepositorysEvenFromInsideALinkedWorktree(t *testin
 	assert.Equal(t, filepath.Join(repo.Dir, ".git"), common)
 }
 
+func TestTheToplevelIsTheRootOfTheWorktreeHoldingTheDirectoryItsLinksResolved(t *testing.T) {
+	repo := newRepo(t)
+	linked := filepath.Join(gittest.Symlinked(t), "feature")
+	gittest.Git(t, repo.Dir, "worktree", "add", "-b", "feature", linked)
+	inside := filepath.Join(linked, "sub")
+	require.NoError(t, os.Mkdir(inside, 0o755))
+
+	top, err := git.Repo{Dir: inside}.Toplevel(t.Context())
+
+	require.NoError(t, err)
+	want, err := git.RealPath(linked)
+	require.NoError(t, err)
+	assert.Equal(t, want, top)
+}
+
 func TestLocateResolvesWhatExistsAndKeepsTheRest(t *testing.T) {
 	link := gittest.Symlinked(t)
 	require.NoError(t, os.WriteFile(filepath.Join(link, "file"), nil, 0o644))

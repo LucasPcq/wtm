@@ -1,0 +1,18 @@
+
+  feat/billing · profile dev · 1 up · 1 crashed · 1 exited · 1 not started
+    worker   crashed · exit 1 · 2m ago                  Error: Cannot find module './jobs/send-invoic…
+    web      running · up 12m           localhost:3020  GET /invoices 200 in 702ms
+    migrate  exited · exit 0 · 11m ago                  All migrations have been applied
+    api      not started
+
+  fix/login · profile full · 2 up
+    web        running · up 1h   localhost:3030
+    stack      detached · up 1h                  Container mailpit-1  Started
+      mailpit                    localhost:8055
+
+  shared services · 1 up · held by 3 worktrees
+    db              running · up 2h  localhost:5432
+      main                           acme_main          since 2h
+      fix/login                      acme_fix_login     since 1h
+      feat/billing                   acme_feat_billing  since 12m
+

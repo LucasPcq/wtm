@@ -1,0 +1,14 @@
+$ wtm run list; echo EXIT=$?
+
+  Step 2/2 • Action
+
+  ✓ Profile or job: api
+
+  What to do with api
+
+▌› start the job
+   stop the job
+   read its output
+
+  ↑↓ navigate • / filter • enter confirm • esc back
+

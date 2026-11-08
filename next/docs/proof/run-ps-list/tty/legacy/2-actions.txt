@@ -1,0 +1,12 @@
+$ wtm run list; echo EXIT=$?
+
+  Step 2/2 • Action for api
+
+  ✓ Entry: job:api
+
+▌▸ Start
+   Stop
+   Logs
+
+  ↑↓ navigate • / filter • enter confirm • esc back
+

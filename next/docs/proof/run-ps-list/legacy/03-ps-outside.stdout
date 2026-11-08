@@ -1,0 +1,11 @@
+
+  NAME    KIND     STATUS    ADDRESS                                 UPTIME  WORKTREE
+  db      service  running                                           0s      main
+  api     service  running   http://api.feat-a.acme.localhost:24852  0s      feat/a
+  db      service  joined                                            0s      feat/a
+  stack   service  detached                                          0s      feat/a
+  web     service  running   http://web.feat-a.acme.localhost:24852  0s      feat/a
+  api     service  running   http://api.feat-b.acme.localhost:24852  0s      feat/b
+  crashy  service  crashed                                                   feat/b
+  db      service  joined                                            0s      feat/b
+

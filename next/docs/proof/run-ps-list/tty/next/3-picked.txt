@@ -1,0 +1,7 @@
+$ wtm run list; echo EXIT=$?
+
+┃  → wtm run logs feat/a --job api   read its output
+
+EXIT=0
+$
+

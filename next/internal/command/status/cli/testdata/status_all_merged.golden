@@ -2,10 +2,10 @@
   ! 4 worktrees · 2 need attention
 
      WORKTREE            ISOLATION   PORTS         JOBS                   ENV        REVIEW
-     main                isolated    base          2 stopped              2 files    —
-     ../.trees/detached  isolated    not numbered  2 stopped              2 files    —
+     main                isolated    base          —                      2 files    —
+     ../.trees/detached  isolated    not numbered  —                      2 files    —
   !  feat/a              isolated    +10           1 running · 1 crashed  1 missing  #12 merged
-  !  feat/old            not chosen  —             2 stopped              2 files    —
+  !  feat/old            not chosen  —             —                      2 files    —
 
   feat/a
   ! its pull request is merged

@@ -1,0 +1,13 @@
+
+  Profiles · feat/a
+    dev   default running  db, api, web
+    full                   migrate, db, stack, api, web
+
+  Jobs
+    web      service  running      PORT=3010             pnpm dev
+    api      service  crashed      API_PORT=4010         pnpm dev
+    migrate  task     stopped                            pnpm migrate
+    db       service  running      DB_PORT=5432  shared  postgres
+    cache    service  not started  CACHE_PORT=6389       true
+    stack    service  not started                        docker compose up -d
+

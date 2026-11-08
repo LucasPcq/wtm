@@ -1,0 +1,20 @@
+$ wtm run list; echo EXIT=$?
+
+  Step 1/2 • Profile or job
+
+  Select a profile or a job of feat/a
+
+▌› dev                                                                             default  2 jobs
+   full                                                                            running  5 jobs
+   crash                                                                                    3 jobs
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   web                                                                            service  running
+   api                                                                            service  running
+   migrate                                                                            task  exited
+   db                                                                             service  running
+   cache                                                                          service  running
+   stack                                                                          service  running
+   crashy                                                                     service  not started
+
+  ↑↓ navigate • / filter • enter confirm • esc cancel
+

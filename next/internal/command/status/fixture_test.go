@@ -2,6 +2,7 @@ package status_test
 
 import (
 	"context"
+	"slices"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/configtest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
@@ -31,6 +32,7 @@ type seed struct {
 	ConfigErr  error
 	Jobs       []run.Job
 	JobsErr    error
+	Logged     []string // the jobs whose log holds a line, in every worktree
 	PRs        []worktree.PullRequest
 	PRsErr     error
 }
@@ -58,6 +60,13 @@ func newWorld(s seed) world {
 			Meta:     store,
 			EnvFiles: store,
 			Jobs:     func(context.Context) ([]run.Job, error) { return s.Jobs, s.JobsErr },
+			ReadLog: func(file run.LogFile, _ int) ([]run.Line, error) {
+				if slices.Contains(s.Logged, file.Job) {
+					return []run.Line{{Text: "ran"}}, nil
+				}
+				return nil, nil
+			},
+			StateDir: "/state",
 			PullRequests: func(_ context.Context, branches []string) ([]worktree.PullRequest, error) {
 				asked = append(asked, branches)
 				return s.PRs, s.PRsErr

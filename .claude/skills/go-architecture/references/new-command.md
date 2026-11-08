@@ -61,7 +61,7 @@ No conclusion, envelope or dry-run drawing in a command's `cli/`: they are `form
 | `catalogue.go` | `api.Bind(<name>.Name, open<Name>, <name>.UseCase.Questions, <name>.UseCase.Run)` |
 | `wire.go` | its field in `app`, its use case built from the adapters `wire` builds once |
 
-`registration_test.go` fails when a command of `main.go` is missing from the catalogue or from the wiring. The command also enters the catalogue contract: `contract.md`, "The catalogue contract".
+`registration_test.go` fails when a command of `main.go` is missing from the catalogue or from the wiring. A command of the whole machine (`run ps`) opens no repository: its opener in `project.go` returns its use case whatever the directory (`openRunPs`), the use case opening each repository it reads through a port of its own (`openProject`), and it narrows to one with `--repo <path>` (`domain.PathRepo`); `--all` is every worktree of one repository, never the machine. The command also enters the catalogue contract: `contract.md`, "The catalogue contract".
 
 ## 8. Tests
 

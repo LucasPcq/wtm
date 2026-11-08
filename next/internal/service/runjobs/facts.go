@@ -93,21 +93,7 @@ func (f Facts) urlOf(name, path string) string {
 
 // children are the declared jobs a runner starts itself, its runners' own included, each once.
 func (f Facts) children(runner project.Job) []project.Job {
-	seen := map[string]bool{runner.Name: true}
-	queue := slices.Clone(runner.Runs)
-	var children []project.Job
-	for len(queue) > 0 {
-		name := queue[0]
-		queue = queue[1:]
-		child, ok := f.Declared(name)
-		if seen[name] || !ok {
-			continue
-		}
-		seen[name] = true
-		children = append(children, child)
-		queue = append(queue, child.Runs...)
-	}
-	return children
+	return f.Run.Children(runner)
 }
 
 // jobsIn are the declared jobs t starts, in its order.

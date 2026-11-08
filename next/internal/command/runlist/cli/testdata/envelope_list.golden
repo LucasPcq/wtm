@@ -1,0 +1,536 @@
+{
+  "v": 2,
+  "command": "run-list",
+  "ok": true,
+  "items": [
+    {
+      "subject": "feat/a",
+      "status": "done",
+      "detail": {
+        "branch": "feat/a",
+        "path": "/repo/.trees/feat-a",
+        "profile": "dev",
+        "profiles": [
+          {
+            "name": "dev",
+            "default": true,
+            "jobs": [
+              "db",
+              "api",
+              "web"
+            ],
+            "running": true,
+            "actions": [
+              {
+                "command": "run-up",
+                "answers": [
+                  {
+                    "path": "worktree",
+                    "values": [
+                      "feat/a"
+                    ]
+                  },
+                  {
+                    "path": "profile",
+                    "values": [
+                      "dev"
+                    ]
+                  }
+                ],
+                "code": "run-list.up",
+                "message": "start the profile"
+              },
+              {
+                "command": "run-down",
+                "answers": [
+                  {
+                    "path": "worktree",
+                    "values": [
+                      "feat/a"
+                    ]
+                  },
+                  {
+                    "path": "profile",
+                    "values": [
+                      "dev"
+                    ]
+                  }
+                ],
+                "code": "run-list.down",
+                "message": "stop its jobs"
+              }
+            ]
+          },
+          {
+            "name": "full",
+            "default": false,
+            "jobs": [
+              "migrate",
+              "db",
+              "stack",
+              "api",
+              "web"
+            ],
+            "running": false,
+            "actions": [
+              {
+                "command": "run-up",
+                "answers": [
+                  {
+                    "path": "worktree",
+                    "values": [
+                      "feat/a"
+                    ]
+                  },
+                  {
+                    "path": "profile",
+                    "values": [
+                      "full"
+                    ]
+                  }
+                ],
+                "code": "run-list.up",
+                "message": "start the profile"
+              },
+              {
+                "command": "run-down",
+                "answers": [
+                  {
+                    "path": "worktree",
+                    "values": [
+                      "feat/a"
+                    ]
+                  },
+                  {
+                    "path": "profile",
+                    "values": [
+                      "full"
+                    ]
+                  }
+                ],
+                "code": "run-list.down",
+                "message": "stop its jobs"
+              }
+            ]
+          }
+        ],
+        "jobs": [
+          {
+            "name": "web",
+            "kind": "service",
+            "state": "running",
+            "hold": "own",
+            "dir": "apps/web",
+            "command": "pnpm dev",
+            "ports": {
+              "PORT": 3010
+            },
+            "url": "http://web.feat-a.acme.localhost",
+            "actions": [
+              {
+                "command": "run-start",
+                "answers": [
+                  {
+                    "path": "worktree",
+                    "values": [
+                      "feat/a"
+                    ]
+                  },
+                  {
+                    "path": "job",
+                    "values": [
+                      "web"
+                    ]
+                  }
+                ],
+                "code": "run-list.start",
+                "message": "start the job"
+              },
+              {
+                "command": "run-stop",
+                "answers": [
+                  {
+                    "path": "worktree",
+                    "values": [
+                      "feat/a"
+                    ]
+                  },
+                  {
+                    "path": "job",
+                    "values": [
+                      "web"
+                    ]
+                  }
+                ],
+                "code": "run-list.stop",
+                "message": "stop the job"
+              },
+              {
+                "command": "run-logs",
+                "answers": [
+                  {
+                    "path": "worktree",
+                    "values": [
+                      "feat/a"
+                    ]
+                  },
+                  {
+                    "path": "job",
+                    "values": [
+                      "web"
+                    ]
+                  }
+                ],
+                "code": "run-list.logs",
+                "message": "read its output"
+              }
+            ]
+          },
+          {
+            "name": "api",
+            "kind": "service",
+            "state": "crashed",
+            "hold": "own",
+            "dir": "apps/api",
+            "command": "pnpm dev",
+            "ports": {
+              "API_PORT": 4010
+            },
+            "actions": [
+              {
+                "command": "run-start",
+                "answers": [
+                  {
+                    "path": "worktree",
+                    "values": [
+                      "feat/a"
+                    ]
+                  },
+                  {
+                    "path": "job",
+                    "values": [
+                      "api"
+                    ]
+                  }
+                ],
+                "code": "run-list.start",
+                "message": "start the job"
+              },
+              {
+                "command": "run-stop",
+                "answers": [
+                  {
+                    "path": "worktree",
+                    "values": [
+                      "feat/a"
+                    ]
+                  },
+                  {
+                    "path": "job",
+                    "values": [
+                      "api"
+                    ]
+                  }
+                ],
+                "code": "run-list.stop",
+                "message": "stop the job"
+              },
+              {
+                "command": "run-logs",
+                "answers": [
+                  {
+                    "path": "worktree",
+                    "values": [
+                      "feat/a"
+                    ]
+                  },
+                  {
+                    "path": "job",
+                    "values": [
+                      "api"
+                    ]
+                  }
+                ],
+                "code": "run-list.logs",
+                "message": "read its output"
+              }
+            ]
+          },
+          {
+            "name": "migrate",
+            "kind": "task",
+            "state": "stopped",
+            "command": "pnpm migrate",
+            "actions": [
+              {
+                "command": "run-start",
+                "answers": [
+                  {
+                    "path": "worktree",
+                    "values": [
+                      "feat/a"
+                    ]
+                  },
+                  {
+                    "path": "job",
+                    "values": [
+                      "migrate"
+                    ]
+                  }
+                ],
+                "code": "run-list.start",
+                "message": "start the job"
+              },
+              {
+                "command": "run-stop",
+                "answers": [
+                  {
+                    "path": "worktree",
+                    "values": [
+                      "feat/a"
+                    ]
+                  },
+                  {
+                    "path": "job",
+                    "values": [
+                      "migrate"
+                    ]
+                  }
+                ],
+                "code": "run-list.stop",
+                "message": "stop the job"
+              },
+              {
+                "command": "run-logs",
+                "answers": [
+                  {
+                    "path": "worktree",
+                    "values": [
+                      "feat/a"
+                    ]
+                  },
+                  {
+                    "path": "job",
+                    "values": [
+                      "migrate"
+                    ]
+                  }
+                ],
+                "code": "run-list.logs",
+                "message": "read its output"
+              }
+            ]
+          },
+          {
+            "name": "db",
+            "kind": "service",
+            "state": "running",
+            "hold": "claim",
+            "command": "postgres",
+            "ports": {
+              "DB_PORT": 5432
+            },
+            "shared": true,
+            "actions": [
+              {
+                "command": "run-start",
+                "answers": [
+                  {
+                    "path": "worktree",
+                    "values": [
+                      "feat/a"
+                    ]
+                  },
+                  {
+                    "path": "job",
+                    "values": [
+                      "db"
+                    ]
+                  }
+                ],
+                "code": "run-list.start",
+                "message": "start the job"
+              },
+              {
+                "command": "run-stop",
+                "answers": [
+                  {
+                    "path": "worktree",
+                    "values": [
+                      "feat/a"
+                    ]
+                  },
+                  {
+                    "path": "job",
+                    "values": [
+                      "db"
+                    ]
+                  }
+                ],
+                "code": "run-list.stop",
+                "message": "stop the job"
+              },
+              {
+                "command": "run-logs",
+                "answers": [
+                  {
+                    "path": "worktree",
+                    "values": [
+                      "feat/a"
+                    ]
+                  },
+                  {
+                    "path": "job",
+                    "values": [
+                      "db"
+                    ]
+                  }
+                ],
+                "code": "run-list.logs",
+                "message": "read its output"
+              }
+            ]
+          },
+          {
+            "name": "cache",
+            "kind": "service",
+            "state": "not_started",
+            "command": "true",
+            "ports": {
+              "CACHE_PORT": 6389
+            },
+            "actions": [
+              {
+                "command": "run-start",
+                "answers": [
+                  {
+                    "path": "worktree",
+                    "values": [
+                      "feat/a"
+                    ]
+                  },
+                  {
+                    "path": "job",
+                    "values": [
+                      "cache"
+                    ]
+                  }
+                ],
+                "code": "run-list.start",
+                "message": "start the job"
+              },
+              {
+                "command": "run-stop",
+                "answers": [
+                  {
+                    "path": "worktree",
+                    "values": [
+                      "feat/a"
+                    ]
+                  },
+                  {
+                    "path": "job",
+                    "values": [
+                      "cache"
+                    ]
+                  }
+                ],
+                "code": "run-list.stop",
+                "message": "stop the job"
+              },
+              {
+                "command": "run-logs",
+                "answers": [
+                  {
+                    "path": "worktree",
+                    "values": [
+                      "feat/a"
+                    ]
+                  },
+                  {
+                    "path": "job",
+                    "values": [
+                      "cache"
+                    ]
+                  }
+                ],
+                "code": "run-list.logs",
+                "message": "read its output"
+              }
+            ]
+          },
+          {
+            "name": "stack",
+            "kind": "service",
+            "state": "not_started",
+            "command": "docker compose up -d",
+            "runs": [
+              "cache"
+            ],
+            "actions": [
+              {
+                "command": "run-start",
+                "answers": [
+                  {
+                    "path": "worktree",
+                    "values": [
+                      "feat/a"
+                    ]
+                  },
+                  {
+                    "path": "job",
+                    "values": [
+                      "stack"
+                    ]
+                  }
+                ],
+                "code": "run-list.start",
+                "message": "start the job"
+              },
+              {
+                "command": "run-stop",
+                "answers": [
+                  {
+                    "path": "worktree",
+                    "values": [
+                      "feat/a"
+                    ]
+                  },
+                  {
+                    "path": "job",
+                    "values": [
+                      "stack"
+                    ]
+                  }
+                ],
+                "code": "run-list.stop",
+                "message": "stop the job"
+              },
+              {
+                "command": "run-logs",
+                "answers": [
+                  {
+                    "path": "worktree",
+                    "values": [
+                      "feat/a"
+                    ]
+                  },
+                  {
+                    "path": "job",
+                    "values": [
+                      "stack"
+                    ]
+                  }
+                ],
+                "code": "run-list.logs",
+                "message": "read its output"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}

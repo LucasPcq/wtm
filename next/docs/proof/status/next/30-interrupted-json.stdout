@@ -66,14 +66,14 @@
           {
             "name": "web",
             "kind": "service",
-            "state": "stopped",
+            "state": "not_started",
             "url": "",
             "port": 23460
           },
           {
             "name": "api",
             "kind": "service",
-            "state": "stopped",
+            "state": "not_started",
             "url": "",
             "port": 23461
           }
@@ -133,13 +133,13 @@
           {
             "name": "web",
             "kind": "service",
-            "state": "stopped",
+            "state": "not_started",
             "url": ""
           },
           {
             "name": "api",
             "kind": "service",
-            "state": "stopped",
+            "state": "not_started",
             "url": ""
           }
         ],
@@ -325,14 +325,14 @@
           {
             "name": "web",
             "kind": "service",
-            "state": "stopped",
+            "state": "not_started",
             "url": "",
             "port": 23480
           },
           {
             "name": "api",
             "kind": "service",
-            "state": "stopped",
+            "state": "not_started",
             "url": "",
             "port": 23481
           }
@@ -409,14 +409,14 @@
           {
             "name": "web",
             "kind": "service",
-            "state": "stopped",
+            "state": "not_started",
             "url": "",
             "port": 23490
           },
           {
             "name": "api",
             "kind": "service",
-            "state": "stopped",
+            "state": "not_started",
             "url": "",
             "port": 23491
           }
@@ -552,14 +552,14 @@
           {
             "name": "web",
             "kind": "service",
-            "state": "stopped",
+            "state": "not_started",
             "url": "",
             "port": 23500
           },
           {
             "name": "api",
             "kind": "service",
-            "state": "stopped",
+            "state": "not_started",
             "url": "",
             "port": 23501
           }

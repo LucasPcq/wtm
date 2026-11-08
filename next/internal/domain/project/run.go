@@ -168,3 +168,22 @@ func (c Run) IsolationApplies() bool {
 	isolates := func(job Job) bool { return len(job.Ports) > 0 || job.hasNamespace() || job.RunsCompose() }
 	return len(c.EnvPorts) > 0 || len(c.EnvValues) > 0 || slices.ContainsFunc(c.Jobs, isolates)
 }
+
+// Children are the declared jobs of c that runner starts itself (its runs), its runners' own included, each once.
+func (c Run) Children(runner Job) []Job {
+	seen := map[string]bool{runner.Name: true}
+	queue := slices.Clone(runner.Runs)
+	var children []Job
+	for len(queue) > 0 {
+		name := queue[0]
+		queue = queue[1:]
+		at := slices.IndexFunc(c.Jobs, func(job Job) bool { return job.Name == name })
+		if seen[name] || at < 0 {
+			continue
+		}
+		seen[name] = true
+		children = append(children, c.Jobs[at])
+		queue = append(queue, c.Jobs[at].Runs...)
+	}
+	return children
+}

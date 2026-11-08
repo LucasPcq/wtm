@@ -1,0 +1,10 @@
+## jobs up (the daemon's index)
+acme db own
+feat-a api own
+feat-a db claim
+feat-a stack stack
+feat-a web own
+feat-b api own
+feat-b db claim
+## compose containers
+acme-feat-a-cache-1

@@ -94,6 +94,21 @@ func TestASharedJobWithNoMainCheckoutIsRefused(t *testing.T) {
 	assert.Empty(t, w.spawner.lines(), "never one instance per worktree")
 }
 
+func TestTheMainCheckoutHoldingASharedJobListsItsNamespace(t *testing.T) {
+	w := newWorld(t, map[string]script{"up db": prints("listening"), "createdb": exits(0)})
+	spec := shared("db", "/repo", "")
+	spec.Job.Namespace = &project.Namespace{Name: "app_{worktree}", Create: "createdb"}
+
+	_, err := w.Start(spec, nil)
+
+	require.NoError(t, err)
+	listed := w.List("/repo")
+	require.Len(t, listed, 1)
+	assert.True(t, listed[0].MainHolds)
+	assert.Equal(t, "app_main", listed[0].Namespace)
+	assert.Equal(t, "app_main", w.spawner.commands[1].Env["WTM_NAMESPACE"], "the namespace listed is the one made")
+}
+
 func TestEachWorktreesNamespaceIsCreatedRetriedWhileTheServiceComesUpAndNoted(t *testing.T) {
 	w := newWorld(t, map[string]script{"up db": prints("listening"), "createdb": failsFirst(2, "the database system is starting up")})
 	spec := shared("db", "/wt/a", "")
@@ -110,6 +125,7 @@ func TestEachWorktreesNamespaceIsCreatedRetriedWhileTheServiceComesUpAndNoted(t 
 	_, err = w.Lines(t.Context(), run.Tail{Name: "db", WorkDir: "/wt/a"}, func(line run.Line) { lines = append(lines, line.Text) })
 	require.NoError(t, err)
 	assert.Contains(t, lines, "[wtm] namespace app_a ready for a", "a claim's lines are its service's")
+	assert.Equal(t, "app_a", w.List("/wt/a")[0].Namespace, "a claim lists the namespace it holds")
 }
 
 func TestANamespaceThatCannotBeMadeTakesTheHoldBackAndTheJobWithIt(t *testing.T) {

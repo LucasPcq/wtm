@@ -1,0 +1,7 @@
+$ wtm run list; echo EXIT=$?
+
+┃  = Aborted.
+
+EXIT=19
+$
+

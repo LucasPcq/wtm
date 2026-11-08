@@ -1,0 +1,15 @@
+
+  Profiles · feat/b
+    dev    default  api, web
+    full            migrate, db, stack, api, web
+    crash  running  db, api, crashy
+
+  Jobs
+    web      service  not started  PORT=24870             python3 ../../scripts/dev.py web
+    api      service  running      PORT=24871             python3 ../../scripts/dev.py api
+    migrate  task     not started                         echo migrating; sleep 1; echo migrated
+    db       service  running      DB_PORT=24853  shared  python3 scripts/db.py
+    cache    service  not started  CACHE_PORT=24874       true
+    stack    service  not started                         docker compose up -d cache
+    crashy   service  crashed                             echo starting; sleep 0.2; echo boom >&2; exit 1
+

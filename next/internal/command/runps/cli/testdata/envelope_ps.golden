@@ -1,0 +1,190 @@
+{
+  "v": 2,
+  "command": "run-ps",
+  "ok": true,
+  "items": [
+    {
+      "subject": "feat/billing",
+      "status": "done",
+      "detail": {
+        "repository": "/acme",
+        "shared": false,
+        "branch": "feat/billing",
+        "path": "/acme.trees/feat-billing",
+        "profile": "dev",
+        "counts": {
+          "running": 1,
+          "starting": 0,
+          "crashed": 1,
+          "exited": 1,
+          "stopped": 0,
+          "not_started": 1,
+          "holders": 0
+        },
+        "jobs": [
+          {
+            "name": "worker",
+            "kind": "service",
+            "state": "crashed",
+            "hold": "own",
+            "started_at": "2026-11-08T13:48:00Z",
+            "ended_at": "2026-11-08T13:58:00Z",
+            "duration_ms": 600000,
+            "exit_code": 1,
+            "last_line": {
+              "text": "Error: Cannot find module './jobs/send-invoice'"
+            },
+            "dir": "apps/worker",
+            "command": "pnpm start",
+            "log": "/state/logs/feat%2Fbilling/worker.log"
+          },
+          {
+            "name": "web",
+            "kind": "service",
+            "state": "running",
+            "hold": "own",
+            "url": "http://web.feat-billing.acme.localhost",
+            "address": "localhost:3020",
+            "started_at": "2026-11-08T13:48:00Z",
+            "last_line": {
+              "text": "GET /invoices 200 in 702ms"
+            },
+            "dir": "apps/web",
+            "command": "pnpm dev",
+            "log": "/state/logs/feat%2Fbilling/web.log"
+          },
+          {
+            "name": "migrate",
+            "kind": "task",
+            "state": "exited",
+            "hold": "own",
+            "started_at": "2026-11-08T13:48:00Z",
+            "ended_at": "2026-11-08T13:49:00Z",
+            "duration_ms": 60000,
+            "exit_code": 0,
+            "last_line": {
+              "text": "All migrations have been applied"
+            },
+            "dir": "packages/db",
+            "command": "pnpm migrate",
+            "log": "/state/logs/feat%2Fbilling/migrate.log"
+          },
+          {
+            "name": "api",
+            "kind": "service",
+            "state": "not_started",
+            "dir": "apps/api",
+            "command": "pnpm dev",
+            "log": "/state/logs/feat%2Fbilling/api.log"
+          }
+        ]
+      }
+    },
+    {
+      "subject": "fix/login",
+      "status": "done",
+      "detail": {
+        "repository": "/acme",
+        "shared": false,
+        "branch": "fix/login",
+        "path": "/acme.trees/fix-login",
+        "profile": "full",
+        "counts": {
+          "running": 2,
+          "starting": 0,
+          "crashed": 0,
+          "exited": 0,
+          "stopped": 0,
+          "not_started": 0,
+          "holders": 0
+        },
+        "jobs": [
+          {
+            "name": "web",
+            "kind": "service",
+            "state": "running",
+            "hold": "own",
+            "address": "localhost:3030",
+            "started_at": "2026-11-08T13:00:00Z",
+            "dir": "apps/web",
+            "command": "pnpm dev",
+            "log": "/state/logs/fix%2Flogin/web.log"
+          },
+          {
+            "name": "stack",
+            "kind": "service",
+            "state": "running",
+            "hold": "detached",
+            "started_at": "2026-11-08T13:00:00Z",
+            "last_line": {
+              "text": "Container mailpit-1  Started"
+            },
+            "command": "docker compose up -d",
+            "log": "/state/logs/fix%2Flogin/stack.log",
+            "services": [
+              {
+                "name": "mailpit",
+                "state": "running",
+                "address": "localhost:8055"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "subject": "shared",
+      "status": "done",
+      "detail": {
+        "repository": "/acme",
+        "shared": true,
+        "branch": "main",
+        "path": "/acme",
+        "profile": "",
+        "counts": {
+          "running": 1,
+          "starting": 0,
+          "crashed": 0,
+          "exited": 0,
+          "stopped": 0,
+          "not_started": 0,
+          "holders": 3
+        },
+        "jobs": [
+          {
+            "name": "db",
+            "kind": "service",
+            "state": "running",
+            "hold": "own",
+            "address": "localhost:5432",
+            "started_at": "2026-11-08T12:00:00Z",
+            "command": "postgres",
+            "log": "/state/logs/main/db.log",
+            "holders": [
+              {
+                "branch": "main",
+                "path": "/acme",
+                "namespace": "acme_main",
+                "since": "2026-11-08T12:00:00Z"
+              },
+              {
+                "branch": "fix/login",
+                "path": "/acme.trees/fix-login",
+                "namespace": "acme_fix_login",
+                "since": "2026-11-08T13:00:00Z"
+              },
+              {
+                "branch": "feat/billing",
+                "path": "/acme.trees/feat-billing",
+                "namespace": "acme_feat_billing",
+                "since": "2026-11-08T13:48:00Z"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}

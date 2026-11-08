@@ -1,0 +1,86 @@
+[
+  {
+    "name": "db",
+    "kind": "service",
+    "status": "running",
+    "pid": <PID>,
+    "branch": "main",
+    "path": "<SB>/acme",
+    "project": "acme",
+    "started_at": "<TIME>"
+  },
+  {
+    "name": "api",
+    "kind": "service",
+    "status": "running",
+    "pid": <PID>,
+    "branch": "feat/a",
+    "path": "<SB>/acme.trees/feat-a",
+    "project": "acme",
+    "started_at": "<TIME>",
+    "url": "http://api.feat-a.acme.localhost:24852"
+  },
+  {
+    "name": "db",
+    "kind": "service",
+    "status": "joined",
+    "pid": <PID>,
+    "branch": "feat/a",
+    "path": "<SB>/acme.trees/feat-a",
+    "project": "acme",
+    "started_at": "<TIME>"
+  },
+  {
+    "name": "stack",
+    "kind": "service",
+    "status": "detached",
+    "pid": <PID>,
+    "branch": "feat/a",
+    "path": "<SB>/acme.trees/feat-a",
+    "project": "acme",
+    "started_at": "<TIME>"
+  },
+  {
+    "name": "web",
+    "kind": "service",
+    "status": "running",
+    "pid": <PID>,
+    "branch": "feat/a",
+    "path": "<SB>/acme.trees/feat-a",
+    "project": "acme",
+    "started_at": "<TIME>",
+    "url": "http://web.feat-a.acme.localhost:24852"
+  },
+  {
+    "name": "api",
+    "kind": "service",
+    "status": "running",
+    "pid": <PID>,
+    "branch": "feat/b",
+    "path": "<SB>/acme.trees/feat-b",
+    "project": "acme",
+    "started_at": "<TIME>",
+    "url": "http://api.feat-b.acme.localhost:24852"
+  },
+  {
+    "name": "crashy",
+    "kind": "service",
+    "status": "crashed",
+    "pid": <PID>,
+    "branch": "feat/b",
+    "path": "<SB>/acme.trees/feat-b",
+    "project": "acme",
+    "started_at": "<TIME>",
+    "exit_code": 1
+  },
+  {
+    "name": "db",
+    "kind": "service",
+    "status": "joined",
+    "pid": <PID>,
+    "branch": "feat/b",
+    "path": "<SB>/acme.trees/feat-b",
+    "project": "acme",
+    "started_at": "<TIME>"
+  }
+]

@@ -89,6 +89,50 @@ func (p JobParams) composeProject() string {
 	return worktree.Slug(p.Project()) + "-" + worktree.Slug(p.Branch)
 }
 
+// OffsetParams are what tells how far a worktree's ports sit above the main worktree's: the worktree, every worktree of its repository, their meta records by branch, and run.toml.
+type OffsetParams struct {
+	Worktree  worktree.Worktree
+	Worktrees []worktree.Worktree
+	Records   map[string]worktree.Meta
+	Run       project.Run
+}
+
+// OffsetOf is how far a worktree's ports sit above the main worktree's: none for the main one; for another, its ordinal's, unless no run has numbered it yet or another branch, first by name, holds the same number; nil when it cannot be told.
+func OffsetOf(params OffsetParams) *int {
+	if params.Worktree.Main {
+		return new(int)
+	}
+
+	branch := params.Worktree.Branch()
+	record, recorded := params.Records[branch]
+	if branch == "" || !recorded || record.Ordinal <= 0 {
+		return nil
+	}
+	for _, other := range params.Worktrees {
+		if name := other.Branch(); name != branch && name < branch && params.Records[name].Ordinal == record.Ordinal {
+			return nil
+		}
+	}
+
+	offset := JobParams{Ordinal: record.Ordinal, Isolation: record.Isolation, Run: params.Run}.Offset()
+	return &offset
+}
+
+// PortsAt are the ports job binds in a worktree whose ports sit offset above the main worktree's, by the names it declares them under: a shared job's at their base; none when the offset is not known (nil) and the job is not shared.
+func PortsAt(job project.Job, offset *int) map[string]int {
+	if offset == nil && job.Scope != project.Shared {
+		return nil
+	}
+	ports := map[string]int{}
+	for name, base := range job.Ports {
+		ports[name] = base
+		if job.Scope != project.Shared {
+			ports[name] += *offset
+		}
+	}
+	return ports
+}
+
 const defaultOffsetBlock = 10
 
 // OffsetBlock returns how many ports apart two consecutive worktrees sit: run.toml's port_offset_block, else 10.

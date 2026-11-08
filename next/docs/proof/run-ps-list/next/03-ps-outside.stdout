@@ -1,0 +1,17 @@
+
+  feat/b · profile crash · 1 up · 1 crashed
+    crashy  crashed · exit 1 · 0s ago                   boom
+    api     running · up 0s            localhost:24871  00:00:00 <a request>
+
+  feat/a · profile full · 3 up · 1 exited
+    web      running · up 0s           localhost:24860  00:00:00 <a request>
+    api      running · up 0s           localhost:24861  00:00:00 <a request>
+    stack    detached · up 0s                            Container acme-feat-a-cache-1 Started
+      cache                            localhost:24864
+    migrate  exited · exit 0 · 0s ago                   migrated
+
+  shared services · 1 up · held by 2 worktrees
+    db        running · up 0s  localhost:24853  <db line>
+      feat/a                   acme_feat-a      since 0s
+      feat/b                   acme_feat-b      since 0s
+

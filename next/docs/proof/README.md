@@ -31,6 +31,7 @@ other=$(mktemp -d)/wtm-next && (cd ../../.. && go build -ldflags "-X main.versio
 ./run-up.sh "$wtm" "$next" run-up
 ./run-view.sh "$wtm" "$next" run-view
 ./run-logs.sh "$wtm" "$next" run-logs
+./run-ps-list.sh "$wtm" "$next" run-ps-list
 ./run-down.sh "$wtm" "$next" run-down
 ./run-start-stop.sh "$wtm" "$next" run-start-stop
 ./clean-data.sh "$wtm" "$next" clean-data
@@ -226,6 +227,7 @@ The reference is the legacy `wtm status` of 0.30.1. `status` is a read: the proo
   - **The picker reads the questions only when it asks**: with a worktree named or `--all`, nothing is read before the read itself.
   - **An ambiguous name is picked among its matches on a terminal** (approved deviation, shared with `resolve`): a part of a branch several worktrees hold opens the picker over them, where legacy refused it; anywhere else it is refused, exit 2, its field code `ambiguous` (shared with `resolve`, was `status.ambiguous`) naming the matches (`TestOnATerminalAnAmbiguousNameIsPickedAmongTheWorktreesItMatches`).
   - **The other legacy bugs of the issue**: 5, the stale comment on a constant, has nothing to fix in next, whose status declares no such constant; 9, legacy listing the worktrees with `git worktree list` once per question, is one snapshot read once per run here.
+  - **A job that never ran is `not_started`** (LUC-345): a job run.toml declares that the daemon does not list is `stopped` once its log holds a line, else `not_started` (`not started` in the text, `—` in the table's jobs column); legacy said `stopped` for both (`TestADeclaredJobTheDaemonDoesNotListIsStoppedOnceItsLogSaysItRan`). The rule run ps and run list read by.
 
 # Proof: `wtm resolve` and the `wtm go` wrapper (legacy `surface/cli/resolve`) vs `wtm-next resolve`
 
@@ -821,3 +823,32 @@ The reference is the legacy `wtm run logs` of 0.30.1. next speaks the v2 envelop
   - **A search reads the whole log** (next only, 13): `--search` (`--regex`, `--match-case`) and `--since` read each job's log, its rotated files included, and print the matching lines of every job (`TestASearchReadsTheWholeLogItsBackupsFirst`).
   - **The view** is `ui/runview`, as run up opens it, on the jobs read (`tty/next/2-view.txt`; a task done is `✓`, B7: legacy's `○`), `--job` selected; leaving it prints nothing of the read (`3-left`).
 
+# Proof: `wtm run ps` and `wtm run list` (legacy `surface/cli/run/ps.go`, `flow/run/list`) vs `wtm-next run ps`, `wtm-next run list`
+
+The reference is the legacy `wtm run ps` and `wtm run list` of 0.30.1. next speaks the v2 envelope of a read, so the proof keeps both outputs side by side and compares the state on disk, which a read leaves as it was.
+
+- `run-ps-list.sh <wtm> <wtm-next> run-ps-list`: two identical sandboxes, one after the other, each with its own HOME (so its own daemon, socket and index), torn down before the next starts (every job stopped, the stack's `docker compose down` run, then the daemon): the `docs/demos` "acme" project with a task `migrate`, a shared service `db` with a namespace, a docker compose `stack` that `runs` cache, and `crashy`, a service that exits 1 at once; each side's own binary starts profile `full` in feat/a (migrate, db, stack, api, web) and profile `crash` in feat/b (db, api, crashy), so db has two holders, a job crashed and a job exited. Each scenario runs with no terminal; after each, the exit code, stdout, stderr and the state (the daemon's index, the compose containers). The demo servers' own lines and every time and age are masked, so a rerun leaves the captures unchanged.
+  1. `run ps`, from the main checkout
+  2. `run ps --output json`
+  3. `run ps` from outside any repository
+  4. `run ps -q`
+  5. next only: `run ps --repo acme.trees/feat-a`
+  6. next only: `run ps --repo nowhere`
+  7. `run list` from feat/a
+  8. `run list --yes` from feat/a
+  9. `run list --output json` from feat/a
+  10. `run list` from outside any repository
+  11. next only: `run list feat/b`
+  - then, in tmux, `run list` from feat/a: the entries, api picked, its actions; next ends on `read its output`, legacy (which runs the action it picks) is left with esc.
+- The states are identical: both reads change nothing and never start the daemon.
+- The differences, each an owner-approved departure or a legacy bug fixed with its test:
+  - **JSON is the v2 envelope of a read** (2, 9): run ps an item per group, run list one item, the worktree; legacy printed a bare array of jobs (run ps) and run.toml as it is (run list), with no warning (B7, `TestTheJSONOfRunPsIsTheV2EnvelopeOfARead`, `TestTheJSONOfRunListIsTheV2EnvelopeOfARead`).
+  - **run ps groups by worktree** (1): a block per worktree running jobs for itself, those with a crash first, its profile and its counts in its title, its jobs crashed first, then running, then exited, stopped and never started; then the shared services, each with the worktrees holding it, the namespace it made for each and since when; legacy printed one table, a row per daemon job, a claim a row of its worktree.
+  - **The states are the daemon's** (1, 2): `state` and `hold` (`own`, `detached`, `claim`) in place of legacy's status words (`joined`, `detached`); no `pid` (legacy printed `0` for a claim or a stack, B5); every time in UTC (legacy's `started_at` in the local zone, B5).
+  - **What ended is listed** (B3): a task that ended (`migrate exited · exit 0`) and a service that crashed with when (`crashy crashed · exit 1 · 0s ago`), `started_at`, `ended_at` and `duration_ms` in the JSON (B6); legacy's daemon dropped an ended task and gave a crash no time (`TestAGroupListsWhatCrashedFirstThenWhatRunsThenWhatEndedOrNeverStarted`, `TestAJobThatEndedSaysWhenAndHowLongItRan`, the daemon's `TestAnEndedJobSaysWhenItStartedAndWhenItEnded`).
+  - **Where each job answers** (B4): `address` (`localhost:<port>`) for every job binding a port, the shared db included, a runner's services under it at their worktree's ports (`cache localhost:24864`); legacy showed a job's url only, none for db, a claim or a stack's services (`TestARunnerListsTheServicesItStartsAtItsWorktreesPorts`, `TestASharedServiceListsTheWorktreesHoldingItTheirNamespaceAndSinceWhen`).
+  - **A job of a group's profile the daemon does not list** is listed `stopped` once its log holds a line, else `not_started`: one rule for run ps, run list and status (status said `stopped` for a job that never ran: `TestADeclaredJobTheDaemonDoesNotListIsStoppedOnceItsLogSaysItRan` in status and run ps).
+  - **`--repo <path>`** (5, 6): run ps narrows to one repository, a path in it read from where the caller stands; one in no repository is `git.not_a_repository` (21). Legacy had no such flag. In next, `--all` means every worktree of this repository, never the machine.
+  - **run list reads a worktree** (7, 11): `run list [worktree]`, the one named, else the one stood in; at a terminal with none named it asks which, the one stood in picked (`tty/next/0-worktree.txt`); each job with its state there and the ports it binds there. Legacy printed run.toml's base ports in every worktree (B1: feat/a showed main's `PORT=24850`, next feat/a's `PORT=24860`, `TestAJobsPortsAreTheWorktreesNotRunTomlsBase`); a runner's service reads as its runner (`cache running`).
+  - **The picker ends on a follow-up** (tty): profiles, a rule, then jobs, each with its state; then the actions as data of the read (a profile: start the profile, stop its jobs; a job: start, stop, read its output), the one picked printed as the command that does it, `→ wtm run logs feat/a --job api   read its output`, exit 0; legacy ran the action in process. Its trail names the entry, `✓ Profile or job: api` (B2: legacy's `✓ Entry: job:api`, `TestThePickerAsksAProfileOrAJobThenWhatToDoWithIt`). `--yes` asks nothing, no worktree and no picker, as legacy's `--yes` printed the table (8, `TestAtATerminalYesListsTheWorktreeYouStandInWithNoPicker`).
+  - **Leaving the picker** ends the read cancelled, `✗ interrupted`, exit 19, as every next picker; legacy said `= Aborted.`, exit 19 too.

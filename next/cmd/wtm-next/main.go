@@ -19,7 +19,9 @@ import (
 	reparentcli "github.com/LucasPcq/wtm/next/internal/command/reparent/cli"
 	resolvecli "github.com/LucasPcq/wtm/next/internal/command/resolve/cli"
 	rundowncli "github.com/LucasPcq/wtm/next/internal/command/rundown/cli"
+	runlistcli "github.com/LucasPcq/wtm/next/internal/command/runlist/cli"
 	runlogscli "github.com/LucasPcq/wtm/next/internal/command/runlogs/cli"
+	runpscli "github.com/LucasPcq/wtm/next/internal/command/runps/cli"
 	runstartcli "github.com/LucasPcq/wtm/next/internal/command/runstart/cli"
 	runstopcli "github.com/LucasPcq/wtm/next/internal/command/runstop/cli"
 	runupcli "github.com/LucasPcq/wtm/next/internal/command/runup/cli"
@@ -65,7 +67,7 @@ func commands(streams *output.Streams, env cli.Env) []*cobra.Command {
 		statuscli.New(streams, env, openStatus, commandLine),
 		treecli.New(streams, env, openTree, commandLine),
 		eventscli.New(streams, env, systemStream(), commandLine),
-		runCmd(runupcli.New(streams, env, openRunUp, commandLine, liveView()), runlogscli.New(streams, env, openRunLogs, commandLine, runlogscli.View{Daemon: runDaemon(), Open: openURL}), rundowncli.New(streams, env, openRunDown, commandLine), runstartcli.New(streams, env, openRunStart, commandLine, liveView()), runstopcli.New(streams, env, openRunStop, commandLine), runDaemonCmd(streams)),
+		runCmd(runupcli.New(streams, env, openRunUp, commandLine, liveView()), runlogscli.New(streams, env, openRunLogs, commandLine, runlogscli.View{Daemon: runDaemon(), Open: openURL}), rundowncli.New(streams, env, openRunDown, commandLine), runstartcli.New(streams, env, openRunStart, commandLine, liveView()), runstopcli.New(streams, env, openRunStop, commandLine), runpscli.New(streams, env, openRunPs, commandLine), runlistcli.New(streams, env, openRunList, commandLine), runDaemonCmd(streams)),
 		uiCmd(env),
 		daemonCmd(),
 	}

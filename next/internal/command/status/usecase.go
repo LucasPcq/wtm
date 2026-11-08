@@ -10,6 +10,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/dotenv"
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
+	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
 )
@@ -35,6 +36,8 @@ type UseCase struct {
 	Meta         Meta
 	EnvFiles     EnvFiles
 	Jobs         Jobs
+	ReadLog      ReadLog
+	StateDir     string
 	PullRequests PullRequests
 	Repository   repository.Service
 }
@@ -104,9 +107,28 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	for i, w := range targets {
 		facts.States[w.Path] = read[i]
 	}
+	facts.Logged = u.logged(facts, targets)
 	facts.Behind = repository.Behind(ctx, u.Git, repo, facts.PullRequests, targets)
 	facts.Interrupted = ctx.Err() != nil
 	return facts, nil
+}
+
+// logged is, per worktree of targets, the last line each job run.toml declares that the daemon lists nothing of there left in its log: one that has one ran, and was stopped since.
+func (u UseCase) logged(facts Facts, targets []worktree.Worktree) map[string]map[string]*run.Line {
+	logged := map[string]map[string]*run.Line{}
+	if facts.JobsErr != nil || facts.RunErr != nil || u.ReadLog == nil {
+		return logged
+	}
+	for _, w := range targets {
+		var names []string
+		for _, job := range facts.Run.Jobs {
+			if _, listed := run.StandingIn(run.StandingParams{Jobs: facts.Jobs, Dir: w.Path, Name: job.Name, Declared: facts.Run}); !listed {
+				names = append(names, job.Name)
+			}
+		}
+		logged[w.Path] = repository.LastLines(repository.LastLinesParams{StateDir: u.StateDir, Branch: w.Branch(), Names: names, Read: u.ReadLog})
+	}
+	return logged
 }
 
 // observeRequest reads the repository and the path the worktree req names stands for (located).

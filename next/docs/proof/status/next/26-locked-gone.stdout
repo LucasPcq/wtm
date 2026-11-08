@@ -10,8 +10,8 @@
   parent      main
 
   JOBS
-  web  stopped  port 23480
-  api  stopped  port 23481
+  web  not started  port 23480
+  api  not started  port 23481
 
   ! its directory is gone
   → wtm-next clean feat/b   remove what is left of it

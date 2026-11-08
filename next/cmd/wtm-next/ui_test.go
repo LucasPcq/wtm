@@ -100,8 +100,8 @@ func TestUITrustsTheRecordOnlyWhileItsServerHoldsTheLock(t *testing.T) {
 func TestThePageCarriesTheTokenAndTheRepoInItsFragment(t *testing.T) {
 	record := webserver.Record{Port: 4777, Token: "abc"}
 
-	assert.Equal(t, "http://127.0.0.1:4777/#repo=e96269f9d69f&token=abc", pageURL(record, "e96269f9d69f"))
-	assert.Equal(t, "http://127.0.0.1:4777/#token=abc", pageURL(record, ""))
+	assert.Equal(t, "http://127.0.0.1:4777/#repo=e96269f9d69f&token=abc&worktree=%2Fr%2Ffeat-a", pageURL(pageParams{Record: record, Repo: "e96269f9d69f", Worktree: "/r/feat-a"}))
+	assert.Equal(t, "http://127.0.0.1:4777/#token=abc", pageURL(pageParams{Record: record}))
 }
 
 func TestTheServerServesTheEventStreamOfStreamsAndThePublishedSchema(t *testing.T) {

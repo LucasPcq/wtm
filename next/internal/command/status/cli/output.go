@@ -86,7 +86,7 @@ func headline(w io.Writer, name string, problems int) {
 		output.UnchangedLine(w, name+" — nothing to fix")
 		return
 	}
-	output.WarningLine(w, name+" — "+counted(problems, "problem", "problems"))
+	output.WarningLine(w, name+" — "+output.Counted(problems, "problem", "problems"))
 }
 
 func drawJobs(w io.Writer, jobs []status.Job) {
@@ -104,7 +104,7 @@ func drawJobs(w io.Writer, jobs []status.Job) {
 			held = "held from " + cmp.Or(job.Owner.Branch, job.Owner.Path)
 		}
 		if job.StartedAt != nil && (job.State == run.Running || job.State == run.Starting) {
-			age = st.Muted.Render("up " + elapsed(*job.StartedAt))
+			age = st.Muted.Render("up " + output.Span(now().Sub(*job.StartedAt)))
 		}
 		rows = append(rows, []string{job.Name, stateOf(job.State, st), address(job), held, age})
 	}
@@ -180,7 +180,7 @@ func drawAll(w io.Writer, items []status.Item, view output.View) {
 
 // headlineAll counts the worktrees, and how many need attention or could not be read; nothing to fix only when every one read and none has a problem.
 func headlineAll(w io.Writer, worktrees, troubled, unread int) {
-	line := counted(worktrees, "worktree", "worktrees")
+	line := output.Counted(worktrees, "worktree", "worktrees")
 	switch {
 	case troubled == 1:
 		line += output.Dot + "1 needs attention"
@@ -247,7 +247,7 @@ func envCell(d status.Detail) string {
 	if missing > 0 {
 		return strconv.Itoa(missing) + " missing"
 	}
-	return counted(d.Env.Declared, "file", "files")
+	return output.Counted(d.Env.Declared, "file", "files")
 }
 
 // ----------------------------------------------------------------------------
@@ -321,7 +321,7 @@ func ports(d status.Detail) string {
 }
 
 func envFiles(env status.Env) string {
-	files := counted(env.Declared, "file", "files")
+	files := output.Counted(env.Declared, "file", "files")
 	if missing := missingFiles(env); missing > 0 {
 		return files + output.Dot + strconv.Itoa(missing) + " missing"
 	}
@@ -397,7 +397,7 @@ func lastCommit(commits []worktree.Commit) string {
 		line += output.Dot + last.Author
 	}
 	if !last.At.IsZero() {
-		line += output.Dot + elapsed(last.At) + " ago"
+		line += output.Dot + output.Span(now().Sub(last.At)) + " ago"
 	}
 	return line
 }
@@ -442,6 +442,8 @@ func stateOf(state run.State, st *output.Styles) string {
 		return st.Danger.Render(string(state))
 	case run.Starting:
 		return st.Warning.Render(string(state))
+	case run.NotStarted:
+		return st.Muted.Render("not started")
 	case run.Exited, run.Stopped:
 	}
 	return st.Muted.Render(string(state))
@@ -453,27 +455,6 @@ func address(job status.Job) string {
 		return job.URL
 	}
 	return "port " + strconv.Itoa(*job.Port)
-}
-
-// elapsed is the time since at, in its largest unit.
-func elapsed(at time.Time) string {
-	since := now().Sub(at)
-	switch {
-	case since < time.Minute:
-		return strconv.Itoa(max(int(since.Seconds()), 0)) + "s"
-	case since < time.Hour:
-		return strconv.Itoa(int(since.Minutes())) + "m"
-	case since < 24*time.Hour:
-		return strconv.Itoa(int(since.Hours())) + "h"
-	}
-	return strconv.Itoa(int(since.Hours()/24)) + "d"
-}
-
-func counted(n int, one, many string) string {
-	if n == 1 {
-		return "1 " + one
-	}
-	return strconv.Itoa(n) + " " + many
 }
 
 // decision is GitHub's review decision as words: review required, changes requested, approved.

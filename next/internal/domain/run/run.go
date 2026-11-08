@@ -11,7 +11,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
-// A Job is one job the daemon knows: its name, the worktree it runs in, the profile it was started under (empty for one started alone), whether it is up (running, detached or joined), its kind, its State (empty for a claim, which runs no process), what of it the daemon holds (Hold), whether the daemon Reaped it (an orphan stopped as it started), the PID of a process of the daemon's own, its url, the ports it binds, the code its process exited with (-1 when a signal killed it), when the daemon started it (zero once it is no longer up), the main checkout a shared job runs in, whether that checkout itself holds the shared job (MainHolds, on the job itself, never on a claim) and whether that cannot be told (MainHoldsUnknown: a daemon of another build listed it, and the index has no record of it), the main checkout of the repository it was started for (Repo, empty when its start named none), the command a stack stops with as it was started (StopCommand), and the last line it printed (nil before any).
+// A Job is one job the daemon knows: its name, the worktree it runs in, the profile it was started under (empty for one started alone), whether it is up (running, detached or joined), its kind, its State (empty for a claim, which runs no process), what of it the daemon holds (Hold), whether the daemon Reaped it (an orphan stopped as it started), the PID of a process of the daemon's own, its url, the ports it binds, the code its process exited with (-1 when a signal killed it), when the daemon started it (zero for a job taken over that ended before), when it ended (zero while it is up, or when that is not known), the namespace a shared job holds for its worktree (on a claim, and on the main checkout's own job when it holds it; empty when it makes none), the main checkout a shared job runs in, whether that checkout itself holds the shared job (MainHolds, on the job itself, never on a claim) and whether that cannot be told (MainHoldsUnknown: a daemon of another build listed it, and the index has no record of it), the main checkout of the repository it was started for (Repo, empty when its start named none), the command a stack stops with as it was started (StopCommand), and the last line it printed (nil before any).
 type Job struct {
 	Name             string
 	WorkDir          string
@@ -26,6 +26,8 @@ type Job struct {
 	Ports            map[string]int
 	ExitCode         *int
 	StartedAt        time.Time
+	EndedAt          time.Time
+	Namespace        string
 	SharedDir        string
 	MainHolds        bool
 	MainHoldsUnknown bool
@@ -59,11 +61,71 @@ const (
 	Crashed  State = "crashed"
 	Exited   State = "exited" // a task that ran to its end
 	Stopped  State = "stopped"
+	// NotStarted is a job run.toml declares that the daemon does not list and whose log holds nothing: it never ran, never a state the daemon gives.
+	NotStarted State = "not_started"
 )
+
+// StandingParams are what tells where a job run.toml declares stands in a worktree: the jobs the daemon lists, the worktree's directory, the job's name, and run.toml (whose runners start some of its jobs).
+type StandingParams struct {
+	Jobs     []Job
+	Dir      string
+	Name     string
+	Declared project.Run
+}
+
+// A Standing is what the daemon lists of a job run.toml declares in a worktree: the job itself (Runner empty: its own, or its claim on a shared one), or a runner listed there that starts it, its runners' own included (Runner its name, Job the runner).
+type Standing struct {
+	Job    Job
+	Runner string
+}
+
+// StandingIn is what the daemon lists of the job run.toml declares under params.Name in the worktree at params.Dir: the job itself, else a runner listed there that starts it, one up before one that is not; false when it lists neither, the job's log then telling whether it ran (Unlisted).
+func StandingIn(params StandingParams) (Standing, bool) {
+	var runner *Job
+	for i, job := range params.Jobs {
+		if job.WorkDir != params.Dir {
+			continue
+		}
+		if job.Name == params.Name {
+			return Standing{Job: job}, true
+		}
+		if (runner == nil || !runner.Up && job.Up) && params.runs(job.Name) {
+			runner = &params.Jobs[i]
+		}
+	}
+	if runner == nil {
+		return Standing{}, false
+	}
+	return Standing{Job: *runner, Runner: runner.Name}, true
+}
+
+// runs reports whether run.toml's job called runner starts the job of params, itself or through a runner it starts.
+func (params StandingParams) runs(runner string) bool {
+	at := slices.IndexFunc(params.Declared.Jobs, func(job project.Job) bool { return job.Name == runner })
+	return at >= 0 && slices.ContainsFunc(params.Declared.Children(params.Declared.Jobs[at]), func(child project.Job) bool { return child.Name == params.Name })
+}
+
+// StartedUnder is the profile the jobs the worktree at dir runs for itself were started under, up or ended, "" when none says one: a worktree whose every job crashed keeps it, where ProfileIn, which counts the jobs up alone, says none.
+func StartedUnder(jobs []Job, dir string) string {
+	for _, job := range jobs {
+		if job.WorkDir == dir && Own(job) && job.Profile != "" {
+			return job.Profile
+		}
+	}
+	return ""
+}
+
+// Unlisted is the state of a job run.toml declares that the daemon does not list: stopped once its log holds a line, so it ran; else NotStarted.
+func Unlisted(logged bool) State {
+	if logged {
+		return Stopped
+	}
+	return NotStarted
+}
 
 // States returns every State.
 func States() []State {
-	return []State{Starting, Running, Crashed, Exited, Stopped}
+	return []State{Starting, Running, Crashed, Exited, Stopped, NotStarted}
 }
 
 // ErrUnknown says whether a job is up cannot be told: no daemon answers, yet its index holds jobs it would run.

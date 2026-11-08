@@ -62,13 +62,16 @@ func TestAServiceThatEndsOnItsOwnCrashesWithItsLastLines(t *testing.T) {
 	assert.Equal(t, 1, *crashed.ExitCode)
 }
 
-func TestAStartTimeIsGivenOnlyWhileTheJobIsUp(t *testing.T) {
+func TestAnEndedJobSaysWhenItStartedAndWhenItEnded(t *testing.T) {
 	w := newWorld(t, map[string]script{"serve web": exits(1)})
 
-	_, err := w.Start(service("web"), nil)
+	up, err := w.Start(service("web"), nil)
 	require.NoError(t, err)
+	ended := w.settled(t, "web", run.Crashed)
 
-	assert.Zero(t, w.settled(t, "web", run.Crashed).StartedAt, "a job that ended has no uptime")
+	assert.Zero(t, up.EndedAt, "a job up has not ended")
+	assert.Equal(t, now, ended.StartedAt)
+	assert.Equal(t, now, ended.EndedAt)
 }
 
 func TestATaskHandsOverEachLineAndEndsExited(t *testing.T) {

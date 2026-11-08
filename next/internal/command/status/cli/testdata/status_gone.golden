@@ -10,8 +10,8 @@
   parent      main
 
   JOBS
-  web  stopped
-  api  stopped
+  web  not started
+  api  not started
 
   ! its directory is gone
   → wtm clean feat/old   remove what is left of it
