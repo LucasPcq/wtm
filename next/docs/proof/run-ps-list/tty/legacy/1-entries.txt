@@ -1,0 +1,18 @@
+$ wtm run list; echo EXIT=$?
+
+  Step 1/2 • Jobs & profiles
+
+▌▸ dev                                                                             default  2 jobs
+   full                                                                                     5 jobs
+   crash                                                                                    3 jobs
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   web                                                                                     service
+   api                                                                                     service
+   migrate                                                                                    task
+   db                                                                                      service
+   cache                                                                                   service
+   stack                                                                                   service
+   crashy                                                                                  service
+
+  ↑↓ navigate • / filter • enter confirm • esc cancel
+

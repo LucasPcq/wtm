@@ -106,12 +106,15 @@ func List(f Facts) (domain.Unit[Detail], []domain.Warning) {
 	return domain.Unit[Detail]{Subject: name, Status: domain.StatusDone, Detail: &d}, f.Warnings(Name)
 }
 
-// standing is where the job called name stands in the worktree read, what of it the daemon holds, and its url while it is up: the daemon's state, a claim reading as the shared job it holds; else stopped once its log holds a line, not_started when it never ran; nil when the daemon cannot tell.
+// standing is where the job called name stands in the worktree read, what of it the daemon holds, and its url while it is up: the daemon's state, a claim reading as the shared job it holds, a job a runner starts itself as that runner; else stopped once its log holds a line, not_started when it never ran; nil when the daemon cannot tell.
 func (f Facts) standing(name string) (*run.State, run.Hold, string) {
 	if f.JobsErr != nil {
 		return nil, "", ""
 	}
 	at := slices.IndexFunc(f.Jobs, func(job run.Job) bool { return job.WorkDir == f.Target.Path && job.Name == name })
+	if at < 0 {
+		at = slices.IndexFunc(f.Jobs, func(job run.Job) bool { return job.WorkDir == f.Target.Path && f.runs(job.Name, name) })
+	}
 	if at < 0 {
 		return new(run.Unlisted(f.Logged[name])), "", ""
 	}
@@ -126,4 +129,10 @@ func (f Facts) standing(name string) (*run.State, run.Hold, string) {
 		url = job.URL
 	}
 	return &state, job.Hold, url
+}
+
+// runs reports whether run.toml's job runner starts the job called name itself.
+func (f Facts) runs(runner, name string) bool {
+	at := slices.IndexFunc(f.Run.Jobs, func(job project.Job) bool { return job.Name == runner })
+	return at >= 0 && slices.Contains(f.Run.Jobs[at].Runs, name)
 }

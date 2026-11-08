@@ -1,0 +1,12 @@
+$ wtm run list; echo EXIT=$?
+
+  Step 1/1 • Worktree
+
+  The worktree whose jobs and profiles to list, by its branch, its path or part of its branch
+
+   main                                                                                       main
+▌› feat/a                                                                                  current
+   feat/b
+
+  ↑↓ navigate • / filter • enter confirm • esc cancel
+

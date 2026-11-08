@@ -1,0 +1,119 @@
+{
+  "job": [
+    {
+      "name": "web",
+      "kind": "service",
+      "cmd": "python3 ../../scripts/dev.py web",
+      "cwd": "apps/web",
+      "ports": {
+        "PORT": 24850
+      },
+      "url": {
+        "port": "PORT"
+      }
+    },
+    {
+      "name": "api",
+      "kind": "service",
+      "cmd": "python3 ../../scripts/dev.py api",
+      "cwd": "apps/api",
+      "ports": {
+        "PORT": 24851
+      },
+      "url": {
+        "port": "PORT"
+      }
+    },
+    {
+      "name": "migrate",
+      "kind": "task",
+      "cmd": "echo migrating; sleep 1; echo migrated"
+    },
+    {
+      "name": "db",
+      "kind": "service",
+      "cmd": "python3 scripts/db.py",
+      "ports": {
+        "DB_PORT": 24853
+      },
+      "scope": "shared",
+      "namespace": {
+        "name": "acme_{worktree}",
+        "create": "echo \"$WTM_NAMESPACE\" >> \"$HOME/namespaces.txt\""
+      }
+    },
+    {
+      "name": "cache",
+      "kind": "service",
+      "cmd": "true",
+      "ports": {
+        "CACHE_PORT": 24854
+      }
+    },
+    {
+      "name": "stack",
+      "kind": "service",
+      "cmd": "docker compose up -d cache",
+      "stop": "docker compose down",
+      "runs": [
+        "cache"
+      ]
+    },
+    {
+      "name": "crashy",
+      "kind": "service",
+      "cmd": "echo starting; sleep 0.2; echo boom >&2; exit 1",
+      "binds_no_port": true
+    }
+  ],
+  "profile": [
+    {
+      "name": "dev",
+      "jobs": [
+        "api",
+        "web"
+      ],
+      "default": true
+    },
+    {
+      "name": "full",
+      "jobs": [
+        "migrate",
+        "db",
+        "stack",
+        "api",
+        "web"
+      ],
+      "default": false
+    },
+    {
+      "name": "crash",
+      "jobs": [
+        "db",
+        "api",
+        "crashy"
+      ],
+      "default": false
+    }
+  ],
+  "env_port": [
+    {
+      "file": "apps/web/.env",
+      "key": "PORT",
+      "job": "web",
+      "port": "PORT"
+    },
+    {
+      "file": "apps/web/.env",
+      "key": "API_URL",
+      "job": "api",
+      "port": "PORT"
+    },
+    {
+      "file": "apps/api/.env",
+      "key": "PORT",
+      "job": "api",
+      "port": "PORT"
+    }
+  ]
+}

@@ -1,0 +1,200 @@
+{
+  "v": 2,
+  "command": "run-ps",
+  "ok": true,
+  "items": [
+    {
+      "subject": "feat/b",
+      "status": "done",
+      "detail": {
+        "repository": "<SB>/acme",
+        "shared": false,
+        "branch": "feat/b",
+        "path": "<SB>/acme.trees/feat-b",
+        "profile": "crash",
+        "counts": {
+          "running": 1,
+          "starting": 0,
+          "crashed": 1,
+          "exited": 0,
+          "stopped": 0,
+          "not_started": 0
+        },
+        "jobs": [
+          {
+            "name": "crashy",
+            "kind": "service",
+            "state": "crashed",
+            "hold": "own",
+            "started_at": "<TIME>",
+            "ended_at": "<TIME>",
+            "duration_ms": <MS>,
+            "exit_code": 1,
+            "last_line": {
+              "at": "<TIME>",
+              "text": "boom"
+            },
+            "command": "echo starting; sleep 0.2; echo boom >&2; exit 1",
+            "log": "<SB>/acme/.git/wtm/logs/feat%2Fb/crashy.log"
+          },
+          {
+            "name": "api",
+            "kind": "service",
+            "state": "running",
+            "hold": "own",
+            "url": "http://api.feat-b.acme.localhost:24852",
+            "address": "localhost:24871",
+            "started_at": "<TIME>",
+            "last_line": {
+              "at": "<TIME>",
+              "text": "00:00:00 <a request>"
+            },
+            "dir": "apps/api",
+            "command": "python3 ../../scripts/dev.py api",
+            "log": "<SB>/acme/.git/wtm/logs/feat%2Fb/api.log"
+          }
+        ]
+      }
+    },
+    {
+      "subject": "feat/a",
+      "status": "done",
+      "detail": {
+        "repository": "<SB>/acme",
+        "shared": false,
+        "branch": "feat/a",
+        "path": "<SB>/acme.trees/feat-a",
+        "profile": "full",
+        "counts": {
+          "running": 3,
+          "starting": 0,
+          "crashed": 0,
+          "exited": 1,
+          "stopped": 0,
+          "not_started": 0
+        },
+        "jobs": [
+          {
+            "name": "web",
+            "kind": "service",
+            "state": "running",
+            "hold": "own",
+            "url": "http://web.feat-a.acme.localhost:24852",
+            "address": "localhost:24860",
+            "started_at": "<TIME>",
+            "last_line": {
+              "at": "<TIME>",
+              "text": "00:00:00 <a request>"
+            },
+            "dir": "apps/web",
+            "command": "python3 ../../scripts/dev.py web",
+            "log": "<SB>/acme/.git/wtm/logs/feat%2Fa/web.log"
+          },
+          {
+            "name": "api",
+            "kind": "service",
+            "state": "running",
+            "hold": "own",
+            "url": "http://api.feat-a.acme.localhost:24852",
+            "address": "localhost:24861",
+            "started_at": "<TIME>",
+            "last_line": {
+              "at": "<TIME>",
+              "text": "00:00:00 <a request>"
+            },
+            "dir": "apps/api",
+            "command": "python3 ../../scripts/dev.py api",
+            "log": "<SB>/acme/.git/wtm/logs/feat%2Fa/api.log"
+          },
+          {
+            "name": "stack",
+            "kind": "service",
+            "state": "running",
+            "hold": "detached",
+            "started_at": "<TIME>",
+            "last_line": {
+              "at": "<TIME>",
+              "text": " Container acme-feat-a-cache-1 Started"
+            },
+            "command": "docker compose up -d cache",
+            "log": "<SB>/acme/.git/wtm/logs/feat%2Fa/stack.log",
+            "services": [
+              {
+                "name": "cache",
+                "address": "localhost:24864"
+              }
+            ]
+          },
+          {
+            "name": "migrate",
+            "kind": "task",
+            "state": "exited",
+            "hold": "own",
+            "started_at": "<TIME>",
+            "ended_at": "<TIME>",
+            "duration_ms": <MS>,
+            "exit_code": 0,
+            "last_line": {
+              "at": "<TIME>",
+              "text": "migrated"
+            },
+            "command": "echo migrating; sleep 1; echo migrated",
+            "log": "<SB>/acme/.git/wtm/logs/feat%2Fa/migrate.log"
+          }
+        ]
+      }
+    },
+    {
+      "subject": "shared",
+      "status": "done",
+      "detail": {
+        "repository": "<SB>/acme",
+        "shared": true,
+        "branch": "",
+        "path": "<SB>/acme",
+        "profile": "",
+        "counts": {
+          "running": 1,
+          "starting": 0,
+          "crashed": 0,
+          "exited": 0,
+          "stopped": 0,
+          "not_started": 0,
+          "holders": 2
+        },
+        "jobs": [
+          {
+            "name": "db",
+            "kind": "service",
+            "state": "running",
+            "hold": "own",
+            "address": "localhost:24853",
+            "started_at": "<TIME>",
+            "last_line": {
+              "at": "<TIME>",
+              "text": "<db line>"
+            },
+            "command": "python3 scripts/db.py",
+            "log": "<SB>/acme/.git/wtm/logs/main/db.log",
+            "holders": [
+              {
+                "branch": "feat/a",
+                "path": "<SB>/acme.trees/feat-a",
+                "namespace": "acme_feat-a",
+                "since": "<TIME>"
+              },
+              {
+                "branch": "feat/b",
+                "path": "<SB>/acme.trees/feat-b",
+                "namespace": "acme_feat-b",
+                "since": "<TIME>"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}

@@ -1,0 +1,9 @@
+=== 00-before: exit legacy , next 
+=== 01-ps: exit legacy 0, next 0
+=== 02-ps-json: exit legacy 0, next 0
+=== 03-ps-outside: exit legacy 0, next 0
+=== 04-ps-quiet: exit legacy 0, next 0
+=== 07-list: exit legacy 0, next 0
+=== 08-list-yes: exit legacy 0, next 0
+=== 09-list-json: exit legacy 0, next 0
+=== 10-list-outside: exit legacy 21, next 21

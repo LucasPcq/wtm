@@ -1,0 +1,15 @@
+
+  PROFILES
+  dev    default    api, web
+  full              migrate, db, stack, api, web
+  crash             db, api, crashy
+
+  JOBS
+  web      service  python3 ../../scripts/dev.py web                 PORT=24850 ↗
+  api      service  python3 ../../scripts/dev.py api                 PORT=24851 ↗
+  migrate  task     echo migrating; sleep 1; echo migrated
+  db       service  python3 scripts/db.py                            DB_PORT=24853  shared
+  cache    service  true                                             CACHE_PORT=24854
+  stack    service  docker compose up -d cache
+  crashy   service  echo starting; sleep 0.2; echo boom >&2; exit 1
+
