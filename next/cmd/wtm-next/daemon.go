@@ -203,6 +203,14 @@ func (unpublished) Open(domain.Operation) domain.Report {
 	return func(domain.Event) {}
 }
 
+// frozenIndex is the daemon's index of jobs when a newer wtm wrote it, "" otherwise.
+func frozenIndex() string {
+	if !wtmDaemon().IndexFrozen() {
+		return ""
+	}
+	return daemon.IndexPath(daemon.SocketPath())
+}
+
 // wtmDaemon is wtm's daemon of this machine as a command asks it: on the bus's socket, started from this binary when one is needed.
 func wtmDaemon() daemon.Daemon {
 	return daemon.Daemon{SocketPath: daemon.SocketPath(), Version: version, StartDaemon: startDaemon}

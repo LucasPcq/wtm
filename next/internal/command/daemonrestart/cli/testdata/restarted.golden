@@ -4,5 +4,5 @@
   Daemon      0.30.9 → 0.31.0
   Come back   web (main · acme), db (main · acme), db (feat/a · acme)
   Taken over  mail (feat/a · acme)
-  Not back    seed (main · acme), a task: not run again
+  Not back    seed (main · acme) — a task, not run again
 

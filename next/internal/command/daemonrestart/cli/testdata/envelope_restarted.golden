@@ -144,8 +144,8 @@
         "label": "Not back",
         "values": [
           {
-            "value": "seed (main · acme), a task: not run again",
-            "text": "seed (main · acme), a task: not run again"
+            "value": "seed (main · acme) — a task, not run again",
+            "text": "seed (main · acme) — a task, not run again"
           }
         ]
       }

@@ -378,7 +378,7 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 		return Facts{}, err
 	}
 	facts.Cwd = cmp.Or(cwd, req.Caller.Cwd)
-	facts.Asked = repository.Ask(ctx, repository.AskParams{Jobs: u.Daemon.Jobs, Restart: u.Repository.Restart}, func() {})
+	facts.Asked = repository.Ask(ctx, repository.AskParams{Jobs: u.Daemon.Jobs, Restart: u.Repository.Restart, FrozenIndex: u.Repository.FrozenIndex}, func() {})
 
 	return facts, ctx.Err()
 }

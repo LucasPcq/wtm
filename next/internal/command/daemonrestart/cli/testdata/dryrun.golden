@@ -3,7 +3,7 @@
   Daemon      0.30.9 → 0.31.0
   Come back   web (main · acme), db (main · acme), db (feat/a · acme)
   Taken over  mail (feat/a · acme)
-  Not back    seed (main · acme), a task: not run again
+  Not back    seed (main · acme) — a task, not run again
   fingerprint  2fe2c5da61c79d06c66b9b4d
   → wtm-next daemon restart --expect-fingerprint 2fe2c5da61c79d06c66b9b4d   apply this plan
 

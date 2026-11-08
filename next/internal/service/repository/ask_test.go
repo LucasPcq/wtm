@@ -132,3 +132,17 @@ func TestACountCutShortCancelsItsWorktreeAnyOtherFailureLeavesItNotCounted(t *te
 		})
 	}
 }
+
+func TestAnIndexANewerWtmWroteIsWarnedOfUnderTheReadsCode(t *testing.T) {
+	params := repository.AskParams{
+		Jobs:        func(context.Context) ([]run.Job, error) { return nil, nil },
+		FrozenIndex: func() string { return "/cfg/wtm/jobs.json" },
+	}
+
+	got := repository.Ask(t.Context(), params, func() {})
+
+	warnings := got.Warnings("tree")
+	assert.Len(t, warnings, 1)
+	assert.Equal(t, "tree.index_frozen", warnings[0].Code)
+	assert.Equal(t, "/cfg/wtm/jobs.json", warnings[0].Params["path"])
+}

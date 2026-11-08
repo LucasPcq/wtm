@@ -17,6 +17,8 @@ type Service struct {
 	MainPath string
 	Init     *domain.FollowUp // the command that sets wtm up in a repository, offered by the refusal of one with no config; none when nil
 	Restart  *domain.FollowUp // the command that restarts a daemon of another build, handing its jobs over; none when nil
+	// FrozenIndex is the daemon's index of jobs when a newer wtm wrote it, which the daemon then leaves unwritten; "" otherwise, or when nil.
+	FrozenIndex func() string
 }
 
 // Observe reads the repository the command named command decides from: the

@@ -123,7 +123,12 @@ func Decide(f Facts) (Plan, []domain.Warning) {
 		}
 	}
 
-	plan.Back, plan.TakenOver, plan.Tasks, plan.Unrecorded = run.Held(back), run.Held(shutdown.Kept), run.Held(tasks), run.Held(unrecorded)
+	kept := shutdown.Kept
+	if d.IndexFrozen {
+		// The new daemon reads no index a newer wtm wrote: the stacks run on, untracked.
+		unrecorded, kept = append(unrecorded, kept...), nil
+	}
+	plan.Back, plan.TakenOver, plan.Tasks, plan.Unrecorded = run.Held(back), run.Held(kept), run.Held(tasks), run.Held(unrecorded)
 	plan.starts = append(own, holds...)
 	plan.Confirm = len(shutdown.Cut) > 0
 	plan.Recap = plan.recap()
@@ -180,10 +185,10 @@ func (p Plan) recap() []domain.RecapRow {
 	add("taken_over", "Taken over", run.Names(p.TakenOver))
 	var notBack []string
 	for _, name := range run.Names(p.Tasks) {
-		notBack = append(notBack, name+", a task: not run again")
+		notBack = append(notBack, name+" — a task, not run again")
 	}
 	for _, name := range run.Names(p.Unrecorded) {
-		notBack = append(notBack, name+", unrecorded")
+		notBack = append(notBack, name+" — no record of it")
 	}
 	add("not_back", "Not back", notBack)
 	return rows

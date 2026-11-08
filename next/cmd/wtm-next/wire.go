@@ -369,7 +369,7 @@ func (r refFetchedOnce) FetchRef(ctx context.Context, name string) error {
 
 // facts reads the repository params locates, as every use case decides from it.
 func (p wireParams) facts() repository.Service {
-	return repository.Service{Config: config.Project{StateDir: p.StateDir, GlobalPath: config.GlobalPath()}, Git: git.Repo{Dir: p.MainPath}, MainPath: p.MainPath, Init: initialize(), Restart: daemonRestart()}
+	return repository.Service{Config: config.Project{StateDir: p.StateDir, GlobalPath: config.GlobalPath()}, Git: git.Repo{Dir: p.MainPath}, MainPath: p.MainPath, Init: initialize(), Restart: daemonRestart(), FrozenIndex: frozenIndex}
 }
 
 // repo is how the event bus and the registry name the repository params locates.

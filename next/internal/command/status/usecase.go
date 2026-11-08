@@ -99,7 +99,7 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 		branches = append(branches, w.Branch())
 	}
 	var read []State
-	facts.Asked = repository.Ask(ctx, repository.AskParams{Jobs: u.Jobs, Restart: u.Repository.Restart, PullRequests: u.PullRequests, Branches: branches, WithPRs: req.WithPRs}, func() {
+	facts.Asked = repository.Ask(ctx, repository.AskParams{Jobs: u.Jobs, Restart: u.Repository.Restart, FrozenIndex: u.Repository.FrozenIndex, PullRequests: u.PullRequests, Branches: branches, WithPRs: req.WithPRs}, func() {
 		read = repository.Each(targets, func(w worktree.Worktree) State { return u.state(ctx, facts, w) })
 	})
 

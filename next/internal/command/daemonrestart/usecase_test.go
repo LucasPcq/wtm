@@ -108,8 +108,9 @@ func TestWithAFrozenIndexNothingComesBackAndItIsSaid(t *testing.T) {
 
 	plan, warnings := daemonrestart.Decide(daemonrestart.Facts{Daemon: d.status, Records: d.records, Version: build})
 
-	assert.Equal(t, []string{"web (main · acme)"}, run.Names(plan.Unrecorded))
+	assert.Equal(t, []string{"web (main · acme)", "mail (main · acme)"}, run.Names(plan.Unrecorded))
 	assert.Empty(t, plan.Back)
+	assert.Empty(t, plan.TakenOver, "the new daemon reads no index a newer wtm wrote")
 	require.Len(t, warnings, 1)
 	assert.Equal(t, daemonrestart.CodeIndexFrozen, warnings[0].Code)
 }
