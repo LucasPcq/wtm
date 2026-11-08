@@ -123,3 +123,24 @@ func TestADaemonOfAnotherProtocolHasItsJobsReadFromItsIndex(t *testing.T) {
 	assert.Equal(t, []string{"web (main · acme)"}, run.Names(plan.Back))
 	assert.Equal(t, []string{"mail (main · acme)"}, run.Names(plan.TakenOver))
 }
+
+// The index keeps no spec.Shared: a claim started again from its record alone was refused, "job db is shared, and no main checkout was named to run it in".
+func TestASharedJobComesBackRunningWhereItsOwnRunRan(t *testing.T) {
+	d := running("0.30.9", db, dbHeld)
+	d.records[0].Spec.Env, d.records[0].Spec.LogDir = map[string]string{"DB_PORT": "5432"}, "/acme/.git/wtm/logs/main"
+
+	restarted(t, d, domain.RunOptions{})
+
+	require.Len(t, d.started, 1)
+	assert.Equal(t, &run.Shared{WorkDir: main, Env: map[string]string{"DB_PORT": "5432"}, LogDir: "/acme/.git/wtm/logs/main"}, d.started[0].Shared)
+}
+
+func TestAClaimWhoseSharedJobHasNoRecordDoesNotComeBack(t *testing.T) {
+	d := running("0.30.9", db, dbHeld)
+	d.records = d.records[1:]
+
+	plan, _ := daemonrestart.Decide(daemonrestart.Facts{Daemon: d.status, Records: d.records, Version: build})
+
+	assert.Equal(t, []string{"db (main · acme)", "db (feat/a · acme)"}, run.Names(plan.Unrecorded))
+	assert.Empty(t, plan.Back)
+}

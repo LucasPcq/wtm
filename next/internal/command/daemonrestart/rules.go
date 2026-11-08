@@ -32,6 +32,26 @@ func (f Facts) recordOf(job run.Job) *run.Record {
 	return &f.Records[at]
 }
 
+// startOf is how the job of record starts again: its spec, a shared job's naming where it runs as the record of its own run in the main checkout says, the index keeping no more of it than that checkout; none without a record, or for a shared job whose own run has none.
+func (f Facts) startOf(record *run.Record) (run.Spec, bool) {
+	if record == nil {
+		return run.Spec{}, false
+	}
+	spec := record.Spec
+	if spec.Job.Scope != project.Shared || spec.Shared != nil {
+		return spec, true
+	}
+	at := slices.IndexFunc(f.Records, func(r run.Record) bool {
+		return !r.Claim && r.Spec.WorkDir == record.SharedDir && r.Spec.Job.Name == spec.Job.Name
+	})
+	if at < 0 {
+		return run.Spec{}, false
+	}
+	runs := f.Records[at].Spec
+	spec.Shared = &run.Shared{WorkDir: runs.WorkDir, Env: runs.Env, LogDir: runs.LogDir}
+	return spec, true
+}
+
 // jobs are the jobs the daemon holds; for one whose listing cannot be read (another protocol), those its index records, every one up.
 func (f Facts) jobs() []run.Job {
 	if !f.Daemon.Answering || f.Daemon.Skew != run.SkewProtocol {
@@ -54,33 +74,46 @@ func (f Facts) jobs() []run.Job {
 // CodeIndexFrozen warns of an index a newer wtm wrote: the daemon recorded nothing of what it started, so nothing of it comes back.
 const CodeIndexFrozen = Name + domain.IndexFrozen
 
-// Decide turns the facts into the plan and its warnings: of the jobs the shutdown stops, those that come back (a service its index records, a shared one through the worktrees that hold it), the task not run again and the job with no record; the stacks taken over; the daemon's build and the new one's.
+// Decide turns the facts into the plan and its warnings: of the jobs the shutdown stops, those that come back (a service its index records, a shared one through the worktrees that hold it), the task not run again and the job with no record (a shared one whose own run has none, or that no worktree holding it brings back); the stacks taken over; the daemon's build and the new one's.
 func Decide(f Facts) (Plan, []domain.Warning) {
 	d := f.Daemon
 	plan := Plan{Running: d.Answering, From: d.Stamp.Version, Legacy: d.Answering && d.Skew == run.SkewLegacy, To: f.Version}
 	shutdown := run.ShutdownOf(f.jobs())
 
-	var back, tasks, unrecorded []run.Job
+	var back, tasks, unrecorded, held []run.Job
 	var own, holds []run.Spec
 	for _, job := range shutdown.Cut {
 		record := f.recordOf(job)
+		spec, startable := f.startOf(record)
 		switch {
 		case job.Kind == project.Task:
 			tasks = append(tasks, job)
-		case record == nil:
+		case !startable:
 			unrecorded = append(unrecorded, job)
 		case job.SharedDir == job.WorkDir && !job.MainHolds:
 			// A shared job's own run its main checkout does not hold comes back with the worktrees that hold it.
-			back = append(back, job)
+			held = append(held, job)
 		default:
 			back = append(back, job)
-			own = append(own, record.Spec)
+			own = append(own, spec)
 		}
 	}
+	served := map[string]bool{}
 	for _, claim := range shutdown.Lost {
-		if record := f.recordOf(claim); record != nil {
-			back = append(back, claim)
-			holds = append(holds, record.Spec)
+		spec, startable := f.startOf(f.recordOf(claim))
+		if !startable {
+			unrecorded = append(unrecorded, claim)
+			continue
+		}
+		back = append(back, claim)
+		holds = append(holds, spec)
+		served[claim.SharedDir+"\x00"+claim.Name] = true
+	}
+	for _, job := range held {
+		if served[job.WorkDir+"\x00"+job.Name] {
+			back = append(back, job)
+		} else {
+			unrecorded = append(unrecorded, job)
 		}
 	}
 

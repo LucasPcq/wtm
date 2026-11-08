@@ -62,11 +62,11 @@ func recordOf(job run.Job) run.Record {
 	if job.Hold == run.HoldDetached {
 		spec.Job.Stop = "stop " + job.Name
 	}
+	// The index keeps a shared job's main checkout, never where it runs (spec.Shared): legacy's format.
 	if job.SharedDir != "" {
 		spec.Job.Scope = project.Shared
-		spec.Shared = &run.Shared{WorkDir: job.SharedDir}
 	}
-	return run.Record{Spec: spec, Claim: job.Hold == run.HoldClaim, SharedDir: job.SharedDir}
+	return run.Record{Spec: spec, Claim: job.Hold == run.HoldClaim, SharedDir: job.SharedDir, MainHolds: job.MainHolds}
 }
 
 // running is a daemon of build holding jobs, each recorded in its index.
