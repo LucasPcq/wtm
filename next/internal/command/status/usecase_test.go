@@ -295,8 +295,16 @@ func TestAJobRunTomlNoLongerDeclaresIsListedLastOnlyWhileItRuns(t *testing.T) {
 	main := only(t, read(t, w, status.Request{}))
 
 	assert.Equal(t, []string{"web", "old"}, []string{main.Jobs[0].Name, main.Jobs[1].Name})
-	assert.Equal(t, run.Stopped, main.Jobs[0].State, "a declared job nothing started is stopped")
+	assert.Equal(t, run.NotStarted, main.Jobs[0].State, "a declared job nothing started is not started")
 	assert.Len(t, main.Jobs, 2)
+}
+
+func TestADeclaredJobTheDaemonDoesNotListIsStoppedOnceItsLogSaysItRan(t *testing.T) {
+	w := newWorld(seed{Run: isolating(), Logged: []string{"web"}})
+
+	main := only(t, read(t, w, status.Request{}))
+
+	assert.Equal(t, run.Stopped, main.Jobs[0].State)
 }
 
 func TestWhatCannotBeAskedIsNullAndAWarning(t *testing.T) {

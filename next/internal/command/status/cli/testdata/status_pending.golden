@@ -13,8 +13,8 @@
   parent       main
 
   JOBS
-  web  stopped
-  api  stopped
+  web  not started
+  api  not started
 
   ! main has 1 commit it lacks
   → wtm sync feat/old   sync it onto main

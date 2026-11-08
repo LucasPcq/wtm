@@ -61,11 +61,26 @@ const (
 	Crashed  State = "crashed"
 	Exited   State = "exited" // a task that ran to its end
 	Stopped  State = "stopped"
+	// NotStarted is a job run.toml declares that the daemon does not list and whose log holds nothing: it never ran, never a state the daemon gives.
+	NotStarted State = "not_started"
 )
+
+// Listed reports whether jobs lists a job called name in the worktree at dir: its own, or its claim on a shared one.
+func Listed(jobs []Job, dir, name string) bool {
+	return slices.ContainsFunc(jobs, func(job Job) bool { return job.WorkDir == dir && job.Name == name })
+}
+
+// Unlisted is the state of a job run.toml declares that the daemon does not list: stopped once its log holds a line, so it ran; else NotStarted.
+func Unlisted(logged bool) State {
+	if logged {
+		return Stopped
+	}
+	return NotStarted
+}
 
 // States returns every State.
 func States() []State {
-	return []State{Starting, Running, Crashed, Exited, Stopped}
+	return []State{Starting, Running, Crashed, Exited, Stopped, NotStarted}
 }
 
 // ErrUnknown says whether a job is up cannot be told: no daemon answers, yet its index holds jobs it would run.

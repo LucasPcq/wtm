@@ -442,6 +442,8 @@ func stateOf(state run.State, st *output.Styles) string {
 		return st.Danger.Render(string(state))
 	case run.Starting:
 		return st.Warning.Render(string(state))
+	case run.NotStarted:
+		return st.Muted.Render("not started")
 	case run.Exited, run.Stopped:
 	}
 	return st.Muted.Render(string(state))

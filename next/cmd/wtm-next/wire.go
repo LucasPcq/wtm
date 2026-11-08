@@ -250,6 +250,8 @@ func wire(params wireParams) app {
 			Meta:         meta,
 			EnvFiles:     store.EnvFiles{},
 			Jobs:         jobs,
+			ReadLog:      joblog.Tail,
+			StateDir:     params.StateDir,
 			PullRequests: gh.PullRequestsOf,
 			Repository:   facts,
 		},

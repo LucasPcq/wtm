@@ -117,6 +117,7 @@ const (
 	CommandRunStop     = "run-stop"
 	PathWorktree       = "worktree" // the worktree a follow-up acts on: its branch or, on no branch, its path
 	PathTo             = "to"       // the branch reparent moves a worktree onto
+	PathRepo           = "repo"     // the one repository a command of the whole machine narrows to: a path in it
 )
 
 // Enter is the follow-up that enters worktree, by its branch or, on no branch, its path; its caller gives it a code.

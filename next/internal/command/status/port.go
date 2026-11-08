@@ -32,5 +32,8 @@ type EnvFiles interface {
 // Jobs lists the jobs the run daemon knows, never starting it; it fails with run.ErrUnknown when it cannot tell which are up.
 type Jobs func(ctx context.Context) ([]run.Job, error)
 
+// ReadLog returns the last n lines of the log file names, oldest first, none when it does not exist.
+type ReadLog func(file run.LogFile, n int) ([]run.Line, error)
+
 // PullRequests returns the pull request of each of branches, its open one else its newest whatever its state, none from a fork, an empty branch (a worktree on none) having none; it fails with worktree.ErrPullRequestsUnavailable, wrapped with what to do about it, or the context's error, keeping what it found before failing.
 type PullRequests func(ctx context.Context, branches []string) ([]worktree.PullRequest, error)

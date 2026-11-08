@@ -10,6 +10,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/dotenv"
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
+	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
 )
@@ -35,6 +36,8 @@ type UseCase struct {
 	Meta         Meta
 	EnvFiles     EnvFiles
 	Jobs         Jobs
+	ReadLog      ReadLog
+	StateDir     string
 	PullRequests PullRequests
 	Repository   repository.Service
 }
@@ -104,9 +107,32 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	for i, w := range targets {
 		facts.States[w.Path] = read[i]
 	}
+	facts.Logged = u.logged(facts, targets)
 	facts.Behind = repository.Behind(ctx, u.Git, repo, facts.PullRequests, targets)
 	facts.Interrupted = ctx.Err() != nil
 	return facts, nil
+}
+
+// logged says, per worktree of targets, which jobs run.toml declares that the daemon does not hold there left a line in their log: they ran, and were stopped since.
+func (u UseCase) logged(facts Facts, targets []worktree.Worktree) map[string]map[string]bool {
+	logged := map[string]map[string]bool{}
+	if facts.JobsErr != nil || facts.RunErr != nil || u.ReadLog == nil {
+		return logged
+	}
+	for _, w := range targets {
+		dir := run.LogDir(u.StateDir, w.Branch())
+		if dir == "" {
+			continue
+		}
+		logged[w.Path] = map[string]bool{}
+		for _, job := range facts.Run.Jobs {
+			if !run.Listed(facts.Jobs, w.Path, job.Name) {
+				lines, _ := u.ReadLog(run.LogFile{Dir: dir, Job: job.Name}, 1)
+				logged[w.Path][job.Name] = len(lines) > 0
+			}
+		}
+	}
+	return logged
 }
 
 // observeRequest reads the repository and the path the worktree req names stands for (located).

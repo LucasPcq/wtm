@@ -24,10 +24,11 @@ type Facts struct {
 	worktree.Repository
 	repository.Asked
 	Targets    []worktree.Worktree
-	Records    map[string]worktree.Meta // by branch
-	RecordErrs map[string]error         // by branch
-	States     map[string]State         // by worktree path
-	Behind     map[string]bool          // by branch
+	Records    map[string]worktree.Meta   // by branch
+	RecordErrs map[string]error           // by branch
+	States     map[string]State           // by worktree path
+	Behind     map[string]bool            // by branch
+	Logged     map[string]map[string]bool // by worktree path, then job: a job the daemon does not hold there whose log holds a line
 	Stack      worktree.Stack
 }
 
@@ -258,7 +259,7 @@ func (f Facts) item(w worktree.Worktree) Item {
 	record, recordErr := f.Records[branch], f.RecordErrs[branch]
 	parent, _ := f.Stack.Parent(branch)
 	pending := recordErr == nil && f.pending(w)
-	offset := f.offset(w)
+	offset := env.OffsetOf(env.OffsetParams{Worktree: w, Worktrees: f.Worktrees, Records: f.Records, Run: f.Run})
 	pr, hasPR := worktree.PullRequestOf(f.PullRequests, branch)
 	merged := !state.Missing && f.Repository.Cleans(pr, w, f.Behind[branch])
 
@@ -354,27 +355,6 @@ func isolationOf(record worktree.Meta, unknown bool) *project.Isolation {
 	return &isolation
 }
 
-// offset is how far w's ports sit above the main worktree's: none for the main one; for another, its ordinal's, unless no run has numbered it yet or another branch, first by name, holds the same number; nil when it cannot be told.
-func (f Facts) offset(w worktree.Worktree) *int {
-	if w.Main {
-		return new(int)
-	}
-
-	branch := w.Branch()
-	record, recorded := f.Records[branch]
-	if branch == "" || !recorded || record.Ordinal <= 0 {
-		return nil
-	}
-	for _, other := range f.Worktrees {
-		if name := other.Branch(); name != branch && name < branch && f.Records[name].Ordinal == record.Ordinal {
-			return nil
-		}
-	}
-
-	offset := env.JobParams{Ordinal: record.Ordinal, Isolation: record.Isolation, Run: f.Run}.Offset()
-	return &offset
-}
-
 func (f Facts) runToml() RunToml {
 	switch {
 	case f.RunErr != nil:
@@ -420,7 +400,7 @@ func portsOf(w worktree.Worktree, params portsParams) Ports {
 // ----------------------------------------------------------------------------
 // The jobs
 
-// jobs are the jobs w can run, nil when the daemon cannot tell: each job run.toml declares, in its order, as the daemon holds it in w or stopped when it holds nothing, then each job up in w that run.toml no longer declares.
+// jobs are the jobs w can run, nil when the daemon cannot tell: each job run.toml declares, in its order, as the daemon holds it in w, else stopped once it ran there and not_started when it never did, then each job up in w that run.toml no longer declares.
 func (f Facts) jobs(w worktree.Worktree, offset *int) []Job {
 	if f.JobsErr != nil {
 		return nil
@@ -435,7 +415,7 @@ func (f Facts) jobs(w worktree.Worktree, offset *int) []Job {
 	jobs := []Job{}
 	for _, job := range declared {
 		at := slices.IndexFunc(held, func(h Job) bool { return h.Name == job.Name })
-		found := Job{Name: job.Name, Kind: job.Kind, State: run.Stopped}
+		found := Job{Name: job.Name, Kind: job.Kind, State: run.Unlisted(f.Logged[w.Path][job.Name])}
 		if at >= 0 {
 			found = held[at]
 		}
