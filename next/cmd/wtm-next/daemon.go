@@ -192,7 +192,11 @@ func openDaemonStop(context.Context, string) (daemonstop.UseCase, error) {
 
 // machineOperations runs the operations on wtm's daemon, which is no repository's: recorded in the daemon's own directory, publishing no event, since the bus files every event under a repository.
 func machineOperations() operation.Service {
-	return operation.Service{Locker: locker{oplock.Locks{StateDir: filepath.Dir(daemon.SocketPath())}}, Publisher: unpublished{}, NewOpID: newOpID, Now: time.Now}
+	dir := ""
+	if socket := daemon.SocketPath(); socket != "" {
+		dir = filepath.Dir(socket)
+	}
+	return operation.Service{Locker: locker{oplock.Locks{StateDir: dir}}, Publisher: unpublished{}, NewOpID: newOpID, Now: time.Now}
 }
 
 // unpublished publishes nothing of an operation.

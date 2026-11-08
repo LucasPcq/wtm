@@ -111,3 +111,26 @@ func TestARecordKeepsItsJobsKeysAndProfileBothWays(t *testing.T) {
 	assert.Contains(t, string(data), `"profile":"dev"`)
 	assert.Equal(t, []run.Record{record}, index.Load())
 }
+
+func TestAnIndexIsFrozenOnlyOnceANewerWtmWroteIt(t *testing.T) {
+	cases := map[string]struct {
+		content string
+		frozen  bool
+	}{
+		"newer":   {content: `{"version":99,"jobs":[]}`, frozen: true},
+		"current": {content: `{"version":2,"jobs":[]}`},
+		"older":   {content: `{"version":1,"jobs":[]}`},
+		"garbled": {content: `{`},
+		"absent":  {},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "jobs.json")
+			if c.content != "" {
+				require.NoError(t, os.WriteFile(path, []byte(c.content), 0o600))
+			}
+
+			assert.Equal(t, c.frozen, (&daemon.Index{Path: path}).Frozen())
+		})
+	}
+}

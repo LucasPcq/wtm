@@ -15,6 +15,7 @@ type daemon struct {
 	shutdown error
 	ensure   error
 	refuse   map[string]error // the starts refused, by job name and work dir
+	stopped  func()           // run once it stopped
 	calls    []string
 	started  []run.Spec
 }
@@ -25,6 +26,9 @@ func (d *daemon) Records() []run.Record { return d.records }
 
 func (d *daemon) Shutdown(context.Context) error {
 	d.calls = append(d.calls, "shutdown")
+	if d.stopped != nil {
+		d.stopped()
+	}
 	return d.shutdown
 }
 
@@ -33,7 +37,10 @@ func (d *daemon) Ensure(context.Context) error {
 	return d.ensure
 }
 
-func (d *daemon) Start(_ context.Context, spec run.Spec, _ func(run.Line)) (run.Job, error) {
+func (d *daemon) Start(ctx context.Context, spec run.Spec, _ func(run.Line)) (run.Job, error) {
+	if ctx.Err() != nil {
+		return run.Job{}, ctx.Err()
+	}
 	d.calls = append(d.calls, "start "+spec.Job.Name+" "+spec.WorkDir)
 	d.started = append(d.started, spec)
 	return run.Job{Name: spec.Job.Name, WorkDir: spec.WorkDir}, d.refuse[spec.Job.Name+" "+spec.WorkDir]

@@ -113,6 +113,8 @@ func (u UseCase) restart(ctx context.Context, plan Plan, report domain.Report) I
 			return item
 		}
 	}
+	// A restart whose daemon stopped is let finish: cut short, it would leave the jobs it stopped down, recorded nowhere.
+	ctx = context.WithoutCancel(ctx)
 	if err := u.Daemon.Ensure(ctx); err != nil {
 		item.Status, item.Err = domain.StatusFailed, domain.AsError(domain.AsErrorParams{Err: err, Code: CodeStartFailed, Message: "the new daemon didn't start"})
 		return item

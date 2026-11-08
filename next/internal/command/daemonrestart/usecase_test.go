@@ -1,6 +1,7 @@
 package daemonrestart_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/daemonrestart"
@@ -155,4 +156,16 @@ func TestAClaimTheLegacyWtmRecordedWithNoOriginComesBackForItsWorktree(t *testin
 	claim := d.started[len(d.started)-1]
 	require.Equal(t, featA, claim.WorkDir)
 	assert.Equal(t, &run.Origin{Root: main, Branch: "feat/a", CorrelationID: "restart-1"}, claim.Origin)
+}
+
+func TestARestartInterruptedOnceItsDaemonStoppedStillBringsTheJobsBack(t *testing.T) {
+	d := running("0.30.9", web)
+	ctx, cancel := context.WithCancel(t.Context())
+	d.stopped = cancel
+
+	outcome, err := usecase(d, operations()).Run(ctx, daemonrestart.Request{}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	assert.Equal(t, domain.StatusDone, outcome.Result.Items[0].Status, outcome.Result.Items[0].Err)
+	assert.Equal(t, []string{"shutdown", "ensure", "start web " + main}, d.calls)
 }

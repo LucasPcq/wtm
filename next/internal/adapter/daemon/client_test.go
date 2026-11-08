@@ -484,3 +484,40 @@ func TestAnAttachOrAResizeOfADaemonOfAnotherBuildIsRefused(t *testing.T) {
 		assert.Equal(t, run.CodeSkew, refusal.Code)
 	}
 }
+
+func TestTheStatusOfALegacyDaemonIsReadAsItSpellsIt(t *testing.T) {
+	socket, _ := serve(t, `{"status":"ok","version":"0.30.1","daemon_pid":77,"proxy_port":27102,"proxy_public_port":80,"jobs":[{"name":"web","kind":"service","status":"running","work_dir":"/w"}]}`)
+
+	got, err := daemon.Daemon{SocketPath: socket, Version: "1.0"}.Status(t.Context())
+
+	require.NoError(t, err)
+	assert.True(t, got.Answering)
+	assert.Equal(t, run.SkewLegacy, got.Skew)
+	assert.Equal(t, 77, got.Stamp.PID)
+	assert.Equal(t, run.Proxy{Port: 27102, PublicPort: 80}, got.Proxy)
+	require.Len(t, got.Jobs, 1)
+	assert.True(t, got.Jobs[0].Up)
+}
+
+func TestASocketAnsweringNoListingHasItsJobsUnread(t *testing.T) {
+	socket, _ := serve(t, `{"status":"error","message":"unknown action: list"}`)
+
+	got, err := daemon.Daemon{SocketPath: socket, Version: "1.0"}.Status(t.Context())
+
+	require.NoError(t, err)
+	assert.True(t, got.Answering)
+	assert.Equal(t, run.SkewProtocol, got.Skew)
+	assert.Nil(t, got.Jobs)
+}
+
+func TestWithNoDaemonTheStatusIsTheStacksItsIndexHolds(t *testing.T) {
+	socket := unanswered(t, `{"version":2,"jobs":[{"name":"db","work_dir":"/w","config":{"name":"db","kind":"service","stop":"down"},"started_at":"2026-11-01T10:00:00Z"},{"name":"web","work_dir":"/w","config":{"name":"web","kind":"service"},"pid":42,"pgid":42}]}`)
+
+	got, err := daemon.Daemon{SocketPath: socket, Version: "1.0"}.Status(t.Context())
+
+	require.NoError(t, err)
+	assert.False(t, got.Answering)
+	require.Len(t, got.Jobs, 1, "a foreground service left in the index runs with no daemon nowhere")
+	assert.Equal(t, run.HoldDetached, got.Jobs[0].Hold)
+	assert.False(t, got.IndexFrozen)
+}

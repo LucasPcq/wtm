@@ -23,7 +23,6 @@ func TestJobsAreHeldByRepositoryEachWorktreesTogether(t *testing.T) {
 		}},
 		{Root: "/b", Worktrees: []HeldWorktree{{Branch: "main", Path: "/b", Jobs: []HeldJob{{Name: "web", Hold: HoldOwn}}}}},
 	}, got)
-	assert.Equal(t, 4, Count(got))
 	assert.Equal(t, []HeldRepo{}, Held(nil))
 }
 

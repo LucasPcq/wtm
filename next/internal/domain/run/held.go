@@ -71,17 +71,6 @@ func Placed(jobs []Job) []Job {
 	return placed
 }
 
-// Count returns how many jobs repos hold.
-func Count(repos []HeldRepo) int {
-	n := 0
-	for _, repo := range repos {
-		for _, wt := range repo.Worktrees {
-			n += len(wt.Jobs)
-		}
-	}
-	return n
-}
-
 // Names returns each job of repos as a recap names it: its name, then its worktree and its repository, when it was started for one.
 func Names(repos []HeldRepo) []string {
 	var names []string
