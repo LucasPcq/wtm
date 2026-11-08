@@ -13,8 +13,8 @@
   parent       main
 
   JOBS
-  web  stopped  port 23490
-  api  stopped  port 23491
+  web  not started  port 23490
+  api  not started  port 23491
 
   ! main has 2 commits it lacks
   → wtm-next sync feat/old   sync it onto main

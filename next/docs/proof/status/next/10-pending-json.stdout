@@ -49,14 +49,14 @@
           {
             "name": "web",
             "kind": "service",
-            "state": "stopped",
+            "state": "not_started",
             "url": "",
             "port": 23490
           },
           {
             "name": "api",
             "kind": "service",
-            "state": "stopped",
+            "state": "not_started",
             "url": "",
             "port": 23491
           }

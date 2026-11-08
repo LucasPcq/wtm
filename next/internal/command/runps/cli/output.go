@@ -11,12 +11,15 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/runps"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
+
+	"github.com/charmbracelet/x/ansi"
 )
 
 // now is the time the ages of the jobs count up to.
 var now = time.Now
 
 const (
+	lastLineMin    = 16
 	nothingRunning = "nothing running"
 	sharedTitle    = "shared services"
 )
@@ -52,7 +55,7 @@ func drawPs(w io.Writer, read runps.Outcome, _ runps.Request, _ output.View) {
 				rows = append(rows, []string{"    " + cmp.Or(holder.Branch, holder.Path), "", holder.Namespace, since(holder, st)})
 			}
 		}
-		output.Columns(w, rows)
+		output.Columns(w, fitLast(rows, output.BlockWidth(w)))
 	}
 	output.ReadEnd(w, read)
 }
@@ -143,4 +146,22 @@ func counted(n int, one, many string) string {
 		return "1 " + one
 	}
 	return strconv.Itoa(n) + " " + many
+}
+
+// fitLast cuts the last cell of each row, a job's last line, so the row fits width beside the cells before it, keeping at least lastLineMin columns of it.
+func fitLast(rows [][]string, width int) [][]string {
+	used := 0
+	for col := range 3 {
+		widest := 0
+		for _, row := range rows {
+			widest = max(widest, ansi.StringWidth(row[col]))
+		}
+		if widest > 0 {
+			used += widest + len("  ")
+		}
+	}
+	for _, row := range rows {
+		row[3] = output.Truncate(row[3], max(width-used, lastLineMin))
+	}
+	return rows
 }

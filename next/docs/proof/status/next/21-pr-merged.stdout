@@ -14,8 +14,8 @@
   review       #9 merged
 
   JOBS
-  web  stopped  port 23480
-  api  stopped  port 23481
+  web  not started  port 23480
+  api  not started  port 23481
 
   ! its pull request is merged
   → wtm-next prune feat/b   prune it

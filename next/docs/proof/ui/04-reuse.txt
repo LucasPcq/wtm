@@ -2,7 +2,7 @@ $ cat "$G/web.json" | jq -c "{pid, port}"
 {"pid":<PID1>,"port":<PORT>}
 
 $ cd $SB/B && wtm-next ui --no-open
-http://127.0.0.1:<PORT>/#repo=<REPO_B>&token=<TOKEN>
+http://127.0.0.1:<PORT>/#repo=<REPO_B>&token=<TOKEN>&worktree=<SB>%2FB
 
 $ cat "$G/web.json" | jq -c "{pid, port}"
 {"pid":<PID1>,"port":<PORT>}

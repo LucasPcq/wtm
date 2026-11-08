@@ -170,6 +170,7 @@ show 'curl -s -o /dev/null -w "stop %{http_code}\n" -X POST -H "X-Wtm-Token: $(j
 rm -f "$out"/.[a-z]*
 sed -i '' -E \
   -e "s#(/private)?$SB#<SB>#g" \
+  -e "s#worktree=(%2Fprivate)?${SB//\//%2F}#worktree=<SB>#g" \
   -e "s#$TOKEN#<TOKEN>#g" \
   -e 's#"token":"[0-9a-f]+"#"token":"<TOKEN>"#g' \
   -e 's#token=[0-9a-f]{64}#token=<TOKEN>#g' \

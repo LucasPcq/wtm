@@ -227,6 +227,7 @@ The reference is the legacy `wtm status` of 0.30.1. `status` is a read: the proo
   - **The picker reads the questions only when it asks**: with a worktree named or `--all`, nothing is read before the read itself.
   - **An ambiguous name is picked among its matches on a terminal** (approved deviation, shared with `resolve`): a part of a branch several worktrees hold opens the picker over them, where legacy refused it; anywhere else it is refused, exit 2, its field code `ambiguous` (shared with `resolve`, was `status.ambiguous`) naming the matches (`TestOnATerminalAnAmbiguousNameIsPickedAmongTheWorktreesItMatches`).
   - **The other legacy bugs of the issue**: 5, the stale comment on a constant, has nothing to fix in next, whose status declares no such constant; 9, legacy listing the worktrees with `git worktree list` once per question, is one snapshot read once per run here.
+  - **A job that never ran is `not_started`** (LUC-345): a job run.toml declares that the daemon does not list is `stopped` once its log holds a line, else `not_started` (`not started` in the text, `—` in the table's jobs column); legacy said `stopped` for both (`TestADeclaredJobTheDaemonDoesNotListIsStoppedOnceItsLogSaysItRan`). The rule run ps and run list read by.
 
 # Proof: `wtm resolve` and the `wtm go` wrapper (legacy `surface/cli/resolve`) vs `wtm-next resolve`
 

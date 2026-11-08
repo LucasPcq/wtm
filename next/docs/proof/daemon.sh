@@ -48,7 +48,7 @@ normalise() {
   sed -E \
     -e "s#(/private)?$root#<SB>#g" \
     -e 's#"(pid|pgid|daemon_pid)":[0-9]+#"\1":<PID>#g' \
-    -e 's#"(at|started_at|ts)":"[^"]+"#"\1":"<T>"#g' \
+    -e 's#"(at|started_at|ended_at|ts)":"[^"]+"#"\1":"<T>"#g' \
     -e 's#up [0-9]+[smh]#up <T>#g' \
     -e "s#$((port + 3))#<JOB_PORT>#g" -e "s#$((port + 2))#<PROXY_PORT>#g" -e "s#$((port + 1))#<API_PORT>#g" -e "s#$port#<WEB_PORT>#g" \
     -e "s#\"version\":\"$build\"#\"version\":\"<NEXT>\"#g" \
