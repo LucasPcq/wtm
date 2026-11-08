@@ -71,7 +71,7 @@ test('a follow that stops is said beside a daemon of another build, not beside t
         type: 'warning',
         code: 'run-logs.daemon_skew',
         params: { skew },
-        message: `the run daemon is ${skew === 'legacy' ? 'the legacy one' : 'of another build'}`,
+        message: `the daemon is ${skew === 'legacy' ? 'the legacy one' : 'of another build'}`,
       })
       stream.end()
       return stream.response()
@@ -84,7 +84,7 @@ test('a follow that stops is said beside a daemon of another build, not beside t
   skew = 'legacy'
   await user.click(within(panel).getByRole('button', { name: 'Reconnect' }))
 
-  expect(await within(panel).findByText('the run daemon is the legacy one')).toBeDefined()
+  expect(await within(panel).findByText('the daemon is the legacy one')).toBeDefined()
   expect(within(panel).queryByText('Stopped following web')).toBeNull()
 })
 

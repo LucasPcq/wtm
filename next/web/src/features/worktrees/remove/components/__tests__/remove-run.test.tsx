@@ -149,7 +149,7 @@ test('a finished removal says a warning of the whole run first, as its Alert, th
 
   await within(dialog).findByText('1 of 2 removed.')
   const alert = within(dialog).getByRole('alert')
-  expect(alert.textContent).toContain("Couldn't ask the run daemon which jobs are up")
+  expect(alert.textContent).toContain("Couldn't ask wtm's daemon which jobs are up")
   expect(
     within(dialog)
       .getAllByRole('heading', { level: 3 })
