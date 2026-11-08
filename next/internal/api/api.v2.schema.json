@@ -20,7 +20,8 @@
         "run-logs",
         "run-down",
         "run-start",
-        "run-stop"
+        "run-stop",
+        "run-ps"
       ]
     },
     "checkout.Action": {
@@ -4486,6 +4487,64 @@
       },
       "type": "array"
     },
+    "run-ps.envelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/domain.Envelope"
+        }
+      ],
+      "properties": {
+        "command": {
+          "const": "run-ps"
+        },
+        "items": {
+          "items": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/runps.Detail"
+                  },
+                  {
+                    "maxProperties": 0,
+                    "type": "object"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "plan": false
+      }
+    },
+    "run-ps.request": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "repo"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "type": "array"
+    },
     "run-start.envelope": {
       "allOf": [
         {
@@ -5012,7 +5071,8 @@
         "running",
         "crashed",
         "exited",
-        "stopped"
+        "stopped",
+        "not_started"
       ]
     },
     "rundown.Plan": {
@@ -5550,6 +5610,207 @@
       },
       "required": [
         "text"
+      ],
+      "type": "object"
+    },
+    "runps.Counts": {
+      "additionalProperties": false,
+      "properties": {
+        "crashed": {
+          "type": "integer"
+        },
+        "exited": {
+          "type": "integer"
+        },
+        "holders": {
+          "type": "integer"
+        },
+        "not_started": {
+          "type": "integer"
+        },
+        "running": {
+          "type": "integer"
+        },
+        "starting": {
+          "type": "integer"
+        },
+        "stopped": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "running",
+        "starting",
+        "crashed",
+        "exited",
+        "stopped",
+        "not_started"
+      ],
+      "type": "object"
+    },
+    "runps.Detail": {
+      "additionalProperties": false,
+      "properties": {
+        "branch": {
+          "type": "string"
+        },
+        "counts": {
+          "$ref": "#/$defs/runps.Counts"
+        },
+        "jobs": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runps.Job"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "profile": {
+          "type": "string"
+        },
+        "repository": {
+          "type": "string"
+        },
+        "shared": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "repository",
+        "shared",
+        "branch",
+        "path",
+        "profile",
+        "counts",
+        "jobs"
+      ],
+      "type": "object"
+    },
+    "runps.Holder": {
+      "additionalProperties": false,
+      "properties": {
+        "branch": {
+          "type": "string"
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "since": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "branch",
+        "path"
+      ],
+      "type": "object"
+    },
+    "runps.Job": {
+      "additionalProperties": false,
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "command": {
+          "type": "string"
+        },
+        "dir": {
+          "type": "string"
+        },
+        "duration_ms": {
+          "type": "integer"
+        },
+        "ended_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "exit_code": {
+          "type": "integer"
+        },
+        "hold": {
+          "$ref": "#/$defs/run.Hold"
+        },
+        "holders": {
+          "items": {
+            "$ref": "#/$defs/runps.Holder"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "$ref": "#/$defs/project.JobKind"
+        },
+        "last_line": {
+          "$ref": "#/$defs/runps.Line"
+        },
+        "log": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "services": {
+          "items": {
+            "$ref": "#/$defs/runps.Service"
+          },
+          "type": "array"
+        },
+        "started_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/run.State"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "state"
+      ],
+      "type": "object"
+    },
+    "runps.Line": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "type": "object"
+    },
+    "runps.Service": {
+      "additionalProperties": false,
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
       ],
       "type": "object"
     },

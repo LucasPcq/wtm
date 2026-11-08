@@ -44,6 +44,7 @@ import (
 	rundowncli "github.com/LucasPcq/wtm/next/internal/command/rundown/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/runlogs"
 	runlogscli "github.com/LucasPcq/wtm/next/internal/command/runlogs/cli"
+	"github.com/LucasPcq/wtm/next/internal/command/runps"
 	"github.com/LucasPcq/wtm/next/internal/command/runstart"
 	runstartcli "github.com/LucasPcq/wtm/next/internal/command/runstart/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/runstop"
@@ -93,6 +94,7 @@ type app struct {
 	RunDown     rundown.UseCase
 	RunStart    runstart.UseCase
 	RunStop     runstop.UseCase
+	RunPs       runps.UseCase
 }
 
 // wire builds each adapter of the repository params locates once and injects it into every use case.
@@ -291,6 +293,7 @@ func wire(params wireParams) app {
 			Teardown:   teardowns,
 			Jobs:       starts,
 		},
+		RunPs: runPs(),
 		RunStop: runstop.UseCase{
 			Repository: facts,
 			Operations: operations,
@@ -373,6 +376,11 @@ func leftBehind(branch string) domain.FollowUp {
 // initialize sets wtm up in a repository that has no config, in the legacy wtm until init migrates.
 func initialize() *domain.FollowUp {
 	return &domain.FollowUp{Command: domain.CommandInit}
+}
+
+// runPs is run ps over the daemon of the machine, opening each repository its jobs run for.
+func runPs() runps.UseCase {
+	return runps.UseCase{Jobs: runDaemon().Jobs, Open: openProject, ReadLog: joblog.Tail, Restart: daemonRestart()}
 }
 
 // daemonRestart is the follow-up that replaces a run daemon of another build by one of this build: run daemon restart.

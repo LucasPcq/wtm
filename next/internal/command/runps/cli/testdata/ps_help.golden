@@ -1,0 +1,25 @@
+
+  List the jobs wtm's daemon runs, in every repository of the machine (--repo
+  narrows to one): a group per worktree with the profile its jobs were started
+  under, what crashed first, then what runs, then what ended or never started; a
+  runner with the services it starts, and each repository's shared services with
+  the worktrees holding them. It works from any directory, changes nothing and
+  never starts the daemon.
+
+  Usage:
+    wtm-next run ps [flags]
+
+  Examples:
+    wtm run ps
+
+    # Only this repository's jobs, as JSON
+    wtm run ps --repo . --output json
+
+  Flags:
+    -h, --help            help for ps
+        --output string   Output format: text or json (default "text")
+        --repo string     Only this repository's jobs (a path in it)
+
+  Global Flags:
+    -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+

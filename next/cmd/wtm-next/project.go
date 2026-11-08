@@ -28,6 +28,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/resolve"
 	"github.com/LucasPcq/wtm/next/internal/command/rundown"
 	"github.com/LucasPcq/wtm/next/internal/command/runlogs"
+	"github.com/LucasPcq/wtm/next/internal/command/runps"
 	"github.com/LucasPcq/wtm/next/internal/command/runstart"
 	"github.com/LucasPcq/wtm/next/internal/command/runstop"
 	"github.com/LucasPcq/wtm/next/internal/command/runup"
@@ -35,6 +36,7 @@ import (
 	synccommand "github.com/LucasPcq/wtm/next/internal/command/sync"
 	"github.com/LucasPcq/wtm/next/internal/command/tree"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/service/repository"
 	"github.com/LucasPcq/wtm/next/internal/service/runjobs"
 	"github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/runview"
@@ -66,6 +68,29 @@ var (
 	openRunStart    = opener(func(a app) runstart.UseCase { return a.RunStart })
 	openRunStop     = opener(func(a app) runstop.UseCase { return a.RunStop })
 )
+
+// openRunPs opens run ps, which reads the jobs of the whole machine: from any directory, in a repository or not.
+func openRunPs(context.Context, string) (runps.UseCase, error) {
+	return runPs(), nil
+}
+
+// openProject reads the repository holding dir as run ps reports its jobs: its config, run.toml and worktrees, each one's meta record, and where wtm keeps its state.
+func openProject(ctx context.Context, dir string) (runps.Project, error) {
+	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+		return runps.Project{}, notARepository(dir, git.ErrNotRepository)
+	}
+	params, err := locate(ctx, dir)
+	if err != nil {
+		return runps.Project{}, err
+	}
+	repo, err := params.facts().Observe(ctx, runps.Name)
+	if err != nil {
+		return runps.Project{}, err
+	}
+
+	records, _ := repository.Records(store.Meta{StateDir: params.StateDir}, repo.Live())
+	return runps.Project{Repository: repo, Records: records, StateDir: params.StateDir}, nil
+}
 
 // opener returns the function that opens the use case useCase picks out of the app wired on the repository of a directory.
 func opener[U any](useCase func(app) U) func(ctx context.Context, dir string) (U, error) {

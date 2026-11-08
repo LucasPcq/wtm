@@ -18,6 +18,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/command/resolve"
+	"github.com/LucasPcq/wtm/next/internal/command/runps"
 	"github.com/LucasPcq/wtm/next/internal/command/status"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
@@ -97,6 +98,10 @@ func TestARepositoryWithNoWtmConfigIsFollowedUpByTheLegacyInit(t *testing.T) {
 	uninitialized := gittest.InitRepo(t)
 	ownConfigDir(t)
 	for _, command := range catalogue() {
+		// run ps reads the jobs of the whole machine: the directory it is called from opens no repository
+		if command.Name == runps.Name {
+			continue
+		}
 		t.Run(command.Name, func(t *testing.T) {
 			got := command.Execute(t.Context(), api.Call{Dir: uninitialized})
 

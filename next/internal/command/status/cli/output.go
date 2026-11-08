@@ -104,7 +104,7 @@ func drawJobs(w io.Writer, jobs []status.Job) {
 			held = "held from " + cmp.Or(job.Owner.Branch, job.Owner.Path)
 		}
 		if job.StartedAt != nil && (job.State == run.Running || job.State == run.Starting) {
-			age = st.Muted.Render("up " + elapsed(*job.StartedAt))
+			age = st.Muted.Render("up " + output.Span(now().Sub(*job.StartedAt)))
 		}
 		rows = append(rows, []string{job.Name, stateOf(job.State, st), address(job), held, age})
 	}
@@ -397,7 +397,7 @@ func lastCommit(commits []worktree.Commit) string {
 		line += output.Dot + last.Author
 	}
 	if !last.At.IsZero() {
-		line += output.Dot + elapsed(last.At) + " ago"
+		line += output.Dot + output.Span(now().Sub(last.At)) + " ago"
 	}
 	return line
 }
@@ -455,20 +455,6 @@ func address(job status.Job) string {
 		return job.URL
 	}
 	return "port " + strconv.Itoa(*job.Port)
-}
-
-// elapsed is the time since at, in its largest unit.
-func elapsed(at time.Time) string {
-	since := now().Sub(at)
-	switch {
-	case since < time.Minute:
-		return strconv.Itoa(max(int(since.Seconds()), 0)) + "s"
-	case since < time.Hour:
-		return strconv.Itoa(int(since.Minutes())) + "m"
-	case since < 24*time.Hour:
-		return strconv.Itoa(int(since.Hours())) + "h"
-	}
-	return strconv.Itoa(int(since.Hours()/24)) + "d"
 }
 
 func counted(n int, one, many string) string {
