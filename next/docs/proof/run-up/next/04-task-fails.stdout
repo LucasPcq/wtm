@@ -5,7 +5,7 @@
   Profile    broken
   Jobs       fail, web (up)
 
-  ✗ feat/a  fail failed: run daemon: task fail exited with code 3
+  ✗ feat/a  fail failed: task fail exited with code 3
       nope
   full output:  <SB>/acme/.git/wtm/logs/feat%2Fa/fail.log
 

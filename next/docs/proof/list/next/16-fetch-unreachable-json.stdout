@@ -1050,11 +1050,11 @@
         "daemon": "dev",
         "skew": "legacy"
       },
-      "message": "the run daemon is the legacy wtm's: restart it to start jobs beside its own",
+      "message": "the daemon is the legacy wtm's: restart it to start jobs beside its own",
       "follow_up": {
-        "command": "run daemon restart",
+        "command": "daemon-restart",
         "code": "list.restart_daemon",
-        "message": "restart it: its services stop, its stacks are kept"
+        "message": "restart it: its jobs come back on a daemon of this build"
       }
     }
   ]

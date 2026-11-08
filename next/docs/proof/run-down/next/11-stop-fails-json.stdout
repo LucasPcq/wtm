@@ -10,7 +10,7 @@
       "error": {
         "kind": "internal",
         "code": "run-down.stop_failed",
-        "message": "couldn't stop stuck: run daemon: the stop command of stuck failed (exit 4)",
+        "message": "couldn't stop stuck: the stop command of stuck failed (exit 4)",
         "params": {
           "jobs": "stuck"
         }
@@ -21,7 +21,7 @@
           {
             "name": "stuck",
             "status": "failed",
-            "message": "run daemon: the stop command of stuck failed (exit 4)"
+            "message": "the stop command of stuck failed (exit 4)"
           }
         ]
       }
@@ -74,7 +74,7 @@
   "error": {
     "kind": "internal",
     "code": "run-down.stop_failed",
-    "message": "couldn't stop stuck: run daemon: the stop command of stuck failed (exit 4)",
+    "message": "couldn't stop stuck: the stop command of stuck failed (exit 4)",
     "params": {
       "jobs": "stuck"
     }

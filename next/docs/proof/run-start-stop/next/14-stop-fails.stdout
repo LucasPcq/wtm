@@ -5,5 +5,5 @@
   Job        stuck
   Stops      stuck
 
-  ✗ feat/b  couldn't stop stuck: run daemon: the stop command of stuck failed (exit 4)
+  ✗ feat/b  couldn't stop stuck: the stop command of stuck failed (exit 4)
 

@@ -6,5 +6,5 @@ feat-b web
 ./feat%2Fb/crashy.log
 ./feat%2Fb/migrate.log
 ./feat%2Fb/web.log
-## a run daemon answers
+## a daemon answers
 yes
