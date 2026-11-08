@@ -8,7 +8,6 @@ import { RunDialogContent } from '@/features/worktrees/components/run-dialog-con
 import { type CardState, DaemonCard } from '@/features/worktrees/daemon/components/daemon-card'
 import { RestartDialog } from '@/features/worktrees/daemon/components/restart-dialog'
 import { StopJobsDialog } from '@/features/worktrees/daemon/components/stop-jobs-dialog'
-import { takenOverRows } from '@/features/worktrees/daemon/utils/rows'
 import { succeeded, useRun } from '@/features/worktrees/hooks/use-run'
 import { jobsTodo } from '@/features/worktrees/utils/progress'
 
@@ -36,7 +35,10 @@ export function DaemonPanel({ repo, children }: { repo: string; children: ReactE
       return
     }
     const back = (envelope?.items[0]?.detail?.back ?? []).filter((job) => job.back).length
-    const stacks = envelope?.plan ? takenOverRows(envelope.plan).length : 0
+    const stacks = (envelope?.plan?.taken_over ?? [])
+      .flatMap((repo) => repo.worktrees ?? [])
+      .flatMap((wt) => wt.jobs ?? [])
+      .filter((job) => job.hold === 'detached').length
     const said = [
       back > 0 && (back === 1 ? '1 job is back' : `${back} jobs are back`),
       stacks > 0 && (stacks === 1 ? 'the stack was taken over' : `${stacks} stacks were taken over`),
