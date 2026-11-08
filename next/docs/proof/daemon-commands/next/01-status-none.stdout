@@ -1,0 +1,8 @@
+
+  = wtm's daemon is not running
+
+  build   <build>
+  jobs    none
+  socket  <root>/home/Library/Application Support/wtm/wtm.sock
+  index   <root>/home/Library/Application Support/wtm/jobs.json
+

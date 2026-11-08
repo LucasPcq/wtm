@@ -1,0 +1,183 @@
+{
+  "v": 2,
+  "command": "daemon-stop-jobs",
+  "ok": true,
+  "op": "<id>",
+  "items": [
+    {
+      "subject": "main (acme)",
+      "status": "done",
+      "detail": {
+        "path": "<root>/acme",
+        "jobs": [
+          {
+            "name": "api",
+            "status": "stopped"
+          },
+          {
+            "name": "db",
+            "status": "stopped"
+          },
+          {
+            "name": "stack",
+            "status": "stopped"
+          },
+          {
+            "name": "web",
+            "status": "stopped"
+          }
+        ]
+      }
+    },
+    {
+      "subject": "feat/a (acme)",
+      "status": "done",
+      "detail": {
+        "path": "<root>/acme.trees/feat-a",
+        "jobs": [
+          {
+            "name": "api",
+            "status": "stopped"
+          },
+          {
+            "name": "db",
+            "status": "stopped"
+          },
+          {
+            "name": "stack",
+            "status": "stopped"
+          },
+          {
+            "name": "web",
+            "status": "stopped"
+          }
+        ]
+      }
+    }
+  ],
+  "plan": {
+    "repo": "<root>/acme",
+    "repos": [
+      {
+        "root": "<root>/acme",
+        "worktrees": [
+          {
+            "worktree": "main (acme)",
+            "branch": "main",
+            "path": "<root>/acme",
+            "jobs": [
+              {
+                "name": "api",
+                "kind": "service",
+                "hold": "own",
+                "fate": "stop"
+              },
+              {
+                "name": "db",
+                "kind": "service",
+                "hold": "own",
+                "fate": "stop",
+                "shared_in": "<root>/acme"
+              },
+              {
+                "name": "stack",
+                "kind": "service",
+                "hold": "detached",
+                "fate": "stop",
+                "stop_command": "kill $(cat \"$HOME/stack-$(basename $PWD).pid\") && echo stack down"
+              },
+              {
+                "name": "web",
+                "kind": "service",
+                "hold": "own",
+                "fate": "stop"
+              }
+            ]
+          },
+          {
+            "worktree": "feat/a (acme)",
+            "branch": "feat/a",
+            "path": "<root>/acme.trees/feat-a",
+            "jobs": [
+              {
+                "name": "api",
+                "kind": "service",
+                "hold": "own",
+                "fate": "stop"
+              },
+              {
+                "name": "db",
+                "kind": "service",
+                "hold": "claim",
+                "fate": "stop",
+                "shared_in": "<root>/acme"
+              },
+              {
+                "name": "stack",
+                "kind": "service",
+                "hold": "detached",
+                "fate": "stop",
+                "stop_command": "kill $(cat \"$HOME/stack-$(basename $PWD).pid\") && echo stack down"
+              },
+              {
+                "name": "web",
+                "kind": "service",
+                "hold": "own",
+                "fate": "stop"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "confirm": true,
+    "recap": [
+      {
+        "key": "jobs:main (acme)",
+        "label": "Stops in main (acme)",
+        "values": [
+          {
+            "value": "api",
+            "text": "api"
+          },
+          {
+            "value": "db (shared)",
+            "text": "db (shared)"
+          },
+          {
+            "value": "stack (a stack, by its stop command)",
+            "text": "stack (a stack, by its stop command)"
+          },
+          {
+            "value": "web",
+            "text": "web"
+          }
+        ]
+      },
+      {
+        "key": "jobs:feat/a (acme)",
+        "label": "Stops in feat/a (acme)",
+        "values": [
+          {
+            "value": "api",
+            "text": "api"
+          },
+          {
+            "value": "db (shared)",
+            "text": "db (shared)"
+          },
+          {
+            "value": "stack (a stack, by its stop command)",
+            "text": "stack (a stack, by its stop command)"
+          },
+          {
+            "value": "web",
+            "text": "web"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": []
+}

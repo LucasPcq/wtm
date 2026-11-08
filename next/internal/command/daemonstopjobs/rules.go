@@ -181,7 +181,7 @@ func words(job runjobs.StopJob) string {
 	case job.Fate == run.FateClear:
 		return job.Name + " (crashed: nothing to stop)"
 	case job.Hold == run.HoldDetached:
-		return job.Name + " (a stack: " + job.StopCommand + ")"
+		return job.Name + " (a stack, by its stop command)"
 	case job.Shared():
 		return job.Name + " (shared)"
 	}

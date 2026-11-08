@@ -3,7 +3,7 @@
 # Runs the same run down scenarios in two identical sandboxes (run-up.sh's "acme",
 # with a stack whose stop command fails), one per binary, one after the other:
 # legacy `wtm run down` against `wtm-next run down`, each side starting its jobs
-# with its own `run up`. Each sandbox has its own HOME, so its own run daemon,
+# with its own `run up`. Each sandbox has its own HOME, so its own daemon,
 # socket and index; its jobs are stopped, its daemon and its compose containers
 # gone before the next side starts. After each scenario it records the exit code,
 # the output and the state, then diffs the states. Then, in a fresh sandbox per
@@ -117,7 +117,7 @@ TOML
 # teardown: every job of the sandbox stopped (its stacks' stop commands run), then its daemon.
 teardown() {
   "$legacy" run down --all --yes </dev/null >/dev/null 2>&1 || true
-  "$legacy" run daemon stop --yes </dev/null >/dev/null 2>&1 || true
+  "$next" daemon stop --yes </dev/null >/dev/null 2>&1 || true
 }
 
 scenario() {
@@ -185,7 +185,7 @@ run_side() {
     quietly run up feat/b -d --yes
     scenario 08-all-json run down --all --yes --output json
     quietly run up feat/a --profile full -d --yes
-    "$legacy" run daemon stop --yes </dev/null >/dev/null 2>&1 || true
+    "$next" daemon stop --yes </dev/null >/dev/null 2>&1 || true
     scenario 09-daemon-down run down feat/a --yes
     quietly run up feat/b --profile stuck -d --yes
     scenario 10-stop-fails run down feat/b --yes

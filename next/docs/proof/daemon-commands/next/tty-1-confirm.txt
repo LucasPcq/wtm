@@ -1,0 +1,32 @@
+
+  Step 1/1 • Confirm
+
+  ┃  Review & confirm
+  ┃
+  ┃  Daemon      <build> → <build>
+  ┃  Come back   api (main · acme)
+  ┃              db (main · acme)
+  ┃              web (main · acme)
+  ┃              api (feat/a · acme)
+  ┃              web (feat/a · acme)
+  ┃              db (feat/a · acme)
+  ┃  Taken over  stack (main · acme), stack (feat/a · acme)
+
+▌› Yes, restart wtm's daemon
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+   No, cancel
+
+  ↑↓ navigate • / filter • enter confirm • esc cancel
+
+
+
+
+
+
+
+
+
+
+
+
+

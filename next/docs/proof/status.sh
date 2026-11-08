@@ -214,7 +214,7 @@ run_side() {
     scenario 11-jobs-up "$root/acme" status feat/a
     scenario 12-jobs-up-json "$root/acme" status feat/a --output json
     "$legacy" run down feat/a --yes </dev/null >/dev/null 2>&1
-    "$legacy" run daemon stop --yes </dev/null >/dev/null 2>&1 || true
+    "$next" daemon stop --yes </dev/null >/dev/null 2>&1 || true
     scenario 13-quiet "$root/acme" status -q
     scenario 14-all-with-worktree "$root/acme" status feat/a --all
     scenario 15-not-found "$root/acme" status nope

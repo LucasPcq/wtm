@@ -1,0 +1,8 @@
+acme                     api    gone
+acme                     db     gone
+acme                     stack  same process
+acme                     web    gone
+acme.trees/feat-a        api    gone
+acme.trees/feat-a        db     gone
+acme.trees/feat-a        stack  same process
+acme.trees/feat-a        web    gone

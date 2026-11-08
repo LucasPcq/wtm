@@ -1,0 +1,7 @@
+
+  ✓ daemon stop: 1 done
+
+  Stops    api (main · acme), db (main · acme), web (main · acme), api (feat/a · acme), web (feat/a · acme), the daemon
+  Runs on  stack (main · acme), stack (feat/a · acme)
+  Lets go  db (feat/a · acme)
+

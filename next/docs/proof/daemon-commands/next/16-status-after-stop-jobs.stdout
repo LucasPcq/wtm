@@ -1,0 +1,9 @@
+
+  ✓ wtm's daemon runs · pid <pid>
+
+  build   <build>
+  jobs    none
+  proxy   port 27412
+  socket  <root>/home/Library/Application Support/wtm/wtm.sock
+  index   <root>/home/Library/Application Support/wtm/jobs.json
+

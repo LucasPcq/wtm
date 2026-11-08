@@ -1,0 +1,8 @@
+
+  = No daemon running.
+
+  Run daemon
+  Version  dev
+  Socket   <root>/home/Library/Application Support/wtm/wtm.sock
+  Index    <root>/home/Library/Application Support/wtm/jobs.json
+

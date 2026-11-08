@@ -3,11 +3,11 @@
 # Runs the same run logs scenarios in two identical sandboxes (the docs/demos "acme"
 # project with a task, a service that crashes 2 seconds after it starts and a job
 # never started), one per binary, one after the other: legacy `wtm run logs` against
-# `wtm-next run logs`. Each sandbox has its own HOME, so its own run daemon, socket
+# `wtm-next run logs`. Each sandbox has its own HOME, so its own daemon, socket
 # and index; its jobs and its daemon are stopped before the next side starts. Each
 # side starts the profile in feat/b with its own binary, then reads it. After each
 # scenario it records the exit code, the output and the state (the daemon's index of
-# the jobs up, the jobs' logs, whether a run daemon runs). Legacy's run logs follows
+# the jobs up, the jobs' logs, whether a daemon runs). Legacy's run logs follows
 # without a terminal and ignores SIGINT and SIGTERM (B1): its follows are stopped
 # with SIGKILL, on the process the script started. Then, in tmux, the picker and the
 # live view, and a worktree where nothing ran. Outputs differ by design (next's v2
@@ -63,7 +63,7 @@ TOML
 # teardown: every job of the sandbox stopped, then its daemon.
 teardown() {
   "$legacy" run down --all --yes </dev/null >/dev/null 2>&1 || true
-  "$legacy" run daemon stop --yes </dev/null >/dev/null 2>&1 || true
+  "$next" daemon stop --yes </dev/null >/dev/null 2>&1 || true
 }
 
 # scenario <name> <seconds> <args...>: runs the side's binary with no terminal; one still running after seconds gets SIGINT, then SIGKILL a second later.
@@ -95,7 +95,7 @@ for job in sorted(jobs, key=lambda j: (j["work_dir"], j["name"])):
 PY
   echo "## logs"
   (cd .git/wtm/logs 2>/dev/null && find . -type f | sort) || true
-  echo "## a run daemon answers"
+  echo "## a daemon answers"
   python3 - "$HOME/Library/Application Support/wtm/wtm.sock" <<'PY'
 import socket, sys
 s = socket.socket(socket.AF_UNIX)
@@ -142,7 +142,7 @@ run_side() {
     if [[ $side == next ]]; then
       scenario 13-search 3 run logs feat/b --search 'boom|migrated' --regex
     fi
-    "$bin" run daemon stop --yes </dev/null >/dev/null 2>&1 || "$legacy" run daemon stop --yes </dev/null >/dev/null 2>&1 || true
+    "$next" daemon stop --yes </dev/null >/dev/null 2>&1 || true
     sleep 1
     state >"$dir/12-daemon-stopped.state"
     scenario 12-daemon-down 3 run logs feat/b --job crashy

@@ -1,0 +1,4 @@
+version 2
+acme                     stack  stack  pid
+acme.trees/feat-a        stack  stack  pid
+socket: yes

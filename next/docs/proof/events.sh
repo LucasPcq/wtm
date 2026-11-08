@@ -27,7 +27,7 @@ prepare() {
   export HOME=$root/home
   cd "$root/acme"
   "$legacy" create feat/a --yes </dev/null >/dev/null 2>&1
-  "$legacy" run daemon stop --yes </dev/null >/dev/null 2>&1 || true
+  "$next" daemon stop --yes </dev/null >/dev/null 2>&1 || true
   mkdir -p "$root/plain" "$root/bare"
   git -C "$root/bare" init -q
   # every side starts from no repository known: what each registers shows in registry-after
@@ -155,7 +155,7 @@ run_side() {
     (export WTM_PROJECT_DIR=$root/plain && stream 14-relative-repo-project-dir-elsewhere "$root" "" events --repo acme --output json)
     registry >"$dir_out/registry-after"
     if [[ $side == legacy ]]; then
-      "$legacy" run daemon stop --yes </dev/null >/dev/null 2>&1 || true
+      "$next" daemon stop --yes </dev/null >/dev/null 2>&1 || true
     else
       pkill -f "^$bin daemon$" || true
     fi

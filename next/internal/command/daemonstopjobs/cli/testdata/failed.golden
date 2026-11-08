@@ -2,7 +2,7 @@
   ✗ daemon stop-jobs: 1 done · 1 failed
 
   Stops in main (acme)    web, api (crashed: nothing to stop)
-  Stops in feat/a (acme)  db (shared), mail (a stack: docker compose down)
+  Stops in feat/a (acme)  db (shared), mail (a stack, by its stop command)
 
   ✗ feat/a (acme)  couldn't stop mail: docker compose down exited 1
 

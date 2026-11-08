@@ -1,0 +1,32 @@
+
+  Stop the run daemon?
+
+  5 foreground service(s) are drained through it and will be stopped. Detached services keep running.
+
+  Yes
+▸ No
+
+  ↑↓ navigate • enter confirm • esc cancel
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

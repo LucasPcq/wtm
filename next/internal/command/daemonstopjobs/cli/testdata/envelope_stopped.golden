@@ -143,8 +143,8 @@
             "text": "db (shared)"
           },
           {
-            "value": "mail (a stack: docker compose down)",
-            "text": "mail (a stack: docker compose down)"
+            "value": "mail (a stack, by its stop command)",
+            "text": "mail (a stack, by its stop command)"
           }
         ]
       },
