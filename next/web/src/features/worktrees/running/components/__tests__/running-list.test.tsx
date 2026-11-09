@@ -1,4 +1,5 @@
 import { screen, waitFor, within } from '@testing-library/react'
+import type { UserEvent } from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
 import { expect, test } from 'vitest'
 import { useUi } from '@/features/worktrees/store/ui-store'
@@ -148,8 +149,7 @@ test("the Filter menu's Worktree submenu picks one, and says which", async () =>
   const { user } = await renderApp('/r/r1/running')
 
   await user.click(await screen.findByRole('button', { name: 'Filter' }))
-  const worktree = await screen.findByRole('menuitem', { name: /Worktree/ })
-  expect(worktree.textContent).toContain('All worktrees')
+  const worktree = await screen.findByRole('menuitem', { name: 'Worktree: All worktrees' })
   await user.click(worktree)
   const picks = await screen.findAllByRole('menuitemradio')
   expect(picks.map((pick) => pick.textContent)).toEqual([
@@ -165,8 +165,38 @@ test("the Filter menu's Worktree submenu picks one, and says which", async () =>
 
   expect(await screen.findByRole('region', { name: 'fix/login' })).toBeDefined()
   expect(screen.queryByRole('region', { name: 'feat/billing' })).toBeNull()
-  await user.click(screen.getByRole('button', { name: 'Filter' }))
-  expect((await screen.findByRole('menuitem', { name: /Worktree/ })).textContent).toContain('fix/login')
+  expect(await worktreeShown(user)).toBe('Worktree: fix/login')
+  await user.click(screen.getByRole('menuitem', { name: 'Worktree: fix/login' }))
+  ;(await screen.findByRole('menuitemradio', { name: 'Shared services' })).focus()
+  await user.keyboard('{Enter}')
+
+  expect(await worktreeShown(user)).toBe('Worktree: Shared services')
+})
+
+const worktreeShown = async (user: UserEvent) => {
+  await user.click(await screen.findByRole('button', { name: 'Filter' }))
+  return (await screen.findByRole('menuitem', { name: /^Worktree: / })).getAttribute('aria-label')
+}
+
+// The review of 3e1fff81: a filter on the shared services, once none ran, named them by their key.
+test('the Worktree item names the shared services, even once none runs', async () => {
+  await storedFilter({ chip: 'all', worktree: 'shared', states: ['running', 'crashed'] })
+  server.use(
+    http.post('/api/repos/r1/commands/run-ps', () =>
+      HttpResponse.json(psEnvelope([psGroup('feat/billing', [psJob('web')])])),
+    ),
+  )
+  const { user } = await renderApp('/r/r1/running')
+
+  expect(await worktreeShown(user)).toBe('Worktree: Shared services')
+})
+
+test('the Worktree item names a worktree gone from the page by its folder', async () => {
+  await storedFilter({ chip: 'all', worktree: '/acme:/acme.trees/feat-gone', states: ['running', 'crashed'] })
+  acme()
+  const { user } = await renderApp('/r/r1/running')
+
+  expect(await worktreeShown(user)).toBe('Worktree: feat-gone')
 })
 
 test('the Pinned group unpins them all from its menu', async () => {
@@ -204,15 +234,16 @@ test('a filter stored broken is the calm default', async () => {
   expect(screen.getByRole('radio', { name: /All/ }).getAttribute('aria-checked')).toBe('true')
 })
 
-// "This worktree" is gone: a filter stored on it lists every worktree again.
-test('a filter stored on this worktree lists all worktrees', async () => {
-  await storedFilter({ chip: 'all', worktree: 'here', states: ['running', 'crashed'] })
+// "This worktree" is gone: a filter stored on it is the calm default again, its chip included, as a branch's is.
+test('a filter stored on this worktree is the calm default, listing all worktrees', async () => {
+  await storedFilter({ chip: 'crashed', worktree: 'here', states: ['running', 'crashed'] })
   acme()
   await renderApp('/r/r1/running')
 
   expect(await screen.findByRole('region', { name: 'feat/billing' })).toBeDefined()
   expect(screen.getByRole('region', { name: 'fix/login' })).toBeDefined()
   expect(screen.getByRole('region', { name: 'Shared services' })).toBeDefined()
+  expect(screen.getByRole('radio', { name: /All/ }).getAttribute('aria-checked')).toBe('true')
 })
 
 // An older page stored the filter's worktree by its branch, which no group's key spells: the list stayed empty.

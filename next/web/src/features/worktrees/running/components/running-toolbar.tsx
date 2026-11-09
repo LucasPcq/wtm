@@ -57,7 +57,7 @@ export function RunningToolbar({
   const own = worktrees.filter((one) => !one.shared)
   const chosen = () => {
     if (filter.worktree === undefined) return 'All worktrees'
-    if (filter.worktree === shared?.key) return 'Shared services'
+    if (filter.worktree === 'shared') return 'Shared services'
     // a worktree whose jobs all ended is no group any more: its key still names its folder
     return worktrees.find((one) => one.key === filter.worktree)?.label ?? filter.worktree.split('/').pop()
   }
@@ -117,7 +117,7 @@ export function RunningToolbar({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-72">
           <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
+            <DropdownMenuSubTrigger aria-label={`Worktree: ${chosen()}`}>
               <GitBranch className="text-muted-foreground" aria-hidden="true" />
               <span className="flex-1">Worktree</span>
               <span className="max-w-32 truncate text-muted-foreground">{chosen()}</span>

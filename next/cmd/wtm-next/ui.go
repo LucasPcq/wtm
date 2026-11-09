@@ -317,7 +317,7 @@ func pageURL(record webserver.Record, repo string) string {
 	if repo != "" {
 		fragment.Set("repo", repo)
 	}
-	return (&url.URL{Scheme: "http", Host: net.JoinHostPort("127.0.0.1", strconv.Itoa(record.Port)), Path: "/", Fragment: fragment.Encode()}).String()
+	return (&url.URL{Scheme: "http", Host: net.JoinHostPort("127.0.0.1", strconv.Itoa(record.Port)), Path: "/"}).String() + "#" + fragment.Encode()
 }
 
 // repoID is the id the server names the repository of dir by, registering it among those wtm knows; "" when dir is in no repository.

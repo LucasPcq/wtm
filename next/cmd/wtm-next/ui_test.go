@@ -102,6 +102,7 @@ func TestThePageCarriesTheTokenAndTheRepoInItsFragment(t *testing.T) {
 
 	assert.Equal(t, "http://127.0.0.1:4777/#repo=e96269f9d69f&token=abc", pageURL(record, "e96269f9d69f"))
 	assert.Equal(t, "http://127.0.0.1:4777/#token=abc", pageURL(record, ""))
+	assert.Equal(t, "http://127.0.0.1:4777/#repo=a%2Fb&token=abc", pageURL(record, "a/b"), "escaped once, never twice")
 }
 
 func TestTheServerServesTheEventStreamOfStreamsAndThePublishedSchema(t *testing.T) {
