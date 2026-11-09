@@ -1,13 +1,10 @@
 import { screen, waitFor, within } from '@testing-library/react'
-import { HttpResponse, http } from 'msw'
 import { expect, test } from 'vitest'
-import { envelope, listDetail } from '@/test/fixtures'
+import { listDetail } from '@/test/fixtures'
 import { renderApp } from '@/test/render'
-import { answeringRunUp, heldRun, job, runningWorktrees } from '@/test/run-up'
+import { listing } from '@/test/run-logs'
+import { answeringRunUp, heldRun, job } from '@/test/run-up'
 import { server } from '@/test/server'
-
-const listing = (details = runningWorktrees) =>
-  server.use(http.post('/api/repos/r1/commands/list', () => HttpResponse.json(envelope('list', details))))
 
 const startOne = async (user: Awaited<ReturnType<typeof renderApp>>['user'], worktree: string) => {
   await user.click(await screen.findByRole('button', { name: 'Start a profile' }))
@@ -40,8 +37,9 @@ test('each worktree with jobs up or crashed is a group, its crash first, and the
   expect(
     within(group)
       .getAllByRole('listitem')
-      .map((row) => row.getAttribute('aria-label')),
+      .flatMap((row) => row.getAttribute('aria-label') ?? []),
   ).toEqual(['api', 'web'])
+  expect(within(group).getByText('1 exited · migrate'), 'what ended closes its group').toBeDefined()
   expect(within(group).getByText('crashed · exit 1')).toBeDefined()
   expect(screen.getByText('1 job up in 1 worktree · 1 crashed')).toBeDefined()
   expect(screen.getByRole('link', { name: /Running/ }).closest('li')?.textContent).toBe('Running1')

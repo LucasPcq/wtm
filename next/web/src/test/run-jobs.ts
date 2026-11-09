@@ -1,6 +1,6 @@
 import { HttpResponse, http } from 'msw'
 import type { DomainAnswered, ListDetail, RunjobsStopJob, WebCall } from '@/api/types.gen'
-import { envelope } from '@/test/fixtures'
+import { envelope, psOf } from '@/test/fixtures'
 import { job, runningWorktrees } from '@/test/run-up'
 import { line, streamed } from '@/test/stream'
 
@@ -149,5 +149,6 @@ export const runJobsHandlers = ({ failing = [] as string[], calls = [] as WebCal
 // the Running page over runningJobs, its jobs stopped and started as runJobsHandlers says
 export const answeringRunJobs = (over: Parameters<typeof runJobsHandlers>[0] = {}) => [
   http.post('/api/repos/r1/commands/list', () => HttpResponse.json(envelope('list', runningJobs))),
+  http.post('/api/repos/r1/commands/run-ps', () => HttpResponse.json(psOf(runningJobs))),
   ...runJobsHandlers(over),
 ]

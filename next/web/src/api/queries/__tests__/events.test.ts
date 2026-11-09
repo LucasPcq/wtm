@@ -241,12 +241,14 @@ test("an operation finished waits for an open detail's status read too, beside t
   expect(seen[released]?.status).toBe(2)
 })
 
-// The Running page filled only once the whole start finished: a job's own events read nothing again.
+// The Running page filled only once the whole start finished, and a crash after run up left its row up: a job's own
+// events read nothing again.
 test("a job's event reads its repository again, as the job comes up, crashes or stops", async () => {
   const client = new QueryClient()
   client.setQueryData(['repos'], [repo])
   client.setQueryData(['repo', 'r1', 'list', []], { ok: true })
   client.setQueryData(['repo', 'r1', 'status', []], { ok: true })
+  client.setQueryData(['repo', 'r1', 'run-ps', [{ path: 'repo', values: ['/acme'] }]], { ok: true })
   client.setQueryData(['repo', 'r1', 'run-up', 'dry_run', []], { ok: true })
   const facts = ['repo', 'r1', 'run-logs', [{ path: 'job', values: ['web'] }]]
   const whole = [
@@ -269,6 +271,10 @@ test("a job's event reads its repository again, as the job comes up, crashes or 
 
   expect(client.getQueryState(['repo', 'r1', 'list', []])?.isInvalidated).toBe(true)
   expect(client.getQueryState(['repo', 'r1', 'status', []])?.isInvalidated).toBe(true)
+  expect(
+    client.getQueryState(['repo', 'r1', 'run-ps', [{ path: 'repo', values: ['/acme'] }]])?.isInvalidated,
+    'the Running page and its count',
+  ).toBe(true)
   expect(
     client.getQueryState(['repo', 'r1', 'run-up', 'dry_run', []])?.isInvalidated,
     'a dialog open on a plan is not asked again at each job',

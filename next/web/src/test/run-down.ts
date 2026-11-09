@@ -9,7 +9,7 @@ import type {
   WebCall,
 } from '@/api/types.gen'
 import { worktrees } from '@/test/acme'
-import { envelope } from '@/test/fixtures'
+import { envelope, psOf } from '@/test/fixtures'
 import { job } from '@/test/run-up'
 import { line, streamed } from '@/test/stream'
 
@@ -193,6 +193,7 @@ export const runDownRun =
 
 export const answeringRunDown = (run: (call: WebCall) => Response = runDownRun()) => [
   http.post('/api/repos/r1/commands/list', () => HttpResponse.json(envelope('list', runningAcme))),
+  http.post('/api/repos/r1/commands/run-ps', () => HttpResponse.json(psOf(runningAcme))),
   http.post('/api/repos/r1/commands/run-down/questions', async ({ request }) =>
     HttpResponse.json(runDownQuestionsOf(((await request.json()) as WebCall).answers)),
   ),

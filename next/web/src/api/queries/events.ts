@@ -142,7 +142,7 @@ function invalidate(client: QueryClient, line: WtmEventsV2) {
   if (line.type.startsWith('job.')) {
     const id = repoOf(client, line)
     return Promise.all(
-      (['list', 'status', 'run-logs'] as const).map((read) =>
+      (['list', 'status', 'run-logs', 'run-ps'] as const).map((read) =>
         client.invalidateQueries({
           queryKey: id ? ['repo', id, read] : ['repo'],
           predicate: (query) => !readsWhole(query),

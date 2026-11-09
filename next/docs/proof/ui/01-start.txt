@@ -1,5 +1,5 @@
 $ cd $SB/A && wtm-next ui --no-open --idle 40s
-http://127.0.0.1:<PORT>/#repo=<REPO_A>&token=<TOKEN>&worktree=<SB>%2FA
+http://127.0.0.1:<PORT>/#repo=<REPO_A>&token=<TOKEN>
 
 $ ls -l "$G" | awk "{print \$1, \$NF}"
 total 16

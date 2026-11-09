@@ -4,6 +4,9 @@ import type {
   DomainFollowUp,
   ListDetail,
   RepositoryOffer,
+  RunpsCounts,
+  RunpsDetail,
+  RunpsJob,
   StatusDetail,
   TreeDetail,
   WorktreeAction,
@@ -168,3 +171,65 @@ export const unreadable = (command: string, subject: string): DomainEnvelope => 
     },
   ],
 })
+
+const countsOf = (jobs: RunpsJob[]): RunpsCounts => {
+  const counts: RunpsCounts = { running: 0, starting: 0, crashed: 0, exited: 0, stopped: 0, not_started: 0, holders: 0 }
+  for (const job of jobs) counts[job.state] += 1
+  return counts
+}
+
+export const psJob = (name: string, over: Partial<RunpsJob> = {}): RunpsJob => ({
+  name,
+  kind: 'service',
+  state: 'running',
+  hold: 'own',
+  started_at: '2026-10-25T11:50:00Z',
+  ...over,
+})
+
+// a group of run ps: a worktree's jobs, its counts counted from them
+export const psGroup = (branch: string, jobs: RunpsJob[], over: Partial<RunpsDetail> = {}): RunpsDetail => ({
+  repository: '/acme',
+  shared: false,
+  branch,
+  path: branch === 'main' ? '/acme' : `/acme.trees/${branch.replace('/', '-')}`,
+  profile: 'dev',
+  counts: countsOf(jobs),
+  jobs,
+  ...over,
+})
+
+export const psEnvelope = (groups: RunpsDetail[]): DomainEnvelope => ({
+  ...envelope('run-ps', []),
+  items: groups.map((detail) => ({
+    subject: detail.shared ? 'shared' : detail.branch,
+    status: 'done',
+    detail: detail as never,
+  })),
+})
+
+// run ps of what list says: each worktree's own jobs, a crash first, its claims left out
+export const psOf = (details: ListDetail[]): DomainEnvelope =>
+  psEnvelope(
+    details
+      .flatMap((detail) => {
+        const jobs = (detail.jobs ?? []).flatMap((job) =>
+          job.hold === 'claim'
+            ? []
+            : [
+                psJob(job.name, {
+                  ...(job.kind && { kind: job.kind }),
+                  state: job.state ?? 'running',
+                  ...(job.hold && { hold: job.hold }),
+                  ...(job.url && { url: job.url }),
+                  ...(job.exit_code !== undefined && { exit_code: job.exit_code }),
+                  ...(job.started_at && { started_at: job.started_at }),
+                }),
+              ],
+        )
+        return jobs.length > 0
+          ? [psGroup(detail.branch, jobs, { profile: detail.profile ?? '', path: detail.path })]
+          : []
+      })
+      .toSorted((a, b) => Number(b.counts.crashed > 0) - Number(a.counts.crashed > 0)),
+  )

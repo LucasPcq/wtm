@@ -8,6 +8,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { type Filter, filterLabel, filters } from '@/features/worktrees/utils/filters'
 import type { WorktreesSearch } from '@/features/worktrees/utils/search'
+import { focusOnSlash } from '@/features/worktrees/utils/slash'
 
 export function Toolbar({
   search,
@@ -30,19 +31,6 @@ export function Toolbar({
     const own = box.typed.trim() === (search.q ?? '')
     setBox({ typed: own ? box.typed : (search.q ?? ''), asked: search.q })
     if (!own) ask.cancel()
-  }
-
-  const focusOnSlash = (input: HTMLInputElement | null) => {
-    if (!input) return
-
-    const onKey = (e: KeyboardEvent) => {
-      const typing = e.target instanceof HTMLElement && e.target.closest('input, textarea, select, [contenteditable]')
-      if (e.key !== '/' || typing || e.metaKey || e.ctrlKey || e.altKey) return
-      e.preventDefault()
-      input.focus()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
   }
 
   return (

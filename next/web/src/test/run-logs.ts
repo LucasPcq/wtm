@@ -1,7 +1,7 @@
 import { screen, within } from '@testing-library/react'
 import { HttpResponse, http } from 'msw'
 import type { DomainAnswered, DomainEnvelope, RunlogsJob, RunlogsLine, WebCall, WebJobLine } from '@/api/types.gen'
-import { envelope } from '@/test/fixtures'
+import { envelope, psOf } from '@/test/fixtures'
 import { runningWorktrees } from '@/test/run-up'
 import { server } from '@/test/server'
 
@@ -97,7 +97,10 @@ export const answeringRunLogs = (over: Record<string, Partial<RunlogsJob>> = {})
 
 // the Running page's list: feat/billing running dev, unless details say otherwise
 export const listing = (details = runningWorktrees) =>
-  server.use(http.post('/api/repos/r1/commands/list', () => HttpResponse.json(envelope('list', details))))
+  server.use(
+    http.post('/api/repos/r1/commands/list', () => HttpResponse.json(envelope('list', details))),
+    http.post('/api/repos/r1/commands/run-ps', () => HttpResponse.json(psOf(details))),
+  )
 
 export const panelOf = (job: string) => screen.findByRole('region', { name: `${job} in feat/billing` })
 
