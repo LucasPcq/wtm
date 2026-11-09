@@ -122,10 +122,12 @@ export function DaemonCard({
           <RotateCw />
           Restart
         </Button>
-        <Button variant="outline" size="sm" disabled={busy || down || repos.length === 0} onClick={onStopJobs}>
-          <Square />
-          Stop every job
-        </Button>
+        {!down && (
+          <Button variant="outline" size="sm" disabled={busy || repos.length === 0} onClick={onStopJobs}>
+            <Square />
+            Stop every job
+          </Button>
+        )}
       </div>
     </div>
   )
