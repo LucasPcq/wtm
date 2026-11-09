@@ -18,7 +18,6 @@ import (
 	"time"
 
 	bus "github.com/LucasPcq/wtm/next/internal/adapter/events"
-	"github.com/LucasPcq/wtm/next/internal/adapter/git"
 	reposjson "github.com/LucasPcq/wtm/next/internal/adapter/registry"
 	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
 	"github.com/LucasPcq/wtm/next/internal/adapter/webserver"
@@ -72,8 +71,7 @@ func uiCmd(env cli.Env) *cobra.Command {
 			return err
 		}
 
-		here, _ := git.Repo{Dir: env.ProjectDir}.Toplevel(cmd.Context())
-		page := pageURL(pageParams{Record: record, Repo: repoID(cmd.Context(), env.ProjectDir), Worktree: here})
+		page := pageURL(record, repoID(cmd.Context(), env.ProjectDir))
 		fmt.Fprintln(cmd.OutOrStdout(), page)
 		if *noOpen {
 			return nil
@@ -313,23 +311,13 @@ func listen() (net.Listener, error) {
 	return net.Listen("tcp", "127.0.0.1:0")
 }
 
-// pageURL is the address of the page params name, the token, the repository and the worktree ui ran in in its fragment, which the browser never sends; each left out when empty.
-func pageURL(params pageParams) string {
-	fragment := url.Values{"token": {params.Record.Token}}
-	if params.Repo != "" {
-		fragment.Set("repo", params.Repo)
+// pageURL is the address of the page of the repository repo on the server of record, the token in its fragment, which the browser never sends; repo is left out when empty.
+func pageURL(record webserver.Record, repo string) string {
+	fragment := url.Values{"token": {record.Token}}
+	if repo != "" {
+		fragment.Set("repo", repo)
 	}
-	if params.Worktree != "" {
-		fragment.Set("worktree", params.Worktree)
-	}
-	return (&url.URL{Scheme: "http", Host: net.JoinHostPort("127.0.0.1", strconv.Itoa(params.Record.Port)), Path: "/"}).String() + "#" + fragment.Encode()
-}
-
-// pageParams are what the page's address carries: the server's record (its port and token), the repository it opens on and the worktree ui ran in (the page's "this worktree"), each "" when there is none.
-type pageParams struct {
-	Record   webserver.Record
-	Repo     string
-	Worktree string
+	return (&url.URL{Scheme: "http", Host: net.JoinHostPort("127.0.0.1", strconv.Itoa(record.Port)), Path: "/", Fragment: fragment.Encode()}).String()
 }
 
 // repoID is the id the server names the repository of dir by, registering it among those wtm knows; "" when dir is in no repository.

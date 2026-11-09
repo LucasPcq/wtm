@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { groupsOf } from '@/features/worktrees/running/utils/groups'
 import { pinOf, visible } from '@/features/worktrees/running/utils/visible'
-import { calm, hereFilter } from '@/features/worktrees/store/ui-store'
+import { calm } from '@/features/worktrees/store/ui-store'
 import { psGroup, psJob, read } from '@/test/fixtures'
 
 const groups = groupsOf({
@@ -19,7 +19,7 @@ const groups = groupsOf({
 })
 const none = () => false
 const shown = (over: Partial<Parameters<typeof visible>[0]> = {}) =>
-  visible({ groups, filter: calm, search: '', here: undefined, pinned: none, quiet: none, ...over })
+  visible({ groups, filter: calm, search: '', pinned: none, quiet: none, ...over })
 
 test('the calm default lists what runs and crashed, a group closing on its ended jobs, one with nothing else gone', () => {
   const { groups: listed, counts, hidden } = shown()
@@ -55,41 +55,31 @@ test('a group asked to show its ended jobs lists them, and the Stopped and exite
   expect(everything.groups[2]?.endedShown.map((job) => job.name)).toEqual(['api'])
 })
 
-test('this worktree is the one the page was opened from, by its path', () => {
-  const { groups: listed } = shown({ filter: { ...calm, worktree: hereFilter }, here: '/acme.trees/fix-login' })
-
-  expect(listed.map((group) => group.worktree)).toEqual(['fix/login'])
-})
-
 // A worktree on a branch called shared took the shared services' key: folding one folded both, and the filter took one
 // for the other.
-test('a group is keyed by its repository and path, so a branch called shared or here is its own group', () => {
+test('a group is keyed by its repository and path, so a branch called shared is its own group', () => {
   const tricky = groupsOf({
     read: read('run-ps', [
       psGroup('shared', [psJob('web')]),
-      psGroup('here', [psJob('api')]),
       psGroup('main', [psJob('db')], { shared: true, profile: '' }),
     ]),
     progress: undefined,
     plan: undefined,
   })
-  const [branchShared, branchHere, services] = tricky
+  const [branchShared, services] = tricky
 
-  expect(new Set(tricky.map((group) => group.key)).size).toBe(3)
+  expect(new Set(tricky.map((group) => group.key)).size).toBe(2)
   expect(services?.key).toBe('shared')
   const only = (worktree: string) =>
     visible({
       groups: tricky,
       filter: { ...calm, worktree },
       search: '',
-      here: undefined,
       pinned: none,
       quiet: none,
     }).groups.map((group) => group.key)
   expect(only('shared')).toEqual(['shared'])
   expect(only(branchShared?.key ?? '')).toEqual([branchShared?.key])
-  expect(only(hereFilter), 'this worktree is unknown: nothing is it').toEqual([])
-  expect(branchHere?.worktree).toBe('here')
 })
 
 test('a pinned job that ended stays on top, and a job starting counts as running', () => {
@@ -105,7 +95,6 @@ test('a pinned job that ended stays on top, and a job starting counts as running
     groups: starting,
     filter: calm,
     search: '',
-    here: undefined,
     pinned: none,
     quiet: none,
   })

@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Activity, Play } from 'lucide-react'
 import { useState } from 'react'
-import { hereIn } from '@/api/here'
 import { jobsQuery } from '@/api/queries/commands'
 import { reposQuery } from '@/api/queries/repos'
 import { Centered } from '@/components/centered'
@@ -42,13 +41,12 @@ export function RunningPage({ repo, search }: { repo: string; search: RunningSea
   const quiet = useMarks('quiet', repo)
   const { filter, change, clear } = useRunFilter(repo)
   const [typed, setTyped] = useState('')
-  const here = hereIn(repo)
 
   // past its end, a start's progress holds until the first read after it lands: its groups would vanish in between
   const ended = progress?.endedAt
   const overlay = running || (ended !== undefined && ps.dataUpdatedAt < ended) ? progress : undefined
   const groups = ps.data ? groupsOf({ read: ps.data, progress: overlay, plan }) : []
-  const shown = visible({ groups, filter, search: typed, here, pinned: pinned.has, quiet: quiet.has })
+  const shown = visible({ groups, filter, search: typed, pinned: pinned.has, quiet: quiet.has })
   // the shared services fold by default: a mark opens them, as one folds a worktree
   const isFolded = (group: RunningGroup) => group.shared !== folded.has(group.key)
   const pinnedKey = 'pinned'
@@ -58,10 +56,7 @@ export function RunningPage({ repo, search }: { repo: string; search: RunningSea
     shown.pinned.map(({ group, row }) => ({ group, job: row.job }))[0] ??
     shown.groups.flatMap((group) => group.rows.flatMap((row) => ('job' in row ? [{ group, job: row.job }] : [])))[0]
 
-  const worktrees = groups.map((group) => ({
-    key: group.key,
-    label: group.shared ? 'Shared services' : group.worktree,
-  }))
+  const worktrees = groups.map(({ key, shared, worktree }) => ({ key, shared, label: worktree }))
   const up = shown.counts.running
   const crashed = groups.reduce((count, group) => count + group.counts.crashed, 0)
   const live = groups.filter((group) => group.rows.length > 0)
@@ -77,7 +72,6 @@ export function RunningPage({ repo, search }: { repo: string; search: RunningSea
         : [group.path ?? group.worktree],
     ),
   ).size
-  const hereName = groups.find((group) => !group.shared && group.path === here)?.worktree ?? here?.split('/').pop()
 
   const description = () => {
     if (!ps.data) return 'Reading the jobs…'
@@ -120,7 +114,6 @@ export function RunningPage({ repo, search }: { repo: string; search: RunningSea
           stateCounts={shown.states}
           hidden={shown.hidden}
           worktrees={worktrees}
-          here={hereName}
           switcher={
             picked && (
               <JobSwitcher

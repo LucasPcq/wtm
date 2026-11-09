@@ -1,6 +1,6 @@
 import type { RunpsJob } from '@/api/types.gen'
 import { hasEnded, type RunningGroup, type RunningRow } from '@/features/worktrees/running/utils/groups'
-import { type Chip, hereFilter, type RunFilter, type ShownState } from '@/features/worktrees/store/ui-store'
+import type { Chip, RunFilter, ShownState } from '@/features/worktrees/store/ui-store'
 
 // a job pinned to the top: its worktree and its name
 export const pinOf = (worktree: string, job: string) => `${worktree}/${job}`
@@ -34,24 +34,17 @@ export function visible({
   groups,
   filter,
   search,
-  here,
   pinned,
   quiet,
 }: {
   groups: RunningGroup[]
   filter: RunFilter
   search: string
-  here: string | undefined
   pinned: (id: string) => boolean
   quiet: (key: string) => boolean
 }): Visible {
   const query = search.trim().toLowerCase()
-  // the filter names a group by its key, or this worktree, where the page was opened, by `here`, no key's spelling
-  const inWorktree = (group: RunningGroup) => {
-    if (filter.worktree === undefined) return true
-    if (filter.worktree === hereFilter) return !group.shared && group.path === here
-    return group.key === filter.worktree
-  }
+  const inWorktree = (group: RunningGroup) => filter.worktree === undefined || group.key === filter.worktree
   const keeps = (group: RunningGroup, job: RunpsJob) =>
     inWorktree(group) &&
     chipKeeps[filter.chip](job) &&

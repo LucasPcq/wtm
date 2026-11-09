@@ -1,4 +1,4 @@
-import { ListFilter, Search } from 'lucide-react'
+import { GitBranch, ListFilter, Search } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import {
@@ -9,13 +9,16 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import { Kbd } from '@/components/ui/kbd'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { chipLabel, shownLabel } from '@/features/worktrees/running/utils/list-words'
-import { type Chip, hereFilter, type RunFilter, type ShownState } from '@/features/worktrees/store/ui-store'
+import type { Chip, RunFilter, ShownState } from '@/features/worktrees/store/ui-store'
 import { focusOnSlash } from '@/features/worktrees/utils/slash'
 import { cn } from '@/lib/utils'
 
@@ -24,7 +27,7 @@ const states: ShownState[] = ['running', 'crashed', 'ended']
 const all = 'all'
 
 // the list's filter: the search, the chips with their counts, what the filter hides and its Clear; the Filter menu
-// picks a worktree (this worktree, where `wtm ui` ran, first) and the states the list shows
+// picks a worktree in a submenu, which a repository with many keeps out of the way, and the states the list shows
 export function RunningToolbar({
   search,
   onSearch,
@@ -35,7 +38,6 @@ export function RunningToolbar({
   stateCounts,
   hidden,
   worktrees,
-  here,
   switcher,
 }: {
   search: string
@@ -46,12 +48,19 @@ export function RunningToolbar({
   counts: Record<Chip, number>
   stateCounts: Record<ShownState, number>
   hidden: number
-  worktrees: { key: string; label: string }[]
-  here: string | undefined
+  worktrees: { key: string; shared: boolean; label: string }[]
   switcher: ReactNode
 }) {
   // a window too narrow for the list beside a job's log folds the list into the switcher, beside Crashed and Filter
   const folds = switcher ? '@max-[1100px]/page:hidden' : undefined
+  const shared = worktrees.find((one) => one.shared)
+  const own = worktrees.filter((one) => !one.shared)
+  const chosen = () => {
+    if (filter.worktree === undefined) return 'All worktrees'
+    if (filter.worktree === shared?.key) return 'Shared services'
+    // a worktree whose jobs all ended is no group any more: its key still names its folder
+    return worktrees.find((one) => one.key === filter.worktree)?.label ?? filter.worktree.split('/').pop()
+  }
   return (
     <div className="flex flex-wrap items-center gap-3 border-b px-8 py-3">
       {switcher}
@@ -107,24 +116,28 @@ export function RunningToolbar({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-72">
-          <DropdownMenuLabel className="text-xs text-muted-foreground">Worktree</DropdownMenuLabel>
-          <DropdownMenuRadioGroup
-            value={filter.worktree ?? all}
-            onValueChange={(value) => onFilter({ worktree: value === all ? undefined : value })}
-          >
-            <DropdownMenuRadioItem value={all}>All worktrees</DropdownMenuRadioItem>
-            {here && (
-              <DropdownMenuRadioItem value={hereFilter} className="flex-col items-start gap-0">
-                This worktree
-                <span className="text-xs text-muted-foreground">{here}, where this page was opened</span>
-              </DropdownMenuRadioItem>
-            )}
-            {worktrees.map(({ key, label }) => (
-              <DropdownMenuRadioItem key={key} value={key}>
-                {label}
-              </DropdownMenuRadioItem>
-            ))}
-          </DropdownMenuRadioGroup>
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>
+              <GitBranch className="text-muted-foreground" aria-hidden="true" />
+              <span className="flex-1">Worktree</span>
+              <span className="max-w-32 truncate text-muted-foreground">{chosen()}</span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="max-h-80 w-56 overflow-y-auto">
+              <DropdownMenuRadioGroup
+                value={filter.worktree ?? all}
+                onValueChange={(value) => onFilter({ worktree: value === all ? undefined : value })}
+              >
+                <DropdownMenuRadioItem value={all}>All worktrees</DropdownMenuRadioItem>
+                {shared && <DropdownMenuRadioItem value={shared.key}>Shared services</DropdownMenuRadioItem>}
+                {own.length > 0 && <DropdownMenuSeparator />}
+                {own.map(({ key, label }) => (
+                  <DropdownMenuRadioItem key={key} value={key}>
+                    {label}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
           <DropdownMenuSeparator />
           <DropdownMenuLabel className="text-xs text-muted-foreground">State</DropdownMenuLabel>
           {states.map((state) => (

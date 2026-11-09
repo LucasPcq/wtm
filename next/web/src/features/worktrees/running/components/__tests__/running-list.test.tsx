@@ -143,16 +143,30 @@ test('a job pinned from its panel sits on top, out of its group', async () => {
   ).toContain('web')
 })
 
-test('this worktree is where the page was opened from', async () => {
-  localStorage.setItem('wtm.here.r1', '/acme.trees/fix-login')
+test("the Filter menu's Worktree submenu picks one, and says which", async () => {
   acme()
   const { user } = await renderApp('/r/r1/running')
 
   await user.click(await screen.findByRole('button', { name: 'Filter' }))
-  await user.click(await screen.findByRole('menuitemradio', { name: /This worktree/ }))
+  const worktree = await screen.findByRole('menuitem', { name: /Worktree/ })
+  expect(worktree.textContent).toContain('All worktrees')
+  await user.click(worktree)
+  const picks = await screen.findAllByRole('menuitemradio')
+  expect(picks.map((pick) => pick.textContent)).toEqual([
+    'All worktrees',
+    'Shared services',
+    'feat/billing',
+    'fix/login',
+  ])
+  expect(screen.queryByText(/This worktree/)).toBeNull()
+  // happy-dom's pointer never settles in a submenu: the keyboard picks it, as a person may
+  screen.getByRole('menuitemradio', { name: 'fix/login' }).focus()
+  await user.keyboard('{Enter}')
 
-  await waitFor(() => expect(screen.queryByRole('region', { name: 'feat/billing' })).toBeNull())
-  expect(screen.getByRole('region', { name: 'fix/login' })).toBeDefined()
+  expect(await screen.findByRole('region', { name: 'fix/login' })).toBeDefined()
+  expect(screen.queryByRole('region', { name: 'feat/billing' })).toBeNull()
+  await user.click(screen.getByRole('button', { name: 'Filter' }))
+  expect((await screen.findByRole('menuitem', { name: /Worktree/ })).textContent).toContain('fix/login')
 })
 
 test('the Pinned group unpins them all from its menu', async () => {
@@ -188,6 +202,17 @@ test('a filter stored broken is the calm default', async () => {
 
   expect(await screen.findByRole('region', { name: 'fix/login' })).toBeDefined()
   expect(screen.getByRole('radio', { name: /All/ }).getAttribute('aria-checked')).toBe('true')
+})
+
+// "This worktree" is gone: a filter stored on it lists every worktree again.
+test('a filter stored on this worktree lists all worktrees', async () => {
+  await storedFilter({ chip: 'all', worktree: 'here', states: ['running', 'crashed'] })
+  acme()
+  await renderApp('/r/r1/running')
+
+  expect(await screen.findByRole('region', { name: 'feat/billing' })).toBeDefined()
+  expect(screen.getByRole('region', { name: 'fix/login' })).toBeDefined()
+  expect(screen.getByRole('region', { name: 'Shared services' })).toBeDefined()
 })
 
 // An older page stored the filter's worktree by its branch, which no group's key spells: the list stayed empty.
