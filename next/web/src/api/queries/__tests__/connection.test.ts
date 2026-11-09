@@ -46,3 +46,21 @@ test('the connection reads the query of the stream', () => {
     'daemon-down',
   )
 })
+
+test("a daemon that doesn't start reads wtm's daemon again, which no longer says it up", async () => {
+  const client = new QueryClient()
+  client.setQueryData(['repo', 'r1', 'daemon-status', []], { ok: true })
+  server.use(
+    http.get(
+      '/api/events',
+      () =>
+        new HttpResponse(
+          'event: warning\ndata: {"message":"the event bus did not start","code":"daemon.start_failed"}\n\n',
+        ),
+    ),
+  )
+
+  await client.fetchQuery(eventsQuery)
+
+  expect(client.getQueryState(['repo', 'r1', 'daemon-status', []])?.isInvalidated).toBe(true)
+})

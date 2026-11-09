@@ -113,6 +113,7 @@ async function* lines(client: QueryClient, signal: AbortSignal): AsyncGenerator<
     }
     if (value.event === 'warning') {
       const warning = JSON.parse(value.data) as WebWarning
+      if (warning.code === 'daemon.start_failed') void daemonRead(client)
       yield { warning: warning.message, ...(warning.code && { warningCode: warning.code }), operations }
     }
     if (!value.event) {
@@ -167,6 +168,13 @@ function settled(client: QueryClient, repo: string | undefined, since: number): 
 const repoOf = (client: QueryClient, line: WtmEventsV2) =>
   client.getQueryData<WebRepos>(['repos'])?.find((repo) => repo.common_dir === line.repo?.common_dir)?.id
 
+// wtm's daemon is the machine's: its read under every repository
+const daemonRead = (client: QueryClient) =>
+  client.invalidateQueries({
+    queryKey: ['repo'],
+    predicate: (query) => query.queryKey[2] === 'daemon-status' && query.queryKey[3] !== 'questions',
+  })
+
 function invalidate(client: QueryClient, line: WtmEventsV2) {
   if (line.type === 'repo.added' || line.type === 'repo.removed')
     return client.invalidateQueries({ queryKey: ['repos'] })
@@ -181,10 +189,7 @@ function invalidate(client: QueryClient, line: WtmEventsV2) {
           predicate: (query) => !readsWhole(query),
         }),
       ),
-      client.invalidateQueries({
-        queryKey: ['repo'],
-        predicate: (query) => query.queryKey[2] === 'daemon-status' && query.queryKey[3] !== 'questions',
-      }),
+      daemonRead(client),
     ])
   }
   if (line.type.startsWith('worktree.') || line.type === 'operation.finished') {
