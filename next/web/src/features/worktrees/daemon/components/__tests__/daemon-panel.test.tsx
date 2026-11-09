@@ -63,7 +63,7 @@ test('Restart lists what comes back by repository, whose hold goes, what is take
   expect(within(dialog).getByText("fix/login's stack")).toBeDefined()
   await user.click(within(dialog).getByRole('button', { name: 'Restart' }))
 
-  expect(await screen.findByText("Restarted wtm's daemon · 2 jobs are back; the stack was taken over.")).toBeDefined()
+  expect(await screen.findByText("Restarted wtm's daemon · 3 jobs are back; the stack was taken over.")).toBeDefined()
 })
 
 test("a restart whose new daemon didn't start says it in the panel, with its log to open", async () => {
@@ -164,9 +164,9 @@ test("a daemon up again after a restart that didn't start it is no longer said d
 
   panel = await openPanel(user)
 
-  expect(await within(panel).findByText("The restart didn't finish")).toBeDefined()
+  expect(await within(panel).findByText('Up · 0.31.0, this version')).toBeDefined()
   expect(within(panel).queryByText("The new daemon didn't start")).toBeNull()
-  expect(within(panel).getByText('on :11080')).toBeDefined()
+  expect(within(panel).queryByText("The restart didn't finish")).toBeNull()
 })
 
 test('a Stop every job hidden while it runs says how it ended, and Details opens it again', async () => {
@@ -189,4 +189,35 @@ test('a Stop every job hidden while it runs says how it ended, and Details opens
   expect(
     await within(await screen.findByRole('dialog', { name: 'Stop every job' })).findByText("Couldn't stop"),
   ).toBeDefined()
+})
+
+test('a worktree refused before any of its jobs ran is no full stop, and Run again shows only when the core offers it', async () => {
+  server.use(daemonStatus(), answeringStopJobs('refused'))
+  const { user } = await renderApp('/r/r1/worktrees')
+  const panel = await openPanel(user)
+  await user.click(within(panel).getByRole('button', { name: 'Stop every job' }))
+  const dialog = await screen.findByRole('dialog', { name: 'Stop every job' })
+  await user.click(await within(dialog).findByRole('button', { name: 'Stop 3 jobs' }))
+
+  expect(await within(dialog).findByText('2 of 3 stopped.')).toBeDefined()
+  expect(within(dialog).queryByRole('button', { name: 'Run again' })).toBeNull()
+})
+
+test('a Stop every job closed with Escape while it runs still says how it ended', async () => {
+  let release = () => {}
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  server.use(daemonStatus(), answeringStopJobs(true, held))
+  const { user } = await renderApp('/r/r1/worktrees')
+  const panel = await openPanel(user)
+  await user.click(within(panel).getByRole('button', { name: 'Stop every job' }))
+  const dialog = await screen.findByRole('dialog', { name: 'Stop every job' })
+  await user.click(await within(dialog).findByRole('button', { name: 'Stop 3 jobs' }))
+  await within(dialog).findByRole('button', { name: 'Hide' })
+  await user.keyboard('{Escape}')
+
+  release()
+
+  expect(await screen.findByText("Jobs didn't stop in 1 worktree.")).toBeDefined()
 })

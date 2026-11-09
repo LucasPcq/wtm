@@ -1,10 +1,11 @@
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
 import { toast } from 'sonner'
 import type { Applied, Planned } from '@/api/queries/commands'
 import { Dialog } from '@/components/ui/dialog'
 import { RunDialogContent } from '@/features/worktrees/components/run-dialog-content'
 import { StopProgress } from '@/features/worktrees/components/stop-progress'
 import { StopJobsConfirm } from '@/features/worktrees/daemon/components/stop-jobs-confirm'
+import { useDaemonRuns } from '@/features/worktrees/daemon/hooks/use-daemon-runs'
 import { together } from '@/features/worktrees/daemon/utils/rows'
 import { succeeded, useRun } from '@/features/worktrees/hooks/use-run'
 import { unitsOf } from '@/features/worktrees/utils/stop-plan'
@@ -21,7 +22,8 @@ export function StopJobsDialog({
   onShow: () => void
 }) {
   const run = useRun(repo, 'daemon-stop-jobs')
-  const [ran, setRan] = useState<Planned<'daemon-stop-jobs'>>()
+  const ran = useDaemonRuns((runs) => runs.stopping)
+  const setRan = (stopping: Planned<'daemon-stop-jobs'> | undefined) => useDaemonRuns.setState({ stopping })
   const hidden = useRef(false)
   const again = run.progress?.envelope?.follow_ups?.some((followUp) => followUp.code === 'daemon-stop-jobs.again')
 
@@ -55,8 +57,9 @@ export function StopJobsDialog({
           title="Stop every job"
           stopping="Stopping every job"
           ended={({ stopped, total }, failed) => {
-            if (failed.length === 0) return `${stopped} stopped. The proxy is still up.`
-            return `${stopped} of ${total} stopped. Run again retries ${together(failed)}.`
+            if (stopped === total && failed.length === 0) return `${stopped} stopped. The proxy is still up.`
+            const retries = again && failed.length > 0 ? ` Run again retries ${together(failed)}.` : ''
+            return `${stopped} of ${total} stopped.${retries}`
           }}
           progress={run.progress}
           running={run.running}
@@ -93,7 +96,14 @@ export function StopJobsDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (next) return
+        hidden.current = run.running
+        onClose()
+      }}
+    >
       <RunDialogContent running={run.running}>{content()}</RunDialogContent>
     </Dialog>
   )

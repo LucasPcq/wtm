@@ -48,7 +48,7 @@ export function holderEvents(op: string) {
       new HttpResponse(
         new ReadableStream({
           start: (controller) => {
-            controller.enqueue(encoder.encode(': open\n\n'))
+            controller.enqueue(encoder.encode(': open\n\ndata: {"v":2,"type":"ready"}\n\n'))
             write = (line) => controller.enqueue(encoder.encode(line))
             close = () => controller.close()
           },

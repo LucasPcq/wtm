@@ -52,6 +52,25 @@ func TestADaemonThatFailsToStartFailsTheSubscription(t *testing.T) {
 	assert.Equal(t, run.CodeStartFailed, failure.Code)
 }
 
+func TestADaemonStartedThatNeverAnswersFailsAsNotStarted(t *testing.T) {
+	bus := Bus{SocketPath: filepath.Join(socketDir(t), "wtm.sock"), Start: func() error { return nil }}
+
+	_, err := bus.Subscribe(t.Context(), nil)
+
+	assert.ErrorContains(t, err, "the event bus did not start")
+	failure, ok := errors.AsType[*domain.Error](err)
+	require.True(t, ok)
+	assert.Equal(t, run.CodeStartFailed, failure.Code)
+}
+
+func TestNoDaemonToStartFailsAsNotStarted(t *testing.T) {
+	_, err := Bus{SocketPath: filepath.Join(socketDir(t), "wtm.sock")}.Subscribe(t.Context(), nil)
+
+	failure, ok := errors.AsType[*domain.Error](err)
+	require.True(t, ok)
+	assert.Equal(t, run.CodeStartFailed, failure.Code)
+}
+
 func TestASubscriptionEndsWithItsContext(t *testing.T) {
 	socket := serving(t)
 	ctx, cancel := context.WithCancel(t.Context())

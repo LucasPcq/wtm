@@ -8,6 +8,8 @@ import { RunDialogContent } from '@/features/worktrees/components/run-dialog-con
 import { type CardState, DaemonCard } from '@/features/worktrees/daemon/components/daemon-card'
 import { RestartDialog } from '@/features/worktrees/daemon/components/restart-dialog'
 import { StopJobsDialog } from '@/features/worktrees/daemon/components/stop-jobs-dialog'
+import { useDaemonRuns } from '@/features/worktrees/daemon/hooks/use-daemon-runs'
+import { cameBack, comingBack as comingBackOf } from '@/features/worktrees/daemon/utils/rows'
 import { succeeded, useRun } from '@/features/worktrees/hooks/use-run'
 import { jobsTodo } from '@/features/worktrees/utils/progress'
 
@@ -21,24 +23,27 @@ const notBack = (envelope: Applied<'daemon-restart'> | undefined) => {
 export function DaemonPanel({ repo, children }: { repo: string; children: ReactElement }) {
   const status = useQuery(readQuery(repo, 'daemon-status'))
   const restart = useRun(repo, 'daemon-restart')
+  const comingBack = useDaemonRuns((runs) => runs.comingBack)
   const stopping = useRun(repo, 'daemon-stop-jobs').running
   const [asking, setAsking] = useState<'restart' | 'stop'>()
   const detail = status.data?.items[0]?.detail
   const unread = status.error?.message ?? status.data?.error?.message
 
   const state = (): CardState => {
-    if (restart.running) return { kind: 'restarting', back: restart.progress?.units[0]?.phases.length ?? 0 }
+    if (restart.running) return { kind: 'restarting', back: comingBack }
     if (stopping) return { kind: 'stopping' }
     if (!restart.progress) return { kind: 'read' }
     const envelope = restart.progress.envelope
     const error = envelope?.items[0]?.error
     const message = restart.progress.refused ?? error?.message ?? envelope?.error?.message
     if (!message) return { kind: 'read' }
-    // down until a daemon answers again: the page's own stream starts one
-    const down = error?.code === 'daemon-restart.start_failed' && !detail?.running
-    const title =
-      error?.code === 'daemon-restart.not_back' ? `Restarted · ${notBack(envelope)}` : "The restart didn't finish"
-    return { kind: 'failed', title, message, down }
+    // down until a daemon answers again, which the page's own stream starts: then it reads as it stands
+    if (error?.code === 'daemon-restart.start_failed' && detail?.running) return { kind: 'read' }
+    const down = error?.code === 'daemon-restart.start_failed'
+    // it restarted, some jobs short: a warning, not a failure
+    if (error?.code === 'daemon-restart.not_back')
+      return { kind: 'failed', title: `Restarted · ${notBack(envelope)}`, message, down, tone: 'attention' }
+    return { kind: 'failed', title: "The restart didn't finish", message, down, tone: 'failed' }
   }
 
   const told = (envelope: Applied<'daemon-restart'> | undefined) => {
@@ -50,7 +55,7 @@ export function DaemonPanel({ repo, children }: { repo: string; children: ReactE
       toast.error("Couldn't restart wtm's daemon", { description: 'Its panel says why.' })
       return
     }
-    const back = (envelope?.items[0]?.detail?.back ?? []).filter((job) => job.back).length
+    const back = envelope?.plan ? cameBack(envelope.plan, envelope.items[0]?.detail?.back ?? []) : 0
     const stacks = (envelope?.plan?.taken_over ?? [])
       .flatMap((repo) => repo.worktrees ?? [])
       .flatMap((wt) => wt.jobs ?? [])
@@ -88,11 +93,8 @@ export function DaemonPanel({ repo, children }: { repo: string; children: ReactE
               repo={repo}
               onRestart={(fingerprint, plan) => {
                 setAsking(undefined)
-                // each job that comes back is a phase of the one unit: its count travels with the run to every page
-                const back = (plan.back ?? []).flatMap((repo) =>
-                  (repo.worktrees ?? []).flatMap((wt) => (wt.jobs ?? []).map((job) => `${wt.path}:${job.name}`)),
-                )
-                restart.start({ answers: [], fingerprint, units: [jobsTodo('daemon', back)] }, told)
+                useDaemonRuns.setState({ comingBack: comingBackOf(plan) })
+                restart.start({ answers: [], fingerprint, units: [jobsTodo('daemon', [])] }, told)
               }}
               onCancel={() => setAsking(undefined)}
             />

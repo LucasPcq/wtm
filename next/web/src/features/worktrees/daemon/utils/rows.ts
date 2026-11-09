@@ -1,4 +1,11 @@
-import type { DaemonrestartPlan, DaemonstopjobsPlan, RunHeldJob, RunHeldRepo, RunjobsStopJob } from '@/api/types.gen'
+import type {
+  DaemonrestartBack,
+  DaemonrestartPlan,
+  DaemonstopjobsPlan,
+  RunHeldJob,
+  RunHeldRepo,
+  RunjobsStopJob,
+} from '@/api/types.gen'
 
 export type Row = { key: string; title: string; lines: string[]; warning?: string }
 export type RepoRows = { repo: string; rows: Row[] }
@@ -41,6 +48,22 @@ function heldRows(repos: RunHeldRepo[] | null, after: string): RepoRows[] {
 }
 
 const names = (jobs: { name: string }[]) => jobs.map((job) => job.name).join(', ')
+
+// the jobs a restart starts again: a claim comes back with the shared job it holds, not as a job of its own
+const startedAgain = (plan: DaemonrestartPlan) =>
+  (plan.back ?? []).flatMap((repo) =>
+    (repo.worktrees ?? []).flatMap((wt) =>
+      (wt.jobs ?? []).filter((job) => job.hold !== 'claim').map((job) => `${wt.path}\n${job.name}`),
+    ),
+  )
+
+export const comingBack = (plan: DaemonrestartPlan) => startedAgain(plan).length
+
+// of the jobs a restart says back, those it started again
+export const cameBack = (plan: DaemonrestartPlan, back: DaemonrestartBack[]) => {
+  const started = new Set(startedAgain(plan))
+  return back.filter((job) => job.back && started.has(`${job.path}\n${job.name}`)).length
+}
 
 export const restartRows = (plan: DaemonrestartPlan) => heldRows(plan.back, ' for the cut')
 

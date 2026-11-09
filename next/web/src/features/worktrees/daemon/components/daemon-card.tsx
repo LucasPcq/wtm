@@ -13,7 +13,7 @@ export type CardState =
   | { kind: 'read' }
   | { kind: 'restarting'; back: number }
   | { kind: 'stopping' }
-  | { kind: 'failed'; title: string; message: string; down: boolean }
+  | { kind: 'failed'; title: string; message: string; down: boolean; tone: 'failed' | 'attention' }
 
 const comeBack = (count: number) => {
   if (count === 0) return 'Nothing to bring back.'
@@ -55,7 +55,15 @@ export function DaemonCard({
           below="Named addresses don't answer; see its log."
         />
       )
-    if (state.kind === 'failed') return <Line icon={CircleX} tone="failed" title={state.title} below={state.message} />
+    if (state.kind === 'failed')
+      return (
+        <Line
+          icon={state.tone === 'attention' ? TriangleAlert : CircleX}
+          tone={state.tone}
+          title={state.title}
+          below={state.message}
+        />
+      )
     if (!detail?.running)
       return <Line icon={Square} tone="muted" title="Not running" below="The next job started brings it up." />
     if (detail.skew)

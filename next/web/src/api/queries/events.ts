@@ -16,7 +16,8 @@ export const operationCap = 10 * 60_000
 export const current = (operations: Record<string, UnderWay>, now: number) =>
   Object.values(operations).filter((operation) => now - operation.since < operationCap)
 
-export type Live = { warning?: string; warningCode?: string; operations: Record<string, UnderWay> }
+// ready: the stream reached the core's ready, every change from now on reaches the page
+export type Live = { warning?: string; warningCode?: string; ready?: boolean; operations: Record<string, UnderWay> }
 
 export const reconnectEvery = 2000
 
@@ -84,7 +85,8 @@ async function* lines(client: QueryClient, signal: AbortSignal): AsyncGenerator<
   // operation under way across a reconnect is known again only at its next unit; a field naming the locked subjects
   // on operation.started would lift both
   let operations: Record<string, UnderWay> = {}
-  yield { operations }
+  let ready = false
+  yield { operations, ready }
 
   const reader = body.pipeThrough(new TextDecoderStream()).pipeThrough(new EventSourceParserStream()).getReader()
   // an operation finished settles while the reader goes on: each resolves to the line that releases it
@@ -98,7 +100,7 @@ async function* lines(client: QueryClient, signal: AbortSignal): AsyncGenerator<
     if ('line' in arrived) {
       settling.delete(arrived.line.op_id ?? '')
       operations = track(operations, arrived.line, repoOf(client, arrived.line))
-      yield { operations }
+      yield { operations, ready }
       continue
     }
 
@@ -108,13 +110,13 @@ async function* lines(client: QueryClient, signal: AbortSignal): AsyncGenerator<
       // the stream ended: what settles still releases, within settleCap
       for (const line of await Promise.all(settling.values()))
         operations = track(operations, line, repoOf(client, line))
-      if (settling.size > 0) yield { operations }
+      if (settling.size > 0) yield { operations, ready }
       return
     }
     if (value.event === 'warning') {
       const warning = JSON.parse(value.data) as WebWarning
       if (warning.code === 'daemon.start_failed') void daemonRead(client)
-      yield { warning: warning.message, ...(warning.code && { warningCode: warning.code }), operations }
+      yield { warning: warning.message, ...(warning.code && { warningCode: warning.code }), operations, ready }
     }
     if (!value.event) {
       const line = JSON.parse(value.data) as WtmEventsV2
@@ -130,8 +132,9 @@ async function* lines(client: QueryClient, signal: AbortSignal): AsyncGenerator<
         )
         continue
       }
+      if (line.type === 'ready') ready = true
       operations = track(operations, line, repoOf(client, line))
-      yield { operations }
+      yield { operations, ready }
     }
   }
 }
@@ -176,6 +179,8 @@ const daemonRead = (client: QueryClient) =>
   })
 
 function invalidate(client: QueryClient, line: WtmEventsV2) {
+  // ready after a break: wtm's daemon answers again, its read may still say it down
+  if (line.type === 'ready') return daemonRead(client)
   if (line.type === 'repo.added' || line.type === 'repo.removed')
     return client.invalidateQueries({ queryKey: ['repos'] })
   // a job's event changes the reads that list jobs or say a job's facts, never a dialog's questions nor its plan, nor a
@@ -225,13 +230,14 @@ export function connectionOf(query: {
   status: string
   fetchStatus: string
   error: unknown
-  data?: Live | undefined
+  data?: { ready?: boolean | undefined; warningCode?: string | undefined } | undefined
 }): Connection {
   if (refused(query.error)) return 'disconnected'
   if (down(query.error) && query.fetchStatus !== 'fetching') return 'server-down'
   if (query.status === 'pending') return 'connecting'
   if (query.status !== 'success' || query.fetchStatus !== 'fetching') return 'reconnecting'
-  return query.data?.warningCode === 'daemon.start_failed' ? 'daemon-down' : 'live'
+  if (query.data?.warningCode === 'daemon.start_failed') return 'daemon-down'
+  return query.data?.ready ? 'live' : 'connecting'
 }
 
 // a read of run logs that searches a job's whole log or reads it from a time

@@ -44,8 +44,8 @@ test('a line of a repository invalidates what it answers, and a warning shows un
   client.getQueryCache().subscribe(() => seen.push(client.getQueryData(eventsQuery.queryKey)))
   await client.fetchQuery(eventsQuery)
 
-  expect(seen).toContainEqual({ warning: 'the bus was lost', operations: {} })
-  expect(client.getQueryData(eventsQuery.queryKey)).toEqual({ operations: {} })
+  expect(seen).toContainEqual({ warning: 'the bus was lost', operations: {}, ready: false })
+  expect(client.getQueryData(eventsQuery.queryKey)).toEqual({ operations: {}, ready: false })
   expect(client.getQueryState(['repo', 'r1', 'list', []])?.isInvalidated).toBe(true)
   expect(client.getQueryState(['repo', 'r2', 'list', []])?.isInvalidated).toBe(false)
 })

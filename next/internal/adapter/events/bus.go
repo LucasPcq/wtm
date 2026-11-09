@@ -102,7 +102,7 @@ func (b Bus) ensure(ctx context.Context) error {
 	}
 
 	if b.Start == nil {
-		return errors.New("no event bus answers on " + b.SocketPath)
+		return notStarted(errors.New("no event bus answers on " + b.SocketPath))
 	}
 	if err := b.Start(); err != nil {
 		return notStarted(fmt.Errorf("start the event bus: %w", err))

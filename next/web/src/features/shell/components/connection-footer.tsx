@@ -67,7 +67,11 @@ export function ConnectionFooter({ repo, daemon }: { repo: string | undefined; d
 
   const down = connection === 'daemon-down' || connection === 'server-down'
 
-  // the visible words are the button's name, the panel it opens named before them
+  const said =
+    (live && (problem ?? events.data?.warning ?? (skewed && "wtm's daemon runs another build"))) || detail[connection]
+
+  // the visible words are the button's name, the panel it opens named before them; a button's content is not
+  // announced, so the live region beside it says them
   const block = (
     <button
       type="button"
@@ -75,22 +79,20 @@ export function ConnectionFooter({ repo, daemon }: { repo: string | undefined; d
       disabled={!daemon}
     >
       <span className="sr-only">wtm's daemon: </span>
-      <span role="status" aria-live="polite" className="flex flex-col gap-0.5">
-        <span className="flex items-center gap-2 text-sm font-medium">
-          <span className={dot({ look: skewed ? 'skewed' : connection })} aria-hidden="true" />
-          {label[connection]}
-        </span>
-        <span className={cn('text-xs text-muted-foreground', live && problem && 'text-destructive')}>
-          {(live && (problem ?? events.data?.warning ?? (skewed && "wtm's daemon runs another build"))) ||
-            detail[connection]}
-        </span>
+      <span className="flex items-center gap-2 text-sm font-medium">
+        <span className={dot({ look: skewed ? 'skewed' : connection })} aria-hidden="true" />
+        {label[connection]}
       </span>
+      <span className={cn('text-xs text-muted-foreground', live && problem && 'text-destructive')}>{said}</span>
     </button>
   )
 
   return (
     <SidebarFooter className="gap-4 border-t border-sidebar-border px-4 pt-4 pb-3">
       <div>{daemon ? daemon(block) : block}</div>
+      <p role="status" aria-live="polite" className="sr-only">
+        {label[connection]}: {said}
+      </p>
       {down && (
         <Button
           variant="outline"

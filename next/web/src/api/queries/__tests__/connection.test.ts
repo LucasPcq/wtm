@@ -23,7 +23,11 @@ test('a stream that cannot open counts its failed attempts in a row', async () =
 
 test('the connection reads the query of the stream', () => {
   expect(connectionOf({ status: 'pending', fetchStatus: 'fetching', error: null })).toBe('connecting')
-  expect(connectionOf({ status: 'success', fetchStatus: 'fetching', error: null })).toBe('live')
+  expect(
+    connectionOf({ status: 'success', fetchStatus: 'fetching', error: null, data: {} }),
+    'open but not ready yet',
+  ).toBe('connecting')
+  expect(connectionOf({ status: 'success', fetchStatus: 'fetching', error: null, data: { ready: true } })).toBe('live')
   expect(connectionOf({ status: 'success', fetchStatus: 'idle', error: null })).toBe('reconnecting')
   expect(connectionOf({ status: 'error', fetchStatus: 'idle', error: new TypeError('Failed to fetch') })).toBe(
     'reconnecting',
@@ -63,4 +67,15 @@ test("a daemon that doesn't start reads wtm's daemon again, which no longer says
   await client.fetchQuery(eventsQuery)
 
   expect(client.getQueryState(['repo', 'r1', 'daemon-status', []])?.isInvalidated).toBe(true)
+})
+
+test("the stream's ready reads wtm's daemon again: a daemon back after a failed start no longer reads down", async () => {
+  const client = new QueryClient()
+  client.setQueryData(['repo', 'r1', 'daemon-status', []], { ok: true })
+  server.use(http.get('/api/events', () => new HttpResponse('data: {"v":2,"type":"ready"}\n\n')))
+
+  await client.fetchQuery(eventsQuery)
+
+  expect(client.getQueryState(['repo', 'r1', 'daemon-status', []])?.isInvalidated).toBe(true)
+  expect(client.getQueryData(eventsQuery.queryKey)).toEqual({ operations: {}, ready: true })
 })

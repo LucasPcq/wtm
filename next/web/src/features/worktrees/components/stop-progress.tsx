@@ -63,9 +63,12 @@ export function StopProgress({
     if (running) return `${doing} · ${done} of ${total} stopped`
     if (items.length === 0) return 'Nothing stopped.'
     if (ended) {
-      const notStopped = progress.units.flatMap((unit) =>
-        unit.phases.filter((run) => run.state === 'failed').map((run) => `${run.job} in ${unit.subject}`),
-      )
+      // a unit refused before any job ran has no failed job: it is named itself
+      const notStopped = progress.units.flatMap((unit) => {
+        const jobs = unit.phases.filter((run) => run.state === 'failed').map((run) => `${run.job} in ${unit.subject}`)
+        if (jobs.length > 0) return jobs
+        return unit.status === 'failed' ? [unit.subject] : []
+      })
       return ended({ stopped, total }, notStopped)
     }
     if (failed > 0) return `Jobs stopped in ${items.length - failed} of ${items.length} worktrees.`

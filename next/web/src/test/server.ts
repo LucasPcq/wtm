@@ -148,7 +148,7 @@ export const liveEvents = http.get('/api/events', () => {
   let closing: ReturnType<typeof setTimeout>
   const stream = new ReadableStream({
     start: (controller) => {
-      controller.enqueue(new TextEncoder().encode(': open\n\n'))
+      controller.enqueue(new TextEncoder().encode(': open\n\ndata: {"v":2,"type":"ready"}\n\n'))
       closing = setTimeout(() => controller.close(), 3000)
     },
     cancel: () => clearTimeout(closing),

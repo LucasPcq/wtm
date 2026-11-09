@@ -39,3 +39,26 @@ test('the block names the panel it opens and keeps its visible words in its name
     await screen.findByRole('button', { name: "wtm's daemon: Live Changes show here as they happen" }),
   ).toBeDefined()
 })
+
+test('Try again reads Connecting until the stream is ready, never Live while the daemon may still not start', async () => {
+  server.use(daemonDown)
+  const { user } = await renderApp('/r/r1/worktrees')
+  await screen.findByText("wtm's daemon doesn't answer")
+
+  server.use(
+    http.get(
+      '/api/events',
+      () =>
+        new HttpResponse(
+          new ReadableStream({ start: (controller) => controller.enqueue(new TextEncoder().encode(': open\n\n')) }),
+          {
+            headers: { 'Content-Type': 'text/event-stream' },
+          },
+        ),
+    ),
+  )
+  await user.click(screen.getByRole('button', { name: 'Try again' }))
+
+  expect(await screen.findByText('Connecting…')).toBeDefined()
+  expect(screen.queryByText('Live')).toBeNull()
+})
