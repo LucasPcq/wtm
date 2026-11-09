@@ -22,10 +22,14 @@ test('a shared service is counted once, stopped once every holder let it go; not
       stops: true,
     },
   ])
-  expect(countOf(one.units, plan)).toEqual({ done: 0, total: 6 })
+  expect(countOf(one.units, plan)).toEqual({ done: 0, stopped: 0, total: 6 })
   const two = advance(one, finished('postgres', 'fix/login'))
-  expect(countOf(two.units, plan)).toEqual({ done: 0, total: 6 })
-  expect(countOf(advance(two, finished('postgres', 'feat/search')).units, plan)).toEqual({ done: 1, total: 6 })
+  expect(countOf(two.units, plan)).toEqual({ done: 0, stopped: 0, total: 6 })
+  expect(countOf(advance(two, finished('postgres', 'feat/search')).units, plan)).toEqual({
+    done: 1,
+    stopped: 1,
+    total: 6,
+  })
 })
 
 test("two repositories' shared services of one name are two services, each counted once", () => {
@@ -41,5 +45,5 @@ test("two repositories' shared services of one name are two services, each count
     ['/acme', ['feat/a (acme)']],
     ['/wtm', ['feat/b (wtm)']],
   ])
-  expect(countOf(unitsOf(plan), plan)).toEqual({ done: 0, total: 2 })
+  expect(countOf(unitsOf(plan), plan)).toEqual({ done: 0, stopped: 0, total: 2 })
 })

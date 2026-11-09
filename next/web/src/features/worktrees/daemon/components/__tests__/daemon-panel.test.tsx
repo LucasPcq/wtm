@@ -1,11 +1,18 @@
-import { screen, within } from '@testing-library/react'
+import { cleanup, screen, within } from '@testing-library/react'
 import { expect, test } from 'vitest'
-import { answeringRestart, answeringStopJobs, daemonDetail, daemonStatus } from '@/test/daemon'
+import {
+  answeringRestart,
+  answeringStopJobs,
+  daemonDetail,
+  daemonStatus,
+  hangingRestart,
+  twoRepos,
+} from '@/test/daemon'
 import { renderApp } from '@/test/render'
 import { liveEvents, server } from '@/test/server'
 
 const openPanel = async (user: Awaited<ReturnType<typeof renderApp>>['user']) => {
-  await user.click(await screen.findByRole('button', { name: "wtm's daemon" }))
+  await user.click(await screen.findByRole('button', { name: /^wtm's daemon/ }))
   return screen.findByRole('dialog')
 }
 
@@ -16,8 +23,8 @@ test("the connection block opens wtm's daemon: up, the jobs of every repository,
   const panel = await openPanel(user)
 
   expect(await within(panel).findByText('Up · 0.31.0, this version')).toBeDefined()
-  expect(within(panel).getByText('2 jobs and a stack: postgres, web, mailpit')).toBeDefined()
-  expect(within(panel).getByText('1 job: docs-site')).toBeDefined()
+  expect(within(panel).getByText('2 jobs and a stack')).toBeDefined()
+  expect(within(panel).getByText('1 job')).toBeDefined()
   expect(within(panel).getByText('on :11080')).toBeDefined()
 })
 
@@ -66,6 +73,7 @@ test("a restart whose new daemon didn't start says it in the panel, with its log
   await user.click(within(panel).getByRole('button', { name: 'Restart' }))
   const dialog = await screen.findByRole('dialog', { name: "Restart wtm's daemon" })
   await within(dialog).findByText('postgres · shared')
+  server.use(daemonStatus({ ...daemonDetail, running: false, repos: [] }))
   await user.click(within(dialog).getByRole('button', { name: 'Restart' }))
 
   panel = await openPanel(user)
@@ -76,7 +84,7 @@ test("a restart whose new daemon didn't start says it in the panel, with its log
   expect(within(panel).getByRole('button', { name: 'Restart' }), 'it can be tried again').toBeDefined()
 })
 
-test("a restart whose job didn't come back keeps the daemon up, says why, and offers Restart again", async () => {
+test("a restart whose job didn't come back warns it restarted, says why, and offers Restart again", async () => {
   server.use(daemonStatus(), answeringRestart('not_back'))
   const { user } = await renderApp('/r/r1/worktrees')
   let panel = await openPanel(user)
@@ -85,9 +93,9 @@ test("a restart whose job didn't come back keeps the daemon up, says why, and of
   await within(dialog).findByText('postgres · shared')
   await user.click(within(dialog).getByRole('button', { name: 'Restart' }))
 
-  expect(await screen.findByText("Couldn't restart wtm's daemon")).toBeDefined()
+  expect(await screen.findByText("Restarted wtm's daemon · 1 job didn't come back")).toBeDefined()
   panel = await openPanel(user)
-  expect(await within(panel).findByText("The restart didn't finish")).toBeDefined()
+  expect(await within(panel).findByText("Restarted · 1 job didn't come back")).toBeDefined()
   expect(within(panel).getByText("didn't come back: web: port 3000 is taken")).toBeDefined()
   expect(within(panel).queryByText("The new daemon didn't start")).toBeNull()
   expect(within(panel).getByText('on :11080')).toBeDefined()
@@ -106,6 +114,7 @@ test('Stop every job lists every repository, then stops them and says the proxy 
   await user.click(within(dialog).getByRole('button', { name: 'Stop 3 jobs' }))
 
   expect(await within(dialog).findByRole('button', { name: 'Done' })).toBeDefined()
+  expect(within(dialog).getByText('3 stopped. The proxy is still up.')).toBeDefined()
 })
 
 test("a stack that didn't stop is named, and Run again plans what still runs", async () => {
@@ -117,7 +126,67 @@ test("a stack that didn't stop is named, and Run again plans what still runs", a
   await user.click(await within(dialog).findByRole('button', { name: 'Stop 3 jobs' }))
 
   expect(await within(dialog).findByText(/couldn't stop mailpit/)).toBeDefined()
+  expect(within(dialog).getByText('2 of 3 stopped. Run again retries mailpit in fix/login (acme).')).toBeDefined()
   await user.click(within(dialog).getByRole('button', { name: 'Run again' }))
 
   expect(await within(dialog).findByRole('button', { name: 'Stop 3 jobs' })).toBeDefined()
+})
+
+test("a restart under way shows on another repository's page, which offers no second one meanwhile", async () => {
+  server.use(daemonStatus(), hangingRestart, twoRepos)
+  const first = await renderApp('/r/r1/worktrees')
+  let panel = await openPanel(first.user)
+  await first.user.click(within(panel).getByRole('button', { name: 'Restart' }))
+  const dialog = await screen.findByRole('dialog', { name: "Restart wtm's daemon" })
+  await within(dialog).findByText('postgres · shared')
+  await first.user.click(within(dialog).getByRole('button', { name: 'Restart' }))
+
+  cleanup()
+  const second = await renderApp('/r/r2/worktrees')
+  panel = await openPanel(second.user)
+
+  expect(await within(panel).findByText('Restarting')).toBeDefined()
+  expect(
+    within(panel).getByText("3 jobs come back once it's up."),
+    'the count known when Restart was clicked',
+  ).toBeDefined()
+  expect(within(panel).getByRole('button', { name: 'Restart' })).toHaveProperty('disabled', true)
+})
+
+test("a daemon up again after a restart that didn't start it is no longer said down", async () => {
+  server.use(daemonStatus(), answeringRestart('start_failed'))
+  const { user } = await renderApp('/r/r1/worktrees')
+  let panel = await openPanel(user)
+  await user.click(within(panel).getByRole('button', { name: 'Restart' }))
+  const dialog = await screen.findByRole('dialog', { name: "Restart wtm's daemon" })
+  await within(dialog).findByText('postgres · shared')
+  await user.click(within(dialog).getByRole('button', { name: 'Restart' }))
+
+  panel = await openPanel(user)
+
+  expect(await within(panel).findByText("The restart didn't finish")).toBeDefined()
+  expect(within(panel).queryByText("The new daemon didn't start")).toBeNull()
+  expect(within(panel).getByText('on :11080')).toBeDefined()
+})
+
+test('a Stop every job hidden while it runs says how it ended, and Details opens it again', async () => {
+  let release = () => {}
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  server.use(daemonStatus(), answeringStopJobs(true, held))
+  const { user } = await renderApp('/r/r1/worktrees')
+  const panel = await openPanel(user)
+  await user.click(within(panel).getByRole('button', { name: 'Stop every job' }))
+  const dialog = await screen.findByRole('dialog', { name: 'Stop every job' })
+  await user.click(await within(dialog).findByRole('button', { name: 'Stop 3 jobs' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Hide' }))
+
+  release()
+
+  expect(await screen.findByText("Jobs didn't stop in 1 worktree.")).toBeDefined()
+  await user.click(screen.getByRole('button', { name: 'Details' }))
+  expect(
+    await within(await screen.findByRole('dialog', { name: 'Stop every job' })).findByText("Couldn't stop"),
+  ).toBeDefined()
 })

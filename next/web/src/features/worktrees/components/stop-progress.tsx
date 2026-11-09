@@ -27,6 +27,7 @@ export function StopProgress({
   onHide,
   onDone,
   onAgain,
+  ended,
 }: {
   title: string
   stopping: string
@@ -36,10 +37,12 @@ export function StopProgress({
   onHide: () => void
   onDone: () => void
   onAgain?: (() => void) | undefined
+  // the outcome said by the command's own words: the jobs stopped of all, and the ones that did not stop
+  ended?: ((count: { stopped: number; total: number }, failed: string[]) => string) | undefined
 }) {
   const envelope = progress.envelope
   const items = envelope?.items ?? []
-  const { done, total } = countOf(progress.units, ran.plan)
+  const { done, stopped, total } = countOf(progress.units, ran.plan)
   const failed = items.filter((item) => item.status !== 'done').length
   const refused = progress.refused ?? (items.some((item) => item.error) ? undefined : envelope?.error?.message)
   const { groups, labels, warnings } = recapOf(envelope, ran.plan, progress.units)
@@ -59,6 +62,12 @@ export function StopProgress({
   const description = () => {
     if (running) return `${doing} · ${done} of ${total} stopped`
     if (items.length === 0) return 'Nothing stopped.'
+    if (ended) {
+      const notStopped = progress.units.flatMap((unit) =>
+        unit.phases.filter((run) => run.state === 'failed').map((run) => `${run.job} in ${unit.subject}`),
+      )
+      return ended({ stopped, total }, notStopped)
+    }
     if (failed > 0) return `Jobs stopped in ${items.length - failed} of ${items.length} worktrees.`
     return `Jobs stopped ${where(items.map((item) => item.subject))}.`
   }

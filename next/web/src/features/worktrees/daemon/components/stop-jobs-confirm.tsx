@@ -6,9 +6,10 @@ import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/co
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert } from '@/features/worktrees/components/alert'
 import { CommandLine } from '@/features/worktrees/components/command-line'
+import { DialogBand } from '@/features/worktrees/components/dialog-band'
 import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
 import { RepoRowsList } from '@/features/worktrees/daemon/components/repo-rows'
-import { stopRows, stopTotal } from '@/features/worktrees/daemon/utils/rows'
+import { crashedTotal, stopRows, stopTotal } from '@/features/worktrees/daemon/utils/rows'
 
 export function StopJobsConfirm({
   repo,
@@ -25,10 +26,12 @@ export function StopJobsConfirm({
   const refusal = planned.data?.error ?? undefined
   const failed = planned.isError ? planned.error.message : refusal?.message
   const total = plan ? stopTotal(plan) : 0
+  const crashed = plan ? crashedTotal(plan) : 0
 
   const label = () => {
-    if (total === 0) return 'Nothing to stop'
-    return total === 1 ? 'Stop 1 job' : `Stop ${total} jobs`
+    if (total > 0) return total === 1 ? 'Stop 1 job' : `Stop ${total} jobs`
+    if (crashed > 0) return crashed === 1 ? 'Clear 1 crashed job' : `Clear ${crashed} crashed jobs`
+    return 'Nothing to stop'
   }
 
   const body = () => {
@@ -41,7 +44,7 @@ export function StopJobsConfirm({
         />
       )
     if (!plan) return <Skeleton className="h-40 w-full" />
-    if (total === 0) return <p className="text-sm text-muted-foreground">No repository runs a job.</p>
+    if (total + crashed === 0) return <p className="text-sm text-muted-foreground">No repository runs a job.</p>
     return (
       <>
         <RepoRowsList repos={stopRows(plan)} />
@@ -60,10 +63,9 @@ export function StopJobsConfirm({
     <>
       <DialogHeader>
         <DialogTitle>Stop every job</DialogTitle>
-        <DialogDescription>
-          In every repository. The proxy stays up: named addresses answer again once a job starts.
-        </DialogDescription>
+        <DialogDescription>Every repository. The proxy stays up.</DialogDescription>
       </DialogHeader>
+      <DialogBand />
       <DialogScroll>{body()}</DialogScroll>
       <DialogFooter className="items-center">
         <Button variant="ghost" className="mr-auto" onClick={onCancel}>
@@ -71,7 +73,7 @@ export function StopJobsConfirm({
         </Button>
         <Button
           variant="destructive"
-          disabled={!plan || !fingerprint || total === 0 || planned.isFetching}
+          disabled={!plan || !fingerprint || total + crashed === 0 || planned.isFetching}
           onClick={() => plan && fingerprint && onStop(fingerprint, plan)}
         >
           {label()}

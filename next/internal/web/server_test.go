@@ -297,6 +297,16 @@ func TestTheEventsOfARepoAreWatchedFromItsRootWithTheirWarnings(t *testing.T) {
 	assert.Equal(t, []api.Call{{Dir: repo.Root}}, s.calls)
 }
 
+func TestAWarningOfWtmsDaemonNotAnsweringCarriesItsCode(t *testing.T) {
+	down := &domain.Error{Kind: domain.KindInternal, Code: "daemon.start_failed", Message: "the event bus did not start"}
+	s := &stream{lines: []string{`{"type":"ready"}`}, warnings: []error{down}, refusal: errors.New("the stream ended")}
+
+	response := do(t, serving(t, Params{Events: s.bind()}), req{method: http.MethodGet, path: "/api/events"})
+
+	require.Equal(t, http.StatusOK, response.StatusCode)
+	assert.Equal(t, sse{name: eventWarning, data: `{"message":"the event bus did not start","code":"daemon.start_failed"}`}, events(t, response.Body)[0])
+}
+
 func TestTheEventsOfEveryRepoAreWatchedFromNowhere(t *testing.T) {
 	s := &stream{refusal: &domain.Error{Kind: domain.KindPrecondition, Code: "events.config_not_found"}}
 

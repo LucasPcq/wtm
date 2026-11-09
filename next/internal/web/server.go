@@ -423,7 +423,7 @@ func (s *Server) watch(w http.ResponseWriter, r *http.Request, stream api.Stream
 		},
 		Warn: func(err error) {
 			events.open()
-			events.named(eventWarning, warning{Message: err.Error()})
+			events.named(eventWarning, warningOf(err))
 		},
 		Open: events.settled,
 	})
@@ -527,6 +527,16 @@ func serveLog(w http.ResponseWriter, r *http.Request, params logParams) {
 // A warning is what kept the event stream from a line or a repository for a while, the data of an event named warning.
 type warning struct {
 	Message string `json:"message"`
+	Code    string `json:"code,omitempty"`
+}
+
+// warningOf is the warning of err, with its code when it has one: daemon.start_failed tells a page wtm's daemon does not answer.
+func warningOf(err error) warning {
+	failure, ok := errors.AsType[*domain.Error](err)
+	if !ok || failure == nil {
+		return warning{Message: err.Error()}
+	}
+	return warning{Message: err.Error(), Code: failure.Code}
 }
 
 // stopAsked stops the server as its idle stop does, once the request is answered: wtm-next ui asks a server of another version to stop rather than signal a process it read from a file. While operations run it refuses, 409 with their ids: a server stopping would keep its lock until they end, with no listener left to answer.

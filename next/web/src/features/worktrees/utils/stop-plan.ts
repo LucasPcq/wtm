@@ -51,8 +51,12 @@ export const unitsOf = (plan: RundownPlan): Unit[] =>
 
 const ended = (run: PhaseRun) => run.state === 'done' || run.state === 'failed'
 
-// what a stop ends, counted: each worktree's own jobs, and each shared service once, let go by every holder
-export function countOf(units: Unit[], plan: RundownPlan | undefined): { done: number; total: number } {
+// what a stop ends, counted: each worktree's own jobs, and each shared service once, let go by every holder; stopped
+// leaves out the ones that failed
+export function countOf(
+  units: Unit[],
+  plan: RundownPlan | undefined,
+): { done: number; stopped: number; total: number } {
   const runs = units.flatMap((unit) =>
     unit.phases.map((run) => ({ run, job: stopJob(plan, unit.subject, run.job ?? '') })),
   )
@@ -62,6 +66,9 @@ export function countOf(units: Unit[], plan: RundownPlan | undefined): { done: n
   )
   return {
     done: own.filter(ended).length + shared.filter((holds) => holds.every(ended)).length,
+    stopped:
+      own.filter((run) => run.state === 'done').length +
+      shared.filter((holds) => holds.every((run) => run.state === 'done')).length,
     total: own.length + shared.length,
   }
 }

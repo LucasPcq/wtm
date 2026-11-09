@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { DaemonrestartPlan, DaemonstopjobsPlan } from '@/api/types.gen'
 import {
+  crashedTotal,
   notBackRows,
   repoLine,
   restartRows,
@@ -118,6 +119,7 @@ describe('stopping every job', () => {
 
   it('counts the jobs that stop, a claim and a crash left out', () => {
     expect(stopTotal(plan)).toBe(4)
+    expect(crashedTotal(plan), 'a crashed job is cleared, not stopped').toBe(1)
   })
 })
 
@@ -143,5 +145,5 @@ it('says a repository by its jobs and its stacks', () => {
         },
       ],
     }),
-  ).toBe('3 jobs and a stack: web, api, mailpit')
+  ).toBe('3 jobs and a stack')
 })

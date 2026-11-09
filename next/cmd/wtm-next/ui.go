@@ -140,7 +140,7 @@ func webParams(token string, idle time.Duration) web.Params {
 		Events:      eventsStream(),
 		Logs:        jobLines(),
 		LogFile:     jobLogFile,
-		DaemonLog:   func() string { return daemon.LogPath(daemon.SocketPath()) },
+		DaemonLog:   func() string { return daemonLogOf(daemon.SocketPath()) },
 		Repos:       knownRepos(reposjson.Path(), daemon.SocketPath()).Prune,
 		Version:     version,
 		Token:       token,
@@ -152,6 +152,14 @@ func webParams(token string, idle time.Duration) web.Params {
 }
 
 // eventsStream is the event stream of streams(), the one the server serves.
+// daemonLogOf is the log of the daemon serving socket, none with no socket: a path of no directory would name a file wherever the server runs.
+func daemonLogOf(socket string) string {
+	if socket == "" {
+		return ""
+	}
+	return daemon.LogPath(socket)
+}
+
 func eventsStream() api.Stream {
 	for _, stream := range streams() {
 		if stream.Name == events.Name {

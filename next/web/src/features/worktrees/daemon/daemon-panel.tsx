@@ -13,23 +13,39 @@ import { jobsTodo } from '@/features/worktrees/utils/progress'
 
 // wtm's daemon, the machine's: the connection block opens it; it is never stopped from here, the page would start it
 // again at once, so its jobs are stopped instead
+const notBack = (envelope: Applied<'daemon-restart'> | undefined) => {
+  const count = (envelope?.items[0]?.detail?.back ?? []).filter((job) => !job.back).length
+  return count === 1 ? "1 job didn't come back" : `${count} jobs didn't come back`
+}
+
 export function DaemonPanel({ repo, children }: { repo: string; children: ReactElement }) {
   const status = useQuery(readQuery(repo, 'daemon-status'))
   const restart = useRun(repo, 'daemon-restart')
+  const stopping = useRun(repo, 'daemon-stop-jobs').running
   const [asking, setAsking] = useState<'restart' | 'stop'>()
   const detail = status.data?.items[0]?.detail
   const unread = status.error?.message ?? status.data?.error?.message
 
   const state = (): CardState => {
-    if (restart.running) return { kind: 'restarting' }
+    if (restart.running) return { kind: 'restarting', back: restart.progress?.units[0]?.phases.length ?? 0 }
+    if (stopping) return { kind: 'stopping' }
     if (!restart.progress) return { kind: 'read' }
-    const error = restart.progress.envelope?.items[0]?.error
-    const message = restart.progress.refused ?? error?.message ?? restart.progress.envelope?.error?.message
+    const envelope = restart.progress.envelope
+    const error = envelope?.items[0]?.error
+    const message = restart.progress.refused ?? error?.message ?? envelope?.error?.message
     if (!message) return { kind: 'read' }
-    return { kind: 'failed', message, down: error?.code === 'daemon-restart.start_failed' }
+    // down until a daemon answers again: the page's own stream starts one
+    const down = error?.code === 'daemon-restart.start_failed' && !detail?.running
+    const title =
+      error?.code === 'daemon-restart.not_back' ? `Restarted · ${notBack(envelope)}` : "The restart didn't finish"
+    return { kind: 'failed', title, message, down }
   }
 
   const told = (envelope: Applied<'daemon-restart'> | undefined) => {
+    if (envelope?.items[0]?.error?.code === 'daemon-restart.not_back') {
+      toast.warning(`Restarted wtm's daemon · ${notBack(envelope)}`)
+      return
+    }
     if (!succeeded(envelope)) {
       toast.error("Couldn't restart wtm's daemon", { description: 'Its panel says why.' })
       return
@@ -70,16 +86,25 @@ export function DaemonPanel({ repo, children }: { repo: string; children: ReactE
           {asking === 'restart' && (
             <RestartDialog
               repo={repo}
-              onRestart={(fingerprint) => {
+              onRestart={(fingerprint, plan) => {
                 setAsking(undefined)
-                restart.start({ answers: [], fingerprint, units: [jobsTodo('daemon', [])] }, told)
+                // each job that comes back is a phase of the one unit: its count travels with the run to every page
+                const back = (plan.back ?? []).flatMap((repo) =>
+                  (repo.worktrees ?? []).flatMap((wt) => (wt.jobs ?? []).map((job) => `${wt.path}:${job.name}`)),
+                )
+                restart.start({ answers: [], fingerprint, units: [jobsTodo('daemon', back)] }, told)
               }}
               onCancel={() => setAsking(undefined)}
             />
           )}
         </RunDialogContent>
       </Dialog>
-      <StopJobsDialog repo={repo} open={asking === 'stop'} onClose={() => setAsking(undefined)} />
+      <StopJobsDialog
+        repo={repo}
+        open={asking === 'stop'}
+        onClose={() => setAsking(undefined)}
+        onShow={() => setAsking('stop')}
+      />
     </>
   )
 }

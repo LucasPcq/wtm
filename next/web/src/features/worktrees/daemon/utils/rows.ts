@@ -109,6 +109,12 @@ export function stopRows(plan: DaemonstopjobsPlan): RepoRows[] {
   })
 }
 
+export const crashedTotal = (plan: DaemonstopjobsPlan) =>
+  (plan.repos ?? [])
+    .flatMap((repo) => repo.worktrees ?? [])
+    .flatMap((target) => target.jobs ?? [])
+    .filter((job) => job.fate === 'clear').length
+
 export const stopTotal = (plan: DaemonstopjobsPlan) =>
   (plan.repos ?? []).reduce(
     (total, repo) => total + (repo.worktrees ?? []).reduce((n, t) => n + stopCount(t.jobs ?? []), 0),
@@ -123,5 +129,5 @@ export function repoLine(repo: RunHeldRepo): string {
     own > 0 && (own === 1 ? '1 job' : `${own} jobs`),
     stacks > 0 && (stacks === 1 ? 'a stack' : `${stacks} stacks`),
   ].filter(Boolean)
-  return `${counted.join(' and ')}: ${[...new Set(jobs.map((job) => job.name))].join(', ')}`
+  return counted.join(' and ')
 }

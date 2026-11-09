@@ -1,5 +1,6 @@
 import { HttpResponse, http } from 'msw'
 import type { DaemonrestartPlan, DaemonstatusDetail, DaemonstopjobsPlan, DomainError, WebCall } from '@/api/types.gen'
+import { repo } from '@/test/acme'
 import { envelope } from '@/test/fixtures'
 import { line, streamed } from '@/test/stream'
 
@@ -43,7 +44,7 @@ export const daemonDetail: DaemonstatusDetail = {
 
 // the daemon's read, or, given an error, a read refused with no item
 export const daemonStatus = (detail: DaemonstatusDetail = daemonDetail, error?: DomainError) =>
-  http.post('/api/repos/r1/commands/daemon-status', () =>
+  http.post('/api/repos/:repo/commands/daemon-status', () =>
     HttpResponse.json(
       error
         ? { ...envelope('daemon-status', []), ok: false, error }
@@ -85,8 +86,21 @@ const restartPlan: DaemonrestartPlan = {
 }
 
 // a restart's plan, then its apply: every job back, or the new daemon failing to start
+// a restart planned, whose apply never ends
+export const hangingRestart = http.post('/api/repos/:repo/commands/daemon-restart', async ({ request }) => {
+  const call = (await request.json()) as WebCall
+  if (call.dry_run)
+    return HttpResponse.json({ ...envelope('daemon-restart', []), fingerprint: 'r:1', plan: restartPlan })
+  return new HttpResponse(new ReadableStream({ start: () => {} }), { headers: { 'Content-Type': 'text/event-stream' } })
+})
+
+// acme and a second repository, wtm, each with its own page
+export const twoRepos = http.get('/api/repos', () =>
+  HttpResponse.json([repo, { id: 'r2', root: '/Users/me/dev/wtm', common_dir: '/Users/me/dev/wtm/.git' }]),
+)
+
 export const answeringRestart = (failing?: 'start_failed' | 'not_back') =>
-  http.post('/api/repos/r1/commands/daemon-restart', async ({ request }) => {
+  http.post('/api/repos/:repo/commands/daemon-restart', async ({ request }) => {
     const call = (await request.json()) as WebCall
     if (call.dry_run)
       return HttpResponse.json({ ...envelope('daemon-restart', []), fingerprint: 'r:1', plan: restartPlan })
@@ -160,12 +174,14 @@ const stopPlan: DaemonstopjobsPlan = {
   ],
 }
 
-// stop-jobs' plan, then its apply: every job stops, but fix/login's stack when failing
-export const answeringStopJobs = (failing = false) =>
-  http.post('/api/repos/r1/commands/daemon-stop-jobs', async ({ request }) => {
+// stop-jobs' plan, then its apply: every job stops, but fix/login's stack when failing; given held, the apply answers
+// once it settles
+export const answeringStopJobs = (failing = false, held?: Promise<void>) =>
+  http.post('/api/repos/:repo/commands/daemon-stop-jobs', async ({ request }) => {
     const call = (await request.json()) as WebCall
     if (call.dry_run)
       return HttpResponse.json({ ...envelope('daemon-stop-jobs', []), fingerprint: 's:1', plan: stopPlan })
+    await held
     const targets = (stopPlan.repos ?? []).flatMap((repo) => repo.worktrees ?? [])
     return streamed(
       [
@@ -173,7 +189,13 @@ export const answeringStopJobs = (failing = false) =>
           line({ type: 'unit.started', subject: target.worktree }),
           ...(target.jobs ?? []).flatMap((job) => [
             line({ type: 'phase.started', subject: target.worktree, phase: 'job', job: job.name }),
-            line({ type: 'phase.finished', subject: target.worktree, phase: 'job', job: job.name }),
+            line({
+              type: 'phase.finished',
+              subject: target.worktree,
+              phase: 'job',
+              job: job.name,
+              failed: failing && target.worktree === 'fix/login (acme)',
+            }),
           ]),
           line({ type: 'unit.finished', subject: target.worktree, status: 'done' }),
         ]),

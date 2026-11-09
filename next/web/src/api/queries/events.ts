@@ -16,12 +16,27 @@ export const operationCap = 10 * 60_000
 export const current = (operations: Record<string, UnderWay>, now: number) =>
   Object.values(operations).filter((operation) => now - operation.since < operationCap)
 
-export type Live = { warning?: string; operations: Record<string, UnderWay> }
+export type Live = { warning?: string; warningCode?: string; operations: Record<string, UnderWay> }
 
 export const reconnectEvery = 2000
 
+// a server that answers none of this many reconnects in a row is down: the page stops asking until Try again
+export const giveUpAfter = 5
+
+// a stream that could not open, the attempts in a row that failed with it
+export class Unreachable extends Error {
+  readonly attempts: number
+
+  constructor(attempts: number) {
+    super("wtm's server doesn't answer")
+    this.attempts = attempts
+  }
+}
+
+const down = (error: unknown) => error instanceof Unreachable && error.attempts >= giveUpAfter
+
 // retried every reconnectEvery until the server refuses the token: it restarted, and the token change that follows
-// reloads the page (main.tsx)
+// reloads the page (main.tsx); or until it answers none of giveUpAfter reconnects
 export const eventsQuery = queryOptions({
   queryKey: ['events'],
   queryFn: streamedQuery<Live, Live>({
@@ -32,15 +47,33 @@ export const eventsQuery = queryOptions({
   }),
   retry: false,
   staleTime: Infinity,
-  refetchInterval: (query) => (refused(query.state.error) ? false : reconnectEvery),
+  refetchInterval: (query) => (refused(query.state.error) || down(query.state.error) ? false : reconnectEvery),
   refetchIntervalInBackground: true,
 })
 
 const refused = (error: unknown) => error instanceof HttpError && error.status === 401
 
+// a query that never had data starts each fetch with its error cleared: the count lives beside it
+const failures = new WeakMap<QueryClient, number>()
+
+async function opened(client: QueryClient, signal: AbortSignal): Promise<NonNullable<Response['body']>> {
+  const failed = () => {
+    const attempts = (failures.get(client) ?? 0) + 1
+    failures.set(client, attempts)
+    return new Unreachable(attempts)
+  }
+  const response = await request('/api/events', { signal }).catch((error: unknown) => {
+    if (signal.aborted) throw error
+    throw failed()
+  })
+  if (response.status === 401) throw new HttpError(response.status, 'the event stream was refused')
+  if (!response.ok || !response.body) throw failed()
+  failures.delete(client)
+  return response.body
+}
+
 async function* lines(client: QueryClient, signal: AbortSignal): AsyncGenerator<Live> {
-  const response = await request('/api/events', { signal })
-  if (!response.ok || !response.body) throw new HttpError(response.status, 'the event stream was refused')
+  const body = await opened(client, signal)
   // back after a break: the lines in between are lost, so everything is read again, but GitHub, asked on demand only, a
   // review, which fetches origin once per opening, and a plan, asked again only on the reads it was chosen on
   if (client.getQueryData(eventsQuery.queryKey))
@@ -53,10 +86,7 @@ async function* lines(client: QueryClient, signal: AbortSignal): AsyncGenerator<
   let operations: Record<string, UnderWay> = {}
   yield { operations }
 
-  const reader = response.body
-    .pipeThrough(new TextDecoderStream())
-    .pipeThrough(new EventSourceParserStream())
-    .getReader()
+  const reader = body.pipeThrough(new TextDecoderStream()).pipeThrough(new EventSourceParserStream()).getReader()
   // an operation finished settles while the reader goes on: each resolves to the line that releases it
   const settling = new Map<string, Promise<WtmEventsV2>>()
   let next = reader.read()
@@ -81,8 +111,11 @@ async function* lines(client: QueryClient, signal: AbortSignal): AsyncGenerator<
       if (settling.size > 0) yield { operations }
       return
     }
-    if (value.event === 'warning') yield { warning: (JSON.parse(value.data) as WebWarning).message, operations }
-    else if (!value.event) {
+    if (value.event === 'warning') {
+      const warning = JSON.parse(value.data) as WebWarning
+      yield { warning: warning.message, ...(warning.code && { warningCode: warning.code }), operations }
+    }
+    if (!value.event) {
       const line = JSON.parse(value.data) as WtmEventsV2
       const at = Date.now()
       void invalidate(client, line)
@@ -180,12 +213,20 @@ export function track(
   return operations
 }
 
-export type Connection = 'connecting' | 'live' | 'reconnecting' | 'disconnected'
+// disconnected: the server restarted under a new session; daemon-down and server-down wait for Try again
+export type Connection = 'connecting' | 'live' | 'reconnecting' | 'disconnected' | 'daemon-down' | 'server-down'
 
-export function connectionOf(query: { status: string; fetchStatus: string; error: unknown }): Connection {
+export function connectionOf(query: {
+  status: string
+  fetchStatus: string
+  error: unknown
+  data?: Live | undefined
+}): Connection {
   if (refused(query.error)) return 'disconnected'
+  if (down(query.error) && query.fetchStatus !== 'fetching') return 'server-down'
   if (query.status === 'pending') return 'connecting'
-  return query.status === 'success' && query.fetchStatus === 'fetching' ? 'live' : 'reconnecting'
+  if (query.status !== 'success' || query.fetchStatus !== 'fetching') return 'reconnecting'
+  return query.data?.warningCode === 'daemon.start_failed' ? 'daemon-down' : 'live'
 }
 
 // a read of run logs that searches a job's whole log or reads it from a time

@@ -4,14 +4,15 @@ import { HttpResponse, http } from 'msw'
 import { beforeEach, expect, onTestFinished, test } from 'vitest'
 import { HttpError } from '@/api/fetch'
 import {
-  connectionOf,
   current,
   eventsQuery,
+  giveUpAfter,
   type Live,
   operationCap,
   reconnectEvery,
   settleCap,
   track,
+  Unreachable,
 } from '@/api/queries/events'
 import { server } from '@/test/server'
 
@@ -61,18 +62,8 @@ test('the stream reconnects after it ends or fails, never once the token is refu
   expect(after(new HttpError(503, 'stopping'))).toBe(reconnectEvery)
   expect(after(new TypeError('Failed to fetch'))).toBe(reconnectEvery)
   expect(after(null)).toBe(reconnectEvery)
-})
-
-test('the connection reads the query of the stream', () => {
-  expect(connectionOf({ status: 'pending', fetchStatus: 'fetching', error: null })).toBe('connecting')
-  expect(connectionOf({ status: 'success', fetchStatus: 'fetching', error: null })).toBe('live')
-  expect(connectionOf({ status: 'success', fetchStatus: 'idle', error: null })).toBe('reconnecting')
-  expect(connectionOf({ status: 'error', fetchStatus: 'idle', error: new TypeError('Failed to fetch') })).toBe(
-    'reconnecting',
-  )
-  expect(connectionOf({ status: 'error', fetchStatus: 'idle', error: new HttpError(401, 'refused') })).toBe(
-    'disconnected',
-  )
+  expect(after(new Unreachable(giveUpAfter - 1))).toBe(reconnectEvery)
+  expect(after(new Unreachable(giveUpAfter)), 'a server down waits for Try again').toBe(false)
 })
 
 test('back after a break, everything is read again but GitHub, the review that fetches origin, and the plans', async () => {

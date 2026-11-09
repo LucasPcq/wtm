@@ -9,7 +9,16 @@ import { Glyph } from '@/features/worktrees/components/glyph'
 import { repoLine, repoName } from '@/features/worktrees/daemon/utils/rows'
 
 // down: the restart stopped the daemon and the new one didn't start
-export type CardState = { kind: 'read' } | { kind: 'restarting' } | { kind: 'failed'; message: string; down: boolean }
+export type CardState =
+  | { kind: 'read' }
+  | { kind: 'restarting'; back: number }
+  | { kind: 'stopping' }
+  | { kind: 'failed'; title: string; message: string; down: boolean }
+
+const comeBack = (count: number) => {
+  if (count === 0) return 'Nothing to bring back.'
+  return count === 1 ? "1 job comes back once it's up." : `${count} jobs come back once it's up.`
+}
 
 export function DaemonCard({
   detail,
@@ -29,12 +38,14 @@ export function DaemonCard({
   if (!detail && state.kind === 'read') return <Skeleton className="h-40 w-full" />
 
   const repos = detail?.repos ?? []
-  const busy = state.kind === 'restarting'
+  const busy = state.kind === 'restarting' || state.kind === 'stopping'
   const down = state.kind === 'failed' && state.down
 
   const headline = () => {
     if (state.kind === 'restarting')
-      return <Line icon={Loader} tone="busy" title="Restarting" below="Its jobs come back once it's up." />
+      return <Line icon={Loader} tone="busy" title="Restarting" below={comeBack(state.back)} />
+    if (state.kind === 'stopping')
+      return <Line icon={Loader} tone="busy" title="Stopping every job" below="The proxy stays up." />
     if (down)
       return (
         <Line
@@ -44,8 +55,7 @@ export function DaemonCard({
           below="Named addresses don't answer; see its log."
         />
       )
-    if (state.kind === 'failed')
-      return <Line icon={CircleX} tone="failed" title="The restart didn't finish" below={state.message} />
+    if (state.kind === 'failed') return <Line icon={CircleX} tone="failed" title={state.title} below={state.message} />
     if (!detail?.running)
       return <Line icon={Square} tone="muted" title="Not running" below="The next job started brings it up." />
     if (detail.skew)

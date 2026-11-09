@@ -167,3 +167,8 @@ func TestUISaysWhatToDoWithAServerThatCannotBeAskedToStop(t *testing.T) {
 	assert.Less(t, time.Since(started), webStart, "ui waited for a server it could not ask to stop")
 	assert.Contains(t, err.Error(), fmt.Sprintf("the web server of wtm 0.0.0 (pid %d) cannot be asked to stop", os.Getpid()))
 }
+
+func TestTheDaemonsLogIsNoneWithNoSocket(t *testing.T) {
+	assert.Empty(t, daemonLogOf(""), "a path of no directory would serve a daemon.log beside the server")
+	assert.Equal(t, filepath.Join("/state", "daemon.log"), daemonLogOf(filepath.Join("/state", "wtm.sock")))
+}

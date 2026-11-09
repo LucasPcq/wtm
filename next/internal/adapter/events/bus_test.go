@@ -10,6 +10,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/statefile"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -46,6 +47,9 @@ func TestADaemonThatFailsToStartFailsTheSubscription(t *testing.T) {
 	_, err := bus.Subscribe(t.Context(), nil)
 
 	assert.ErrorContains(t, err, "start the event bus: no binary")
+	failure, ok := errors.AsType[*domain.Error](err)
+	require.True(t, ok, "a surface reads the daemon not answering by its code")
+	assert.Equal(t, run.CodeStartFailed, failure.Code)
 }
 
 func TestASubscriptionEndsWithItsContext(t *testing.T) {

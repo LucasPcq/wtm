@@ -1,11 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
 import { RefreshCw } from 'lucide-react'
 import { dryRunQuery } from '@/api/queries/commands'
+import type { DaemonrestartPlan } from '@/api/types.gen'
 import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert } from '@/features/worktrees/components/alert'
 import { CommandLine } from '@/features/worktrees/components/command-line'
+import { DialogBand } from '@/features/worktrees/components/dialog-band'
 import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
 import { RepoRowsList } from '@/features/worktrees/daemon/components/repo-rows'
 import { RowBox } from '@/features/worktrees/daemon/components/row-box'
@@ -17,7 +19,7 @@ export function RestartDialog({
   onCancel,
 }: {
   repo: string
-  onRestart: (fingerprint: string) => void
+  onRestart: (fingerprint: string, plan: DaemonrestartPlan) => void
   onCancel: () => void
 }) {
   const planned = useQuery(dryRunQuery(repo, 'daemon-restart', []))
@@ -75,6 +77,7 @@ export function RestartDialog({
             : "Every repository's jobs restart: a short cut, then they run again on the new daemon."}
         </DialogDescription>
       </DialogHeader>
+      <DialogBand />
       <DialogScroll>{body()}</DialogScroll>
       <DialogFooter className="items-center">
         <Button variant="ghost" className="mr-auto" onClick={onCancel}>
@@ -82,7 +85,7 @@ export function RestartDialog({
         </Button>
         <Button
           disabled={!plan || !fingerprint || planned.isFetching}
-          onClick={() => fingerprint && onRestart(fingerprint)}
+          onClick={() => fingerprint && plan && onRestart(fingerprint, plan)}
         >
           Restart
         </Button>
