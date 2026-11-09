@@ -59,10 +59,21 @@ const startedAgain = (plan: DaemonrestartPlan) =>
 
 export const comingBack = (plan: DaemonrestartPlan) => startedAgain(plan).length
 
-// of the jobs a restart says back, those it started again
-export const cameBack = (plan: DaemonrestartPlan, back: DaemonrestartBack[]) => {
-  const started = new Set(startedAgain(plan))
-  return back.filter((job) => job.back && started.has(`${job.path}\n${job.name}`)).length
+// the jobs a restart says did not come back: a claim is its shared service's, said once for all its claimants
+export const notBackCount = (plan: DaemonrestartPlan, back: DaemonrestartBack[]) => {
+  const claims = new Map(
+    (plan.back ?? []).flatMap((repo) =>
+      (repo.worktrees ?? []).flatMap((wt) =>
+        (wt.jobs ?? [])
+          .filter((job) => job.hold === 'claim')
+          .map((job) => [`${wt.path}\n${job.name}`, `${repo.root}\n${job.name}`] as const),
+      ),
+    ),
+  )
+  const missed = back
+    .filter((job) => !job.back)
+    .map((job) => claims.get(`${job.path}\n${job.name}`) ?? `${job.path}\n${job.name}`)
+  return new Set(missed).size
 }
 
 export const restartRows = (plan: DaemonrestartPlan) => heldRows(plan.back, ' for the cut')

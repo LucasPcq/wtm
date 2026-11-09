@@ -118,7 +118,7 @@ func notStarted(err error) error {
 	if errors.Is(err, context.Canceled) {
 		return err
 	}
-	return &domain.Error{Kind: domain.KindInternal, Code: run.CodeStartFailed, Message: err.Error(), Cause: err}
+	return &domain.Error{Kind: domain.KindInternal, Code: run.CodeStartFailed, Message: "wtm's daemon did not start", Cause: err}
 }
 
 // answers reports whether a daemon accepts a connection on the socket.

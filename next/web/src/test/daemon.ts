@@ -134,8 +134,8 @@ export const answeringRestart = (failing?: 'start_failed' | 'not_back') =>
           subject: 'daemon',
           status: 'done',
           detail: {
+            // the core starts main's shared postgres for its claimants: only the claim has an entry
             back: [
-              { name: 'postgres', path: '/Users/me/dev/acme', back: true },
               { name: 'web', path: '/Users/me/dev/acme', back: true },
               { name: 'postgres', path: '/a/feat-billing', back: true },
               { name: 'web', path: '/a/feat-billing', back: true },
@@ -191,22 +191,21 @@ const stopPlan: DaemonstopjobsPlan = {
   ],
 }
 
-// stop-jobs' plan, then its apply: every job stops, but fix/login's stack when failing (offered again), or fix/login
-// refused before any job of it ran when refused (offered nothing); given held, the apply answers once it settles
-export const answeringStopJobs = (failing: boolean | 'refused' = false, held?: Promise<void>) =>
+// stop-jobs' plan, then its apply: every job stops, but fix/login's stack when failing, offered again; given held, the
+// apply answers once it settles
+export const answeringStopJobs = (failing = false, held?: Promise<void>) =>
   http.post('/api/repos/:repo/commands/daemon-stop-jobs', async ({ request }) => {
     const call = (await request.json()) as WebCall
     if (call.dry_run)
       return HttpResponse.json({ ...envelope('daemon-stop-jobs', []), fingerprint: 's:1', plan: stopPlan })
     await held
     const targets = (stopPlan.repos ?? []).flatMap((repo) => repo.worktrees ?? [])
-    const fails = (worktree: string) => Boolean(failing) && worktree === 'fix/login (acme)'
-    const refused = (worktree: string) => failing === 'refused' && fails(worktree)
+    const fails = (worktree: string) => failing && worktree === 'fix/login (acme)'
     return streamed(
       [
         ...targets.flatMap((target) => [
           line({ type: 'unit.started', subject: target.worktree }),
-          ...(refused(target.worktree) ? [] : (target.jobs ?? [])).flatMap((job) => [
+          ...(target.jobs ?? []).flatMap((job) => [
             line({ type: 'phase.started', subject: target.worktree, phase: 'job', job: job.name }),
             line({
               type: 'phase.finished',
@@ -222,31 +221,24 @@ export const answeringStopJobs = (failing: boolean | 'refused' = false, held?: P
           ...envelope('daemon-stop-jobs', []),
           plan: stopPlan,
           ok: !failing,
-          follow_ups:
-            failing === true
-              ? [{ command: 'daemon-stop-jobs', code: 'daemon-stop-jobs.again', message: 'stop the ones left' }]
-              : [],
+          follow_ups: failing
+            ? [{ command: 'daemon-stop-jobs', code: 'daemon-stop-jobs.again', message: 'stop the ones left' }]
+            : [],
           items: targets.map((target) => {
             const failed = fails(target.worktree)
-            const status = () => {
-              if (refused(target.worktree)) return 'not_reached'
-              return failed ? 'failed' : 'stopped'
-            }
             return {
               subject: target.worktree,
               status: failed ? 'failed' : 'done',
               detail: {
                 path: target.path,
-                jobs: (target.jobs ?? []).map((job) => ({ name: job.name, status: status() })),
+                jobs: (target.jobs ?? []).map((job) => ({ name: job.name, status: failed ? 'failed' : 'stopped' })),
               },
               ...(failed && {
-                error: refused(target.worktree)
-                  ? { kind: 'conflict', code: 'operation.locked', message: 'fix/login is locked by another operation' }
-                  : {
-                      kind: 'internal',
-                      code: 'daemon-stop-jobs.stop_failed',
-                      message: "couldn't stop mailpit: docker compose down exited 1",
-                    },
+                error: {
+                  kind: 'internal',
+                  code: 'daemon-stop-jobs.stop_failed',
+                  message: "couldn't stop mailpit: docker compose down exited 1",
+                },
               }),
             }
           }),

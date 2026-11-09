@@ -54,8 +54,10 @@ func TestADaemonThatFailsToStartFailsTheSubscription(t *testing.T) {
 
 func TestADaemonStartedThatNeverAnswersFailsAsNotStarted(t *testing.T) {
 	bus := Bus{SocketPath: filepath.Join(socketDir(t), "wtm.sock"), Start: func() error { return nil }}
+	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+	defer cancel()
 
-	_, err := bus.Subscribe(t.Context(), nil)
+	_, err := bus.Subscribe(ctx, nil)
 
 	assert.ErrorContains(t, err, "the event bus did not start")
 	failure, ok := errors.AsType[*domain.Error](err)

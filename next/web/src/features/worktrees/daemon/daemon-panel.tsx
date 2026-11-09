@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { type ReactElement, useState } from 'react'
+import type { ReactElement } from 'react'
 import { toast } from 'sonner'
 import { type Applied, readQuery } from '@/api/queries/commands'
 import { Dialog } from '@/components/ui/dialog'
@@ -9,14 +9,13 @@ import { type CardState, DaemonCard } from '@/features/worktrees/daemon/componen
 import { RestartDialog } from '@/features/worktrees/daemon/components/restart-dialog'
 import { StopJobsDialog } from '@/features/worktrees/daemon/components/stop-jobs-dialog'
 import { useDaemonRuns } from '@/features/worktrees/daemon/hooks/use-daemon-runs'
-import { cameBack, comingBack as comingBackOf } from '@/features/worktrees/daemon/utils/rows'
+import { comingBack as comingBackOf, notBackCount } from '@/features/worktrees/daemon/utils/rows'
 import { succeeded, useRun } from '@/features/worktrees/hooks/use-run'
-import { jobsTodo } from '@/features/worktrees/utils/progress'
 
 // wtm's daemon, the machine's: the connection block opens it; it is never stopped from here, the page would start it
 // again at once, so its jobs are stopped instead
 const notBack = (envelope: Applied<'daemon-restart'> | undefined) => {
-  const count = (envelope?.items[0]?.detail?.back ?? []).filter((job) => !job.back).length
+  const count = envelope?.plan ? notBackCount(envelope.plan, envelope.items[0]?.detail?.back ?? []) : 0
   return count === 1 ? "1 job didn't come back" : `${count} jobs didn't come back`
 }
 
@@ -25,7 +24,8 @@ export function DaemonPanel({ repo, children }: { repo: string; children: ReactE
   const restart = useRun(repo, 'daemon-restart')
   const comingBack = useDaemonRuns((runs) => runs.comingBack)
   const stopping = useRun(repo, 'daemon-stop-jobs').running
-  const [asking, setAsking] = useState<'restart' | 'stop'>()
+  const asking = useDaemonRuns((runs) => runs.asking)
+  const setAsking = (next: 'restart' | 'stop' | undefined) => useDaemonRuns.setState({ asking: next })
   const detail = status.data?.items[0]?.detail
   const unread = status.error?.message ?? status.data?.error?.message
 
@@ -38,7 +38,8 @@ export function DaemonPanel({ repo, children }: { repo: string; children: ReactE
     const message = restart.progress.refused ?? error?.message ?? envelope?.error?.message
     if (!message) return { kind: 'read' }
     // down until a daemon answers again, which the page's own stream starts: then it reads as it stands
-    if (error?.code === 'daemon-restart.start_failed' && detail?.running) return { kind: 'read' }
+    const readSince = restart.progress.endedAt !== undefined && status.dataUpdatedAt > restart.progress.endedAt
+    if (error?.code === 'daemon-restart.start_failed' && readSince && detail?.running) return { kind: 'read' }
     const down = error?.code === 'daemon-restart.start_failed'
     // it restarted, some jobs short: a warning, not a failure
     if (error?.code === 'daemon-restart.not_back')
@@ -55,7 +56,8 @@ export function DaemonPanel({ repo, children }: { repo: string; children: ReactE
       toast.error("Couldn't restart wtm's daemon", { description: 'Its panel says why.' })
       return
     }
-    const back = envelope?.plan ? cameBack(envelope.plan, envelope.items[0]?.detail?.back ?? []) : 0
+    // every job it started came back, the shared ones run in main for their claimants included
+    const back = envelope?.plan ? comingBackOf(envelope.plan) : 0
     const stacks = (envelope?.plan?.taken_over ?? [])
       .flatMap((repo) => repo.worktrees ?? [])
       .flatMap((wt) => wt.jobs ?? [])
@@ -94,19 +96,14 @@ export function DaemonPanel({ repo, children }: { repo: string; children: ReactE
               onRestart={(fingerprint, plan) => {
                 setAsking(undefined)
                 useDaemonRuns.setState({ comingBack: comingBackOf(plan) })
-                restart.start({ answers: [], fingerprint, units: [jobsTodo('daemon', [])] }, told)
+                restart.start({ answers: [], fingerprint, units: [{ subject: 'daemon', phases: [], lines: [] }] }, told)
               }}
               onCancel={() => setAsking(undefined)}
             />
           )}
         </RunDialogContent>
       </Dialog>
-      <StopJobsDialog
-        repo={repo}
-        open={asking === 'stop'}
-        onClose={() => setAsking(undefined)}
-        onShow={() => setAsking('stop')}
-      />
+      <StopJobsDialog repo={repo} open={asking === 'stop'} onClose={() => setAsking(undefined)} />
     </>
   )
 }

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { DaemonrestartPlan, DaemonstopjobsPlan } from '@/api/types.gen'
 import {
+  comingBack,
   crashedTotal,
+  notBackCount,
   notBackRows,
   repoLine,
   restartRows,
@@ -146,4 +148,40 @@ it('says a repository by its jobs and its stacks', () => {
       ],
     }),
   ).toBe('3 jobs and a stack')
+})
+
+describe('the jobs of a restart, counted', () => {
+  const plan: DaemonrestartPlan = {
+    running: true,
+    from: '0.31.0',
+    to: '0.31.0',
+    confirm: true,
+    back: [
+      {
+        root: '/src/acme',
+        worktrees: [
+          { branch: 'main', path: '/src/acme', jobs: [{ name: 'postgres', hold: 'own', shared: true }] },
+          { branch: 'feat/a', path: '/src/acme/.trees/a', jobs: [{ name: 'postgres', hold: 'claim' }] },
+          { branch: 'feat/b', path: '/src/acme/.trees/b', jobs: [{ name: 'postgres', hold: 'claim' }] },
+        ],
+      },
+    ],
+    taken_over: null,
+    tasks: null,
+    unrecorded: null,
+    gone: null,
+    unheld: null,
+  }
+
+  it('counts a shared service run in main for its claimants once, its claims aside', () => {
+    expect(comingBack(plan)).toBe(1)
+  })
+
+  it('says a shared service that did not come back once, whatever its claimants', () => {
+    const back = [
+      { name: 'postgres', path: '/src/acme/.trees/a', back: false },
+      { name: 'postgres', path: '/src/acme/.trees/b', back: false },
+    ]
+    expect(notBackCount(plan, back)).toBe(1)
+  })
 })

@@ -66,7 +66,11 @@ func TestABusOutOfReachIsAWarningAndTriedAgain(t *testing.T) {
 
 	r, _ := watching(t, useCase(bus, &known{}, opening(newRepo("/repo"))), events.Request{Caller: domain.Caller{Dir: "/repo"}})
 
-	assert.ErrorIs(t, r.warning(t), errBusGone)
+	warned := r.warning(t)
+	assert.ErrorIs(t, warned, errBusGone)
+	failure, ok := errors.AsType[*domain.Error](warned)
+	require.True(t, ok, "a surface reads the stream as not ready by its code")
+	assert.Equal(t, events.CodeBusLost, failure.Code)
 	assert.Equal(t, "snapshot", r.nextType(t))
 }
 

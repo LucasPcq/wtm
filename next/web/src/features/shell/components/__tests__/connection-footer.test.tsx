@@ -38,6 +38,9 @@ test('the block names the panel it opens and keeps its visible words in its name
   expect(
     await screen.findByRole('button', { name: "wtm's daemon: Live Changes show here as they happen" }),
   ).toBeDefined()
+  const status = screen.getByRole('status')
+  expect(status.closest('button'), "a button's content is not announced: the live region sits beside it").toBeNull()
+  expect(status.textContent).toBe('Live: Changes show here as they happen')
 })
 
 test('Try again reads Connecting until the stream is ready, never Live while the daemon may still not start', async () => {

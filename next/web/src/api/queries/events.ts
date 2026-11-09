@@ -116,6 +116,8 @@ async function* lines(client: QueryClient, signal: AbortSignal): AsyncGenerator<
     if (value.event === 'warning') {
       const warning = JSON.parse(value.data) as WebWarning
       if (warning.code === 'daemon.start_failed') void daemonRead(client)
+      // the bus lost: not ready until the core subscribes again and says so; any other warning leaves it as it was
+      if (warning.code === 'events.bus_lost' || warning.code === 'daemon.start_failed') ready = false
       yield { warning: warning.message, ...(warning.code && { warningCode: warning.code }), operations, ready }
     }
     if (!value.event) {

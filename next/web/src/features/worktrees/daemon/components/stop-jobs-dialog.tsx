@@ -1,4 +1,3 @@
-import { useRef } from 'react'
 import { toast } from 'sonner'
 import type { Applied, Planned } from '@/api/queries/commands'
 import { Dialog } from '@/components/ui/dialog'
@@ -10,21 +9,10 @@ import { together } from '@/features/worktrees/daemon/utils/rows'
 import { succeeded, useRun } from '@/features/worktrees/hooks/use-run'
 import { unitsOf } from '@/features/worktrees/utils/stop-plan'
 
-export function StopJobsDialog({
-  repo,
-  open,
-  onClose,
-  onShow,
-}: {
-  repo: string
-  open: boolean
-  onClose: () => void
-  onShow: () => void
-}) {
+export function StopJobsDialog({ repo, open, onClose }: { repo: string; open: boolean; onClose: () => void }) {
   const run = useRun(repo, 'daemon-stop-jobs')
   const ran = useDaemonRuns((runs) => runs.stopping)
   const setRan = (stopping: Planned<'daemon-stop-jobs'> | undefined) => useDaemonRuns.setState({ stopping })
-  const hidden = useRef(false)
   const again = run.progress?.envelope?.follow_ups?.some((followUp) => followUp.code === 'daemon-stop-jobs.again')
 
   // every repository's worktrees, as a stop of worktrees takes them: the progress and the outcome are run down's
@@ -34,7 +22,7 @@ export function StopJobsDialog({
 
   // hidden while it stops, its end is said in a toast that opens it again
   const told = (envelope: Applied<'daemon-stop-jobs'> | undefined, refused: string | undefined) => {
-    if (!hidden.current) return
+    if (!useDaemonRuns.getState().hidden) return
     if (succeeded(envelope)) {
       toast.success('Stopped every job. The proxy is still up.')
       return run.dismiss()
@@ -46,7 +34,7 @@ export function StopJobsDialog({
       return envelope?.error?.message ?? refused ?? 'Nothing stopped.'
     }
     toast.error(said(), {
-      action: { label: 'Details', onClick: onShow },
+      action: { label: 'Details', onClick: () => useDaemonRuns.setState({ asking: 'stop' }) },
     })
   }
 
@@ -65,7 +53,7 @@ export function StopJobsDialog({
           running={run.running}
           ran={{ worktrees: [], plan: asStop(ran) }}
           onHide={() => {
-            hidden.current = true
+            useDaemonRuns.setState({ hidden: true })
             onClose()
           }}
           onDone={() => {
@@ -87,7 +75,7 @@ export function StopJobsDialog({
         repo={repo}
         onStop={(fingerprint, plan) => {
           setRan(plan)
-          hidden.current = false
+          useDaemonRuns.setState({ hidden: false })
           run.start({ answers: [], fingerprint, units: unitsOf(asStop(plan)) }, told)
         }}
         onCancel={onClose}
@@ -100,7 +88,7 @@ export function StopJobsDialog({
       open={open}
       onOpenChange={(next) => {
         if (next) return
-        hidden.current = run.running
+        useDaemonRuns.setState({ hidden: run.running })
         onClose()
       }}
     >

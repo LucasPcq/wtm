@@ -79,3 +79,31 @@ test("the stream's ready reads wtm's daemon again: a daemon back after a failed 
   expect(client.getQueryState(['repo', 'r1', 'daemon-status', []])?.isInvalidated).toBe(true)
   expect(client.getQueryData(eventsQuery.queryKey)).toEqual({ operations: {}, ready: true })
 })
+
+test('a bus lost after ready is not ready until the core says so again; any other warning leaves it ready', async () => {
+  const client = new QueryClient()
+  const ready = 'data: {"v":2,"type":"ready"}\n\n'
+  server.use(
+    http.get(
+      '/api/events',
+      () =>
+        new HttpResponse(
+          `${ready}event: warning\ndata: {"message":"the event bus was lost","code":"events.bus_lost"}\n\n`,
+        ),
+    ),
+  )
+  await client.fetchQuery(eventsQuery)
+  expect(client.getQueryData(eventsQuery.queryKey)).toMatchObject({ ready: false, warningCode: 'events.bus_lost' })
+
+  server.use(
+    http.get(
+      '/api/events',
+      () => new HttpResponse(`${ready}event: warning\ndata: {"message":"/acme: a repository was skipped"}\n\n`),
+    ),
+  )
+  await client.fetchQuery({ ...eventsQuery, staleTime: 0 })
+  expect(client.getQueryData(eventsQuery.queryKey)).toMatchObject({
+    ready: true,
+    warning: '/acme: a repository was skipped',
+  })
+})
