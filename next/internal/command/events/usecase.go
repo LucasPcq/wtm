@@ -573,9 +573,9 @@ func (s *stream) stillThere(ctx context.Context, source Source) error {
 	return nil
 }
 
-// busLost is the failed attempt err as its warning, its text kept: its own code when it has one (daemon.start_failed), else events.bus_lost.
+// busLost is the failed attempt err as its warning, its text kept: daemon.start_failed when wtm's daemon did not start, else events.bus_lost, whatever code a snapshot or a registry gave it, since the stream is not ready until it is back.
 func busLost(err error) error {
-	if failure, ok := errors.AsType[*domain.Error](err); ok && failure != nil {
+	if failure, ok := errors.AsType[*domain.Error](err); ok && failure != nil && failure.Code == run.CodeStartFailed {
 		return err
 	}
 	return &domain.Error{Kind: domain.KindInternal, Code: CodeBusLost, Message: err.Error()}

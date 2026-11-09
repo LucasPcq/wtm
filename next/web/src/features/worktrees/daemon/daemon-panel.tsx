@@ -19,6 +19,13 @@ const notBack = (envelope: Applied<'daemon-restart'> | undefined) => {
   return count === 1 ? "1 job didn't come back" : `${count} jobs didn't come back`
 }
 
+// a dialog asked for belongs to the panel that shows it: one asked where no panel was, or left open when the panel went
+// (Back, another page), never opens later on its own
+const askedHere = () => {
+  useDaemonRuns.setState({ asking: undefined })
+  return () => useDaemonRuns.setState({ asking: undefined })
+}
+
 export function DaemonPanel({ repo, children }: { repo: string; children: ReactElement }) {
   const status = useQuery(readQuery(repo, 'daemon-status'))
   const restart = useRun(repo, 'daemon-restart')
@@ -38,7 +45,7 @@ export function DaemonPanel({ repo, children }: { repo: string; children: ReactE
     const message = restart.progress.refused ?? error?.message ?? envelope?.error?.message
     if (!message) return { kind: 'read' }
     // down until a daemon answers again, which the page's own stream starts: then it reads as it stands
-    const readSince = restart.progress.endedAt !== undefined && status.dataUpdatedAt > restart.progress.endedAt
+    const readSince = restart.progress.endedAt !== undefined && status.dataUpdatedAt >= restart.progress.endedAt
     if (error?.code === 'daemon-restart.start_failed' && readSince && detail?.running) return { kind: 'read' }
     const down = error?.code === 'daemon-restart.start_failed'
     // it restarted, some jobs short: a warning, not a failure
@@ -72,6 +79,7 @@ export function DaemonPanel({ repo, children }: { repo: string; children: ReactE
 
   return (
     <>
+      <span hidden ref={askedHere} />
       <Popover>
         <PopoverTrigger asChild>{children}</PopoverTrigger>
         <PopoverContent side="top" align="start" className="w-96">

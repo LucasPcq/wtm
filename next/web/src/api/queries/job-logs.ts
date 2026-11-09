@@ -75,4 +75,4 @@ async function* lines(at: JobAt, signal: AbortSignal): AsyncGenerator<WebJobLine
 }
 
 export const downloadLog = (at: JobAt) =>
-  saved(path(at, 'log'), { name: `${at.job}.log`, failure: `${at.job}’s log could not be saved` })
+  saved(path(at, 'log'), { name: `${at.job}.log`, failure: `${at.job}'s log could not be saved` })

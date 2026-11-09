@@ -191,9 +191,9 @@ const stopPlan: DaemonstopjobsPlan = {
   ],
 }
 
-// stop-jobs' plan, then its apply: every job stops, but fix/login's stack when failing, offered again; given held, the
-// apply answers once it settles
-export const answeringStopJobs = (failing = false, held?: Promise<void>) =>
+// stop-jobs' plan, then its apply: every job stops, but fix/login's stack when failing, offered again unless offered is
+// false; given held, the apply answers once it settles
+export const answeringStopJobs = (failing = false, held?: Promise<void>, offered = true) =>
   http.post('/api/repos/:repo/commands/daemon-stop-jobs', async ({ request }) => {
     const call = (await request.json()) as WebCall
     if (call.dry_run)
@@ -221,9 +221,10 @@ export const answeringStopJobs = (failing = false, held?: Promise<void>) =>
           ...envelope('daemon-stop-jobs', []),
           plan: stopPlan,
           ok: !failing,
-          follow_ups: failing
-            ? [{ command: 'daemon-stop-jobs', code: 'daemon-stop-jobs.again', message: 'stop the ones left' }]
-            : [],
+          follow_ups:
+            failing && offered
+              ? [{ command: 'daemon-stop-jobs', code: 'daemon-stop-jobs.again', message: 'stop the ones left' }]
+              : [],
           items: targets.map((target) => {
             const failed = fails(target.worktree)
             return {

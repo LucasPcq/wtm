@@ -1,6 +1,7 @@
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { HttpResponse, http } from 'msw'
 import { expect, test } from 'vitest'
+import { useDaemonRuns } from '@/features/worktrees/daemon/hooks/use-daemon-runs'
 import { useRuns } from '@/features/worktrees/hooks/use-run'
 import {
   answeringRestart,
@@ -247,4 +248,40 @@ test('after a restart that did not start its daemon, a read from before the run 
 
   release()
   expect(await within(panel).findByText('Up · 0.31.0, this version'), 'the read after the run').toBeDefined()
+})
+
+test('a dialog left open when the panel goes never opens again on its own', async () => {
+  server.use(daemonStatus(), answeringRestart())
+  const first = await renderApp('/r/r1/worktrees')
+  const panel = await openPanel(first.user)
+  await first.user.click(within(panel).getByRole('button', { name: 'Restart' }))
+  await screen.findByRole('dialog', { name: "Restart wtm's daemon" })
+
+  cleanup()
+  await renderApp('/r/r1/worktrees')
+
+  await screen.findByRole('button', { name: /^wtm's daemon/ })
+  expect(screen.queryByRole('dialog', { name: "Restart wtm's daemon" })).toBeNull()
+})
+
+test("a toast's Details clicked where no panel was opens no dialog later", async () => {
+  server.use(daemonStatus(), answeringStopJobs())
+  useDaemonRuns.setState({ asking: 'stop' })
+
+  await renderApp('/r/r1/worktrees')
+
+  await screen.findByRole('button', { name: /^wtm's daemon/ })
+  expect(screen.queryByRole('dialog', { name: 'Stop every job' })).toBeNull()
+})
+
+test('a stop the core offers no again for shows no Run again', async () => {
+  server.use(daemonStatus(), answeringStopJobs(true, undefined, false))
+  const { user } = await renderApp('/r/r1/worktrees')
+  const panel = await openPanel(user)
+  await user.click(within(panel).getByRole('button', { name: 'Stop every job' }))
+  const dialog = await screen.findByRole('dialog', { name: 'Stop every job' })
+  await user.click(await within(dialog).findByRole('button', { name: 'Stop 3 jobs' }))
+
+  expect(await within(dialog).findByText('2 of 3 stopped.')).toBeDefined()
+  expect(within(dialog).queryByRole('button', { name: 'Run again' })).toBeNull()
 })

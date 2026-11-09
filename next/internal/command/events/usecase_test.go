@@ -61,6 +61,27 @@ func TestWhenTheBusGoesAwayTheStreamOpensAgainOnAFreshSnapshot(t *testing.T) {
 	assert.Equal(t, "ready", r.nextType(t))
 }
 
+func TestAFailedAttemptIsCodedNotReadyWhateverCodeItCarried(t *testing.T) {
+	cases := []struct {
+		name  string
+		cause *domain.Error
+		code  string
+	}{
+		{"coded", &domain.Error{Kind: domain.KindInternal, Code: "registry.unreadable", Message: "repos.json cannot be read"}, events.CodeBusLost},
+		{"not_started", &domain.Error{Kind: domain.KindInternal, Code: run.CodeStartFailed, Message: "the event bus did not start"}, run.CodeStartFailed},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			r, _ := watching(t, useCase(newBus(c.cause), &known{}, opening(newRepo("/repo"))), events.Request{Caller: domain.Caller{Dir: "/repo"}})
+
+			failure, ok := errors.AsType[*domain.Error](r.warning(t))
+			require.True(t, ok)
+			assert.Equal(t, c.code, failure.Code)
+			assert.Equal(t, c.cause.Message, failure.Error(), "its text kept")
+		})
+	}
+}
+
 func TestABusOutOfReachIsAWarningAndTriedAgain(t *testing.T) {
 	bus := newBus(errBusGone)
 

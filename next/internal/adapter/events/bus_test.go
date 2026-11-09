@@ -35,10 +35,15 @@ func TestSubscribingStartsTheDaemonWhenNoneAnswers(t *testing.T) {
 	assert.JSONEq(t, `{"v":2,"type":"repo.added","ts":"2026-10-16T12:00:00Z","repo":{"root":"/repo","common_dir":"/repo/.git"}}`, received(t, lines))
 }
 
-func TestSubscribingWithNoDaemonAndNoWayToStartOneFails(t *testing.T) {
-	_, err := Bus{SocketPath: filepath.Join(socketDir(t), "wtm.sock")}.Subscribe(t.Context(), nil)
+func TestSubscribingWithNoDaemonAndNoWayToStartOneFailsAsNotStarted(t *testing.T) {
+	socket := filepath.Join(socketDir(t), "wtm.sock")
 
-	assert.ErrorContains(t, err, "no event bus answers")
+	_, err := Bus{SocketPath: socket}.Subscribe(t.Context(), nil)
+
+	assert.EqualError(t, err, "no event bus answers on "+socket)
+	failure, ok := errors.AsType[*domain.Error](err)
+	require.True(t, ok)
+	assert.Equal(t, run.CodeStartFailed, failure.Code)
 }
 
 func TestADaemonThatFailsToStartFailsTheSubscription(t *testing.T) {
@@ -46,7 +51,7 @@ func TestADaemonThatFailsToStartFailsTheSubscription(t *testing.T) {
 
 	_, err := bus.Subscribe(t.Context(), nil)
 
-	assert.ErrorContains(t, err, "start the event bus: no binary")
+	assert.EqualError(t, err, "start the event bus: no binary", "its text once, never repeated by a cause")
 	failure, ok := errors.AsType[*domain.Error](err)
 	require.True(t, ok, "a surface reads the daemon not answering by its code")
 	assert.Equal(t, run.CodeStartFailed, failure.Code)
@@ -59,15 +64,7 @@ func TestADaemonStartedThatNeverAnswersFailsAsNotStarted(t *testing.T) {
 
 	_, err := bus.Subscribe(ctx, nil)
 
-	assert.ErrorContains(t, err, "the event bus did not start")
-	failure, ok := errors.AsType[*domain.Error](err)
-	require.True(t, ok)
-	assert.Equal(t, run.CodeStartFailed, failure.Code)
-}
-
-func TestNoDaemonToStartFailsAsNotStarted(t *testing.T) {
-	_, err := Bus{SocketPath: filepath.Join(socketDir(t), "wtm.sock")}.Subscribe(t.Context(), nil)
-
+	assert.EqualError(t, err, "the event bus did not start: context deadline exceeded")
 	failure, ok := errors.AsType[*domain.Error](err)
 	require.True(t, ok)
 	assert.Equal(t, run.CodeStartFailed, failure.Code)
