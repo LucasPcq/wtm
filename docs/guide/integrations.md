@@ -90,3 +90,5 @@ It installs the `using-wtm` skill into Claude Code (`.claude/`) or Cursor (`.cur
 ## Built on wtm
 
 [herdr-wtm](https://github.com/LucasPcq/herdr-wtm) runs your worktree commands from a herdr popup and keeps herdr's workspaces in sync with your worktrees, on top of `wtm events` and `WTM_CORRELATION_ID` (early preview).
+
+[herdr-app-wtm](https://github.com/LucasPcq/herdr-app-wtm) does the same for the Herdr desktop app: a space opens for each worktree wtm creates and closes when wtm removes it, whoever ran the command, on top of `wtm events` (early preview).

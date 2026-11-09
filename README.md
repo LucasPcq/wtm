@@ -90,7 +90,7 @@ Every change takes `--yes`, every data command `--output json`, and `wtm events`
 wtm agents install
 ```
 
-[Integrations](docs/guide/integrations.md) · [The event stream](docs/guide/events.md) · [herdr-wtm](https://github.com/LucasPcq/herdr-wtm)
+[Integrations](docs/guide/integrations.md) · [The event stream](docs/guide/events.md) · [herdr-wtm](https://github.com/LucasPcq/herdr-wtm) · [herdr-app-wtm](https://github.com/LucasPcq/herdr-app-wtm)
 
 ## Learn more
 
