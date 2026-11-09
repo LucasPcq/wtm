@@ -113,12 +113,12 @@ func (b Bus) ensure(ctx context.Context) error {
 	return nil
 }
 
-// notStarted is err as the daemon not answering, daemon.start_failed, which a reader's surface names; ctx done stays an interruption.
+// notStarted is err as the daemon not answering, daemon.start_failed, which a reader's surface names, its text kept; ctx done stays an interruption.
 func notStarted(err error) error {
 	if errors.Is(err, context.Canceled) {
 		return err
 	}
-	return &domain.Error{Kind: domain.KindInternal, Code: run.CodeStartFailed, Message: "wtm's daemon did not start", Cause: err}
+	return &domain.Error{Kind: domain.KindInternal, Code: run.CodeStartFailed, Message: err.Error()}
 }
 
 // answers reports whether a daemon accepts a connection on the socket.

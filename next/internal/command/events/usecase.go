@@ -573,15 +573,15 @@ func (s *stream) stillThere(ctx context.Context, source Source) error {
 	return nil
 }
 
-// lost is err ending the stream when it says the repository watched lost its wtm config, else err as it is.
-// busLost is the failed attempt err as its warning: its own code when it has one (daemon.start_failed), else events.bus_lost.
+// busLost is the failed attempt err as its warning, its text kept: its own code when it has one (daemon.start_failed), else events.bus_lost.
 func busLost(err error) error {
 	if failure, ok := errors.AsType[*domain.Error](err); ok && failure != nil {
 		return err
 	}
-	return &domain.Error{Kind: domain.KindInternal, Code: CodeBusLost, Message: "the event bus was lost", Cause: err}
+	return &domain.Error{Kind: domain.KindInternal, Code: CodeBusLost, Message: err.Error()}
 }
 
+// lost is err ending the stream when it says the repository watched lost its wtm config, else err as it is.
 func lost(err error) error {
 	if configLost(err) {
 		return ended{err}
