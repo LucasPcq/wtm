@@ -14,7 +14,7 @@ func TestAFirstInitTakesWhatTheRepositorySuggests(t *testing.T) {
 
 	assert.Equal(t, domain.Answer[string]{Value: project.DefaultBasePath, Origin: domain.OriginDefault}, q.BasePath)
 	assert.Equal(t, domain.Answer[string]{Value: "main", Origin: domain.OriginDetected}, q.BaseBranch.Answer)
-	assert.Equal(t, domain.Answer[project.EnvStrategy]{Value: project.EnvExample, Origin: domain.OriginDefault}, q.EnvStrategy)
+	assert.Equal(t, domain.Answer[string]{Value: string(project.EnvExample), Origin: domain.OriginDefault}, q.EnvStrategy)
 	assert.Equal(t, []string{"apps/api/.env", "apps/web/.env"}, q.EnvFiles.Picked)
 	assert.Equal(t, domain.OriginDetected, q.EnvFiles.Origin)
 	assert.Equal(t, Hooks{Entries: []project.Hook{{Cmd: "pnpm install"}}, Origin: domain.OriginDetected, Found: detected().OnCreate}, q.OnCreate)
@@ -30,7 +30,7 @@ func TestAReInitShowsEveryFileButPicksOnlyWhatTheConfigHolds(t *testing.T) {
 	assert.Equal(t, saved().Config.OnCreate, q.OnCreate.Entries)
 	assert.Equal(t, Hooks{Entries: []project.Hook{}, Origin: domain.OriginConfig, Found: detected().OnClean}, q.OnClean, "a list the config holds empty stays empty")
 	assert.Equal(t, domain.Answer[string]{Value: "../acme.trees", Origin: domain.OriginConfig}, q.BasePath)
-	assert.Equal(t, domain.Answer[project.EnvStrategy]{Value: project.EnvMain, Origin: domain.OriginConfig}, q.EnvStrategy)
+	assert.Equal(t, domain.Answer[string]{Value: string(project.EnvMain), Origin: domain.OriginConfig}, q.EnvStrategy)
 }
 
 func TestAReInitChangesOnlyTheSettingsGiven(t *testing.T) {
@@ -49,7 +49,7 @@ func TestAConfigThatCopiesNoEnvFileReadsAsNone(t *testing.T) {
 
 	q := questions(facts(s), Given{})
 
-	assert.Equal(t, domain.Answer[project.EnvStrategy]{Value: EnvNone, Origin: domain.OriginConfig}, q.EnvStrategy)
+	assert.Equal(t, domain.Answer[string]{Value: EnvNone, Origin: domain.OriginConfig}, q.EnvStrategy)
 	assert.Equal(t, domain.SkipNoEnv, q.EnvFiles.Skip)
 	assert.Equal(t, project.Env{}, q.Rewrite().Config.Env)
 }

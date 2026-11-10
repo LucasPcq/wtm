@@ -4406,12 +4406,11 @@
       "type": "object"
     },
     "project.EnvStrategy": {
-      "description": "Where a worktree's .env files are copied from, none when they are not.",
+      "description": "Where a worktree's .env files are copied from.",
       "enum": [
         "example",
         "main",
-        "parent",
-        "none"
+        "parent"
       ]
     },
     "project.FoundHook": {

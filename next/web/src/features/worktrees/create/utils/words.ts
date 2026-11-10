@@ -1,4 +1,4 @@
-import type { CreateAction, CreateRequest, DomainSkip, ProjectEnvStrategy } from '@/api/types.gen'
+import type { CreateAction, CreateRequest, DomainSkip } from '@/api/types.gen'
 import type { FieldWords, OptionWords } from '@/components/command-form/command-fields'
 import type { OutcomeKind } from '@/features/worktrees/utils/outcome'
 
@@ -24,12 +24,11 @@ export const isolation: Options<'isolation'> = {
 }
 
 // the answer as the Confirm step's one line says it, beside the others
-export const envFromShort: Record<ValuesOf<'env_from'> | ProjectEnvStrategy, string> = {
+export const envFromShort: Record<ValuesOf<'env_from'>, string> = {
   config: '.env from the project default',
   example: '.env from .env.example',
   main: '.env from the main checkout',
   parent: '.env from the source worktree',
-  none: 'no .env copied',
 }
 
 export const isolationShort: Record<ValuesOf<'isolation'>, string> = {

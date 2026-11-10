@@ -40,18 +40,18 @@ func Sections() []string {
 const EnvNone = project.EnvNone
 
 // EnvStrategies are the answers to where a new worktree's .env files come from, in the order a choice offers them: each strategy, then none.
-func EnvStrategies() []project.EnvStrategy {
-	return append(project.EnvStrategies(), EnvNone)
+func EnvStrategies() []string {
+	return append(domain.Names(project.EnvStrategies()), EnvNone)
 }
 
 // Given is what a request says to the settings, as given: a field left empty (nil for a list) takes the value config.toml holds, else what the repository suggests, else its default; a list given empty is none.
 type Given struct {
-	BasePath    string              `json:"base_path"`
-	BaseBranch  string              `json:"base_branch"`
-	EnvStrategy project.EnvStrategy `json:"env_strategy"`
-	EnvFiles    []string            `json:"env_files"`
-	OnCreate    []project.Hook      `json:"on_create"`
-	OnClean     []project.Hook      `json:"on_clean"`
+	BasePath    string         `json:"base_path"`
+	BaseBranch  string         `json:"base_branch"`
+	EnvStrategy string         `json:"env_strategy"`
+	EnvFiles    []string       `json:"env_files"`
+	OnCreate    []project.Hook `json:"on_create"`
+	OnClean     []project.Hook `json:"on_clean"`
 }
 
 // Answer is the request with the setting at path answered by values, spelled as the setting's field spells them, a blank entry of a list left out; a path that is no setting leaves the request as it was.
@@ -64,7 +64,7 @@ func (g Given) Answer(path string, values []string) (Given, error) {
 	case PathBaseBranch:
 		next.BaseBranch, err = domain.One[string](path, values)
 	case PathEnvStrategy:
-		next.EnvStrategy, err = domain.One[project.EnvStrategy](path, values)
+		next.EnvStrategy, err = domain.One[string](path, values)
 	case PathEnvFiles:
 		next.EnvFiles = filled(values)
 	case PathOnCreate:
@@ -147,7 +147,7 @@ type QuestionsParams struct {
 type Questions struct {
 	BasePath    domain.Answer[string]
 	BaseBranch  BaseBranch
-	EnvStrategy domain.Answer[project.EnvStrategy]
+	EnvStrategy domain.Answer[string]
 	EnvFiles    EnvFiles
 	OnCreate    Hooks
 	OnClean     Hooks
@@ -227,22 +227,22 @@ func baseBranch(given Given, facts Facts) BaseBranch {
 }
 
 // envStrategy is the strategy as given, else config.toml's: none when it names neither a strategy nor a file (as init writes a skipped .env), the default when it names files alone.
-func envStrategy(given Given, saved *project.Saved) domain.Answer[project.EnvStrategy] {
+func envStrategy(given Given, saved *project.Saved) domain.Answer[string] {
 	switch {
 	case given.EnvStrategy != "":
-		return domain.Answer[project.EnvStrategy]{Value: given.EnvStrategy, Origin: domain.OriginRequest}
+		return domain.Answer[string]{Value: given.EnvStrategy, Origin: domain.OriginRequest}
 	case saved == nil:
 	case saved.Config.Env.Strategy != "":
-		return domain.Answer[project.EnvStrategy]{Value: saved.Config.Env.Strategy, Origin: domain.OriginConfig}
+		return domain.Answer[string]{Value: string(saved.Config.Env.Strategy), Origin: domain.OriginConfig}
 	case len(saved.Config.Env.Files) == 0:
-		return domain.Answer[project.EnvStrategy]{Value: EnvNone, Origin: domain.OriginConfig}
+		return domain.Answer[string]{Value: EnvNone, Origin: domain.OriginConfig}
 	}
 
-	return domain.Answer[project.EnvStrategy]{Value: project.DefaultEnvStrategy, Origin: domain.OriginDefault}
+	return domain.Answer[string]{Value: string(project.DefaultEnvStrategy), Origin: domain.OriginDefault}
 }
 
 // envFiles are the .env files picked as given, else those config.toml holds, else every one the repository holds; its options are the files config.toml holds, those the repository holds besides, then those given besides. None is asked when no .env file is copied, or there is none to pick.
-func envFiles(given Given, facts Facts, strategy project.EnvStrategy) EnvFiles {
+func envFiles(given Given, facts Facts, strategy string) EnvFiles {
 	question := EnvFiles{Options: envOptions(facts)}
 	for _, target := range given.EnvFiles {
 		if !slices.Contains(targets(question.Options), target) {
@@ -337,7 +337,7 @@ func (q Questions) Fields() []domain.Field {
 	return []domain.Field{
 		domain.TextField{FieldSpec: domain.FieldSpec{Path: PathBasePath, Section: SectionWorktrees, Origin: q.BasePath.Origin}, Value: q.BasePath.Value},
 		domain.SelectField{FieldSpec: domain.FieldSpec{Path: PathBaseBranch, Section: SectionWorktrees, Origin: q.BaseBranch.Origin}, Value: q.BaseBranch.Value, Options: branches, Pinned: q.BaseBranch.Pinned},
-		domain.SelectField{FieldSpec: domain.FieldSpec{Path: PathEnvStrategy, Section: SectionEnvFiles, Origin: q.EnvStrategy.Origin}, Value: string(q.EnvStrategy.Value), Options: domain.OptionsOf(EnvStrategies()), Closed: true},
+		domain.SelectField{FieldSpec: domain.FieldSpec{Path: PathEnvStrategy, Section: SectionEnvFiles, Origin: q.EnvStrategy.Origin}, Value: q.EnvStrategy.Value, Options: domain.OptionsOf(EnvStrategies()), Closed: true},
 		domain.MultiSelectField{FieldSpec: domain.FieldSpec{Path: PathEnvFiles, Section: SectionEnvFiles, Origin: q.EnvFiles.Origin, Skip: q.EnvFiles.Skip}, Picked: q.EnvFiles.Picked, Options: files},
 		domain.HooksField{FieldSpec: domain.FieldSpec{Path: PathOnCreate, Section: SectionHooks, Origin: q.OnCreate.Origin}, Entries: q.OnCreate.Entries, Found: q.OnCreate.Found, Dirs: q.Dirs},
 		domain.HooksField{FieldSpec: domain.FieldSpec{Path: PathOnClean, Section: SectionHooks, Origin: q.OnClean.Origin}, Entries: q.OnClean.Entries, Found: q.OnClean.Found, Dirs: q.Dirs},
@@ -396,7 +396,7 @@ func (q Questions) Problems() []domain.FieldError {
 	case len(q.BaseBranch.Options) > 0 && !slices.Contains(q.BaseBranch.Options, branch):
 		problems = append(problems, q.problem(PathBaseBranch, CodeBaseBranchUnknown, "{path} {value} is no branch of the repository", branch))
 	}
-	problems = append(problems, domain.OneOf(domain.OneOfParams{Path: PathEnvStrategy, Value: string(q.EnvStrategy.Value), Accepted: domain.Names(EnvStrategies())})...)
+	problems = append(problems, domain.OneOf(domain.OneOfParams{Path: PathEnvStrategy, Value: q.EnvStrategy.Value, Accepted: EnvStrategies()})...)
 
 	if q.EnvStrategy.Value != EnvNone {
 		for index, target := range q.EnvFiles.Picked {
@@ -489,7 +489,7 @@ func (q Questions) Rewrite() project.Rewrite {
 		OnClean:   q.OnClean.Entries,
 	}
 	if q.EnvStrategy.Value != EnvNone {
-		config.Env.Strategy = q.EnvStrategy.Value
+		config.Env.Strategy = project.EnvStrategy(q.EnvStrategy.Value)
 		for _, target := range q.EnvFiles.Picked {
 			config.Env.Files = append(config.Env.Files, q.envFile(target))
 		}
@@ -527,7 +527,7 @@ func (q Questions) Document() Document {
 	document := Document{
 		BasePath:    config.Worktrees.BasePath,
 		BaseBranch:  config.Worktrees.BaseBranch,
-		EnvStrategy: string(q.EnvStrategy.Value),
+		EnvStrategy: q.EnvStrategy.Value,
 		EnvFiles:    answered(config.Env.Files),
 		OnCreate:    answered(config.OnCreate),
 		OnClean:     answered(config.OnClean),
