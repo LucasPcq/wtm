@@ -4,6 +4,6 @@
                 apps/web/.env  PORT → 3020
                 apps/api/.env  OLD left: in no source
   In step       main, fix/login
-  fingerprint  d56f5a117a658a11db73b733
-  → wtm-next env --all --expect-fingerprint d56f5a117a658a11db73b733   apply this plan
+  fingerprint  40105ea28ebb7e11bbecd26e
+  → wtm-next env --all --expect-fingerprint 40105ea28ebb7e11bbecd26e   apply this plan
 

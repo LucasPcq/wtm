@@ -94,7 +94,7 @@ func newWorld() world {
 }
 
 func (w world) env() uicli.Env {
-	return uicli.Env{Cwd: pathOf(billing), ProjectDir: mainPath}
+	return uicli.Env{Cwd: mainPath, ProjectDir: mainPath}
 }
 
 func (w world) open(context.Context, string) (envcmd.UseCase, error) {

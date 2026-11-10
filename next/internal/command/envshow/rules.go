@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
-	"github.com/LucasPcq/wtm/next/internal/domain/dotenv"
 	envs "github.com/LucasPcq/wtm/next/internal/domain/env"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
@@ -248,12 +247,21 @@ func (f Facts) file(read envs.FileRead, writes map[string]map[string]written) Fi
 	file.Origin, file.Parent = f.origin(read)
 
 	parent, main := read.Sources(f.strategy())
-	here, inMain := pairs(read.Child), pairs(read.Main)
+	here, inMain := envs.Values(read.Child), envs.Values(read.Main)
 	if f.Target.Main {
 		inMain = here
 	}
+	// every key is listed, but those wtm writes stand against what it writes, never against a source, as env reconciles them
+	owned := envs.Owned(f.Run, read.File.Target)
+	if f.isolation() == project.Verbatim {
+		owned = map[string]bool{}
+	}
+	status := map[string]envs.KeyStatus{}
+	for _, k := range envs.Keys(envs.DriftParams{Child: read.Child, Template: read.Template, Parent: parent, Main: main, Owned: owned}) {
+		status[k.Name] = k.Status
+	}
 	for _, k := range envs.Keys(envs.DriftParams{Child: read.Child, Template: read.Template, Parent: parent, Main: main}) {
-		key := Key{Key: k.Name, Status: k.Status, Follows: FollowsCopied}
+		key := Key{Key: k.Name, Status: cmp.Or(status[k.Name], envs.KeyInStep), Follows: FollowsCopied}
 		key.Follows, key.Job, key.Port = f.follows(read.File.Target, k.Name, valueOf(inMain, here, k.Name))
 		if w, wtm := writes[read.File.Target][k.Name]; wtm && w.leftAlone == "" {
 			key.Writes, key.OutOfStep = &w.value, w.outOfStep
@@ -267,7 +275,7 @@ func (f Facts) file(read envs.FileRead, writes map[string]map[string]written) Fi
 			key.Main, key.Here = withheld(key.Main), withheld(key.Here)
 		default:
 			// wtm writes the port or the address, never the credentials a url may carry beside them
-			key.Main, key.Here, key.Writes = uncredentialed(key.Main), uncredentialed(key.Here), uncredentialed(key.Writes)
+			key.Main, key.Here, key.Writes = withoutCredentials(key.Main), withoutCredentials(key.Here), withoutCredentials(key.Writes)
 		}
 		file.Keys = append(file.Keys, key)
 	}
@@ -358,16 +366,6 @@ func appOf(apps []App, run project.Run, file File) []App {
 	return apps
 }
 
-func pairs(lines []dotenv.Line) map[string]string {
-	values := map[string]string{}
-	for _, line := range lines {
-		if line.Kind == dotenv.Pair {
-			values[line.Key] = line.Value
-		}
-	}
-	return values
-}
-
 // valueOf is the key's value in main, else here: the one a link's base port is read in.
 func valueOf(main, here map[string]string, key string) string {
 	if value, ok := main[key]; ok {
@@ -393,27 +391,12 @@ func withheld(value *string) *string {
 	return &empty
 }
 
-// uncredentialed is value with the user and password of each url in it masked.
-func uncredentialed(value *string) *string {
+// withoutCredentials is value with its credentials masked (envs.WithoutCredentials).
+func withoutCredentials(value *string) *string {
 	if value == nil {
 		return nil
 	}
-	masked, rest := "", *value
-	for {
-		at := strings.Index(rest, "://")
-		if at < 0 {
-			masked += rest
-			break
-		}
-		masked, rest = masked+rest[:at+3], rest[at+3:]
-		end := strings.IndexAny(rest, "/?#, ")
-		if end < 0 {
-			end = len(rest)
-		}
-		if user := strings.LastIndex(rest[:end], "@"); user >= 0 {
-			masked, rest = masked+"•••", rest[user:]
-		}
-	}
+	masked := envs.WithoutCredentials(*value)
 	return &masked
 }
 

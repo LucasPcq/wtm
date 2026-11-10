@@ -107,3 +107,14 @@ func TestAPortWtmLeavesAloneIsToCheck(t *testing.T) {
 
 	assert.Contains(t, d.Checks, envshow.Check{File: webEnv, Key: "PORT", Kind: envshow.CheckLeftAlone, Job: "web", Port: "PORT", Here: ptr("9999"), Status: env.StatusNotFound})
 }
+
+func TestALinkedKeyStandsAgainstWhatWtmWritesNotAgainstItsSource(t *testing.T) {
+	// the review: a linked PORT read "conflict" with main's, which env never compares
+	s := acmeSeed()
+	s.Meta[billing] = worktree.Meta{SourceBranch: "main", EnvStrategy: project.EnvMain, Ordinal: 2, Isolation: project.Isolated}
+
+	d, _ := read(t, s, envshow.Request{Worktree: billing})
+
+	assert.Equal(t, env.KeyInStep, keyOf(t, d, webEnv, "PORT").Status)
+	assert.True(t, keyOf(t, d, webEnv, "PORT").OutOfStep)
+}

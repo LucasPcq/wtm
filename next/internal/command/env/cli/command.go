@@ -21,8 +21,8 @@ const (
 		"\n" +
 		"A key whose value differs from its source is kept unless --overwrite; a key in no source is\n" +
 		"kept unless --prune. Without arguments, the wizard asks which worktrees to reconcile, those out\n" +
-		"of step and the one you stand in checked; unattended, those are reconciled. A worktree is named\n" +
-		"by its branch or its path; --all asks for every worktree.\n" +
+		"of step and the one you stand in checked; unattended, the one you stand in alone. A worktree is\n" +
+		"named by its branch or its path; --all asks for every worktree.\n" +
 		"\n" +
 		"Only what wtm writes is shown (the ports and addresses it moves); every other value, secrets\n" +
 		"included, is withheld unless --show-values. A job up in a worktree whose .env changed runs on\n" +
@@ -42,7 +42,7 @@ const (
   # For a script or an agent, with the v2 JSON envelope
   wtm env --all --yes --output json`
 
-	yesUsage = "Run unattended: no question, no confirmation (without worktrees, those out of step and the one you stand in; a conflict kept unless --overwrite, an orphan unless --prune)"
+	yesUsage = "Run unattended: no question, no confirmation (without worktrees, the one you stand in; a conflict kept unless --overwrite, an orphan unless --prune)"
 )
 
 type envCommand struct {

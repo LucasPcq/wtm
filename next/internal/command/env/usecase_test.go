@@ -61,13 +61,14 @@ func TestAReconciledWorktreeHasNothingLeftToReconcile(t *testing.T) {
 	assert.Equal(t, 0, optionOf(w.questions(t, env.Request{}).Worktrees.Options, billing).OutOfStep)
 }
 
-func TestTheDefaultPickIsTheWorktreesOutOfStepAndTheCallers(t *testing.T) {
+func TestTheDefaultPickIsTheCallersAndAPersonIsOfferedTheWorktreesOutOfStepToo(t *testing.T) {
 	w := newWorld(acmeSeed())
 
 	q := w.questions(t, env.Request{Caller: domain.Caller{Cwd: "/repo/.trees/" + login + "/apps"}})
 
 	assert.Equal(t, domain.OriginDefault, q.Worktrees.Picked.Origin)
-	assert.Equal(t, []string{billing, fresh, login}, q.Worktrees.Picked.Value)
+	assert.Equal(t, []string{login}, q.Worktrees.Picked.Value)
+	assert.Equal(t, []string{billing, fresh, login}, q.Worktrees.Prechecked)
 	assert.Equal(t, 2, optionOf(q.Worktrees.Options, billing).OutOfStep)
 	assert.Equal(t, 0, optionOf(q.Worktrees.Options, login).OutOfStep)
 	assert.Equal(t, project.Verbatim, optionOf(q.Worktrees.Options, verbatim).Isolation)
@@ -259,4 +260,79 @@ func TestAPortWtmFindsNothingToMoveInIsLeftAloneAndSaid(t *testing.T) {
 	warning := outcome.Warnings[slices.IndexFunc(outcome.Warnings, func(w domain.Warning) bool { return w.Code == env.CodeLeftAlone })]
 	require.Len(t, warning.Ports, 1)
 	assert.Equal(t, "PORT", warning.Ports[0].Key)
+}
+
+func TestAnUnattendedRunWithNoneNamedWritesTheCallersWorktreeAlone(t *testing.T) {
+	// the review: run from main, it wrote into every worktree out of step, which nobody named
+	w := newWorld(acmeSeed())
+
+	outcome := w.run(t, env.Request{Caller: domain.Caller{Cwd: mainPath}}, domain.RunOptions{})
+
+	require.Len(t, outcome.Result.Items, 1)
+	assert.Equal(t, "main", outcome.Result.Items[0].Subject)
+	assert.Equal(t, "PORT=3010\nAPI_URL=http://localhost:4020\n", w.file(t, billing, webEnv))
+}
+
+func TestAnUnreadableWorktreeIsLeftAndRecordsNoIsolation(t *testing.T) {
+	// the review: its isolation was recorded with nothing written, and it was said in step
+	w := newWorld(acmeSeed())
+	w.usecase.EnvFiles = failingIn{Files: w.store, dir: "/repo/.trees/" + login + "/", read: errors.New("permission denied")}
+
+	outcome := w.run(t, env.Request{Worktrees: []string{login}, Isolation: project.Verbatim}, domain.RunOptions{})
+
+	assert.Equal(t, domain.ReasonRuledOut, outcome.Result.Items[0].Reason)
+	assert.Contains(t, codes(outcome.Warnings), env.CodeUnreadable)
+	assert.Equal(t, "left", outcome.Plan.Recap[len(outcome.Plan.Recap)-1].Key)
+	meta, _ := w.store.Meta(login)
+	assert.Equal(t, project.Isolated, meta.Isolation)
+}
+
+func TestTheValuesASwitchToVerbatimPutsBackAreNoConflictToAskAbout(t *testing.T) {
+	// the review: the overwrite question listed the ports a switch to verbatim always restores
+	w := newWorld(acmeSeed())
+
+	q := w.questions(t, env.Request{Worktrees: []string{login}, Isolation: project.Verbatim})
+
+	assert.Equal(t, domain.SkipNoKeyConflict, q.Overwrite.Skip)
+	assert.Empty(t, q.Conflicts)
+}
+
+func TestAnIsolationChosenForAPendingWorktreeLeavesTheOthersTheirs(t *testing.T) {
+	// the review: a verbatim worktree picked beside a pending one became isolated
+	s := acmeSeed()
+	s.Meta[billing] = worktree.Meta{SourceBranch: "main", EnvStrategy: project.EnvMain, Ordinal: 2}
+	w := newWorld(s)
+
+	outcome := w.run(t, env.Request{Worktrees: []string{billing, verbatim}, Isolation: project.Isolated}, domain.RunOptions{DryRun: true})
+
+	assert.Equal(t, project.Isolated, reconcileOf(t, outcome.Plan, billing).Records)
+	assert.Equal(t, project.Verbatim, reconcileOf(t, outcome.Plan, verbatim).Isolation)
+	assert.Empty(t, reconcileOf(t, outcome.Plan, verbatim).Records)
+}
+
+func TestOneWorktreeFailingStopsNoneOfTheOthers(t *testing.T) {
+	s := acmeSeed()
+	s.Files["/repo/.trees/"+login+"/"+webEnv] = "PORT=3000\nAPI_URL=http://localhost:4010\n"
+	w := newWorld(s)
+	w.usecase.EnvFiles = failingIn{Files: w.store, dir: "/repo/.trees/" + login + "/", edit: errors.New("disk full")}
+
+	outcome := w.run(t, naming(login, billing), domain.RunOptions{})
+
+	assert.Equal(t, domain.StatusFailed, outcome.Result.Items[0].Status)
+	assert.Equal(t, env.CodeFailed, outcome.Result.Items[0].Err.Code)
+	assert.Equal(t, domain.StatusDone, outcome.Result.Items[1].Status)
+	assert.Equal(t, "PORT=3020\nAPI_URL=http://localhost:4020\n", w.file(t, billing, webEnv))
+}
+
+func TestACancelledApplySkipsTheWorktreesNotStarted(t *testing.T) {
+	w := newWorld(acmeSeed())
+	planned, _, err := w.usecase.Plan(t.Context(), naming(billing))
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	result := w.usecase.Apply(ctx, planned, func(domain.Event) {})
+
+	assert.Equal(t, domain.ReasonInterrupted, result.Items[0].Reason)
+	assert.Equal(t, "PORT=3010\nAPI_URL=http://localhost:4020\n", w.file(t, billing, webEnv))
 }

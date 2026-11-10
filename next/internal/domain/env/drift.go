@@ -67,7 +67,7 @@ type Key struct {
 
 // Keys returns every key of params.Child and of its sources but those wtm owns, the child's in file order, then the others in the template's, the parent's, then the main's order. An expected key is one of the template, the parent's or the main's; its value is the first non-empty one of the parent's, then the main's.
 func Keys(params DriftParams) []Key {
-	child, template, parent, main := pairs(params.Child), pairs(params.Template), pairs(params.Parent), pairs(params.Main)
+	child, template, parent, main := Values(params.Child), Values(params.Template), Values(params.Parent), Values(params.Main)
 
 	var keys []Key
 	seen := map[string]bool{}
@@ -135,8 +135,8 @@ func Owned(run project.Run, target string) map[string]bool {
 	return owned
 }
 
-// pairs are the values of lines by key, the last of a key winning as a .env file reads.
-func pairs(lines []dotenv.Line) map[string]string {
+// Values are the values of lines by key, the last of a key winning as a .env file reads.
+func Values(lines []dotenv.Line) map[string]string {
 	values := map[string]string{}
 	for _, line := range lines {
 		if line.Kind == dotenv.Pair {

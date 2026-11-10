@@ -107,11 +107,12 @@ type SelectField struct {
 	Refused      []FieldError `json:"refused,omitempty"`
 }
 
-// MultiSelectField asks any of its options.
+// MultiSelectField asks any of its options: Picked is its answer, or its default pick, the one an unattended run takes; Prechecked, when the command gives one, is the pick a person is offered instead, Picked otherwise.
 type MultiSelectField struct {
 	FieldSpec
-	Picked  []string `json:"picked"`
-	Options []Option `json:"options"`
+	Picked     []string `json:"picked"`
+	Prechecked []string `json:"prechecked,omitempty"`
+	Options    []Option `json:"options"`
 }
 
 // TextField asks one line of text.

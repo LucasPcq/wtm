@@ -116,6 +116,8 @@ func TestAWorktreeSwitchedToVerbatimGetsTheSourceValuesOfWhatWtmWrote(t *testing
 	file := Reconcile(ReconcileParams{Reads: []FileRead{read}, Strategy: project.EnvMain, Run: params.Run, Verbatim: true, Restore: true}).Files[0]
 
 	assert.Equal(t, "PORT=3000\nCOMPOSE_PROJECT_NAME=shop\nMINE=x\n", string(dotenv.Render(file.After)))
+	assert.Len(t, file.Restored, 2)
+	assert.Empty(t, file.Settled)
 	assert.Equal(t, []Key{{Name: "MINE", Status: KeyConflict, Value: "x", Source: "y"}}, file.Left)
 }
 

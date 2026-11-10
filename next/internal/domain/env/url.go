@@ -111,3 +111,44 @@ func hasLoopbackOrigin(value string) bool {
 	}
 	return false
 }
+
+// passwordParams are the query parameters that carry a password, whose values WithoutCredentials masks.
+var passwordParams = []string{"password", "passwd", "pwd", "secret", "token"}
+
+// WithoutCredentials returns value with the user and password of each url in it masked, and the value of each query parameter that carries a password: what wtm writes is the port or the address, never the credentials beside them.
+func WithoutCredentials(value string) string {
+	masked, rest := "", value
+	for {
+		at := strings.Index(rest, schemeSeparator)
+		if at < 0 {
+			return maskedParams(masked + rest)
+		}
+		masked, rest = masked+rest[:at+len(schemeSeparator)], rest[at+len(schemeSeparator):]
+		end := strings.IndexAny(rest, "/?#, ")
+		if end < 0 {
+			end = len(rest)
+		}
+		if user := strings.LastIndex(rest[:end], "@"); user >= 0 {
+			masked, rest = masked+"•••", rest[user:]
+		}
+	}
+}
+
+// maskedParams returns value with the value of each password parameter of its query strings masked.
+func maskedParams(value string) string {
+	for _, name := range passwordParams {
+		for _, sep := range []string{"?", "&"} {
+			key := sep + name + "="
+			for from := 0; ; {
+				at := strings.Index(strings.ToLower(value[from:]), key)
+				if at < 0 {
+					break
+				}
+				start := from + at + len(key)
+				end := start + strings.IndexAny(value[start:]+"&", "&#, ")
+				value, from = value[:start]+"•••"+value[end:], start+len("•••")
+			}
+		}
+	}
+	return value
+}

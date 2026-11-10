@@ -58,13 +58,8 @@ func changes(r envcmd.Reconcile) bool {
 
 // skipped words why a field of env's is not asked, where the wizard's words would say it of another command.
 func skipped(_ *session, skip domain.Skip) string {
-	switch skip {
-	case domain.SkipAll:
+	if skip == domain.SkipAll {
 		return "every worktree is asked"
-	case domain.SkipNoKeyConflict:
-		return "every key matches its source"
-	case domain.SkipNoKeyOrphan:
-		return "every key has a source"
 	}
 	return ""
 }

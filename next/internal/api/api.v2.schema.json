@@ -2029,6 +2029,12 @@
           },
           "type": "array"
         },
+        "prechecked": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "skip": {
           "$ref": "#/$defs/domain.Skip"
         }
@@ -2619,6 +2625,9 @@
         "key": {
           "type": "string"
         },
+        "restored": {
+          "type": "boolean"
+        },
         "settled": {
           "type": "boolean"
         },
@@ -2804,6 +2813,9 @@
         },
         "strategy": {
           "$ref": "#/$defs/project.EnvStrategy"
+        },
+        "unreadable": {
+          "type": "string"
         },
         "unsettled": {
           "type": "string"

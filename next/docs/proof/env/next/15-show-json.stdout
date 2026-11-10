@@ -38,7 +38,7 @@
                     "here": "24621",
                     "writes": "24621",
                     "withheld": false,
-                    "status": "conflict",
+                    "status": "in_step",
                     "out_of_step": false
                   },
                   {
@@ -87,7 +87,7 @@
                     "here": "24620",
                     "writes": "24620",
                     "withheld": false,
-                    "status": "conflict",
+                    "status": "in_step",
                     "out_of_step": false
                   },
                   {
@@ -99,7 +99,7 @@
                     "here": "http://api.feat-b.acme.localhost:24602",
                     "writes": "http://api.feat-b.acme.localhost:24602",
                     "withheld": false,
-                    "status": "conflict",
+                    "status": "in_step",
                     "out_of_step": false
                   }
                 ]

@@ -149,7 +149,7 @@ func (u UseCase) Questions(ctx context.Context, req Request) (Questions, error) 
 // ----------------------------------------------------------------------------
 // Observe
 
-// Observe reads what env decides from: the project's config, run.toml and the repository's snapshot, where each name asked as a path leads, the record of each live branch, the port a named address announces, the jobs wtm's daemon lists, and for each worktree asked whether its directory is gone and its .env files with their template, its parent's copies and the main worktree's. A repository with no wtm config is refused with CodeConfigNotFound.
+// Observe reads what env decides from: the project's config, run.toml and the repository's snapshot, where each name asked as a path leads, the record of each live branch, the port a named address announces, the jobs wtm's daemon lists, and for each worktree on a branch, which the picker shows, whether its directory is gone and its .env files with their template, its parent's copies and the main worktree's. A repository with no wtm config is refused with CodeConfigNotFound.
 func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	repo, err := u.Repository.Observe(ctx, Name)
 	if err != nil {
@@ -168,7 +168,7 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	}
 	facts.Jobs, facts.JobsErr = u.Jobs(ctx)
 
-	for _, w := range facts.asked(req) {
+	for _, w := range facts.onBranch() {
 		if facts.Missing[w.Name()], err = repository.Gone(ctx, u.Git, w); err != nil {
 			return Facts{}, err
 		}
@@ -192,7 +192,7 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 func (u UseCase) reconcile(ctx context.Context, r Reconcile, show bool, report domain.Report) (item Item) {
 	item.Subject = r.Worktree
 	switch {
-	case r.Missing:
+	case r.Missing || r.Unreadable != "":
 		item.Status, item.Reason = domain.StatusSkipped, domain.ReasonRuledOut
 		return item
 	case !r.writes():

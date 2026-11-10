@@ -13,7 +13,7 @@ import (
 // ----------------------------------------------------------------------------
 // The request
 
-// A Request is what the caller asks of env: the worktrees it names, each by its branch or its path, else those out of step and the one it stands in, or every worktree with All; the strategy the values come from for this run (Strategy), empty for the one each worktree was created with; whether a key holding another value than its source's takes the source's (Overwrite), and whether a key in no source is dropped (Prune); the isolation each linked worktree asked switches to, empty to keep the one it has; and whether the values wtm does not write are shown (ShowValues). Caller is where the caller stands; it is no field of the form: every surface sets it.
+// A Request is what the caller asks of env: the worktrees it names, each by its branch or its path, else the one it stands in, or every worktree with All; the strategy the values come from for this run (Strategy), empty for the one each worktree was created with; whether a key holding another value than its source's takes the source's (Overwrite), and whether a key in no source is dropped (Prune); the isolation each linked worktree asked switches to, empty to keep the one it has; and whether the values wtm does not write are shown (ShowValues). Caller is where the caller stands; it is no field of the form: every surface sets it.
 type Request struct {
 	Worktrees  []string            `json:"worktree"`
 	All        bool                `json:"all"`
@@ -108,10 +108,11 @@ type Questions struct {
 	Errors     []domain.FieldError
 }
 
-// Worktrees is the question of the worktrees to reconcile: those given, else its default pick, the worktrees out of step and the one the caller stands in; and every worktree on a branch, the main one first, each with the changes reconciling it makes and its isolation.
+// Worktrees is the question of the worktrees to reconcile: those given, else its default pick, the one the caller stands in, and the pick a person is offered, the worktrees out of step and the caller's; and every worktree on a branch, the main one first, each with the changes reconciling it makes and its isolation.
 type Worktrees struct {
-	Picked  domain.Answer[[]string]
-	Options []domain.Option
+	Picked     domain.Answer[[]string]
+	Prechecked []string
+	Options    []domain.Option
 }
 
 // NewQuestions builds the questions for the request on the facts: the worktrees given, else the default pick; whether to overwrite the conflicts, asked when a worktree asked has one, and whether to prune the orphans, asked when one has one.
@@ -125,7 +126,8 @@ func NewQuestions(f Facts, req Request) Questions {
 		Errors:     append(append(problems, f.fromProblems(req)...), f.isolationProblems(req, reconciles)...),
 	}
 	if len(req.Worktrees) == 0 && !req.All {
-		questions.Worktrees.Picked = domain.Answer[[]string]{Value: f.picked(req), Origin: domain.OriginDefault}
+		questions.Worktrees.Picked = domain.Answer[[]string]{Value: names(f.targets(req)), Origin: domain.OriginDefault}
+		questions.Worktrees.Prechecked = f.prechecked(req, questions.Worktrees.Options)
 	}
 	questions.Conflicts, questions.Orphans = keysOf(reconciles, envs.KeyConflict), keysOf(reconciles, envs.KeyOrphan)
 	questions.Overwrite = confirm(req.Overwrite, len(questions.Conflicts) > 0, domain.SkipNoKeyConflict)
@@ -149,7 +151,7 @@ func (q Questions) Form() domain.Form {
 	}
 
 	return domain.Form{Problems: q.Errors, Fields: []domain.Field{
-		domain.MultiSelectField{FieldSpec: worktrees, Picked: q.Worktrees.Picked.Value, Options: q.Worktrees.Options},
+		domain.MultiSelectField{FieldSpec: worktrees, Picked: q.Worktrees.Picked.Value, Prechecked: q.Worktrees.Prechecked, Options: q.Worktrees.Options},
 		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: PathAll, Skip: domain.SkipFlagOnly}, Value: q.All, NoFirst: true},
 		domain.SelectField{FieldSpec: domain.FieldSpec{Path: PathFrom, Skip: domain.SkipFlagOnly}, Value: string(q.From), Options: strategyOptions(), Closed: true},
 		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: PathOverwrite, Origin: q.Overwrite.Origin, Skip: q.Overwrite.Skip}, Value: q.Overwrite.Value, NoFirst: true},
@@ -254,10 +256,8 @@ func (f Facts) entries(req Request) (reconciles []Reconcile, problems []domain.F
 		problems = append(problems, domain.FieldError{Path: PathAll, Code: CodeAllAndNames, Template: "{path} reconciles every worktree: name none with it"})
 	}
 	if !req.named() {
-		for _, w := range f.onBranch() {
-			if req.All || slices.Contains(f.picked(req), w.Name()) {
-				reconciles = append(reconciles, f.reconcile(w.Name(), req))
-			}
+		for _, w := range f.targets(req) {
+			reconciles = append(reconciles, f.reconcile(w.Name(), req))
 		}
 		return reconciles, problems
 	}

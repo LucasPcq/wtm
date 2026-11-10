@@ -2,6 +2,7 @@ package env
 
 import (
 	"bytes"
+	"slices"
 
 	"github.com/LucasPcq/wtm/next/internal/domain/dotenv"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
@@ -60,14 +61,15 @@ type Reconciled struct {
 	Ports Plan
 }
 
-// A FileReconciled is one .env file reconciled: Created when the worktree lacks it and it is rebuilt, its keys not in step with their source, those settled and the others Left as they are, and its lines Before (nil when absent) and After (nil when it stays absent).
+// A FileReconciled is one .env file reconciled: Created when the worktree lacks it and it is rebuilt, its keys not in step with their source, those settled, those wtm wrote put back to their source's (Restored, on a switch to verbatim) and the others Left as they are, and its lines Before (nil when absent) and After (nil when it stays absent).
 type FileReconciled struct {
-	Target  string
-	Created bool
-	Settled []Key
-	Left    []Key
-	Before  []dotenv.Line
-	After   []dotenv.Line
+	Target   string
+	Created  bool
+	Settled  []Key
+	Restored []Key
+	Left     []Key
+	Before   []dotenv.Line
+	After    []dotenv.Line
 }
 
 // Changed reports whether f has to be written.
@@ -93,7 +95,7 @@ func Reconcile(params ReconcileParams) Reconciled {
 			compared = owned
 		}
 		if params.Restore {
-			file.Settled = restored(base, owned, cascaded(read, parent, main))
+			file.Restored = restored(base, owned, cascaded(read, parent, main))
 		}
 		for _, key := range Keys(DriftParams{Child: base, Template: read.Template, Parent: parent, Main: main, Owned: compared}) {
 			switch {
@@ -105,7 +107,7 @@ func Reconcile(params ReconcileParams) Reconciled {
 			}
 		}
 
-		lines := ApplyKeys(base, file.Settled)
+		lines := ApplyKeys(base, append(slices.Clone(file.Restored), file.Settled...))
 		if lines == nil && params.Writes.Creates(file.Target) {
 			lines, file.Created = []dotenv.Line{}, true
 		}
@@ -121,8 +123,8 @@ func Reconcile(params ReconcileParams) Reconciled {
 
 // cascaded are the values a key wtm wrote goes back to under the verbatim isolation: its source's, else the main worktree's, as without wtm, the template giving none.
 func cascaded(read FileRead, parent, main []dotenv.Line) map[string]string {
-	values := pairs(read.Main)
-	for _, source := range []map[string]string{pairs(main), pairs(parent)} {
+	values := Values(read.Main)
+	for _, source := range []map[string]string{Values(main), Values(parent)} {
 		for key, value := range source {
 			if value != "" {
 				values[key] = value

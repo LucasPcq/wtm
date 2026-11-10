@@ -640,6 +640,7 @@ The reference is the legacy `wtm env` of 0.30.1. Its output differs by design (n
   16. `-q`
   17. legacy `main --yes`, next `--all --yes`
   18. `feat/b --yes` with its web `PORT` set by hand to a number that is no port of its job: both leave it, and say so
+  19. from main, `feat/a` drifted again, legacy `main --yes`, next `--yes`: only main is reconciled
 - The bugs of the legacy, each fixed with its test:
   - B1, 4: legacy's `--check` exits 18 right after a successful `--yes`, counting the orphans and conflicts an unattended run leaves; next's dry run plans what the same request writes, empty once applied (`TestAReconciledWorktreeHasNothingLeftToReconcile`).
   - B2, 14: legacy's `--show-values` changes nothing in its text report; next's `env show --show-values` prints every value, and `env` shows the values of its changes (`TestShowValuesShowsEveryValueAndTheJSONTheTree`).
@@ -648,7 +649,7 @@ The reference is the legacy `wtm env` of 0.30.1. Its output differs by design (n
   - B5: legacy's wizard prints the secrets its report withholds; next withholds every value wtm does not write, everywhere, unless `--show-values` (`TestValuesAreWithheldUnlessShown`).
 - Found by the proofs and fixed: a port wtm finds nothing to move in was said in step, where legacy warns it is left alone (18, `TestAPortWtmFindsNothingToMoveInIsLeftAloneAndSaid`, and in `env show` a key to check, `TestAPortWtmLeavesAloneIsToCheck`); switching a worktree whose values come from its template to verbatim left the ports wtm had written, the template giving none (10, `TestAWorktreeSwitchedToVerbatimFromItsTemplateGetsTheMainValues`); recording an isolation alone was said `unchanged` (9, `TestRecordingAnIsolationAloneIsAChange`).
 - The differences, approved by the owner (2026-11-10):
-  - D1: next takes several worktrees (`env [worktree...]`, `--all`); with none named, the worktrees out of step and the one you stand in, picked in the wizard, applied without a terminal (7: legacy refuses, exit 1; next reconciles `feat/c`, in step).
+  - D1: next takes several worktrees (`env [worktree...]`, `--all`); with none named, the one you stand in, the wizard offering those out of step checked beside it; unattended, it alone (7: legacy refuses, exit 1; next reconciles `feat/c`, in step; 19: run from main while `feat/a` drifts, next writes main alone).
   - D2: `--check` is next's `--dry-run`, exit 0 with its fingerprint (1, 2, 4: legacy exits 18).
   - D3: `--mode add|refresh` and `--on-conflict` are one `--overwrite`: a key whose value differs from its source is always planned, kept unless `--overwrite`, like a key in no source unless `--prune` (5).
   - D4: legacy's per-key resolve step, and its `e` that types a value, give way to the dry run of the worktrees picked (the recap) and the two switches, asked only when the worktrees picked have such a key; a key no source gives a value is left, said so.

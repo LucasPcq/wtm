@@ -140,6 +140,9 @@ run_side() {
     # a port set by hand, which holds no port of its job to move
     sed -i '' 's/^PORT=.*/PORT=9999/' "$box/acme.trees/feat-b/apps/web/.env"
     both 18-hand-set-port env feat/b --yes -- env feat/b --yes
+    # feat/a drifts again: a run from main with none named writes main alone
+    cp "$box/acme/apps/web/.env" "$box/acme.trees/feat-a/apps/web/.env"
+    both 19-from-main-none-named env main --yes -- env --yes
   )
   sed -i '' -E \
     -e "s#(/private)?$box#<SB>#g" \

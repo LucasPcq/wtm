@@ -32,3 +32,10 @@ func TestShowValuesShowsEveryValueAndTheJSONTheTree(t *testing.T) {
 	require.Equal(t, uicli.ExitOK, json.Code, json.Stderr)
 	formtest.Golden(t, "json", json.Stdout)
 }
+
+func TestTheJSONOfALinkedWorktreeHoldsWhatWtmWrites(t *testing.T) {
+	got := runShow(t, billing, "--output", "json")
+
+	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
+	formtest.Golden(t, "json_linked", got.Stdout)
+}

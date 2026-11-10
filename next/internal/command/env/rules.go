@@ -36,10 +36,17 @@ func (f Facts) onBranch() []worktree.Worktree {
 	return slices.DeleteFunc(f.MainFirst(), func(w worktree.Worktree) bool { return w.Branch() == "" })
 }
 
-// asked are the worktrees req asks, each once, those on a branch when it names none or asks for every one.
-func (f Facts) asked(req Request) []worktree.Worktree {
-	if !req.named() {
+// targets are the worktrees req reconciles, each once: those it names, every one on a branch with All, else the one the caller stands in.
+func (f Facts) targets(req Request) []worktree.Worktree {
+	switch {
+	case req.All:
 		return f.onBranch()
+	case !req.named():
+		worktrees := f.onBranch()
+		if at := worktree.Holding(worktrees, req.Caller.Cwd, func(w worktree.Worktree) string { return w.Path }); at >= 0 {
+			return worktrees[at : at+1]
+		}
+		return nil
 	}
 
 	var found []worktree.Worktree
@@ -49,6 +56,15 @@ func (f Facts) asked(req Request) []worktree.Worktree {
 		}
 	}
 	return found
+}
+
+// names are the names of worktrees.
+func names(worktrees []worktree.Worktree) []string {
+	out := make([]string, 0, len(worktrees))
+	for _, w := range worktrees {
+		out = append(out, w.Name())
+	}
+	return out
 }
 
 // subject is the worktree name names: by its name, else by the worktree root the path it stands for leads to.
@@ -62,18 +78,16 @@ func (f Facts) subject(name string) (worktree.Worktree, bool) {
 	return f.Worktrees[at], true
 }
 
-// picked are the worktrees picked by default, the main one first: those out of step under req's switches, and the one the caller stands in.
-func (f Facts) picked(req Request) []string {
-	worktrees := f.onBranch()
-	current := worktree.Holding(worktrees, req.Caller.Cwd, func(w worktree.Worktree) string { return w.Path })
-	var names []string
-	for i, w := range worktrees {
-		if i == current || f.reconcile(w.Name(), req).changes() > 0 {
-			names = append(names, w.Name())
+// prechecked is the pick a person is offered, the main one first: the worktrees out of step under req's switches, as options counts them, and the one the caller stands in.
+func (f Facts) prechecked(req Request, options []domain.Option) []string {
+	current := names(f.targets(Request{Caller: req.Caller}))
+	found := []string{}
+	for _, option := range options {
+		if option.OutOfStep > 0 || slices.Contains(current, option.Value) {
+			found = append(found, option.Value)
 		}
 	}
-
-	return names
+	return found
 }
 
 // strategy is where the values of w's .env files come from: req's, else its record's, else the project's, else the default.
@@ -86,10 +100,18 @@ func (f Facts) isolation(w worktree.Worktree, req Request) project.Isolation {
 	switch {
 	case w.Main:
 		return project.Isolated
-	case req.Isolation != "":
+	case f.switches(w, req):
 		return req.Isolation
 	}
 	return f.Records[w.Branch()].Isolation.Effective()
+}
+
+// switches reports whether req switches w's isolation: a linked worktree when req gives one, only those yet to choose theirs when some of its targets are, the others keeping theirs.
+func (f Facts) switches(w worktree.Worktree, req Request) bool {
+	if req.Isolation == "" || w.Main {
+		return false
+	}
+	return f.pending(w) || !slices.ContainsFunc(f.targets(req), f.pending)
 }
 
 // pending reports whether w has yet to choose its isolation: a linked worktree whose record holds no choice, while run.toml declares something a worktree isolates.
@@ -100,22 +122,23 @@ func (f Facts) pending(w worktree.Worktree) bool {
 // ----------------------------------------------------------------------------
 // The decision of each worktree
 
-// A Reconcile is one worktree asked: its name and path, whether it is the main checkout, whether its directory is gone (left as it is), the strategy its values come from, its isolation, whether it has yet to choose one (Pending: its ports and the values wtm owns are left as they are), the isolation the apply records when it changes (Records), whether it holds an ordinal (Numbered: one that needs it and has none is numbered by the apply, which settles its ports then), each .env file, what wtm writes into them (its values withheld unless shown), why its ports cannot be settled when they cannot, and the jobs up in it that read a file that changes, which run on the old values until restarted.
+// A Reconcile is one worktree asked: its name and path, whether it is the main checkout, whether its directory is gone (left as it is), the strategy its values come from, its isolation, whether it has yet to choose one (Pending: its ports and the values wtm owns are left as they are), the isolation the apply records when it changes (Records), whether it holds an ordinal (Numbered: one that needs it and has none is numbered by the apply, which settles its ports then), each .env file, what wtm writes into them (its values withheld unless shown), why its ports cannot be settled when they cannot, why its files could not be read (left as it is), and the jobs up in it that read a file that changes, which run on the old values until restarted.
 type Reconcile struct {
-	Worktree  string              `json:"worktree"`
-	Path      string              `json:"path"`
-	Main      bool                `json:"main"`
-	Missing   bool                `json:"missing"`
-	Strategy  project.EnvStrategy `json:"strategy"`
-	Isolation project.Isolation   `json:"isolation"`
-	Pending   bool                `json:"pending"`
-	Records   project.Isolation   `json:"records,omitempty"`
-	Numbered  bool                `json:"numbered"`
-	Files     []File              `json:"files"`
-	Ports     envs.Redacted       `json:"ports"`
-	Unsettled string              `json:"unsettled,omitempty"`
-	Restart   []string            `json:"restart"`
-	settle    settle
+	Worktree   string              `json:"worktree"`
+	Path       string              `json:"path"`
+	Main       bool                `json:"main"`
+	Missing    bool                `json:"missing"`
+	Strategy   project.EnvStrategy `json:"strategy"`
+	Isolation  project.Isolation   `json:"isolation"`
+	Pending    bool                `json:"pending"`
+	Records    project.Isolation   `json:"records,omitempty"`
+	Numbered   bool                `json:"numbered"`
+	Files      []File              `json:"files"`
+	Ports      envs.Redacted       `json:"ports"`
+	Unsettled  string              `json:"unsettled,omitempty"`
+	Unreadable string              `json:"unreadable,omitempty"`
+	Restart    []string            `json:"restart"`
+	settle     settle
 }
 
 // A File is one .env file of a worktree: whether it is created (the worktree lacks it and it is rebuilt), its keys not in step with their source, each settled or left, and whether it is written.
@@ -126,13 +149,14 @@ type File struct {
 	Writes  bool   `json:"writes"`
 }
 
-// A Key is a key of a .env file not in step with its source: its status, whether the apply settles it on its source, and, when values are shown, its value here and its source's.
+// A Key is a key of a .env file not in step with its source: its status, whether the apply settles it on its source, whether that puts back a value wtm wrote (Restored, on a switch to verbatim), and, when values are shown, its value here and its source's.
 type Key struct {
-	Key     string         `json:"key"`
-	Status  envs.KeyStatus `json:"status"`
-	Settled bool           `json:"settled"`
-	Value   *string        `json:"value,omitempty"`
-	Source  *string        `json:"source,omitempty"`
+	Key      string         `json:"key"`
+	Status   envs.KeyStatus `json:"status"`
+	Settled  bool           `json:"settled"`
+	Restored bool           `json:"restored,omitempty"`
+	Value    *string        `json:"value,omitempty"`
+	Source   *string        `json:"source,omitempty"`
 }
 
 // settle is what the apply settles a worktree's files from: the reconciliation planned, and what its writes resolve from, again once an unnumbered worktree is numbered.
@@ -171,7 +195,7 @@ func (r Reconcile) changes() int {
 
 // writes reports whether the apply writes a file of r, numbers it or records its isolation.
 func (r Reconcile) writes() bool {
-	return !r.Missing && (!r.Numbered || r.Records != "" || slices.ContainsFunc(r.Files, func(f File) bool { return f.Writes }))
+	return !r.Missing && r.Unreadable == "" && (!r.Numbered || r.Records != "" || slices.ContainsFunc(r.Files, func(f File) bool { return f.Writes }))
 }
 
 // A KeyAt is a key of a worktree's .env file.
@@ -187,7 +211,7 @@ func keysOf(reconciles []Reconcile, status envs.KeyStatus) []KeyAt {
 	for _, r := range reconciles {
 		for _, f := range r.Files {
 			for _, k := range f.Keys {
-				if k.Status == status {
+				if k.Status == status && !k.Restored {
 					found = append(found, KeyAt{Worktree: r.Worktree, File: f.Target, Key: k.Key})
 				}
 			}
@@ -199,12 +223,15 @@ func keysOf(reconciles []Reconcile, status envs.KeyStatus) []KeyAt {
 // reconcile decides what reconciling the worktree name does under req: its keys settled on their source, then what wtm writes over them, the main checkout keeping its addresses spelled with ports when its .env spells them so.
 func (f Facts) reconcile(name string, req Request) Reconcile {
 	w, _ := f.subject(name)
-	r := Reconcile{Worktree: name, Path: w.Path, Main: w.Main, Missing: f.Missing[name] || w.Prunable, Strategy: f.strategy(w, req), Isolation: f.isolation(w, req), Pending: req.Isolation == "" && f.pending(w), Numbered: true, Files: []File{}, Restart: []string{}}
-	if req.Isolation != "" && !w.Main && f.Records[w.Branch()].Isolation != req.Isolation {
-		r.Records = req.Isolation
+	r := Reconcile{Worktree: name, Path: w.Path, Main: w.Main, Missing: f.Missing[name] || w.Prunable, Strategy: f.strategy(w, req), Isolation: f.isolation(w, req), Pending: !f.switches(w, req) && f.pending(w), Numbered: true, Files: []File{}, Restart: []string{}}
+	if err := f.ReadErrs[name]; err != nil {
+		r.Unreadable = err.Error()
 	}
-	if r.Missing || f.ReadErrs[name] != nil {
+	if r.Missing || r.Unreadable != "" {
 		return r
+	}
+	if f.switches(w, req) && f.Records[w.Branch()].Isolation != req.Isolation {
+		r.Records = req.Isolation
 	}
 
 	record := f.Records[w.Branch()]
@@ -249,18 +276,21 @@ func files(reconciled envs.Reconciled, show bool) []File {
 	out := make([]File, 0, len(reconciled.Files))
 	for _, rf := range reconciled.Files {
 		file := File{Target: rf.Target, Created: rf.Created, Keys: []Key{}, Writes: rf.Changed()}
-		add := func(key envs.Key, settled bool) {
-			k := Key{Key: key.Name, Status: key.Status, Settled: settled}
+		add := func(key envs.Key, settled, restored bool) {
+			k := Key{Key: key.Name, Status: key.Status, Settled: settled, Restored: restored}
 			if show {
 				k.Value, k.Source = &key.Value, &key.Source
 			}
 			file.Keys = append(file.Keys, k)
 		}
+		for _, key := range rf.Restored {
+			add(key, true, true)
+		}
 		for _, key := range rf.Settled {
-			add(key, true)
+			add(key, true, false)
 		}
 		for _, key := range rf.Left {
-			add(key, false)
+			add(key, false, false)
 		}
 		out = append(out, file)
 	}
@@ -342,9 +372,9 @@ func (f Facts) warnings(planned Plan) []domain.Warning {
 		switch {
 		case r.Missing:
 			warnings = append(warnings, domain.Warning{Code: CodeMissing, Message: r.Worktree + "'s directory is gone: left as it is", Params: params, FollowUp: &domain.FollowUp{Command: domain.CommandClean, Answers: on(r.Worktree), Code: CodeClean, Message: "remove what is left of it"}})
-		case f.ReadErrs[r.Worktree] != nil:
-			params["cause"] = f.ReadErrs[r.Worktree].Error()
-			warnings = append(warnings, domain.Warning{Code: CodeUnreadable, Message: "couldn't read " + r.Worktree + "'s .env files: " + params["cause"] + " — left as it is", Params: params})
+		case r.Unreadable != "":
+			params["cause"] = r.Unreadable
+			warnings = append(warnings, domain.Warning{Code: CodeUnreadable, Message: "couldn't read " + r.Worktree + "'s .env files: " + r.Unreadable + " — left as it is", Params: params})
 		case r.Pending:
 			isolate := domain.FollowUp{Command: Name, Answers: append(on(r.Worktree), domain.Answered{Path: domain.PathIsolation, Values: []string{string(project.Isolated)}}), Code: CodeIsolate, Message: "give it ports of its own"}
 			warnings = append(warnings, domain.Warning{Code: CodePending, Message: r.Worktree + " has yet to choose its isolation: its ports and the values wtm owns are left as they are", Params: params, FollowUp: &isolate})
@@ -388,9 +418,14 @@ func (p Plan) Locks() []domain.Lock {
 	return domain.WorktreeLocks(names)
 }
 
-// Fingerprinted is what the plan's fingerprint covers: the plan, its recap left out, and each file as it stands and as the apply writes it, so a file edited since the preview refuses its apply.
+// Fingerprinted is what the plan's fingerprint covers: what it writes, and each file as it stands and as the apply writes it, so a file edited since the preview refuses its apply; its recap, the values it shows and the jobs up, which a run may start or stop meanwhile, left out.
 func (p Plan) Fingerprinted() any {
-	p.Recapped = domain.Recapped{}
+	written := make([]Reconcile, 0, len(p.Worktrees))
+	for _, r := range p.Worktrees {
+		r.Restart, r.Ports = nil, envs.Redact(envs.Plan(r.Ports))
+		r.Files = files(r.settle.planned, false)
+		written = append(written, r)
+	}
 	var contents []string
 	for _, r := range p.Worktrees {
 		for _, file := range r.settle.planned.Files {
@@ -400,7 +435,7 @@ func (p Plan) Fingerprinted() any {
 	return struct {
 		Plan     Plan     `json:"plan"`
 		Contents []string `json:"contents"`
-	}{p, contents}
+	}{Plan{Worktrees: written, Overwrite: p.Overwrite, Prune: p.Prune}, contents}
 }
 
 // Locks are the locks taken before planning: the repository shared, and each worktree named exclusive; every worktree's are taken once the plan names those it writes.
@@ -424,6 +459,7 @@ const (
 	NoteIsolation   = "isolation"
 	NoteInStep      = "in_step"
 	NoteMissing     = "missing"
+	NoteUnreadable  = "unreadable"
 	NoteLeftAlone   = "left_alone"
 )
 
@@ -440,6 +476,8 @@ func (p Plan) recap() []domain.RecapRow {
 		switch {
 		case r.Missing:
 			left = append(left, domain.RecapValue{Value: r.Worktree, Note: NoteMissing, Text: r.Worktree + " (its directory is gone)"})
+		case r.Unreadable != "":
+			left = append(left, domain.RecapValue{Value: r.Worktree, Note: NoteUnreadable, Text: r.Worktree + " (its .env files could not be read)"})
 		case !r.writes() && !r.leaves() && len(r.Ports.LeftAlone()) > 0:
 			left = append(left, domain.RecapValue{Value: r.Worktree, Note: NoteLeftAlone, Text: r.Worktree + " (ports left alone)"})
 		case r.writes() || r.leaves():

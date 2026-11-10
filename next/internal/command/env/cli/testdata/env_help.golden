@@ -6,8 +6,8 @@
 
   A key whose value differs from its source is kept unless --overwrite; a key in no source is
   kept unless --prune. Without arguments, the wizard asks which worktrees to reconcile, those out
-  of step and the one you stand in checked; unattended, those are reconciled. A worktree is named
-  by its branch or its path; --all asks for every worktree.
+  of step and the one you stand in checked; unattended, the one you stand in alone. A worktree is
+  named by its branch or its path; --all asks for every worktree.
 
   Only what wtm writes is shown (the ports and addresses it moves); every other value, secrets
   included, is withheld unless --show-values. A job up in a worktree whose .env changed runs on
@@ -44,7 +44,7 @@
         --overwrite                   Give a key whose value differs from its source the source's value
         --prune                       Drop a key no source has
         --show-values                 Show every value whole, secrets included; by default only what wtm writes is shown
-    -y, --yes                         Run unattended: no question, no confirmation (without worktrees, those out of step and the one you stand in; a conflict kept unless --overwrite, an orphan unless --prune)
+    -y, --yes                         Run unattended: no question, no confirmation (without worktrees, the one you stand in; a conflict kept unless --overwrite, an orphan unless --prune)
 
   Global Flags:
     -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document

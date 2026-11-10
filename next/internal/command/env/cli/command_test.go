@@ -24,10 +24,10 @@ func TestADryRunShowsEachChangeAndWhatIsLeft(t *testing.T) {
 	formtest.Golden(t, "dryrun", got.Stdout)
 }
 
-func TestAnUnattendedRunReconcilesTheWorktreesOutOfStep(t *testing.T) {
+func TestAnUnattendedRunReconcilesTheWorktreesNamed(t *testing.T) {
 	w := newWorld()
 
-	got := runEnv(t, w, "--yes")
+	got := runEnv(t, w, billing, "--yes")
 
 	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
 	formtest.Golden(t, "applied", got.Stdout)

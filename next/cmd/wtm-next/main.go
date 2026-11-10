@@ -86,13 +86,13 @@ func liveView() runview.View {
 	return runview.View{Daemon: wtmDaemon(), Open: openURL, Stop: stopJob, Restart: restartJob, Again: startAgain, Show: showJob}
 }
 
-// runCmd is run, the parent of the commands that start, watch and stop the jobs of run.toml.
 // withSubcommands is cmd with commands under it: env and env show.
 func withSubcommands(cmd *cobra.Command, commands ...*cobra.Command) *cobra.Command {
 	cmd.AddCommand(commands...)
 	return cmd
 }
 
+// runCmd is run, the parent of the commands that start, watch and stop the jobs of run.toml.
 func runCmd(commands ...*cobra.Command) *cobra.Command {
 	cmd := &cobra.Command{Use: "run", Short: "Start, watch and stop the jobs of run.toml", Args: cobra.NoArgs}
 	cmd.AddCommand(commands...)

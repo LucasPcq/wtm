@@ -2,12 +2,15 @@ package env_test
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/configtest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
 	"github.com/LucasPcq/wtm/next/internal/adapter/storetest"
 	"github.com/LucasPcq/wtm/next/internal/command/env"
+	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/dotenv"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
@@ -123,4 +126,25 @@ func acmeSeed() seed {
 			"/repo/.trees/" + fresh + "/" + webEnv: "PORT=3000\nAPI_URL=http://localhost:4000\n",
 		},
 	}
+}
+
+// failingIn is files whose reads or edits under dir fail.
+type failingIn struct {
+	env.Files
+	dir        string
+	read, edit error
+}
+
+func (f failingIn) Read(path string) ([]dotenv.Line, error) {
+	if f.read != nil && strings.HasPrefix(path, f.dir) {
+		return nil, f.read
+	}
+	return f.Files.Read(path)
+}
+
+func (f failingIn) Edit(ctx context.Context, edit dotenv.Edit) (domain.Written, error) {
+	if f.edit != nil && strings.HasPrefix(edit.Path, f.dir) {
+		return domain.Written{}, f.edit
+	}
+	return f.Files.Edit(ctx, edit)
 }
