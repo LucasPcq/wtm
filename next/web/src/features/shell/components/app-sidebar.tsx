@@ -24,7 +24,6 @@ const soon: { group: string; items: { label: string; icon: LucideIcon }[] }[] = 
     items: [
       { label: 'Profiles & jobs', icon: Layers },
       { label: '.env files', icon: FileKey },
-      { label: 'Run settings', icon: SlidersHorizontal },
     ],
   },
   { group: 'Project', items: [{ label: 'Settings', icon: Settings }] },
@@ -33,6 +32,7 @@ const soon: { group: string; items: { label: string; icon: LucideIcon }[] }[] = 
 export function AppSidebar({ repo, daemon }: { repo: string | undefined; daemon?: Daemon | undefined }) {
   const matchRoute = useMatchRoute()
   const onRunning = matchRoute({ to: '/r/$repo/running', fuzzy: true }) !== false
+  const onRunSetup = matchRoute({ to: '/r/$repo/run-setup', fuzzy: true }) !== false
 
   return (
     <Sidebar>
@@ -48,7 +48,7 @@ export function AppSidebar({ repo, daemon }: { repo: string | undefined; daemon?
           <SidebarMenu>
             <SidebarMenuItem>
               {repo ? (
-                <SidebarMenuButton asChild isActive={!onRunning}>
+                <SidebarMenuButton asChild isActive={!onRunning && !onRunSetup}>
                   <Link to="/r/$repo/worktrees" params={{ repo: repo }}>
                     <GitBranch />
                     All worktrees
@@ -95,6 +95,23 @@ export function AppSidebar({ repo, daemon }: { repo: string | undefined; daemon?
                   <SidebarMenuBadge className="text-muted-foreground">soon</SidebarMenuBadge>
                 </SidebarMenuItem>
               ))}
+              {group === 'Run' && (
+                <SidebarMenuItem>
+                  {repo ? (
+                    <SidebarMenuButton asChild isActive={onRunSetup}>
+                      <Link to="/r/$repo/run-setup" params={{ repo }}>
+                        <SlidersHorizontal />
+                        Run settings
+                      </Link>
+                    </SidebarMenuButton>
+                  ) : (
+                    <SidebarMenuButton disabled>
+                      <SlidersHorizontal />
+                      Run settings
+                    </SidebarMenuButton>
+                  )}
+                </SidebarMenuItem>
+              )}
             </SidebarMenu>
           </SidebarGroup>
         ))}

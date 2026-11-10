@@ -26,6 +26,8 @@ import type {
   ReparentDetail,
   ReparentPlan,
   RundownPlan,
+  RuninitDetail,
+  RuninitPlan,
   RunjobsStopDetail,
   RunlogsDetail,
   RunpsDetail,
@@ -65,6 +67,7 @@ type Mutation = {
   reparent: { plan: ReparentPlan; detail: ReparentDetail }
   sync: { plan: SyncPlan; detail: SyncDetail }
   'run-up': { plan: RunupPlan; detail: RunupDetail }
+  'run-init': { plan: RuninitPlan; detail: RuninitDetail }
   'run-down': { plan: RundownPlan; detail: RunjobsStopDetail }
   'run-start': { plan: RunstartPlan; detail: RunstartDetail }
   'run-stop': { plan: RunstopPlan; detail: RunjobsStopDetail }

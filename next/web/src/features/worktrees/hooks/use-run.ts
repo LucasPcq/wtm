@@ -134,6 +134,7 @@ const doing: Record<MutationCommand, string> = {
   reparent: 'Reparenting',
   sync: 'Syncing',
   'run-up': 'Starting',
+  'run-init': 'Setting up run',
   'run-down': 'Stopping',
   'run-start': 'Starting',
   'run-stop': 'Stopping',
