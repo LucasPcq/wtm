@@ -140,3 +140,11 @@ func recapRow(t *testing.T, recap []domain.RecapRow, key string) domain.RecapRow
 	t.Fatalf("no recap row %s", key)
 	return domain.RecapRow{}
 }
+
+func profileNames(profiles []project.Profile) []string {
+	var found []string
+	for _, profile := range profiles {
+		found = append(found, profile.Name)
+	}
+	return found
+}

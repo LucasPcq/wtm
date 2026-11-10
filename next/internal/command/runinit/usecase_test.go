@@ -198,6 +198,7 @@ func TestAReInitKeepsOutWhatWasLeftOutAndAddsNothingFoundSince(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotContains(t, questions.Decision.Picked, "worker")
 	assert.NotContains(t, questions.Decision.Picked, "docs")
+	assert.NotContains(t, profileNames(questions.Decision.Profiles), "worker", "a profile goes with the job it is named after")
 	assert.Contains(t, candidates(questions.Decision), "docs", "the whole list is shown")
 	assert.Equal(t, domain.OriginConfig, questions.Decision.Origins[runinit.PathJobs])
 }

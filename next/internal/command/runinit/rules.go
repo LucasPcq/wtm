@@ -899,13 +899,17 @@ func (f Facts) decideProfiles(d *Decision, req Request) {
 		given = append(given, project.Profile{Name: strings.TrimSpace(name), Jobs: filled(strings.Split(jobs, ","))})
 	}
 	d.Profiles = settle(d, PathProfiles, given, req.Profiles != nil, func() []project.Profile { return onDisk }, d.ProposedProfiles, f.declared())
+	left := func(job string) bool {
+		_, candidate := d.candidate(job)
+		return candidate && !slices.Contains(d.Picked, job) && job != runnerName
+	}
+	// A profile goes with the job it is named after, and with its last job.
+	d.Profiles = slices.DeleteFunc(slices.Clone(d.Profiles), func(profile project.Profile) bool { return left(profile.Name) })
 	for i, profile := range d.Profiles {
 		d.Profiles[i].Default = false
-		d.Profiles[i].Jobs = slices.DeleteFunc(slices.Clone(profile.Jobs), func(job string) bool {
-			_, candidate := d.candidate(job)
-			return candidate && !slices.Contains(d.Picked, job) && job != runnerName
-		})
+		d.Profiles[i].Jobs = slices.DeleteFunc(slices.Clone(profile.Jobs), left)
 	}
+	d.Profiles = slices.DeleteFunc(d.Profiles, func(profile project.Profile) bool { return len(profile.Jobs) == 0 })
 
 	fallback := ""
 	if len(d.Profiles) > 0 {
