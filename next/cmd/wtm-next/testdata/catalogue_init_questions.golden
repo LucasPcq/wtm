@@ -1,0 +1,99 @@
+{
+  "fields": [
+    {
+      "kind": "text",
+      "path": "base_path",
+      "origin": "config",
+      "section": "worktrees",
+      "value": "../.trees"
+    },
+    {
+      "kind": "select",
+      "path": "base_branch",
+      "origin": "default",
+      "section": "worktrees",
+      "value": "main",
+      "options": [
+        {
+          "value": "main"
+        }
+      ],
+      "pinned": "main",
+      "rememberable": false,
+      "remember": false,
+      "refreshable": false,
+      "closed": false
+    },
+    {
+      "kind": "select",
+      "path": "env_strategy",
+      "origin": "config",
+      "section": "env_files",
+      "value": "none",
+      "options": [
+        {
+          "value": "example"
+        },
+        {
+          "value": "main"
+        },
+        {
+          "value": "parent"
+        },
+        {
+          "value": "none"
+        }
+      ],
+      "rememberable": false,
+      "remember": false,
+      "refreshable": false,
+      "closed": true
+    },
+    {
+      "kind": "multi_select",
+      "path": "env_files",
+      "origin": "config",
+      "skip": "no_env",
+      "section": "env_files",
+      "picked": [],
+      "options": []
+    },
+    {
+      "kind": "hooks",
+      "path": "on_create",
+      "origin": "config",
+      "section": "hooks",
+      "entries": [],
+      "found": [],
+      "dirs": []
+    },
+    {
+      "kind": "hooks",
+      "path": "on_clean",
+      "origin": "request",
+      "section": "hooks",
+      "entries": [
+        {
+          "cmd": "make down"
+        }
+      ],
+      "found": [],
+      "dirs": []
+    }
+  ],
+  "problems": [],
+  "sections": [
+    {
+      "id": "worktrees",
+      "state": "answered"
+    },
+    {
+      "id": "env_files",
+      "state": "answered"
+    },
+    {
+      "id": "hooks",
+      "state": "answered"
+    }
+  ]
+}

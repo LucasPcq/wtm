@@ -304,3 +304,21 @@ func TestABranchTrackingALocalBranchDeletedIsNotGoneOnOrigin(t *testing.T) {
 	assert.Empty(t, gone)
 	assert.Contains(t, gittest.Output(t, repo.Dir, "for-each-ref", "--format=%(upstream:track)", "refs/heads/feat/child"), "gone", "git itself reads it gone")
 }
+
+func TestOriginHeadIsTheWholeNameOfOriginsDefaultBranch(t *testing.T) {
+	repo, _ := newRepoWithOrigin(t)
+	gittest.Git(t, repo.Dir, "update-ref", "refs/remotes/origin/feat/base", "HEAD")
+	gittest.Git(t, repo.Dir, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/feat/base")
+
+	head, err := repo.OriginHead(t.Context())
+
+	require.NoError(t, err)
+	assert.Equal(t, "feat/base", head)
+}
+
+func TestARepositoryWithNoOriginHeadHasNone(t *testing.T) {
+	head, err := newRepo(t).OriginHead(t.Context())
+
+	require.NoError(t, err)
+	assert.Empty(t, head)
+}

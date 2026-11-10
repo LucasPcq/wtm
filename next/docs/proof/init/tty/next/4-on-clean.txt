@@ -1,0 +1,19 @@
+$ wtm init; echo EXIT=$?
+
+  Step 6/7 • On clean
+
+  ✓ Worktrees folder: ../.trees
+  ✓ Base branch: main
+  ✓ .env from: the template
+  ✓ .env files: apps/api/.env, apps/web/.env
+  ✓ On create: pnpm install
+
+  Commands run in a worktree before it is removed, such as stopping what it started
+  Found: docker compose down (from docker-compose.yml)
+
+› 1. docker compose down
+  + Add a command
+  ✓ Done
+
+  ↑↓ navigate • d remove • shift+↑↓ move • enter edit • enter confirm • esc back
+

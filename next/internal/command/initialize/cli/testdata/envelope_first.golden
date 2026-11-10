@@ -1,0 +1,149 @@
+{
+  "v": 2,
+  "command": "init",
+  "ok": true,
+  "op": "op-1",
+  "items": [
+    {
+      "subject": "/repo/main/.git/wtm/config.toml",
+      "status": "done",
+      "detail": {
+        "path": "/repo/main/.git/wtm/config.toml",
+        "created": true
+      }
+    }
+  ],
+  "plan": {
+    "path": "/repo/main/.git/wtm/config.toml",
+    "created": true,
+    "settings": {
+      "base_path": "../.trees",
+      "base_branch": "main",
+      "env_strategy": "example",
+      "env_files": [
+        {
+          "target": "apps/api/.env",
+          "template": "apps/api/.env.example"
+        },
+        {
+          "target": "apps/web/.env",
+          "template": "apps/web/.env.example"
+        }
+      ],
+      "on_create": [
+        {
+          "cmd": "pnpm install"
+        }
+      ],
+      "on_clean": [
+        {
+          "cmd": "docker compose down"
+        }
+      ]
+    },
+    "changed": [],
+    "recap": [
+      {
+        "key": "base_path",
+        "label": "Worktrees folder",
+        "path": "base_path",
+        "values": [
+          {
+            "value": "../.trees",
+            "text": "../.trees"
+          }
+        ]
+      },
+      {
+        "key": "base_branch",
+        "label": "Base branch",
+        "path": "base_branch",
+        "values": [
+          {
+            "value": "main",
+            "text": "main"
+          }
+        ]
+      },
+      {
+        "key": "env_strategy",
+        "label": ".env from",
+        "path": "env_strategy",
+        "values": [
+          {
+            "value": "example",
+            "text": "example"
+          }
+        ]
+      },
+      {
+        "key": "env_files",
+        "label": ".env files",
+        "path": "env_files",
+        "values": [
+          {
+            "value": "apps/api/.env",
+            "text": "apps/api/.env"
+          },
+          {
+            "value": "apps/web/.env",
+            "text": "apps/web/.env"
+          }
+        ]
+      },
+      {
+        "key": "on_create",
+        "label": "On create",
+        "path": "on_create",
+        "values": [
+          {
+            "value": "pnpm install",
+            "text": "pnpm install"
+          }
+        ]
+      },
+      {
+        "key": "on_clean",
+        "label": "On clean",
+        "path": "on_clean",
+        "values": [
+          {
+            "value": "docker compose down",
+            "text": "docker compose down"
+          }
+        ]
+      },
+      {
+        "key": "file",
+        "label": "Settings file",
+        "values": [
+          {
+            "value": "/repo/main/.git/wtm/config.toml",
+            "text": ".git/wtm/config.toml"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [
+    {
+      "command": "create",
+      "code": "init.create",
+      "message": "create a worktree to get started"
+    },
+    {
+      "command": "relocate",
+      "code": "init.relocate",
+      "message": "move the worktrees made elsewhere into the folder",
+      "params": {
+        "count": "1"
+      }
+    },
+    {
+      "command": "run init",
+      "code": "init.run_init",
+      "message": "set up what runs in each worktree"
+    }
+  ],
+  "warnings": []
+}

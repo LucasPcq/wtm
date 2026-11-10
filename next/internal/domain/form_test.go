@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -68,6 +69,7 @@ func TestAFormIsEncodedWithTheKindOfEachField(t *testing.T) {
 			SelectField{FieldSpec: FieldSpec{Path: "isolation", Origin: OriginRemembered}, Value: "shared", Options: []Option{{Value: "shared", Base: true, Origin: &worktree.Origin{Behind: 2, State: worktree.Behind}}}, Remembered: "shared", Rememberable: true, Refreshable: true},
 			MultiSelectField{FieldSpec: FieldSpec{Path: "files"}, Options: []Option{{Value: "a.txt", Change: &worktree.Change{Path: "a.txt", Status: worktree.ChangeModified}}}},
 			TextField{FieldSpec: FieldSpec{Path: "to"}, Value: "feat/y"},
+			HooksField{FieldSpec: FieldSpec{Path: "on_create", Origin: OriginDetected}, Entries: []project.Hook{{Cmd: "pnpm install"}}, Found: []project.FoundHook{{Hook: project.Hook{Cmd: "pnpm install"}, File: "pnpm-lock.yaml"}}},
 		},
 		Problems: []FieldError{{Path: "branches[0]", Code: "required", Template: "{path} is required"}},
 	}
@@ -81,9 +83,11 @@ func TestAFormIsEncodedWithTheKindOfEachField(t *testing.T) {
 			{"kind": "confirm", "path": "keep", "skip": "not asked", "value": false, "no_first": true, "rememberable": false, "remember": false},
 			{"kind": "select", "path": "isolation", "origin": "remembered", "value": "shared", "options": [{"value": "shared", "base": true, "origin": {"ahead": 0, "behind": 2, "state": "behind"}}], "remembered": "shared", "rememberable": true, "remember": false, "refreshable": true, "closed": false},
 			{"kind": "multi_select", "path": "files", "picked": [], "options": [{"value": "a.txt", "change": {"path": "a.txt", "status": "modified"}}]},
-			{"kind": "text", "path": "to", "value": "feat/y"}
+			{"kind": "text", "path": "to", "value": "feat/y"},
+			{"kind": "hooks", "path": "on_create", "origin": "detected", "entries": [{"cmd": "pnpm install"}], "found": [{"cmd": "pnpm install", "file": "pnpm-lock.yaml"}], "dirs": []}
 		],
-		"problems": [{"path": "branches[0]", "code": "required", "flag": "branches[0]", "message": "branches[0] is required"}]
+		"problems": [{"path": "branches[0]", "code": "required", "flag": "branches[0]", "message": "branches[0] is required"}],
+		"sections": []
 	}`, string(data))
 }
 
@@ -91,7 +95,7 @@ func TestAFormWithoutProblemsHasAnEmptyList(t *testing.T) {
 	data, err := json.Marshal(Form{})
 
 	require.NoError(t, err)
-	assert.JSONEq(t, `{"fields": [], "problems": []}`, string(data))
+	assert.JSONEq(t, `{"fields": [], "problems": [], "sections": []}`, string(data))
 }
 
 func TestAFormFoldsIntoTheRequestItsFieldsAnswer(t *testing.T) {
@@ -141,4 +145,37 @@ func TestAFoldStopsAtTheFirstAnswerRefused(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Equal(t, answers{"from": {"main"}}, req)
+}
+
+func TestASectionStandsAsItsFieldsDo(t *testing.T) {
+	fields := []Field{
+		TextField{FieldSpec: FieldSpec{Path: "base_path", Section: "worktrees"}},
+		SelectField{FieldSpec: FieldSpec{Path: "base_branch", Section: "worktrees"}},
+		SelectField{FieldSpec: FieldSpec{Path: "env_strategy", Section: "env_files"}},
+		MultiSelectField{FieldSpec: FieldSpec{Path: "env_files", Section: "env_files", Skip: SkipNoEnv}},
+		HooksField{FieldSpec: FieldSpec{Path: "on_create", Section: "hooks"}},
+		ConfirmField{FieldSpec: FieldSpec{Path: "x", Section: "later", Skip: SkipFlagOnly}},
+	}
+	problems := []FieldError{Required("base_branch"), {Path: "on_create[0]", Code: "init.hook_dir_outside"}}
+
+	sections := SectionsOf([]string{"worktrees", "env_files", "hooks", "later"}, fields, problems)
+
+	assert.Equal(t, []Section{
+		{ID: "worktrees", State: SectionToDo},
+		{ID: "env_files", State: SectionAnswered},
+		{ID: "hooks", State: SectionToCheck},
+		{ID: "later", State: SectionSkipped},
+	}, sections)
+}
+
+func TestAProblemThatNamesNoFieldIsItsSectionsByPath(t *testing.T) {
+	fields := []Field{
+		TextField{FieldSpec: FieldSpec{Path: "base_path", Section: "worktrees"}},
+		ConfirmField{FieldSpec: FieldSpec{Path: "forget", Section: "remembered", Skip: SkipFlagOnly}},
+	}
+	problems := []FieldError{{Path: "remembered.isolation", Code: "config.remembered_not_allowed"}}
+
+	sections := SectionsOf([]string{"worktrees", "remembered"}, fields, problems)
+
+	assert.Equal(t, []Section{{ID: "worktrees", State: SectionAnswered}, {ID: "remembered", State: SectionToCheck}}, sections)
 }

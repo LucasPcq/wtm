@@ -2,7 +2,10 @@
   ✓ extract: 1 done
 
   Source      feat/login
-  Files       mod apps/api/a.txt, new apps/api/new.txt, ren README.md → DOC.md, del old.txt
+  Files       mod apps/api/a.txt
+              new apps/api/new.txt
+              ren README.md → DOC.md
+              del old.txt
   Target      feat/other
   Mode        move
   feat/other  ../wt-feat-other

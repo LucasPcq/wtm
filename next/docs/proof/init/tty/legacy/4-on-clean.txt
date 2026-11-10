@@ -1,0 +1,21 @@
+$ wtm init; echo EXIT=$?
+
+  Step 9/9 • Pre-clean hooks
+
+  ✓ Worktree directory: ../.trees (default)
+  ✓ Base branch: main
+  ✓ Environment files: configured
+  ✓ Env strategy: example
+  ✓ Env files: 2 files selected
+  ✓ Post-create hooks: configured
+  ✓ Post-create hooks: 1 command(s)
+  ✓ Pre-clean hooks: configured
+
+  ┃  Commands run before removing a worktree (e.g. `docker compose down`). Add, edit, remove or
+  ┃  reorder them — then select Done.
+
+▸ + Add a command
+  ✓ Done
+
+  ↑↓ navigate • d delete • shift+↑/↓ reorder • enter select • esc back
+

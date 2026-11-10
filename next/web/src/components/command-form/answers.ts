@@ -22,8 +22,15 @@ export function defaultOf(field: DomainField): string[] {
       return [field.entries.join('\n')]
     case 'confirm':
       return [field.value ? 'true' : 'false']
+    case 'hooks':
+      return field.entries.map(spellHook)
   }
 }
+
+// A hook is answered as the catalogue reads it back: its command alone when it runs in the root and stops on a
+// failure, else the hook as JSON.
+export const spellHook = (hook: { cmd: string; cwd?: string; continue_on_error?: boolean }) =>
+  hook.cwd || hook.continue_on_error ? JSON.stringify(hook) : hook.cmd
 
 export function answersOf(fields: DomainField[], values: Values, changed: (key: string) => boolean): DomainAnswered[] {
   return fields.flatMap((field) => {

@@ -122,6 +122,13 @@ func writeConfig(t *testing.T, main, extra string) {
 	require.NoError(t, os.WriteFile(path, append(config, extra...), 0o644))
 }
 
+func readConfig(t *testing.T, main string) string {
+	t.Helper()
+	config, err := os.ReadFile(filepath.Join(main, ".git", "wtm", "config.toml"))
+	require.NoError(t, err)
+	return string(config)
+}
+
 // recordParent writes the meta record of branch with parent as the branch it was created from.
 func recordParent(t *testing.T, main, branch, parent string) {
 	t.Helper()
@@ -522,7 +529,7 @@ func valuesSchema(field domain.Field) map[string]any {
 		return oneValue(map[string]any{"type": "string"})
 	case domain.ConfirmField:
 		return oneValue(map[string]any{"enum": []string{"true", "false"}})
-	case domain.MultiSelectField, domain.TextListField:
+	case domain.MultiSelectField, domain.TextListField, domain.HooksField:
 	}
 	return map[string]any{"type": "array", "items": map[string]any{"type": "string"}}
 }

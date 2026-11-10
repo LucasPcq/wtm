@@ -76,6 +76,7 @@ export function reparentQuestionsOf(answers: DomainAnswered[] = []) {
       },
     ] as DomainField[],
     problems: [],
+    sections: [],
   }
 }
 

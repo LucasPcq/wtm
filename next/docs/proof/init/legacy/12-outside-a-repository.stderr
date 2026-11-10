@@ -1,0 +1,3 @@
+
+  ✗ wtm must be run inside a git repository: resolve state dir: git rev-parse --git-common-dir: exit status 128
+

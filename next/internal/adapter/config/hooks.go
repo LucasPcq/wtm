@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 )
@@ -46,7 +48,8 @@ func decodeHooks(raw []any) ([]project.Hook, error) {
 }
 
 // decodeHook reads one hook written as a bare command string or as a table
-// with a required cmd and an optional cwd and continue_on_error.
+// with a required cmd and an optional cwd and continue_on_error; any other key,
+// or a value of the wrong type, is refused as the rest of config.toml is.
 func decodeHook(raw any) (project.Hook, error) {
 	if cmd, ok := raw.(string); ok {
 		return project.Hook{Cmd: cmd}, nil
@@ -56,12 +59,23 @@ func decodeHook(raw any) (project.Hook, error) {
 	if !ok {
 		return project.Hook{}, fmt.Errorf("hook must be a string or {cmd, cwd}, got %T", raw)
 	}
+	for _, key := range slices.Sorted(maps.Keys(table)) {
+		if !slices.Contains([]string{"cmd", "cwd", "continue_on_error"}, key) {
+			return project.Hook{}, fmt.Errorf("hook table has an unknown key %q", key)
+		}
+	}
 	cmd, ok := table["cmd"].(string)
 	if !ok {
 		return project.Hook{}, fmt.Errorf(`hook table requires a string "cmd" field`)
 	}
 
-	cwd, _ := table["cwd"].(string)
-	continueOnError, _ := table["continue_on_error"].(bool)
+	cwd, ok := table["cwd"].(string)
+	if _, set := table["cwd"]; set && !ok {
+		return project.Hook{}, fmt.Errorf(`hook table's "cwd" must be a string`)
+	}
+	continueOnError, ok := table["continue_on_error"].(bool)
+	if _, set := table["continue_on_error"]; set && !ok {
+		return project.Hook{}, fmt.Errorf(`hook table's "continue_on_error" must be a boolean`)
+	}
 	return project.Hook{Cmd: cmd, Cwd: cwd, ContinueOnError: continueOnError}, nil
 }

@@ -133,6 +133,7 @@ type questions struct {
 	req        request
 	problems   []domain.FieldError
 	remembered string
+	named      string // the name the questions settle on when the request gives none
 }
 
 func (q questions) Form() domain.Form {
@@ -144,7 +145,7 @@ func (q questions) Form() domain.Form {
 		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: "ff"}, Value: one("ff") == "true", Rememberable: true},
 		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: "keep"}, Value: one("keep") == "true", NoFirst: true},
 		filesField(q.req),
-		domain.TextField{FieldSpec: domain.FieldSpec{Path: "name", Skip: domain.Skip(one("unworded"))}, Value: one("name")},
+		domain.TextField{FieldSpec: domain.FieldSpec{Path: "name", Skip: domain.Skip(one("unworded"))}, Value: cmp.Or(one("name"), q.named)},
 	}}
 }
 
@@ -181,11 +182,12 @@ type outcome = domain.Outcome[request, struct{}]
 // app is a fake use case: a branch "taken" is refused, and each run is recorded.
 type app struct {
 	remembered string
+	named      string
 	runs       []domain.RunOptions
 }
 
 func (a *app) Questions(_ context.Context, req request) (questions, error) {
-	q := questions{req: req, remembered: a.remembered}
+	q := questions{req: req, remembered: a.remembered, named: a.named}
 	for i, branch := range req["branches"] {
 		if branch == "taken" {
 			q.problems = append(q.problems, domain.FieldError{Path: "branches[" + strconv.Itoa(i) + "]", Template: "{value} is taken", Params: domain.Params{"value": branch}})

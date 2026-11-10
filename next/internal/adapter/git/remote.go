@@ -112,3 +112,16 @@ func (r Repo) MergeFFOnly(ctx context.Context, merge worktree.Merge) error {
 	_, err = r.at(merge.Path).git(ctx, "merge", "--ff-only", onto)
 	return err
 }
+
+// OriginHead is the branch origin's HEAD names, its default branch as the last clone or `git remote set-head` recorded it, "" when there is none.
+func (r Repo) OriginHead(ctx context.Context) (string, error) {
+	out, err := r.git(ctx, "symbolic-ref", "--quiet", "refs/remotes/"+origin+"/HEAD")
+	if gitErr, ok := errors.AsType[*Error](err); ok && gitErr.Exit == 1 {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimPrefix(strings.TrimSpace(string(out)), "refs/remotes/"+origin+"/"), nil
+}

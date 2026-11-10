@@ -1,0 +1,7 @@
+
+  = <SB>/acme/.git/wtm/config.toml already exists.
+
+  → wtm init --only env|hooks|worktrees   reconfigure one section
+  → wtm config edit                       edit it by hand
+  → wtm run init                          configure per-worktree services
+

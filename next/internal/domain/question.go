@@ -19,11 +19,12 @@ const (
 	OriginConfig      Origin = "config"       // a value of the project's configuration
 	OriginDefault     Origin = "default"      // the question's default
 	OriginPullRequest Origin = "pull_request" // a fact of the pull request asked: the branch it merges into
+	OriginDetected    Origin = "detected"     // found in the repository: a lockfile, a template, origin's default branch
 )
 
 // Origins returns every Origin.
 func Origins() []Origin {
-	return []Origin{OriginRequest, OriginRemembered, OriginConfig, OriginDefault, OriginPullRequest}
+	return []Origin{OriginRequest, OriginRemembered, OriginConfig, OriginDefault, OriginPullRequest, OriginDetected}
 }
 
 // Skip says why a question is not asked, as a code each surface words its own way; empty when it is asked.
@@ -50,13 +51,15 @@ const (
 	SkipAlone           Skip = "alone"            // no other worktree runs jobs: nothing to keep or stop
 	SkipConfigured      Skip = "configured"       // run.toml answers it
 	SkipTask            Skip = "task"             // the job is a task: it binds no port and is gone once done, nothing to keep or stop
+	SkipNoEnv           Skip = "no_env"           // no .env file is copied: there are none to list
+	SkipNoEnvFile       Skip = "no_env_file"      // the repository holds no .env file to pick
 	SkipNoKeyConflict   Skip = "no_key_conflict"  // no .env key asked holds another value than its source's
 	SkipNoKeyOrphan     Skip = "no_key_orphan"    // no .env key asked is in no source
 )
 
 // Skips returns every Skip.
 func Skips() []Skip {
-	return []Skip{SkipFlagOnly, SkipExists, SkipNotBehind, SkipHeld, SkipRunUnread, SkipNothingIsolated, SkipNoConflict, SkipAll, SkipNoOrphan, SkipSafe, SkipNoDataOwed, SkipNoCandidate, SkipNoDescendant, SkipNoRebase, SkipNothingToPush, SkipOneProfile, SkipAlone, SkipConfigured, SkipTask, SkipNoKeyConflict, SkipNoKeyOrphan}
+	return []Skip{SkipFlagOnly, SkipExists, SkipNotBehind, SkipHeld, SkipRunUnread, SkipNothingIsolated, SkipNoConflict, SkipAll, SkipNoOrphan, SkipSafe, SkipNoDataOwed, SkipNoCandidate, SkipNoDescendant, SkipNoRebase, SkipNothingToPush, SkipOneProfile, SkipAlone, SkipConfigured, SkipTask, SkipNoEnv, SkipNoEnvFile, SkipNoKeyConflict, SkipNoKeyOrphan}
 }
 
 // Answer is the value a question settled on, and where that value came from.
@@ -87,6 +90,7 @@ type Option struct {
 	Profile   string                `json:"profile,omitempty"`      // the profile a worktree's jobs up were started under, empty when they say none
 	RunningIn []string              `json:"running_in,omitempty"`   // the worktrees picked whose jobs up a profile started, or that a job is up in
 	Kind      project.JobKind       `json:"kind,omitempty"`         // a job's kind
+	Template  string                `json:"template,omitempty"`     // the template an .env file is copied from, beside it
 	Problem   *FieldError           `json:"problem,omitempty"`      // the problem picking it raises, nil when it raises none
 	OutOfStep int                   `json:"out_of_step,omitempty"`  // the changes reconciling a worktree's .env files makes
 	Isolation project.Isolation     `json:"isolation,omitempty"`    // how a worktree runs beside the others, when it is not isolated

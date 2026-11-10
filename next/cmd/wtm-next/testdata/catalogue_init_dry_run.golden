@@ -1,0 +1,108 @@
+{
+  "v": 2,
+  "command": "init",
+  "ok": true,
+  "op": "<id>",
+  "plan": {
+    "path": "<root>/main/.git/wtm/config.toml",
+    "created": false,
+    "settings": {
+      "base_path": "../.trees",
+      "base_branch": "main",
+      "env_strategy": "none",
+      "env_files": [],
+      "on_create": [],
+      "on_clean": [
+        {
+          "cmd": "make down"
+        }
+      ]
+    },
+    "changed": [
+      "on_clean"
+    ],
+    "recap": [
+      {
+        "key": "base_path",
+        "label": "Worktrees folder",
+        "path": "base_path",
+        "values": [
+          {
+            "value": "../.trees",
+            "text": "../.trees"
+          }
+        ]
+      },
+      {
+        "key": "base_branch",
+        "label": "Base branch",
+        "path": "base_branch",
+        "values": [
+          {
+            "value": "main",
+            "text": "main"
+          }
+        ]
+      },
+      {
+        "key": "env_strategy",
+        "label": ".env from",
+        "path": "env_strategy",
+        "values": [
+          {
+            "value": "none",
+            "text": "none"
+          }
+        ]
+      },
+      {
+        "key": "env_files",
+        "label": ".env files",
+        "path": "env_files",
+        "values": [
+          {
+            "value": "",
+            "note": "none",
+            "text": "none"
+          }
+        ]
+      },
+      {
+        "key": "on_create",
+        "label": "On create",
+        "path": "on_create",
+        "values": [
+          {
+            "value": "",
+            "note": "none",
+            "text": "none"
+          }
+        ]
+      },
+      {
+        "key": "on_clean",
+        "label": "On clean",
+        "path": "on_clean",
+        "values": [
+          {
+            "value": "make down",
+            "text": "make down"
+          }
+        ]
+      },
+      {
+        "key": "file",
+        "label": "Settings file",
+        "values": [
+          {
+            "value": "<root>/main/.git/wtm/config.toml",
+            "text": ".git/wtm/config.toml"
+          }
+        ]
+      }
+    ]
+  },
+  "fingerprint": "<id>",
+  "follow_ups": [],
+  "warnings": []
+}

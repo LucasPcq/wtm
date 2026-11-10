@@ -5,6 +5,7 @@ import (
 	"context"
 
 	"github.com/LucasPcq/wtm/next/internal/command/create"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	uicli "github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 
@@ -58,4 +59,9 @@ func New(streams *output.Streams, env uicli.Env, open func(ctx context.Context, 
 
 func (c *createCommand) run(cmd *cobra.Command, args []string) error {
 	return c.form.Launch(cmd, args, c.form.Conclude)
+}
+
+// Line spells a follow-up that names create, from create's schema, as wtm-next runs it; none when its answers are not create's.
+func Line(followUp domain.FollowUp) []string {
+	return newForm(nil).Spell(uicli.Program+" "+create.Name, followUp)
 }

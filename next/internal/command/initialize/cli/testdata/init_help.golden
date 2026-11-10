@@ -1,0 +1,54 @@
+
+  Set wtm up in the repository you stand in: where its worktrees go, the branch they start from,
+  the .env files each one gets and the commands run when one is created or removed. The settings
+  stay on this machine, in the repository's git directory, out of git.
+
+  A first init fills each setting from what it finds: origin's default branch, the .env files and
+  their templates, the install command of the package manager, a docker compose file to stop.
+  Run again, it sets the repository up again from its settings: each one as it is, every .env file
+  it finds listed, only those set up picked. Unattended, a flag changes its setting alone.
+
+  A hook is a command, or JSON for one that runs in a folder or goes on after a failure:
+    --on-create '{"cmd": "pnpm db:generate", "cwd": "packages/db"}'
+  What runs in each worktree is set up by `wtm run init`.
+
+  Usage:
+    wtm-next init [flags]
+
+  Examples:
+    # The wizard
+    wtm init
+
+    # Unattended, from what wtm finds
+    wtm init --yes
+
+    # No .env files, two hooks on create
+    wtm init --yes --env-strategy none --on-create "pnpm install" --on-create "make setup"
+
+    # Change one setting of a repository set up already
+    wtm init --yes --on-clean "docker compose down"
+
+    # See the plan first, then apply exactly that plan
+    wtm init --yes --dry-run
+    wtm init --expect-fingerprint <hash>
+
+    # For a script or an agent, with the v2 JSON envelope
+    wtm init --yes --output json
+
+  Flags:
+        --ask                         Ask again the questions this repository remembers an answer to, to change or forget it
+        --base-branch string          The branch new worktrees start from by default
+        --base-path string            Where new worktrees go, relative to the repository; outside it keeps the main checkout clean
+    -n, --dry-run                     Show the plan and its fingerprint, apply nothing
+        --env-file strings            The .env files every new worktree gets
+        --env-strategy string         Where a new worktree's .env files come from: a fresh checkout has none of your local ones
+        --expect-fingerprint string   Apply only if the facts still have this fingerprint, the one --dry-run printed
+    -h, --help                        help for init
+        --on-clean stringArray        Commands run in a worktree before it is removed, such as stopping what it started
+        --on-create stringArray       Commands run in a worktree once it is created, such as installing its dependencies
+        --output string               Output format: text or json (default "text")
+    -y, --yes                         Run unattended: no question, no confirmation (each setting as given, else as set up, else as found)
+
+  Global Flags:
+    -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+

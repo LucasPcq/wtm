@@ -1,0 +1,90 @@
+{
+  "fields": [
+    {
+      "kind": "text",
+      "path": "base_path",
+      "section": "worktrees",
+      "value": ""
+    },
+    {
+      "kind": "select",
+      "path": "base_branch",
+      "section": "worktrees",
+      "value": "",
+      "options": [],
+      "rememberable": false,
+      "remember": false,
+      "refreshable": false,
+      "closed": false
+    },
+    {
+      "kind": "select",
+      "path": "env_strategy",
+      "section": "env_files",
+      "value": "",
+      "options": [
+        {
+          "value": "example"
+        },
+        {
+          "value": "main"
+        },
+        {
+          "value": "parent"
+        },
+        {
+          "value": "none"
+        }
+      ],
+      "rememberable": false,
+      "remember": false,
+      "refreshable": false,
+      "closed": true
+    },
+    {
+      "kind": "multi_select",
+      "path": "env_files",
+      "section": "env_files",
+      "picked": [],
+      "options": []
+    },
+    {
+      "kind": "hooks",
+      "path": "on_create",
+      "section": "hooks",
+      "entries": [],
+      "found": [],
+      "dirs": []
+    },
+    {
+      "kind": "hooks",
+      "path": "on_clean",
+      "section": "hooks",
+      "entries": [],
+      "found": [],
+      "dirs": []
+    }
+  ],
+  "problems": [
+    {
+      "path": "base_branch",
+      "code": "required",
+      "flag": "base_branch",
+      "message": "base_branch is required"
+    }
+  ],
+  "sections": [
+    {
+      "id": "worktrees",
+      "state": "to_do"
+    },
+    {
+      "id": "env_files",
+      "state": "answered"
+    },
+    {
+      "id": "hooks",
+      "state": "answered"
+    }
+  ]
+}

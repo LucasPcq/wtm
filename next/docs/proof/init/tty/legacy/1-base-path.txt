@@ -1,0 +1,11 @@
+$ wtm init; echo EXIT=$?
+
+  Step 1/9 • Worktree directory
+
+  ┃  wtm creates each worktree in this directory, relative to the repo root. Keeping it outside
+  ┃  the repo avoids cluttering your main checkout.
+
+❯ ../.trees
+
+  enter confirm • esc cancel
+

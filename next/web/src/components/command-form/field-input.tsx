@@ -100,5 +100,8 @@ export function FieldInput({
         </div>
       )
     }
+
+    case 'hooks':
+      return null
   }
 }

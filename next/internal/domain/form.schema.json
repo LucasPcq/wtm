@@ -2,23 +2,92 @@
   "$comment": "The shapes Form.MarshalJSON and Answered.MarshalJSON write by hand (form.go); the generator of api.v2.schema.json copies these $defs as they are and generates domain.Field, the union of its kinds, each discriminated by the kind MarshalJSON writes. Change them with form.go.",
   "$defs": {
     "domain.Form": {
-      "description": "A command's request as a schema a surface renders without knowing the command: its fields in the order a wizard asks them, and the request's problems.",
+      "description": "A command's request as a schema a surface renders without knowing the command: its fields in the order a wizard asks them, the request's problems, and the sections its fields fall in.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["fields", "problems"],
+      "required": [
+        "fields",
+        "problems",
+        "sections"
+      ],
       "properties": {
-        "fields": { "type": "array", "items": { "$ref": "#/$defs/domain.Field" } },
-        "problems": { "type": "array", "items": { "$ref": "#/$defs/domain.FieldError" } }
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/domain.Field"
+          }
+        },
+        "problems": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/domain.FieldError"
+          }
+        },
+        "sections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/domain.Section"
+          }
+        }
       }
     },
     "domain.Answered": {
       "description": "The answer to the field at path: its values, as many as the field takes, an array even when it takes none.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "values"],
+      "required": [
+        "path",
+        "values"
+      ],
       "properties": {
-        "path": { "type": "string", "minLength": 1 },
-        "values": { "type": "array", "items": { "type": "string" } }
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "domain.Section": {
+      "description": "A part of a form, which its fields name by id: where it stands, why when it is skipped or to check (a code and its params, each surface words it), and the sections it waits for.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "state"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state": {
+          "enum": [
+            "to_do",
+            "answered",
+            "to_check",
+            "skipped"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "params": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "waits_for": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
       }
     }
   }

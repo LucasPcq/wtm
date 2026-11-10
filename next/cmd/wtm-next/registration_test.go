@@ -17,6 +17,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/runup"
 
 	"github.com/LucasPcq/wtm/next/internal/command/events"
+	"github.com/LucasPcq/wtm/next/internal/command/initialize"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/command/status"
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -36,8 +37,8 @@ func TestEachRegisteredCommandIsInTheCatalogueOrItsStreamsAndWired(t *testing.T)
 	registered := registeredCommands(t)
 	var listed, streamed []string
 	for _, command := range catalogue() {
-		// a command's folder spells its name without dashes: command/fastforward is fast-forward
-		listed = append(listed, strings.ReplaceAll(command.Name, "-", ""))
+		// a command's folder spells its name without dashes, command/fastforward is fast-forward, and init, Go's name for a package's set-up, as command/initialize
+		listed = append(listed, strings.ReplaceAll(strings.Replace(command.Name, "init", "initialize", 1), "-", ""))
 	}
 	for _, stream := range streams() {
 		streamed = append(streamed, stream.Name)
@@ -98,7 +99,7 @@ func TestEachRequestThatCarriesItsCallerTakesItFromEverySurface(t *testing.T) {
 func TestEachFollowUpOfAMigratedCommandIsSpelledFromItsSchema(t *testing.T) {
 	streams, _, _, _ := output.Test()
 	root := cli.NewRoot(version, streams, commands(streams, cli.Env{}))
-	followUps := []domain.FollowUp{leftBehind("feat/a"), *initialize(), settle("feat/a"), proxyStatus(), *daemonRestart()}
+	followUps := []domain.FollowUp{leftBehind("feat/a"), *setUp(), settle("feat/a"), proxyStatus(), *daemonRestart()}
 	followUps = append(followUps, repository.Offered(list.Actions(list.Detail{Branch: "feat/a"}))...)
 	fixes := status.Problems(status.ProblemsParams{Branch: "feat/a", Merged: true, Missing: []status.Missing{{Target: ".env"}, {Target: ".env", From: status.FromNowhere}}, Jobs: []status.Job{{Name: "api", State: run.Crashed}}})
 	for _, problem := range fixes {
@@ -111,7 +112,7 @@ func TestEachFollowUpOfAMigratedCommandIsSpelledFromItsSchema(t *testing.T) {
 			continue
 		}
 
-		require.Contains(t, []string{clean.Name, prune.Name, exec.Name, domain.CommandSync, domain.CommandEnv, runup.Name, runlogs.Name, rundown.Name, runstart.Name, runstop.Name, daemonrestart.Name}, followUp.Command, "%s has migrated: spell its follow-ups from its schema in commandLine", followUp.Command)
+		require.Contains(t, []string{initialize.Name, domain.CommandCreate, clean.Name, prune.Name, exec.Name, domain.CommandSync, domain.CommandEnv, runup.Name, runlogs.Name, rundown.Name, runstart.Name, runstop.Name, daemonrestart.Name}, followUp.Command, "%s has migrated: spell its follow-ups from its schema in commandLine", followUp.Command)
 		argv := commandLine(followUp)
 		assert.Equal(t, append([]string{cli.Program}, strings.Fields(spelling(followUp.Command))...), argv[:min(1+len(strings.Fields(spelling(followUp.Command))), len(argv))], "%s's follow-up %v does not fold into its request", followUp.Command, followUp.Answers)
 	}

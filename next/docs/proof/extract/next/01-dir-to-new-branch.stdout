@@ -2,7 +2,8 @@
   ✓ extract: 1 done
 
   Source     feat/login
-  Files      new apps/api/new/deep/y.txt, new apps/api/new/x.txt
+  Files      new apps/api/new/deep/y.txt
+             new apps/api/new/x.txt
   Target     new worktree feat/api from main
   Env        example
   Isolation  isolated

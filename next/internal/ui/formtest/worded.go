@@ -26,7 +26,7 @@ func Worded[Q form.Questions](t *testing.T, words form.Worder[Q]) {
 				worded := field.Closed || option.Value == ""
 				assert.True(t, !worded || said.Options[option.Value].Label != "", "the label of %s's option %q", path, option.Value)
 			}
-		case domain.TextField, domain.TextListField, domain.ConfirmField:
+		case domain.TextField, domain.TextListField, domain.ConfirmField, domain.HooksField:
 		}
 	}
 }

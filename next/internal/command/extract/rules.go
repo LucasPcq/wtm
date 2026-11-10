@@ -533,7 +533,7 @@ func (p Plan) recap(marks domain.Marks) []domain.RecapRow {
 
 	rows := []domain.RecapRow{
 		{Key: PathSource, Label: "Source", Path: PathSource, Values: domain.RecapValues([]string{p.Source})},
-		{Key: PathFiles, Label: "Files", Path: PathFiles, Values: recappedFiles(p.Files)},
+		{Key: PathFiles, Label: "Files", Path: PathFiles, Values: recappedFiles(p.Files), Stacked: true},
 		{Key: "target", Label: "Target", Path: PathTo, Values: []domain.RecapValue{p.recappedTarget()}},
 	}
 	if p.Target.Action == ActionCheckOut {
@@ -548,7 +548,7 @@ func (p Plan) recap(marks domain.Marks) []domain.RecapRow {
 	rows = append(rows, domain.RecapRow{Key: "mode", Label: "Mode", Path: PathKeep, Values: domain.RecapValues([]string{mode})})
 	if len(p.Conflicts) > 0 {
 		rows = append(rows,
-			domain.RecapRow{Key: "conflicts", Label: "Conflicts", Values: recappedConflicts(p.Conflicts)},
+			domain.RecapRow{Key: "conflicts", Label: "Conflicts", Values: recappedConflicts(p.Conflicts), Stacked: true},
 			domain.RecapRow{Key: PathOnConflict, Label: "On conflict", Path: PathOnConflict, Values: domain.RecapValues([]string{string(p.OnConflict)})},
 		)
 	}
