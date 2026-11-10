@@ -27,12 +27,12 @@ const soon: { group: string; items: { label: string; icon: LucideIcon }[] }[] = 
       { label: 'Run settings', icon: SlidersHorizontal },
     ],
   },
-  { group: 'Project', items: [{ label: 'Settings', icon: Settings }] },
 ]
 
 export function AppSidebar({ repo, daemon }: { repo: string | undefined; daemon?: Daemon | undefined }) {
   const matchRoute = useMatchRoute()
   const onRunning = matchRoute({ to: '/r/$repo/running', fuzzy: true }) !== false
+  const onSettings = matchRoute({ to: '/r/$repo/settings', fuzzy: true }) !== false
 
   return (
     <Sidebar>
@@ -48,7 +48,7 @@ export function AppSidebar({ repo, daemon }: { repo: string | undefined; daemon?
           <SidebarMenu>
             <SidebarMenuItem>
               {repo ? (
-                <SidebarMenuButton asChild isActive={!onRunning}>
+                <SidebarMenuButton asChild isActive={!onRunning && !onSettings}>
                   <Link to="/r/$repo/worktrees" params={{ repo: repo }}>
                     <GitBranch />
                     All worktrees
@@ -98,6 +98,26 @@ export function AppSidebar({ repo, daemon }: { repo: string | undefined; daemon?
             </SidebarMenu>
           </SidebarGroup>
         ))}
+        <SidebarGroup>
+          <SidebarGroupLabel>Project</SidebarGroupLabel>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              {repo ? (
+                <SidebarMenuButton asChild isActive={onSettings}>
+                  <Link to="/r/$repo/settings" params={{ repo }}>
+                    <Settings />
+                    Settings
+                  </Link>
+                </SidebarMenuButton>
+              ) : (
+                <SidebarMenuButton disabled>
+                  <Settings />
+                  Settings
+                </SidebarMenuButton>
+              )}
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
       </SidebarContent>
       <ConnectionFooter repo={repo} daemon={daemon} />
     </Sidebar>
