@@ -148,3 +148,11 @@ func profileNames(profiles []project.Profile) []string {
 	}
 	return found
 }
+
+func jobNames(run project.Run) []string {
+	var names []string
+	for _, job := range run.Jobs {
+		names = append(names, job.Name)
+	}
+	return names
+}

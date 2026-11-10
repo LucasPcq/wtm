@@ -23,12 +23,13 @@ type ComposeService struct {
 	Ports []ComposePort
 }
 
-// ComposePort is one port a service publishes, as the file spells it: the listen address before it ("" for every address), its host side ("5432", "${PG_PORT:-5432}"), its container side, and where its host side is written, to be rewritten; Unreadable says why it cannot be (an anchor, an alias, a host side wtm cannot find in its line).
+// ComposePort is one port a service publishes, as the file spells it: the listen address before it ("" for every address), its host side ("5432", "${PG_PORT:-5432}"), its container side, and where its host side is written, to be rewritten, its whole short form or the published value of the long syntax (Long); Unreadable says why it cannot be (an anchor, an alias, a host side wtm cannot find in its line).
 type ComposePort struct {
 	IP         string
 	Host       string
 	Container  string
 	At         ComposeSpan
+	Long       bool
 	Unreadable string
 }
 

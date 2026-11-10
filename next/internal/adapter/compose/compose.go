@@ -66,6 +66,9 @@ func (r Repository) SaveCompose(ctx context.Context, rewrite project.ComposeRewr
 			if err != nil {
 				return nil, err
 			}
+			if err := readsBack(parse(rewrite.File, current), parse(rewrite.File, []byte(edited))); err != nil {
+				return nil, fmt.Errorf("%s rewritten would not read back: %w", rewrite.File, err)
+			}
 			return statefile.Write{Data: []byte(edited)}, nil
 		},
 	})
@@ -92,6 +95,29 @@ func Apply(content string, edits []project.ComposeEdit) (string, error) {
 		lines[at.Line-1] = line[:start] + edit.New + line[start+len(at.Text):]
 	}
 	return strings.Join(lines, "\n"), nil
+}
+
+// readsBack checks a rewrite against the file it rewrites: it parses, and each service publishes the same ports on the same addresses and container sides, a host side changed only to a variable.
+func readsBack(before, after project.Compose) error {
+	if after.Err != "" {
+		return errors.New(after.Err)
+	}
+	if len(after.Services) != len(before.Services) {
+		return fmt.Errorf("%d services, not %d", len(after.Services), len(before.Services))
+	}
+	for i, service := range before.Services {
+		ports := after.Services[i].Ports
+		if len(ports) != len(service.Ports) {
+			return fmt.Errorf("service %s: %d ports, not %d", service.Name, len(ports), len(service.Ports))
+		}
+		for j, was := range service.Ports {
+			now := ports[j]
+			if now.IP != was.IP || now.Container != was.Container || now.Host != was.Host && !variable.MatchString(now.Host) {
+				return fmt.Errorf("service %s: port %s:%s:%s reads %s:%s:%s", service.Name, was.IP, was.Host, was.Container, now.IP, now.Host, now.Container)
+			}
+		}
+	}
+	return nil
 }
 
 func parse(file string, data []byte) project.Compose {
@@ -173,7 +199,7 @@ func short(entry *yaml.Node, lines []string) project.ComposePort {
 
 // long is a port of the long syntax, its published value the span a rewrite replaces.
 func long(entry *yaml.Node, lines []string) project.ComposePort {
-	port := project.ComposePort{}
+	port := project.ComposePort{Long: true}
 	if target := value(entry, "target"); target != nil {
 		port.Container = target.Value
 	}

@@ -902,15 +902,27 @@ func (f Facts) decideProfiles(d *Decision, req Request) {
 		given = append(given, project.Profile{Name: strings.TrimSpace(name), Jobs: filled(strings.Split(jobs, ","))})
 	}
 	d.Profiles = settle(d, PathProfiles, given, req.Profiles != nil, func() []project.Profile { return onDisk }, d.ProposedProfiles, f.declared())
+	runnerLeft := d.Runnable != nil && d.Runner != Through
 	left := func(job string) bool {
+		if job == runnerName {
+			return runnerLeft
+		}
 		_, candidate := d.candidate(job)
-		return candidate && !slices.Contains(d.Picked, job) && job != runnerName
+		return candidate && !slices.Contains(d.Picked, job)
 	}
-	// A profile goes with the job it is named after, and with its last job.
+	// A profile goes with the job it is named after, and with its last job; the apps the runner started take its place.
 	d.Profiles = slices.DeleteFunc(slices.Clone(d.Profiles), func(profile project.Profile) bool { return left(profile.Name) })
 	for i, profile := range d.Profiles {
-		d.Profiles[i].Default = false
-		d.Profiles[i].Jobs = slices.DeleteFunc(slices.Clone(profile.Jobs), left)
+		var jobs []string
+		for _, job := range profile.Jobs {
+			switch {
+			case job == runnerName && runnerLeft:
+				jobs = append(jobs, slices.DeleteFunc(slices.Clone(d.Picked), func(name string) bool { return !d.startedByRunner(name) || slices.Contains(profile.Jobs, name) })...)
+			case !left(job):
+				jobs = append(jobs, job)
+			}
+		}
+		d.Profiles[i].Default, d.Profiles[i].Jobs = false, jobs
 	}
 	d.Profiles = slices.DeleteFunc(d.Profiles, func(profile project.Profile) bool { return len(profile.Jobs) == 0 })
 
@@ -919,7 +931,8 @@ func (f Facts) decideProfiles(d *Decision, req Request) {
 		fallback = d.Profiles[0].Name
 	}
 	defaultOnDisk := fallback
-	if at := slices.IndexFunc(f.Run.Run.Profiles, func(p project.Profile) bool { return p.Default }); at >= 0 {
+	// a default run.toml holds stays one only while its profile does
+	if at := slices.IndexFunc(f.Run.Run.Profiles, func(p project.Profile) bool { return p.Default }); at >= 0 && slices.ContainsFunc(d.Profiles, func(p project.Profile) bool { return p.Name == f.Run.Run.Profiles[at].Name }) {
 		defaultOnDisk = f.Run.Run.Profiles[at].Name
 	}
 	d.DefaultProfile = settle(d, PathDefaultProfile, req.DefaultProfile, req.DefaultProfile != "", func() string { return defaultOnDisk }, fallback, f.declared())
@@ -1223,7 +1236,11 @@ func (d Decision) job(f Facts, c Candidate) project.Job {
 			job.Namespace = &space
 		}
 	}
-	touches := job.Touches
+	// what run.toml says a task touches, but a job left out
+	touches := slices.DeleteFunc(slices.Clone(job.Touches), func(name string) bool {
+		_, candidate := d.candidate(name)
+		return candidate && !slices.Contains(d.Picked, name)
+	})
 	job.Touches = nil
 	if slices.Contains(d.Touches, c.Name) && len(touches) > 0 {
 		job.Touches = touches
@@ -1260,16 +1277,14 @@ func (d Decision) editsFor(f Facts, ports []Port) []ComposeEdit {
 		}
 		for _, port := range portsOf(ports, service.Name) {
 			for _, published := range service.Ports {
-				if published.Unreadable != "" || published.Host != strconv.Itoa(port.Base) || port.Variable == "" {
+				if published.Unreadable != "" || port.Variable == "" || !readsAnother(published.Host, port) {
 					continue
 				}
-				quote := ""
-				if strings.HasPrefix(published.At.Text, `"`) || published.IP == "" {
-					quote = `"`
-				}
-				after := "${" + port.Variable + ":-" + published.Host + "}"
-				if published.At.Text != published.Host {
-					after = quote + strings.TrimPrefix(published.IP+":", ":") + after + ":" + published.Container + quote
+				// Double quotes always: unquoted, ${ is not plain YAML in a flow sequence or mapping.
+				host := "${" + port.Variable + ":-" + strconv.Itoa(port.Base) + "}"
+				after := `"` + host + `"`
+				if !published.Long {
+					after = `"` + strings.TrimPrefix(published.IP+":", ":") + host + ":" + published.Container + `"`
 				}
 				edits = append(edits, ComposeEdit{Subject: service.Name, What: "port", At: published.At, Before: published.At.Text, After: after})
 			}
@@ -1288,6 +1303,14 @@ func (d Decision) editsFor(f Facts, ports []Port) []ComposeEdit {
 		edits = append(edits, ComposeEdit{Subject: name.Owner, What: string(name.Kind), At: name.At, Before: name.At.Text, After: after})
 	}
 	return edits
+}
+
+// readsAnother reports whether a published host side binds port's base without reading its variable: the literal base, or another variable defaulting to it.
+func readsAnother(host string, port Port) bool {
+	if match := variablePort.FindStringSubmatch(host); match != nil {
+		return match[1] != port.Variable && match[2] == strconv.Itoa(port.Base)
+	}
+	return host == strconv.Itoa(port.Base)
 }
 
 // ----------------------------------------------------------------------------
@@ -1326,16 +1349,17 @@ type File struct {
 	New     bool   `json:"new"`
 }
 
-// written are the files the plan writes: run.toml unless it holds already what the plan writes, docker-compose.yml when it is rewritten, config.toml when it copies a file more.
+// written are the files the plan writes, in the order Apply writes them: docker-compose.yml when it is rewritten, run.toml unless it holds already what the plan writes, config.toml when it copies a file more.
 func (p Plan) written(f Facts) []File {
 	var files []File
+	// docker-compose.yml first: one that fails leaves no run.toml declaring variables it does not read
+	if p.Compose != nil {
+		files = append(files, File{Path: p.Compose.File, Tracked: true})
+	}
 	onDisk := f.Run.Run
 	onDisk.Declared = false
 	if !f.declared() || !sameRun(onDisk, p.Run) {
 		files = append(files, File{Path: runFile, New: !f.declared()})
-	}
-	if p.Compose != nil {
-		files = append(files, File{Path: p.Compose.File, Tracked: true})
 	}
 	if p.Config != nil {
 		files = append(files, File{Path: "config.toml"})

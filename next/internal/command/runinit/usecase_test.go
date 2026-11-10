@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/adapter/compose"
 	"github.com/LucasPcq/wtm/next/internal/adapter/store"
 	"github.com/LucasPcq/wtm/next/internal/command/runinit"
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -22,7 +23,7 @@ func TestAFirstRunInitWritesRunTomlAndRewritesCompose(t *testing.T) {
 
 	formtest.Golden(t, "first.run.toml", w.runToml(t))
 	formtest.Golden(t, "first.docker-compose.yml", readFile(t, filepath.Join(w.main, "docker-compose.yml")))
-	assert.Equal(t, []string{"run.toml", "docker-compose.yml"}, subjects(outcome.Result.Items))
+	assert.Equal(t, []string{"docker-compose.yml", "run.toml"}, subjects(outcome.Result.Items))
 	assert.Equal(t, []string{runinit.CodeUp}, codes(outcome.Result.FollowUps))
 }
 
@@ -164,6 +165,69 @@ func TestTheRootScriptThatStartsTheAppsRunsThemThroughIt(t *testing.T) {
 	assert.Equal(t, "pnpm dev", dev.Cmd)
 	assert.Equal(t, []string{"admin", "api", "web", "worker"}, dev.Runs)
 	assert.Equal(t, []string{"postgres", "redis", "mailpit", "migrate", "seed", "dev"}, w.run(t).Profiles[0].Jobs)
+}
+
+func TestARunnerLeftForOneByOneGivesItsPlaceInTheProfilesBackToTheApps(t *testing.T) {
+	w := newWorld(t)
+	w.apply(t, runinit.Request{Runner: runinit.Through})
+
+	w.apply(t, runinit.Request{Runner: runinit.OneByOne})
+
+	run := w.run(t)
+	assert.NotContains(t, jobNames(run), "dev")
+	assert.Equal(t, []string{"postgres", "redis", "mailpit", "migrate", "seed", "admin", "api", "web", "worker"}, run.Profiles[0].Jobs)
+}
+
+func TestAReInitLeavingASharedServiceOutDropsItFromTheTasksThatTouchedIt(t *testing.T) {
+	w := newWorld(t)
+	w.apply(t, runinit.Request{})
+	require.Equal(t, []string{"postgres"}, w.job(t, "migrate").Touches)
+
+	w.apply(t, runinit.Request{Jobs: []string{"redis", "mailpit", "admin", "api", "web", "worker", "migrate", "seed"}})
+
+	assert.Empty(t, w.job(t, "migrate").Touches)
+	assert.Empty(t, w.job(t, "seed").Touches)
+}
+
+func TestADefaultProfileLeftOutWithItsJobFallsBackToTheFirst(t *testing.T) {
+	w := newWorld(t)
+	w.apply(t, runinit.Request{DefaultProfile: "worker"})
+
+	w.apply(t, runinit.Request{Jobs: []string{"postgres", "redis", "mailpit", "admin", "api", "web", "migrate", "seed"}})
+
+	run := w.run(t)
+	assert.Equal(t, "all", run.Profiles[0].Name)
+	assert.True(t, run.Profiles[0].Default)
+}
+
+func TestEveryPortSyntaxIsRewrittenIntoAFileThatStillReadsTheSamePorts(t *testing.T) {
+	w := newWorld(t)
+	writeFile(t, filepath.Join(w.main, "docker-compose.yml"), readFile(t, filepath.Join("testdata", "syntaxes.docker-compose.yml")))
+
+	w.apply(t, runinit.Request{})
+
+	formtest.Golden(t, "syntaxes.docker-compose.yml", readFile(t, filepath.Join(w.main, "docker-compose.yml")))
+	rewritten, err := compose.Repository{Dir: w.main}.Compose()
+	require.NoError(t, err)
+	require.Empty(t, rewritten.Err)
+	var hosts []string
+	for _, service := range rewritten.Services {
+		for _, port := range service.Ports {
+			hosts = append(hosts, port.IP+" "+port.Host+":"+port.Container)
+		}
+	}
+	assert.Equal(t, []string{" ${POSTGRES_PORT:-5432}:5432", "127.0.0.1 ${REDIS_PORT:-6379}:6379", " ${MAILPIT_PORT:-8025}:8025", "127.0.0.1 ${MAILPIT_PORT_1025:-1025}:1025"}, hosts)
+}
+
+func TestAPortVariableRenamedOnAReInitIsTheOneDockerComposeReads(t *testing.T) {
+	w := newWorld(t)
+	w.apply(t, runinit.Request{})
+
+	w.apply(t, runinit.Request{Ports: []string{"postgres.POSTGRES_PORT=5432", "redis.CACHE_PORT=6379", "mailpit.MAILPIT_PORT=8025", "mailpit.MAILPIT_PORT_1025=1025", "admin.ADMIN_PORT=3001", "api.PORT=4000", "web.PORT=3000", "worker="}})
+
+	file := readFile(t, filepath.Join(w.main, "docker-compose.yml"))
+	assert.Contains(t, file, `"${CACHE_PORT:-6379}:6379"`)
+	assert.NotContains(t, file, "REDIS_PORT")
 }
 
 func TestDockerComposeIsLeftAloneWhenAsked(t *testing.T) {

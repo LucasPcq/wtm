@@ -12,7 +12,7 @@ func read() project.Compose {
 			{Name: "redis", Image: "redis:7", Ports: []project.ComposePort{{IP: "127.0.0.1", Host: "6379", Container: "6379", At: project.ComposeSpan{Line: 12, Column: 9, Text: "127.0.0.1:6379:6379"}}}},
 			{Name: "mailpit", Image: "axllent/mailpit", Ports: []project.ComposePort{
 				{Host: "${MAILPIT_PORT:-8025}", Container: "8025", At: project.ComposeSpan{Line: 16, Column: 9, Text: `"${MAILPIT_PORT:-8025}:8025"`}},
-				{Host: "1025", Container: "1025", At: project.ComposeSpan{Line: 18, Column: 20, Text: "1025"}},
+				{Host: "1025", Container: "1025", At: project.ComposeSpan{Line: 18, Column: 20, Text: "1025"}, Long: true},
 			}},
 			{Name: "api", Build: true, Ports: []project.ComposePort{{Unreadable: "anchor or alias"}}},
 		},

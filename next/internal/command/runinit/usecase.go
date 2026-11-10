@@ -118,7 +118,7 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 // CodeFileChanged fails a run init whose file changed on disk since it was read: nothing is written, and the same answers planned again read it anew.
 const CodeFileChanged = Name + ".file_changed"
 
-// Apply writes the plan's files, all or none, each a unit between its started and finished events: each is checked against the digest it was read with before any is written, then docker-compose.yml, run.toml and config.toml in turn. A file changed since fails its item and leaves every file as it was; a write that fails after another stops the ones after it.
+// Apply writes the plan's files, all or none, each a unit between its started and finished events: each is checked against the digest it was read with before any is written, then docker-compose.yml, run.toml and config.toml in turn, the plan's order. A file changed since fails its item and leaves every file as it was; a write that fails after another stops the ones after it.
 func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Result {
 	items := make([]Item, 0, len(plan.Files))
 	for _, file := range plan.Files {

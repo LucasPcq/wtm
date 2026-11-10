@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:16
+    ports:
+      - target: 5432
+        published: "${POSTGRES_PORT:-5432}"
+  redis:
+    image: redis:7
+    ports: ["127.0.0.1:${REDIS_PORT:-6379}:6379"]
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - { target: 8025, published: "${MAILPIT_PORT:-8025}" }
+      - "127.0.0.1:${MAILPIT_PORT_1025:-1025}:1025"

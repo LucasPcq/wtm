@@ -79,6 +79,27 @@ func TestSaveComposeRefusesAFileChangedSinceItWasRead(t *testing.T) {
 	assert.Equal(t, changed, readFile(t, filepath.Join(repo.Dir, "docker-compose.yml")))
 }
 
+func TestSaveComposeRefusesARewriteThatWouldNotReadBack(t *testing.T) {
+	cases := map[string]string{
+		"not_yaml":        `"${POSTGRES_PORT:-5432}:5432`,
+		"container_moved": `"${POSTGRES_PORT:-5432}:5433"`,
+		"host_literal":    `"5433:5432"`,
+	}
+	for name, edit := range cases {
+		t.Run(name, func(t *testing.T) {
+			repo := repository(t, "docker-compose.yml")
+			compose, err := repo.Compose()
+			require.NoError(t, err)
+			before := readFile(t, filepath.Join(repo.Dir, "docker-compose.yml"))
+
+			_, err = repo.SaveCompose(t.Context(), project.ComposeRewrite{File: compose.File, Edits: []project.ComposeEdit{{At: compose.Services[0].Ports[0].At, New: edit}}, Replaces: compose.Digest})
+
+			require.ErrorContains(t, err, "would not read back")
+			assert.Equal(t, before, readFile(t, filepath.Join(repo.Dir, "docker-compose.yml")))
+		})
+	}
+}
+
 func TestApplyRefusesAnEditWhoseTextIsNoLongerThere(t *testing.T) {
 	_, err := Apply("ports:\n  - \"5433:5432\"\n", []project.ComposeEdit{{At: project.ComposeSpan{Line: 2, Column: 5, Text: `"5432:5432"`}, New: "x"}})
 
