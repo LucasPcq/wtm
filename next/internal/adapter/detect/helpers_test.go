@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/stretchr/testify/require"
 )
 
@@ -18,4 +19,12 @@ func repository(t *testing.T, files map[string]string) string {
 		require.NoError(t, os.WriteFile(at, []byte(content), 0o644))
 	}
 	return dir
+}
+
+func dirs(places []project.Place) []string {
+	found := make([]string, 0, len(places))
+	for _, place := range places {
+		found = append(found, place.Dir)
+	}
+	return found
 }
