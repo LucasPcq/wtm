@@ -20,6 +20,8 @@ import type {
   ExecPlan,
   FastforwardDetail,
   FastforwardPlan,
+  InitializeDetail,
+  InitializePlan,
   ListDetail,
   PruneDetail,
   PrunePlan,
@@ -70,6 +72,7 @@ type Mutation = {
   'run-stop': { plan: RunstopPlan; detail: RunjobsStopDetail }
   'daemon-restart': { plan: DaemonrestartPlan; detail: DaemonrestartDetail }
   'daemon-stop-jobs': { plan: DaemonstopjobsPlan; detail: RunjobsStopDetail }
+  init: { plan: InitializePlan; detail: InitializeDetail }
 }
 export type MutationCommand = keyof Mutation
 export type Planned<C extends MutationCommand> = Mutation[C]['plan']

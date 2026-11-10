@@ -45,7 +45,16 @@ const detail: Record<Connection, string> = {
 // what opens wtm's daemon's panel from the connection block, which it turns into its trigger
 export type Daemon = (trigger: ReactElement) => ReactNode
 
-export function ConnectionFooter({ repo, daemon }: { repo: string | undefined; daemon?: Daemon | undefined }) {
+// idle: a repository not set up yet, whose origin is not fetched from here
+export function ConnectionFooter({
+  repo,
+  idle = false,
+  daemon,
+}: {
+  repo: string | undefined
+  idle?: boolean
+  daemon?: Daemon | undefined
+}) {
   const client = useQueryClient()
   const events = useQuery(eventsQuery)
   const connection = connectionOf(events)
@@ -107,7 +116,7 @@ export function ConnectionFooter({ repo, daemon }: { repo: string | undefined; d
         <Button
           variant="outline"
           className="w-full justify-start"
-          disabled={!live || fetchOrigin.isPending}
+          disabled={!live || idle || fetchOrigin.isPending}
           onClick={() => fetchOrigin.mutate(repo)}
         >
           <RefreshCw className={cn(fetchOrigin.isPending && 'animate-spin')} />

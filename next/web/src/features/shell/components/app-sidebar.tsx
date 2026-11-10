@@ -30,8 +30,11 @@ const soon: { group: string; items: { label: string; icon: LucideIcon }[] }[] = 
   { group: 'Project', items: [{ label: 'Settings', icon: Settings }] },
 ]
 
-export function AppSidebar({ repo, daemon }: { repo: string | undefined; daemon?: Daemon | undefined }) {
+export function AppSidebar({ repo: current, daemon }: { repo: string | undefined; daemon?: Daemon | undefined }) {
   const matchRoute = useMatchRoute()
+  // a repository not set up yet has no page but its gate: the picker names it, the rest waits
+  const setUp = useQuery(reposQuery).data?.find((known) => known.id === current)?.set_up !== false
+  const repo = setUp ? current : undefined
   const onRunning = matchRoute({ to: '/r/$repo/running', fuzzy: true }) !== false
 
   return (
@@ -40,7 +43,7 @@ export function AppSidebar({ repo, daemon }: { repo: string | undefined; daemon?
         <div className="px-2">
           <VersionedLogo />
         </div>
-        <RepoPicker current={repo} />
+        <RepoPicker current={current} />
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
@@ -99,7 +102,7 @@ export function AppSidebar({ repo, daemon }: { repo: string | undefined; daemon?
           </SidebarGroup>
         ))}
       </SidebarContent>
-      <ConnectionFooter repo={repo} daemon={daemon} />
+      <ConnectionFooter repo={current} idle={!setUp} daemon={daemon} />
     </Sidebar>
   )
 }
