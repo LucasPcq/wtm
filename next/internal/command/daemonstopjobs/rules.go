@@ -48,7 +48,7 @@ const (
 	CodeDaemonSkew = Name + domain.DaemonSkew
 )
 
-// Decide turns the facts and the request into the plan: each worktree's jobs up, of the repository asked or of every one, by repository, a crashed job cleared, a shared job's own run left to its holders' stop when the main checkout does not hold it. A daemon whose jobs cannot be read is refused.
+// Decide turns the facts and the request into the plan: each worktree's jobs up, of the repository asked or of every one, by repository, a crashed job cleared, a shared job's own run let go of by the main checkout and every worktree holding it. A daemon whose jobs cannot be read is refused.
 func Decide(f Facts, req Request) (Plan, []domain.Warning, error) {
 	d := f.Daemon
 	if d.Answering && d.Skew == run.SkewProtocol {
@@ -71,7 +71,7 @@ func Decide(f Facts, req Request) (Plan, []domain.Warning, error) {
 	return plan, nil, nil
 }
 
-// stopOf is how job stops when every job does: up, it stops (a stack by its stop command, a hold on a shared service let go of with the others); crashed, it is cleared. A shared job's own run its main checkout does not hold is no stop of its own: it stops with its last hold.
+// stopOf is how job stops when every job does: up, it stops (a stack by its stop command, a shared service let go of by its main checkout and every worktree holding it, which it names); crashed, it is cleared.
 func stopOf(job run.Job, jobs []run.Job) (runjobs.StopJob, bool) {
 	stop := runjobs.StopJob{Name: job.Name, Kind: job.Kind, Hold: job.Hold, Fate: run.FateStop}
 	switch {
@@ -83,16 +83,17 @@ func stopOf(job run.Job, jobs []run.Job) (runjobs.StopJob, bool) {
 	case job.Hold == run.HoldDetached:
 		stop.StopCommand = job.StopCommand
 	}
-	served := job.SharedDir != "" && job.Hold != run.HoldClaim
-	switch {
-	case job.Hold == run.HoldClaim:
-		stop.SharedIn = job.SharedDir
-	case served && job.MainHolds:
-		stop.SharedIn = job.SharedDir
-	case served && slices.ContainsFunc(jobs, func(held run.Job) bool {
-		return held.Up && held.Hold == run.HoldClaim && held.Name == job.Name && held.SharedDir == job.WorkDir
-	}):
-		return stop, false
+	if job.SharedDir == "" {
+		return stop, true
+	}
+	// A hold on a shared service, or its own run, which the main checkout's stop lets go of: it stops with its last hold.
+	stop.SharedIn = job.SharedDir
+	if job.Hold != run.HoldClaim {
+		for _, held := range jobs {
+			if held.Up && held.Hold == run.HoldClaim && held.Name == job.Name && held.SharedDir == job.WorkDir {
+				stop.HeldBy = append(stop.HeldBy, cmp.Or(held.Branch, held.WorkDir))
+			}
+		}
 	}
 	return stop, true
 }

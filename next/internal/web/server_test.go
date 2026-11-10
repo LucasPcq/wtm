@@ -297,6 +297,16 @@ func TestTheEventsOfARepoAreWatchedFromItsRootWithTheirWarnings(t *testing.T) {
 	assert.Equal(t, []api.Call{{Dir: repo.Root}}, s.calls)
 }
 
+func TestAWarningOfWtmsDaemonNotAnsweringCarriesItsCode(t *testing.T) {
+	down := &domain.Error{Kind: domain.KindInternal, Code: "daemon.start_failed", Message: "the event bus did not start"}
+	s := &stream{lines: []string{`{"type":"ready"}`}, warnings: []error{down}, refusal: errors.New("the stream ended")}
+
+	response := do(t, serving(t, Params{Events: s.bind()}), req{method: http.MethodGet, path: "/api/events"})
+
+	require.Equal(t, http.StatusOK, response.StatusCode)
+	assert.Equal(t, sse{name: eventWarning, data: `{"message":"the event bus did not start","code":"daemon.start_failed"}`}, events(t, response.Body)[0])
+}
+
 func TestTheEventsOfEveryRepoAreWatchedFromNowhere(t *testing.T) {
 	s := &stream{refusal: &domain.Error{Kind: domain.KindPrecondition, Code: "events.config_not_found"}}
 
@@ -576,4 +586,24 @@ func TestALogFileThatCannotBeServedIsRefused(t *testing.T) {
 			assert.Equal(t, c.code, decoded[envelope](t, response).Error.Code)
 		})
 	}
+}
+
+func TestTheDaemonsLogIsServedToSave(t *testing.T) {
+	log := filepath.Join(t.TempDir(), "daemon.log")
+	require.NoError(t, os.WriteFile(log, []byte("proxy: cannot serve on port 11080\n"), 0o600))
+
+	response := do(t, serving(t, Params{DaemonLog: func() string { return log }}), req{method: http.MethodGet, path: "/api/daemon/log"})
+
+	require.Equal(t, http.StatusOK, response.StatusCode)
+	body, err := io.ReadAll(response.Body)
+	require.NoError(t, err)
+	assert.Equal(t, "proxy: cannot serve on port 11080\n", string(body))
+	assert.Equal(t, `attachment; filename=daemon.log`, response.Header.Get("Content-Disposition"))
+}
+
+func TestADaemonThatKeepsNoLogHasNoneToSave(t *testing.T) {
+	response := do(t, serving(t, Params{DaemonLog: func() string { return "/no/such/daemon.log" }}), req{method: http.MethodGet, path: "/api/daemon/log"})
+
+	assert.Equal(t, http.StatusNotFound, response.StatusCode)
+	assert.Equal(t, CodeLogMissing, decoded[envelope](t, response).Error.Code)
 }

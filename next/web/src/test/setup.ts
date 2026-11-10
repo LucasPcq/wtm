@@ -1,6 +1,7 @@
 import { cleanup } from '@testing-library/react'
 import { toast } from 'sonner'
 import { afterAll, afterEach, beforeAll } from 'vitest'
+import { useDaemonRuns } from '@/features/worktrees/daemon/hooks/use-daemon-runs'
 import { useExecDialog } from '@/features/worktrees/hooks/use-exec-dialog'
 import { useFastForwardDialog } from '@/features/worktrees/hooks/use-fast-forward-dialog'
 import { usePruneDialog } from '@/features/worktrees/hooks/use-prune-dialog'
@@ -24,6 +25,7 @@ afterEach(() => {
   // the stores outlive a page, as they do in the browser: each test opens a fresh one
   useUi.setState(useUi.getInitialState(), true)
   useRuns.setState(useRuns.getInitialState(), true)
+  useDaemonRuns.setState(useDaemonRuns.getInitialState(), true)
   useRemoveDialog.setState(useRemoveDialog.getInitialState(), true)
   usePruneDialog.setState(usePruneDialog.getInitialState(), true)
   useFastForwardDialog.setState(useFastForwardDialog.getInitialState(), true)

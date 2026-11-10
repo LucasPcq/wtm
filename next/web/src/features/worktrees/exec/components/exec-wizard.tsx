@@ -78,8 +78,12 @@ export function ExecWizard({
   const targets = plan?.targets ?? []
 
   // a holder the event stream shows still under way still holds the lock; one it no longer shows may have let go
-  const events = useQuery({ ...eventsQuery, select: (live) => live.operations })
-  const operations = events.data ?? {}
+  // what the lock and the connection read of the stream: not its other changes, which would render the wizard again
+  const events = useQuery({
+    ...eventsQuery,
+    select: (live) => ({ operations: live.operations, ready: live.ready, warningCode: live.warningCode }),
+  })
+  const operations = events.data?.operations ?? {}
   const holder = ask.held?.params?.op
   // a holder seen under way then gone has let go; one never seen (started before the page) may still hold it, and so
   // may one a reconnect lost: the stream starts again from nothing, so what it saw before no longer counts

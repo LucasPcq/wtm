@@ -8,32 +8,41 @@ import { PhaseRow } from '@/features/worktrees/components/phase-row'
 import { RunFailure } from '@/features/worktrees/components/run-failure'
 import { RunOutcome } from '@/features/worktrees/components/run-outcome'
 import type { RunDownRan } from '@/features/worktrees/hooks/use-run-down-dialog'
-import { countOf, sharedOf, stopJob } from '@/features/worktrees/run-down/utils/plan'
-import { recapOf } from '@/features/worktrees/run-down/utils/recap'
-import { sharedStopping, stopping } from '@/features/worktrees/run-down/utils/words'
 import type { PhaseRun, Progress } from '@/features/worktrees/utils/progress'
 import { where } from '@/features/worktrees/utils/run-words'
+import { countOf, holdsOn, sharedOf, stopJob } from '@/features/worktrees/utils/stop-plan'
+import { recapOf } from '@/features/worktrees/utils/stop-recap'
+import { sharedStopping, stopping } from '@/features/worktrees/utils/stop-words'
 
 // a shared service is let go by each of its holders: its row says where the least advanced one stands
 const rank: Record<PhaseRun['state'], number> = { failed: 0, now: 1, todo: 2, done: 3 }
 
 // a stop is never cancelled: a stack stopped half-way is worse than one stopped or not
-export function RunDownProgress({
+export function StopProgress({
+  title,
+  stopping: doing,
   progress,
   running,
   ran,
   onHide,
   onDone,
+  onAgain,
+  ended,
 }: {
-  progress: Progress<'run-down'>
+  title: string
+  stopping: string
+  progress: Progress<'run-down' | 'daemon-stop-jobs'>
   running: boolean
   ran: RunDownRan
   onHide: () => void
   onDone: () => void
+  onAgain?: (() => void) | undefined
+  // the outcome said by the command's own words: the jobs stopped of all, and the ones that did not stop
+  ended?: ((count: { stopped: number; total: number }, failed: string[]) => string) | undefined
 }) {
   const envelope = progress.envelope
   const items = envelope?.items ?? []
-  const { done, total } = countOf(progress.units, ran.plan)
+  const { done, stopped, total } = countOf(progress.units, ran.plan)
   const failed = items.filter((item) => item.status !== 'done').length
   const refused = progress.refused ?? (items.some((item) => item.error) ? undefined : envelope?.error?.message)
   const { groups, labels, warnings } = recapOf(envelope, ran.plan, progress.units)
@@ -44,15 +53,24 @@ export function RunDownProgress({
 
   const sharedRows = shared.flatMap((service) => {
     const runs = progress.units.flatMap((unit) =>
-      unit.phases.filter((run) => run.job === service.name && isShared(unit.subject, run.job)),
+      unit.phases.filter((run) => holdsOn(ran.plan, unit.subject, run.job, service)),
     )
     const least = runs.toSorted((a, b) => rank[a.state] - rank[b.state])[0]
     return least ? [{ service, run: least, lines: runs.flatMap((run) => run.lines ?? []) }] : []
   })
 
   const description = () => {
-    if (running) return `Stopping jobs ${where(ran.worktrees)} · ${done} of ${total} stopped`
+    if (running) return `${doing} · ${done} of ${total} stopped`
     if (items.length === 0) return 'Nothing stopped.'
+    if (ended) {
+      // a unit refused before any job ran has no failed job: it is named itself
+      const notStopped = progress.units.flatMap((unit) => {
+        const jobs = unit.phases.filter((run) => run.state === 'failed').map((run) => `${run.job} in ${unit.subject}`)
+        if (jobs.length > 0) return jobs
+        return unit.status === 'failed' ? [unit.subject] : []
+      })
+      return ended({ stopped, total }, notStopped)
+    }
     if (failed > 0) return `Jobs stopped in ${items.length - failed} of ${items.length} worktrees.`
     return `Jobs stopped ${where(items.map((item) => item.subject))}.`
   }
@@ -60,7 +78,7 @@ export function RunDownProgress({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Stop jobs</DialogTitle>
+        <DialogTitle>{title}</DialogTitle>
         <DialogDescription>{description()}</DialogDescription>
       </DialogHeader>
       <DialogBand>{running && <Bar value={total ? (done / total) * 100 : 0} aria-label="Progress" />}</DialogBand>
@@ -87,7 +105,7 @@ export function RunDownProgress({
               <JobSection dense title="Shared services">
                 {sharedRows.map(({ service, run, lines }) => (
                   <PhaseRow
-                    key={service.name}
+                    key={`${service.sharedIn}:${service.name}`}
                     name={service.name}
                     run={run}
                     label={sharedStopping(
@@ -95,7 +113,7 @@ export function RunDownProgress({
                       service,
                       items.flatMap((item) =>
                         (item.detail?.jobs ?? [])
-                          .filter((job) => job.name === service.name && isShared(item.subject, job.name))
+                          .filter((job) => holdsOn(ran.plan, item.subject, job.name, service))
                           .map((job) => job.status),
                       ),
                     )}
@@ -122,7 +140,14 @@ export function RunDownProgress({
             </Button>
           </>
         ) : (
-          <Button onClick={onDone}>Done</Button>
+          <>
+            {onAgain && failed > 0 && (
+              <Button variant="outline" onClick={onAgain}>
+                Run again
+              </Button>
+            )}
+            <Button onClick={onDone}>Done</Button>
+          </>
         )}
       </DialogFooter>
     </>

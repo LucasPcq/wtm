@@ -1,0 +1,109 @@
+import { QueryClient } from '@tanstack/react-query'
+import { HttpResponse, http } from 'msw'
+import { beforeEach, expect, test } from 'vitest'
+import { HttpError } from '@/api/fetch'
+import { connectionOf, eventsQuery, giveUpAfter, Unreachable } from '@/api/queries/events'
+import { server } from '@/test/server'
+
+beforeEach(() => localStorage.setItem('wtm.token', 't'))
+
+test('a stream that cannot open counts its failed attempts in a row', async () => {
+  const client = new QueryClient()
+  server.use(http.get('/api/events', () => HttpResponse.error()))
+
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const error = await client.fetchQuery(eventsQuery).catch((failed: unknown) => failed)
+    expect(error).toBeInstanceOf(Unreachable)
+    expect((error as Unreachable).attempts).toBe(attempt)
+  }
+  server.use(http.get('/api/events', () => new HttpResponse('', { status: 503 })))
+  const refused = await client.fetchQuery(eventsQuery).catch((failed: unknown) => failed)
+  expect((refused as Unreachable).attempts, 'a server that answers but cannot stream counts too').toBe(3)
+})
+
+test('the connection reads the query of the stream', () => {
+  expect(connectionOf({ status: 'pending', fetchStatus: 'fetching', error: null })).toBe('connecting')
+  expect(
+    connectionOf({ status: 'success', fetchStatus: 'fetching', error: null, data: {} }),
+    'open but not ready yet',
+  ).toBe('connecting')
+  expect(connectionOf({ status: 'success', fetchStatus: 'fetching', error: null, data: { ready: true } })).toBe('live')
+  expect(connectionOf({ status: 'success', fetchStatus: 'idle', error: null })).toBe('reconnecting')
+  expect(connectionOf({ status: 'error', fetchStatus: 'idle', error: new TypeError('Failed to fetch') })).toBe(
+    'reconnecting',
+  )
+  expect(connectionOf({ status: 'error', fetchStatus: 'idle', error: new HttpError(401, 'refused') })).toBe(
+    'disconnected',
+  )
+  expect(connectionOf({ status: 'error', fetchStatus: 'idle', error: new Unreachable(giveUpAfter - 1) })).toBe(
+    'reconnecting',
+  )
+  expect(connectionOf({ status: 'error', fetchStatus: 'idle', error: new Unreachable(giveUpAfter) })).toBe(
+    'server-down',
+  )
+  expect(
+    connectionOf({ status: 'error', fetchStatus: 'fetching', error: new Unreachable(giveUpAfter) }),
+    'Try again reconnects',
+  ).toBe('reconnecting')
+  const daemonDown = { operations: {}, warning: 'the event bus did not start', warningCode: 'daemon.start_failed' }
+  expect(connectionOf({ status: 'success', fetchStatus: 'fetching', error: null, data: daemonDown })).toBe(
+    'daemon-down',
+  )
+})
+
+test("a daemon that doesn't start reads wtm's daemon again, which no longer says it up", async () => {
+  const client = new QueryClient()
+  client.setQueryData(['repo', 'r1', 'daemon-status', []], { ok: true })
+  server.use(
+    http.get(
+      '/api/events',
+      () =>
+        new HttpResponse(
+          'event: warning\ndata: {"message":"the event bus did not start","code":"daemon.start_failed"}\n\n',
+        ),
+    ),
+  )
+
+  await client.fetchQuery(eventsQuery)
+
+  expect(client.getQueryState(['repo', 'r1', 'daemon-status', []])?.isInvalidated).toBe(true)
+})
+
+test("the stream's ready reads wtm's daemon again: a daemon back after a failed start no longer reads down", async () => {
+  const client = new QueryClient()
+  client.setQueryData(['repo', 'r1', 'daemon-status', []], { ok: true })
+  server.use(http.get('/api/events', () => new HttpResponse('data: {"v":2,"type":"ready"}\n\n')))
+
+  await client.fetchQuery(eventsQuery)
+
+  expect(client.getQueryState(['repo', 'r1', 'daemon-status', []])?.isInvalidated).toBe(true)
+  expect(client.getQueryData(eventsQuery.queryKey)).toEqual({ operations: {}, ready: true })
+})
+
+test('a bus lost after ready is not ready until the core says so again; any other warning leaves it ready', async () => {
+  const client = new QueryClient()
+  const ready = 'data: {"v":2,"type":"ready"}\n\n'
+  server.use(
+    http.get(
+      '/api/events',
+      () =>
+        new HttpResponse(
+          `${ready}event: warning\ndata: {"message":"the event bus was lost","code":"events.bus_lost"}\n\n`,
+        ),
+    ),
+  )
+  await client.fetchQuery(eventsQuery)
+  expect(client.getQueryData(eventsQuery.queryKey)).toMatchObject({ ready: false, warningCode: 'events.bus_lost' })
+
+  server.use(
+    http.get(
+      '/api/events',
+      () => new HttpResponse(`${ready}event: warning\ndata: {"message":"/acme: a repository was skipped"}\n\n`),
+    ),
+  )
+  await client.fetchQuery({ ...eventsQuery, staleTime: 0 })
+  expect(client.getQueryData(eventsQuery.queryKey)).toMatchObject({
+    ready: true,
+    warning: '/acme: a repository was skipped',
+  })
+})

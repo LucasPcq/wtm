@@ -17,7 +17,11 @@ type Ended<C extends MutationCommand> = (envelope: Applied<C> | undefined, refus
 // a store, not a component's state: the dialog shows the run again when it opens again, and the list marks its rows
 export const useRuns = create<Record<string, Run | undefined>>(() => ({}))
 
-const keyOf = (repo: string, command: MutationCommand) => `${command}:${repo}`
+// wtm's daemon is the machine's: its restart and its stop of every job are seen from every repository's page
+const machine: MutationCommand[] = ['daemon-restart', 'daemon-stop-jobs']
+
+const keyOf = (repo: string, command: MutationCommand) =>
+  machine.includes(command) ? `${command}:machine` : `${command}:${repo}`
 
 // a run that ended well has nothing left to read: the next one opens on its own subjects; one still running, or one
 // that failed even in part, stays until it is read, one at a time
@@ -133,6 +137,8 @@ const doing: Record<MutationCommand, string> = {
   'run-down': 'Stopping',
   'run-start': 'Starting',
   'run-stop': 'Stopping',
+  'daemon-restart': 'Restarting',
+  'daemon-stop-jobs': 'Stopping',
 }
 
 export const isMutation = (command: string): command is MutationCommand => Object.hasOwn(doing, command)

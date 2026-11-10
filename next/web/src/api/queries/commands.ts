@@ -8,6 +8,10 @@ import type {
   CleanPlan,
   CreateDetail,
   CreatePlan,
+  DaemonrestartDetail,
+  DaemonrestartPlan,
+  DaemonstatusDetail,
+  DaemonstopjobsPlan,
   DomainAnswered,
   DomainEnvelope,
   DomainForm,
@@ -47,6 +51,7 @@ type ReadDetail = {
   status: StatusDetail
   'run-logs': RunlogsDetail
   'run-ps': RunpsDetail
+  'daemon-status': DaemonstatusDetail
 }
 export type ReadCommand = keyof ReadDetail
 
@@ -63,6 +68,8 @@ type Mutation = {
   'run-down': { plan: RundownPlan; detail: RunjobsStopDetail }
   'run-start': { plan: RunstartPlan; detail: RunstartDetail }
   'run-stop': { plan: RunstopPlan; detail: RunjobsStopDetail }
+  'daemon-restart': { plan: DaemonrestartPlan; detail: DaemonrestartDetail }
+  'daemon-stop-jobs': { plan: DaemonstopjobsPlan; detail: RunjobsStopDetail }
 }
 export type MutationCommand = keyof Mutation
 export type Planned<C extends MutationCommand> = Mutation[C]['plan']

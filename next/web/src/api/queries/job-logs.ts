@@ -1,6 +1,6 @@
 import { queryOptions, experimental_streamedQuery as streamedQuery } from '@tanstack/react-query'
 import { EventSourceParserStream } from 'eventsource-parser/stream'
-import { HttpError, request } from '@/api/fetch'
+import { HttpError, request, saved } from '@/api/fetch'
 import type { DomainEnvelope, WebJobLine } from '@/api/types.gen'
 
 // seq numbers a line in the stream, so that a line keeps its key while the oldest go
@@ -74,14 +74,5 @@ async function* lines(at: JobAt, signal: AbortSignal): AsyncGenerator<WebJobLine
   }
 }
 
-// the token travels in a header, which a link cannot send: the file is fetched, then handed to the browser to save
-export async function downloadLog(at: JobAt) {
-  const response = await request(path(at, 'log'))
-  if (!response.ok) throw new HttpError(response.status, `${at.job}’s log could not be saved`)
-  const link = document.createElement('a')
-  link.href = URL.createObjectURL(await response.blob())
-  link.download = `${at.job}.log`
-  link.click()
-  // Safari cancels a download whose URL is revoked as it starts
-  setTimeout(() => URL.revokeObjectURL(link.href), 60_000)
-}
+export const downloadLog = (at: JobAt) =>
+  saved(path(at, 'log'), { name: `${at.job}.log`, failure: `${at.job}'s log could not be saved` })

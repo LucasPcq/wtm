@@ -36,6 +36,9 @@ const CodeConfigInvalid = Name + domain.ConfigInvalid
 // CodeSchemaNewer ends the stream on a line of a version newer than this wtm reads.
 const CodeSchemaNewer = Name + ".schema_newer"
 
+// CodeBusLost is the code of the warning of an attempt that failed: the stream subscribes again and says ready once it is back.
+const CodeBusLost = Name + ".bus_lost"
+
 // recheckEvery is how often a stream polls what it watches, when the use case says nothing: the legacy dashboard polled its jobs every 3 seconds and git every 20.
 const recheckEvery = 5 * time.Second
 
@@ -99,7 +102,7 @@ func (u UseCase) Watch(ctx context.Context, req Request, out Out) error {
 			return ending.err
 		}
 		if err != nil && ctx.Err() == nil {
-			s.warn(err)
+			s.warn(busLost(err))
 		}
 		if ctx.Err() != nil || !sleep(ctx, backoff.Next(s.ready)) {
 			return s.interrupted(ctx)
@@ -568,6 +571,14 @@ func (s *stream) stillThere(ctx context.Context, source Source) error {
 		return ended{err}
 	}
 	return nil
+}
+
+// busLost is the failed attempt err as its warning, its text kept: daemon.start_failed when wtm's daemon did not start, else events.bus_lost, whatever code a snapshot or a registry gave it, since the stream is not ready until it is back.
+func busLost(err error) error {
+	if failure, ok := errors.AsType[*domain.Error](err); ok && failure != nil && failure.Code == run.CodeStartFailed {
+		return err
+	}
+	return &domain.Error{Kind: domain.KindInternal, Code: CodeBusLost, Message: err.Error()}
 }
 
 // lost is err ending the stream when it says the repository watched lost its wtm config, else err as it is.

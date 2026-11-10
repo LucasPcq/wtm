@@ -22,12 +22,13 @@ type HeldWorktree struct {
 	Jobs   []HeldJob `json:"jobs"`
 }
 
-// A HeldJob is one job: its name, its kind, what of it the daemon holds, and whether it is a shared job's own run, which the worktrees holding a claim on it share.
+// A HeldJob is one job: its name, its kind, what of it the daemon holds, whether it is a shared job's own run, and the worktrees among those held that hold a claim on it (HeldBy, by branch, else path).
 type HeldJob struct {
 	Name   string          `json:"name"`
 	Kind   project.JobKind `json:"kind,omitempty"`
 	Hold   Hold            `json:"hold"`
 	Shared bool            `json:"shared,omitempty"`
+	HeldBy []string        `json:"held_by,omitempty"`
 }
 
 // Held returns jobs by repository, the repositories and, in each, the
@@ -47,7 +48,15 @@ func Held(jobs []Job) []HeldRepo {
 			repo.Worktrees = append(repo.Worktrees, HeldWorktree{Branch: job.Branch, Path: job.WorkDir})
 		}
 		wt := &repo.Worktrees[len(repo.Worktrees)-1]
-		wt.Jobs = append(wt.Jobs, HeldJob{Name: job.Name, Kind: job.Kind, Hold: job.Hold, Shared: job.SharedDir != "" && job.Hold != HoldClaim})
+		held := HeldJob{Name: job.Name, Kind: job.Kind, Hold: job.Hold, Shared: job.SharedDir != "" && job.Hold != HoldClaim}
+		if held.Shared {
+			for _, claim := range sorted {
+				if claim.Hold == HoldClaim && claim.Name == job.Name && claim.SharedDir == job.WorkDir {
+					held.HeldBy = append(held.HeldBy, cmp.Or(claim.Branch, claim.WorkDir))
+				}
+			}
+		}
+		wt.Jobs = append(wt.Jobs, held)
 	}
 	return repos
 }

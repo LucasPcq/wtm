@@ -4,14 +4,15 @@ import { HttpResponse, http } from 'msw'
 import { beforeEach, expect, onTestFinished, test } from 'vitest'
 import { HttpError } from '@/api/fetch'
 import {
-  connectionOf,
   current,
   eventsQuery,
+  giveUpAfter,
   type Live,
   operationCap,
   reconnectEvery,
   settleCap,
   track,
+  Unreachable,
 } from '@/api/queries/events'
 import { server } from '@/test/server'
 
@@ -43,8 +44,8 @@ test('a line of a repository invalidates what it answers, and a warning shows un
   client.getQueryCache().subscribe(() => seen.push(client.getQueryData(eventsQuery.queryKey)))
   await client.fetchQuery(eventsQuery)
 
-  expect(seen).toContainEqual({ warning: 'the bus was lost', operations: {} })
-  expect(client.getQueryData(eventsQuery.queryKey)).toEqual({ operations: {} })
+  expect(seen).toContainEqual({ warning: 'the bus was lost', operations: {}, ready: false })
+  expect(client.getQueryData(eventsQuery.queryKey)).toEqual({ operations: {}, ready: false })
   expect(client.getQueryState(['repo', 'r1', 'list', []])?.isInvalidated).toBe(true)
   expect(client.getQueryState(['repo', 'r2', 'list', []])?.isInvalidated).toBe(false)
 })
@@ -61,18 +62,8 @@ test('the stream reconnects after it ends or fails, never once the token is refu
   expect(after(new HttpError(503, 'stopping'))).toBe(reconnectEvery)
   expect(after(new TypeError('Failed to fetch'))).toBe(reconnectEvery)
   expect(after(null)).toBe(reconnectEvery)
-})
-
-test('the connection reads the query of the stream', () => {
-  expect(connectionOf({ status: 'pending', fetchStatus: 'fetching', error: null })).toBe('connecting')
-  expect(connectionOf({ status: 'success', fetchStatus: 'fetching', error: null })).toBe('live')
-  expect(connectionOf({ status: 'success', fetchStatus: 'idle', error: null })).toBe('reconnecting')
-  expect(connectionOf({ status: 'error', fetchStatus: 'idle', error: new TypeError('Failed to fetch') })).toBe(
-    'reconnecting',
-  )
-  expect(connectionOf({ status: 'error', fetchStatus: 'idle', error: new HttpError(401, 'refused') })).toBe(
-    'disconnected',
-  )
+  expect(after(new Unreachable(giveUpAfter - 1))).toBe(reconnectEvery)
+  expect(after(new Unreachable(giveUpAfter)), 'a server down waits for Try again').toBe(false)
 })
 
 test('back after a break, everything is read again but GitHub, the review that fetches origin, and the plans', async () => {
@@ -262,6 +253,7 @@ test("a job's event reads its repository again, as the job comes up, crashes or 
   ]
   client.setQueryData(facts, { ok: true })
   client.setQueryData(whole, { ok: true })
+  client.setQueryData(['repo', 'r2', 'daemon-status', []], { ok: true })
   serve(
     200,
     'data: {"v":2,"type":"job.started","repo":{"root":"/acme","common_dir":"/acme/.git"},"worktree":{"branch":"feat/a","path":"/acme.trees/feat-a"},"job":{"name":"web","kind":"service","hold":"own"}}\n\n',
@@ -283,4 +275,8 @@ test("a job's event reads its repository again, as the job comes up, crashes or 
   expect(client.getQueryState(whole)?.isInvalidated, 'a scan of a whole log is not started again at each job').toBe(
     false,
   )
+  expect(
+    client.getQueryState(['repo', 'r2', 'daemon-status', []])?.isInvalidated,
+    "wtm's daemon, the machine's, read under another repository",
+  ).toBe(true)
 })

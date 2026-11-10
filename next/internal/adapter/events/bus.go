@@ -11,6 +11,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/statefile"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/run"
 )
 
 const (
@@ -94,22 +95,30 @@ func (b Bus) ensure(ctx context.Context) error {
 		return nil
 	}
 	if err := poll(ctx, func() bool { return b.answers() || !b.locked() }); err != nil {
-		return fmt.Errorf("a stopping event bus did not exit: %w", err)
+		return notStarted(fmt.Errorf("a stopping event bus did not exit: %w", err))
 	}
 	if b.answers() {
 		return nil
 	}
 
 	if b.Start == nil {
-		return errors.New("no event bus answers on " + b.SocketPath)
+		return notStarted(errors.New("no event bus answers on " + b.SocketPath))
 	}
 	if err := b.Start(); err != nil {
-		return fmt.Errorf("start the event bus: %w", err)
+		return notStarted(fmt.Errorf("start the event bus: %w", err))
 	}
 	if err := poll(ctx, b.answers); err != nil {
-		return fmt.Errorf("the event bus did not start: %w", err)
+		return notStarted(fmt.Errorf("the event bus did not start: %w", err))
 	}
 	return nil
+}
+
+// notStarted is err as the daemon not answering, daemon.start_failed, which a reader's surface names, its text kept; ctx done stays an interruption.
+func notStarted(err error) error {
+	if errors.Is(err, context.Canceled) {
+		return err
+	}
+	return &domain.Error{Kind: domain.KindInternal, Code: run.CodeStartFailed, Message: err.Error()}
 }
 
 // answers reports whether a daemon accepts a connection on the socket.

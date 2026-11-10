@@ -1,20 +1,26 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { cva } from 'class-variance-authority'
-import { RefreshCw } from 'lucide-react'
-import { fetchOrigin as fetchOriginOf, githubKey, repoKey } from '@/api/queries/commands'
+import { RefreshCw, RotateCw } from 'lucide-react'
+import type { ReactElement, ReactNode } from 'react'
+import { fetchOrigin as fetchOriginOf, githubKey, readQuery, repoKey } from '@/api/queries/commands'
 import { type Connection, connectionOf, eventsQuery } from '@/api/queries/events'
 import { Button } from '@/components/ui/button'
 import { SidebarFooter } from '@/components/ui/sidebar'
 import { cn } from '@/lib/utils'
 
+type Look = Connection | 'skewed'
+
 const dot = cva('size-2 rounded-full', {
   variants: {
-    connection: {
+    look: {
       connecting: 'bg-muted-foreground',
       live: 'bg-green-500',
       reconnecting: 'bg-amber-500',
       disconnected: 'bg-red-500',
-    } satisfies Record<Connection, string>,
+      'daemon-down': 'bg-red-500',
+      'server-down': 'bg-red-500',
+      skewed: 'bg-orange-500',
+    } satisfies Record<Look, string>,
   },
 })
 
@@ -23,6 +29,8 @@ const label: Record<Connection, string> = {
   live: 'Live',
   reconnecting: 'Reconnecting…',
   disconnected: 'Disconnected',
+  'daemon-down': 'Disconnected',
+  'server-down': 'Disconnected',
 }
 
 const detail: Record<Connection, string> = {
@@ -30,9 +38,14 @@ const detail: Record<Connection, string> = {
   live: 'Changes show here as they happen',
   reconnecting: 'The server stopped answering. Trying again',
   disconnected: 'The server restarted under a new session',
+  'daemon-down': "wtm's daemon doesn't answer",
+  'server-down': "wtm's server doesn't answer",
 }
 
-export function ConnectionFooter({ repo }: { repo: string | undefined }) {
+// what opens wtm's daemon's panel from the connection block, which it turns into its trigger
+export type Daemon = (trigger: ReactElement) => ReactNode
+
+export function ConnectionFooter({ repo, daemon }: { repo: string | undefined; daemon?: Daemon | undefined }) {
   const client = useQueryClient()
   const events = useQuery(eventsQuery)
   const connection = connectionOf(events)
@@ -48,19 +61,49 @@ export function ConnectionFooter({ repo }: { repo: string | undefined }) {
   })
   const problem = fetchOrigin.error?.message ?? fetchOrigin.data?.warnings[0]?.message
   const live = connection === 'live'
+  const status = useQuery({ ...readQuery(repo ?? '', 'daemon-status'), enabled: Boolean(repo) && live })
+  // a daemon of another build refuses new jobs: the block says it amber, its panel says what to do
+  const skewed = live && Boolean(status.data?.items[0]?.detail?.skew)
+
+  const down = connection === 'daemon-down' || connection === 'server-down'
+
+  const said =
+    (live && (problem ?? events.data?.warning ?? (skewed && "wtm's daemon runs another build"))) || detail[connection]
+
+  // the visible words are the button's name, the panel it opens named before them; a button's content is not
+  // announced, so the live region beside it says them
+  const block = (
+    <button
+      type="button"
+      className="flex flex-col gap-0.5 rounded-md p-2 -m-2 text-left hover:bg-sidebar-accent disabled:hover:bg-transparent"
+      disabled={!daemon}
+    >
+      <span className="sr-only">wtm's daemon: </span>
+      <span className="flex items-center gap-2 text-sm font-medium">
+        <span className={dot({ look: skewed ? 'skewed' : connection })} aria-hidden="true" />
+        {label[connection]}
+      </span>
+      <span className={cn('text-xs text-muted-foreground', live && problem && 'text-destructive')}>{said}</span>
+    </button>
+  )
 
   return (
     <SidebarFooter className="gap-4 border-t border-sidebar-border px-4 pt-4 pb-3">
-      <div className="flex flex-col gap-0.5" role="status" aria-live="polite">
-        <span className="flex items-center gap-2 text-sm font-medium">
-          <span className={dot({ connection })} aria-hidden="true" />
-          {label[connection]}
-        </span>
-        <span className={cn('text-xs text-muted-foreground', live && problem && 'text-destructive')}>
-          {(live && (problem ?? events.data?.warning)) || detail[connection]}
-        </span>
-      </div>
-      {repo && (
+      <div>{daemon ? daemon(block) : block}</div>
+      <p role="status" aria-live="polite" className="sr-only">
+        {label[connection]}: {said}
+      </p>
+      {down && (
+        <Button
+          variant="outline"
+          className="w-full justify-start"
+          onClick={() => client.refetchQueries({ queryKey: eventsQuery.queryKey })}
+        >
+          <RotateCw />
+          Try again
+        </Button>
+      )}
+      {repo && !down && (
         <Button
           variant="outline"
           className="w-full justify-start"

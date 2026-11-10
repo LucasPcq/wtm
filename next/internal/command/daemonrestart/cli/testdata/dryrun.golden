@@ -4,6 +4,6 @@
   Come back   db (main · acme), web (main · acme), db (feat/a · acme)
   Taken over  mail (feat/a · acme)
   Not back    seed (main · acme) — a task, not run again
-  fingerprint  32a9faf70f670e5c4c03b77d
-  → wtm-next daemon restart --expect-fingerprint 32a9faf70f670e5c4c03b77d   apply this plan
+  fingerprint  0e9eefd799bf51cb6738e4d6
+  → wtm-next daemon restart --expect-fingerprint 0e9eefd799bf51cb6738e4d6   apply this plan
 

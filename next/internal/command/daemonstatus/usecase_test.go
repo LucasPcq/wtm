@@ -17,7 +17,7 @@ func TestADaemonOfThisBuildIsReadWithItsJobsByRepositoryAndWorktree(t *testing.T
 	assert.Equal(t, &daemonstatus.Detail{
 		Running: true, PID: 42, Build: build, Daemon: build, Protocol: run.ProtocolVersion,
 		Repos: []run.HeldRepo{{Root: "/acme", Worktrees: []run.HeldWorktree{
-			{Branch: "main", Path: "/acme", Jobs: []run.HeldJob{{Name: "db", Kind: project.Service, Hold: run.HoldOwn, Shared: true}, {Name: "web", Kind: project.Service, Hold: run.HoldOwn}}},
+			{Branch: "main", Path: "/acme", Jobs: []run.HeldJob{{Name: "db", Kind: project.Service, Hold: run.HoldOwn, Shared: true, HeldBy: []string{"feat/a"}}, {Name: "web", Kind: project.Service, Hold: run.HoldOwn}}},
 			{Branch: "feat/a", Path: "/acme/.trees/feat-a", Jobs: []run.HeldJob{{Name: "cache", Kind: project.Service, Hold: run.HoldDetached}, {Name: "db", Kind: project.Service, Hold: run.HoldClaim}}},
 		}}},
 		Proxy:  &daemonstatus.Proxy{Port: 11080, PublicPort: 11080},

@@ -6,9 +6,9 @@ import { JobLine } from '@/features/worktrees/components/job-line'
 import { JobSection } from '@/features/worktrees/components/job-section'
 import { type Left, LeftItem } from '@/features/worktrees/components/left-item'
 import { PlanWarnings } from '@/features/worktrees/components/plan-warnings'
-import { ownOf, sharedOf } from '@/features/worktrees/run-down/utils/plan'
-import { confirmed, sharedLine } from '@/features/worktrees/run-down/utils/words'
 import { planWide } from '@/features/worktrees/utils/outcome'
+import { ownOf, sharedOf } from '@/features/worktrees/utils/stop-plan'
+import { confirmed, sharedLine } from '@/features/worktrees/utils/stop-words'
 
 const fateLook: Record<RunFate, { icon: LucideIcon; tone: Tone }> = {
   stop: { icon: CircleDot, tone: 'ok' },

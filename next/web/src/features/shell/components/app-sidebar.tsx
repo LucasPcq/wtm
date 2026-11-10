@@ -15,7 +15,7 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
 import { VersionedLogo } from '@/components/versioned-logo'
-import { ConnectionFooter } from '@/features/shell/components/connection-footer'
+import { ConnectionFooter, type Daemon } from '@/features/shell/components/connection-footer'
 import { RepoPicker } from '@/features/shell/components/repo-picker'
 
 const soon: { group: string; items: { label: string; icon: LucideIcon }[] }[] = [
@@ -30,7 +30,7 @@ const soon: { group: string; items: { label: string; icon: LucideIcon }[] }[] = 
   { group: 'Project', items: [{ label: 'Settings', icon: Settings }] },
 ]
 
-export function AppSidebar({ repo }: { repo: string | undefined }) {
+export function AppSidebar({ repo, daemon }: { repo: string | undefined; daemon?: Daemon | undefined }) {
   const matchRoute = useMatchRoute()
   const onRunning = matchRoute({ to: '/r/$repo/running', fuzzy: true }) !== false
 
@@ -99,7 +99,7 @@ export function AppSidebar({ repo }: { repo: string | undefined }) {
           </SidebarGroup>
         ))}
       </SidebarContent>
-      <ConnectionFooter repo={repo} />
+      <ConnectionFooter repo={repo} daemon={daemon} />
     </Sidebar>
   )
 }

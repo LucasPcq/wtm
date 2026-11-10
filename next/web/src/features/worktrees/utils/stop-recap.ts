@@ -1,7 +1,5 @@
 import type { Applied } from '@/api/queries/commands'
 import type { DomainWarning, RundownPlan, RunjobsStopStatus } from '@/api/types.gen'
-import { sharedOf, stopJob } from '@/features/worktrees/run-down/utils/plan'
-import { kept, statusWords } from '@/features/worktrees/run-down/utils/words'
 import {
   itemWarnings,
   type OutcomeGroup,
@@ -10,6 +8,8 @@ import {
   planWide,
 } from '@/features/worktrees/utils/outcome'
 import type { Unit } from '@/features/worktrees/utils/progress'
+import { holdsOn, sharedOf, stopJob } from '@/features/worktrees/utils/stop-plan'
+import { kept, statusWords } from '@/features/worktrees/utils/stop-words'
 
 type RunDownItem = Applied<'run-down'>['items'][number]
 
@@ -18,7 +18,7 @@ const order: RunjobsStopStatus[] = ['failed', 'not_reached', 'stopped', 'cleared
 
 // units are the stop's progress: a worktree that failed shows the lines of the jobs that would not stop
 export function recapOf(
-  envelope: Applied<'run-down'> | undefined,
+  envelope: Applied<'run-down' | 'daemon-stop-jobs'> | undefined,
   plan: RundownPlan | undefined,
   units: Unit[] = [],
 ): { groups: OutcomeGroup[]; labels: Record<OutcomeKind, string>; warnings: DomainWarning[] } {
@@ -62,10 +62,10 @@ export function recapOf(
   // a shared service says what its holders' stops did to it, once
   const services = shared.map((service) => {
     const statuses = items.flatMap((item) =>
-      (item.detail?.jobs ?? []).filter((job) => job.name === service.name && isShared(item.subject, job.name)),
+      (item.detail?.jobs ?? []).filter((job) => holdsOn(plan, item.subject, job.name, service)),
     )
     const status = (wanted: RunjobsStopStatus) => statuses.some((job) => job.status === wanted)
-    const row = { key: `shared:${service.name}`, title: service.name }
+    const row = { key: `shared:${service.sharedIn}:${service.name}`, title: service.name }
     if (status('failed')) return { row: { ...row, tone: 'failed' as const, message: "didn't stop" }, group: 'failed' }
     if (status('stopped'))
       return { row: { ...row, tone: 'ok' as const, message: 'stopped: no worktree kept it' }, group: 'stopped' }
