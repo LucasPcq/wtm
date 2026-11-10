@@ -1,0 +1,14 @@
+
+  ✗ init: 1 failed
+
+  Worktrees folder  ../.trees
+  Base branch       main
+  .env from         example
+  .env files        apps/api/.env, apps/web/.env
+  On create         pnpm install
+  On clean          docker compose down
+  Settings file     .git/wtm/config.toml
+
+  ✗ /repo/main/.git/wtm/config.toml  couldn't write /repo/main/.git/wtm/config.toml: permission denied
+
+--- stderr

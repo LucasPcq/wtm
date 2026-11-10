@@ -18,6 +18,7 @@ import (
 	execcli "github.com/LucasPcq/wtm/next/internal/command/exec/cli"
 	extractcli "github.com/LucasPcq/wtm/next/internal/command/extract/cli"
 	fastforwardcli "github.com/LucasPcq/wtm/next/internal/command/fastforward/cli"
+	initcli "github.com/LucasPcq/wtm/next/internal/command/initialize/cli"
 	listcli "github.com/LucasPcq/wtm/next/internal/command/list/cli"
 	prunecli "github.com/LucasPcq/wtm/next/internal/command/prune/cli"
 	reparentcli "github.com/LucasPcq/wtm/next/internal/command/reparent/cli"
@@ -58,6 +59,7 @@ func main() {
 // commands are the command lines of every command wtm-next runs, on streams in env, their follow-ups spelled by commandLine.
 func commands(streams *output.Streams, env cli.Env) []*cobra.Command {
 	return []*cobra.Command{
+		initcli.New(streams, env, openInit, commandLine),
 		createcli.New(streams, env, openCreate, commandLine),
 		extractcli.New(streams, env, openExtract, commandLine),
 		checkoutcli.New(streams, env, openCheckout, commandLine),

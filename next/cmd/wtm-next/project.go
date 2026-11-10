@@ -22,6 +22,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/exec"
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/command/fastforward"
+	"github.com/LucasPcq/wtm/next/internal/command/initialize"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
 	"github.com/LucasPcq/wtm/next/internal/command/reparent"
@@ -50,6 +51,7 @@ const (
 
 // The openers of the use cases, each wired on the repository of the directory it is given.
 var (
+	openInit        = opener(func(a app) initialize.UseCase { return a.Init })
 	openCreate      = opener(func(a app) create.UseCase { return a.Create })
 	openExtract     = opener(func(a app) extract.UseCase { return a.Extract })
 	openCheckout    = opener(func(a app) checkout.UseCase { return a.Checkout })

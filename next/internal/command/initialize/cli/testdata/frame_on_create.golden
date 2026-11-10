@@ -1,0 +1,16 @@
+
+  Step 5/7 • On create
+
+  ✓ Worktrees folder: ../.trees
+  ✓ Base branch: main
+  ✓ .env from: the template
+  ✓ .env files: apps/api/.env, apps/web/.env
+
+  Commands run in a worktree once it is created, such as installing its dependencies
+  Found: pnpm install (from pnpm-lock.yaml)
+
+› 1. pnpm install
+  + Add a command
+  ✓ Done
+
+  ↑↓ navigate • d remove • shift+↑↓ move • enter edit • enter confirm • esc back

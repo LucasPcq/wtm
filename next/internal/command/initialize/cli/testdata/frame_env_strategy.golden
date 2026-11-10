@@ -1,0 +1,14 @@
+
+  Step 3/7 • .env from
+
+  ✓ Worktrees folder: ../.trees
+  ✓ Base branch: main
+
+  Where a new worktree's .env files come from: a fresh checkout has none of your local ones
+
+▌› Copy the template (.env.example → .env)
+   Copy main's .env
+   Copy the .env of the worktree it starts from
+   Don't copy them
+
+  ↑↓ navigate • / filter • enter confirm • esc back

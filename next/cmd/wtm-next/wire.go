@@ -14,6 +14,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/config"
 	"github.com/LucasPcq/wtm/next/internal/adapter/daemon"
+	"github.com/LucasPcq/wtm/next/internal/adapter/detect"
 	bus "github.com/LucasPcq/wtm/next/internal/adapter/events"
 	"github.com/LucasPcq/wtm/next/internal/adapter/git"
 	"github.com/LucasPcq/wtm/next/internal/adapter/github"
@@ -28,6 +29,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/clean"
 	cleancli "github.com/LucasPcq/wtm/next/internal/command/clean/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
+	createcli "github.com/LucasPcq/wtm/next/internal/command/create/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/daemonrestart"
 	daemonrestartcli "github.com/LucasPcq/wtm/next/internal/command/daemonrestart/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/daemonstopjobs"
@@ -38,6 +40,8 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/command/fastforward"
 	fastforwardcli "github.com/LucasPcq/wtm/next/internal/command/fastforward/cli"
+	"github.com/LucasPcq/wtm/next/internal/command/initialize"
+	initcli "github.com/LucasPcq/wtm/next/internal/command/initialize/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
 	prunecli "github.com/LucasPcq/wtm/next/internal/command/prune/cli"
@@ -66,6 +70,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/service/registry"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
 	"github.com/LucasPcq/wtm/next/internal/service/runjobs"
+	"github.com/LucasPcq/wtm/next/internal/service/settings"
 	"github.com/LucasPcq/wtm/next/internal/service/teardown"
 )
 
@@ -80,6 +85,7 @@ type wireParams struct {
 
 // An app is every use case wired on one repository.
 type app struct {
+	Init        initialize.UseCase
 	Create      create.UseCase
 	Extract     extract.UseCase
 	Checkout    checkout.UseCase
@@ -166,6 +172,16 @@ func wire(params wireParams) app {
 	stops := runjobs.Stops{Daemon: runs, Gone: repository.GoneIn(repo), Located: repository.LocatedIn(repo), Locate: repository.LocateIn(repo)}
 
 	return app{
+		Init: initialize.UseCase{
+			Git:        repo,
+			Detect:     detect.Repository{Dir: params.MainPath}.Detect,
+			RunConfig:  projectConfig,
+			Register:   func(ctx context.Context) { register(ctx, params) },
+			Settings:   settings.Service{Store: projectConfig},
+			Operations: operations,
+			MainPath:   params.MainPath,
+			ConfigPath: filepath.Join(params.StateDir, "config.toml"),
+		},
 		Create: create.UseCase{
 			Git:        repo,
 			Meta:       meta,
@@ -367,7 +383,7 @@ func (r refFetchedOnce) FetchRef(ctx context.Context, name string) error {
 
 // facts reads the repository params locates, as every use case decides from it.
 func (p wireParams) facts() repository.Service {
-	return repository.Service{Config: config.Project{StateDir: p.StateDir, GlobalPath: config.GlobalPath()}, Git: git.Repo{Dir: p.MainPath}, MainPath: p.MainPath, Init: initialize(), Restart: daemonRestart(), FrozenIndex: frozenIndex}
+	return repository.Service{Config: config.Project{StateDir: p.StateDir, GlobalPath: config.GlobalPath()}, Git: git.Repo{Dir: p.MainPath}, MainPath: p.MainPath, Init: setUp(), Restart: daemonRestart(), FrozenIndex: frozenIndex}
 }
 
 // repo is how the event bus and the registry name the repository params locates.
@@ -386,8 +402,8 @@ func leftBehind(branch string) domain.FollowUp {
 	return domain.FollowUp{Command: clean.Name, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{branch}}, {Path: clean.PathForce, Values: []string{"true"}}}}
 }
 
-// initialize sets wtm up in a repository that has no config, in the legacy wtm until init migrates.
-func initialize() *domain.FollowUp {
+// setUp is the follow-up that sets wtm up in a repository that has no config: init.
+func setUp() *domain.FollowUp {
 	return &domain.FollowUp{Command: domain.CommandInit}
 }
 
@@ -411,7 +427,7 @@ func proxyStatus() domain.FollowUp {
 	return domain.FollowUp{Command: "run proxy status"}
 }
 
-// commandLine spells a follow-up as the command line runs it: one naming a migrated command another command gives (clean, prune, fast-forward, sync, exec, reparent, run up, run down) from that command's schema; go as the shell function over resolve, which takes resolve's answers, but a worktree on no branch entered with cd; a command not yet migrated as the legacy wtm runs it; a pull request opened by gh.
+// commandLine spells a follow-up as the command line runs it: one naming a migrated command another command gives (init, create, clean, prune, fast-forward, sync, exec, reparent, run up, run down) from that command's schema; go as the shell function over resolve, which takes resolve's answers, but a worktree on no branch entered with cd; a command not yet migrated as the legacy wtm runs it; a pull request opened by gh.
 func commandLine(followUp domain.FollowUp) []string {
 	switch followUp.Command {
 	case clean.Name:
@@ -426,6 +442,10 @@ func commandLine(followUp domain.FollowUp) []string {
 		return execcli.Line(followUp)
 	case reparent.Name:
 		return reparentcli.Line(followUp)
+	case initialize.Name:
+		return initcli.Line(followUp)
+	case create.Name:
+		return createcli.Line(followUp)
 	case runup.Name:
 		return runupcli.Line(followUp)
 	case runlogs.Name:

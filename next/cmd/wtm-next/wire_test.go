@@ -17,6 +17,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/api"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
+	"github.com/LucasPcq/wtm/next/internal/command/initialize"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/command/resolve"
 	"github.com/LucasPcq/wtm/next/internal/command/runps"
@@ -95,12 +96,12 @@ func TestPortsLeftUnsettledAreSettledByTheLegacyEnv(t *testing.T) {
 	assert.Equal(t, []string{"wtm", "env", "feat/x"}, commandLine(wire(wireParams{}).Create.Provision.Settle("feat/x")))
 }
 
-func TestARepositoryWithNoWtmConfigIsFollowedUpByTheLegacyInit(t *testing.T) {
+func TestARepositoryWithNoWtmConfigIsFollowedUpByInit(t *testing.T) {
 	uninitialized := gittest.InitRepo(t)
 	ownConfigDir(t)
 	for _, command := range catalogue() {
-		// run ps reads the jobs of the whole machine: the directory it is called from opens no repository
-		if command.Name == runps.Name || slices.Contains(machine, command.Name) {
+		// run ps reads the jobs of the whole machine: the directory it is called from opens no repository; init sets the repository up
+		if command.Name == runps.Name || command.Name == initialize.Name || slices.Contains(machine, command.Name) {
 			continue
 		}
 		t.Run(command.Name, func(t *testing.T) {
@@ -109,12 +110,12 @@ func TestARepositoryWithNoWtmConfigIsFollowedUpByTheLegacyInit(t *testing.T) {
 			require.NotNil(t, got.Envelope.Err)
 			assert.Equal(t, command.Name+domain.ConfigNotFound, got.Envelope.Err.Code)
 			require.NotNil(t, got.Envelope.Err.FollowUp)
-			assert.Equal(t, []string{"wtm", "init"}, commandLine(*got.Envelope.Err.FollowUp))
+			assert.Equal(t, []string{"wtm-next", "init"}, commandLine(*got.Envelope.Err.FollowUp))
 		})
 	}
 	source, err := openEvents(t.Context(), uninitialized)
 	require.NoError(t, err)
-	assert.Equal(t, initialize(), source.Repository.Init)
+	assert.Equal(t, setUp(), source.Repository.Init)
 }
 
 func TestTwoExecutionsInOneProcessKeepTheirOwnRepositoryAndCorrelationID(t *testing.T) {
@@ -173,7 +174,7 @@ func TestEveryFollowUpIsSpelledWhole(t *testing.T) {
 		"go_detached":        {followUp: repository.Offered(list.Actions(list.Detail{Path: "/repo/.trees/detached"}))[0], argv: []string{"cd", "/repo/.trees/detached"}},
 		"enter":              {followUp: domain.Enter("feat/notes"), argv: []string{"wtm", "go", "feat/notes"}},
 		"left_behind":        {followUp: leftBehind("feat/x"), argv: []string{"wtm-next", "clean", "feat/x", "--force"}},
-		"init":               {followUp: *initialize(), argv: []string{"wtm", "init"}},
+		"init":               {followUp: *setUp(), argv: []string{"wtm-next", "init"}},
 		"settle":             {followUp: settle("feat/x"), argv: []string{"wtm", "env", "feat/x"}},
 		"proxy":              {followUp: proxyStatus(), argv: []string{"wtm", "run", "proxy", "status"}},
 		"dry_run":            {followUp: dryRun, argv: []string{"wtm-next", "clean", "feat/x", "--force", "--dry-run"}},

@@ -1,0 +1,70 @@
+{
+  "fields": [
+    {
+      "kind": "text",
+      "path": "base_path",
+      "value": ""
+    },
+    {
+      "kind": "select",
+      "path": "base_branch",
+      "value": "",
+      "options": [],
+      "rememberable": false,
+      "remember": false,
+      "refreshable": false,
+      "closed": false
+    },
+    {
+      "kind": "select",
+      "path": "env_strategy",
+      "value": "",
+      "options": [
+        {
+          "value": "example"
+        },
+        {
+          "value": "main"
+        },
+        {
+          "value": "parent"
+        },
+        {
+          "value": "none"
+        }
+      ],
+      "rememberable": false,
+      "remember": false,
+      "refreshable": false,
+      "closed": true
+    },
+    {
+      "kind": "multi_select",
+      "path": "env_files",
+      "picked": [],
+      "options": []
+    },
+    {
+      "kind": "hooks",
+      "path": "on_create",
+      "entries": [],
+      "found": [],
+      "dirs": []
+    },
+    {
+      "kind": "hooks",
+      "path": "on_clean",
+      "entries": [],
+      "found": [],
+      "dirs": []
+    }
+  ],
+  "problems": [
+    {
+      "path": "base_branch",
+      "code": "required",
+      "flag": "base_branch",
+      "message": "base_branch is required"
+    }
+  ]
+}

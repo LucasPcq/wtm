@@ -120,6 +120,13 @@ func writeConfig(t *testing.T, main, extra string) {
 	require.NoError(t, os.WriteFile(path, append(config, extra...), 0o644))
 }
 
+func readConfig(t *testing.T, main string) string {
+	t.Helper()
+	config, err := os.ReadFile(filepath.Join(main, ".git", "wtm", "config.toml"))
+	require.NoError(t, err)
+	return string(config)
+}
+
 // recordParent writes the meta record of branch with parent as the branch it was created from.
 func recordParent(t *testing.T, main, branch, parent string) {
 	t.Helper()

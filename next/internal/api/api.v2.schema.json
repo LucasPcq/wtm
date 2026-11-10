@@ -3,6 +3,7 @@
     "api.CommandName": {
       "description": "The name of a command of the catalogue, the {name} of its routes.",
       "enum": [
+        "init",
         "create",
         "extract",
         "checkout",
@@ -3710,6 +3711,237 @@
         "behind"
       ]
     },
+    "init.envelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/domain.Envelope"
+        }
+      ],
+      "properties": {
+        "command": {
+          "const": "init"
+        },
+        "items": {
+          "items": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/initialize.Detail"
+                  },
+                  {
+                    "maxProperties": 0,
+                    "type": "object"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "plan": {
+          "$ref": "#/$defs/initialize.Plan"
+        }
+      }
+    },
+    "init.request": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "base_path"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "base_branch"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "env_strategy"
+              },
+              "values": {
+                "items": {
+                  "description": "One of its options, or empty for its default.",
+                  "enum": [
+                    "",
+                    "example",
+                    "main",
+                    "parent",
+                    "none"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "env_files"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "on_create"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "on_clean"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "type": "array"
+    },
+    "initialize.Detail": {
+      "additionalProperties": false,
+      "properties": {
+        "created": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "created"
+      ],
+      "type": "object"
+    },
+    "initialize.Plan": {
+      "additionalProperties": false,
+      "properties": {
+        "changed": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "created": {
+          "type": "boolean"
+        },
+        "empty": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string"
+        },
+        "recalled": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "recap": {
+          "items": {
+            "$ref": "#/$defs/domain.RecapRow"
+          },
+          "type": "array"
+        },
+        "settings": {
+          "$ref": "#/$defs/settings.Document"
+        }
+      },
+      "required": [
+        "path",
+        "created",
+        "settings",
+        "changed"
+      ],
+      "type": "object"
+    },
     "list.Changes": {
       "additionalProperties": false,
       "properties": {
@@ -4091,6 +4323,24 @@
         ]
       },
       "type": "array"
+    },
+    "project.EnvFile": {
+      "additionalProperties": false,
+      "properties": {
+        "local": {
+          "type": "boolean"
+        },
+        "target": {
+          "type": "string"
+        },
+        "template": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "type": "object"
     },
     "project.EnvStrategy": {
       "description": "Where a worktree's .env files are copied from.",
@@ -7071,6 +7321,68 @@
         "exclusive",
         "others",
         "no_probe"
+      ],
+      "type": "object"
+    },
+    "settings.Document": {
+      "additionalProperties": false,
+      "properties": {
+        "base_branch": {
+          "type": "string"
+        },
+        "base_path": {
+          "type": "string"
+        },
+        "env_files": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/project.EnvFile"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "env_strategy": {
+          "type": "string"
+        },
+        "on_clean": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/project.Hook"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "on_create": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/project.Hook"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "base_path",
+        "base_branch",
+        "env_strategy",
+        "env_files",
+        "on_create",
+        "on_clean"
       ],
       "type": "object"
     },

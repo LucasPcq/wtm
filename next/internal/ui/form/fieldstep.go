@@ -318,14 +318,18 @@ type TextStep struct {
 	text  *widget.Text
 }
 
-// Open builds the text field on the answer so far and starts the cursor blinking.
+// Open builds the text field on the answer so far, else the value the field settled on, and starts the cursor blinking.
 func (s *TextStep) Open() tea.Cmd {
 	check := s.check
 	if s.Check != nil {
 		check = s.Check
 	}
 
-	s.text = widget.NewText(strings.Join(s.sheet.values(s.path()), ""), check)
+	value := strings.Join(s.sheet.values(s.path()), "")
+	if field, ok := s.sheet.Field(s.at).(domain.TextField); ok && value == "" {
+		value = field.Value
+	}
+	s.text = widget.NewText(value, check)
 	return textinput.Blink
 }
 

@@ -52,6 +52,21 @@ type mutation struct {
 func mutations() []mutation {
 	return []mutation{
 		{
+			name:     "init",
+			answers:  []domain.Answered{{Path: "on_clean", Values: []string{"make down"}}},
+			complete: true,
+			// a config.toml changed since the preview is not the one the plan rewrites
+			stale: func(t *testing.T, main string) {
+				writeConfig(t, main, "\n[hooks]\non_create = [\"true\"]\n")
+			},
+			untouched: func(t *testing.T, main string) {
+				assert.NotContains(t, readConfig(t, main), "make down")
+			},
+			applied: func(t *testing.T, main string) {
+				assert.Contains(t, readConfig(t, main), "make down")
+			},
+		},
+		{
 			name:    "create",
 			answers: []domain.Answered{{Path: "branches", Values: []string{"feat/x"}}},
 			// the env strategy settles where the new worktree's .env comes from: a plan made before no longer holds
