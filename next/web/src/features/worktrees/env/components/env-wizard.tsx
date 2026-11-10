@@ -149,7 +149,12 @@ export function EnvWizard({
               heading={r.worktree}
               facts={[
                 { label: 'Folder', values: [r.path], mono: true },
-                { label: 'Steps', values: (r.phases ?? []).map((phase) => phaseLabel[phase]) },
+                {
+                  label: 'Steps',
+                  values: (r.phases ?? []).map((phase) =>
+                    phase === 'env' ? 'Write its .env files' : phaseLabel[phase],
+                  ),
+                },
               ]}
             />
           ))}

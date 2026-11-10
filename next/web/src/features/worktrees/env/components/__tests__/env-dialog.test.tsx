@@ -90,4 +90,5 @@ test('Confirm folds the folder and steps of each worktree under Details', async 
   await user.click(await within(dialog).findByRole('button', { name: /^Details/ }))
 
   expect(within(dialog).getByText('/acme.trees/fix/login')).toBeTruthy()
+  expect(within(dialog).getAllByText('Write its .env files')).toHaveLength(2)
 })
