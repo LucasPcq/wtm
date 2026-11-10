@@ -3,6 +3,6 @@
   Worktrees  feat/a
   Profile    dev
   Jobs       migrate, api, web
-  fingerprint  45db16f1c0f950cc90ec87fa
-  → wtm-next run up feat/a --expect-fingerprint 45db16f1c0f950cc90ec87fa   apply this plan
+  fingerprint  fdd65be32647909664f8b8d9
+  → wtm-next run up feat/a --expect-fingerprint fdd65be32647909664f8b8d9   apply this plan
 

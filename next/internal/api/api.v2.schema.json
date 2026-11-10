@@ -6108,6 +6108,51 @@
               "values"
             ],
             "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "remember"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "exclusive"
+                  ]
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "ask"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
           }
         ]
       },
@@ -7364,6 +7409,9 @@
           },
           "type": "array"
         },
+        "remember_parallel": {
+          "type": "boolean"
+        },
         "worktrees": {
           "anyOf": [
             {
@@ -7383,7 +7431,8 @@
         "worktrees",
         "exclusive",
         "others",
-        "no_probe"
+        "no_probe",
+        "remember_parallel"
       ],
       "type": "object"
     },

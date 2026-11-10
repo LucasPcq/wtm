@@ -167,3 +167,15 @@ func TestAProfileSaysWhichOfTheWorktreesPickedRunIt(t *testing.T) {
 	assert.Equal(t, []string{featB}, questions.Profiles[0].RunningIn)
 	assert.Empty(t, questions.Profiles[1].RunningIn)
 }
+
+func TestStoppingTheOthersJobsIsNeverRemembered(t *testing.T) {
+	w := newWorld(t)
+	w.up("api", featB, nil)
+	yes := true
+
+	stopping := w.questions(t, runup.Request{Worktrees: []string{featA}, Exclusive: &yes, Remember: []string{runup.PathExclusive}})
+	unknown := w.questions(t, runup.Request{Worktrees: []string{featA}, Remember: []string{runup.PathProfile}})
+
+	assert.Equal(t, []string{runup.CodeRememberExclusive}, fieldCodes(stopping.Errors))
+	assert.Equal(t, []string{domain.CodeOneOf}, fieldCodes(unknown.Errors))
+}

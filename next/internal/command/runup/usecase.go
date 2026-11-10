@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
 	"github.com/LucasPcq/wtm/next/internal/service/runjobs"
@@ -25,9 +26,10 @@ const CodeConfigNotFound = Name + domain.ConfigNotFound
 // CodeConfigInvalid refuses a repository whose config.toml does not parse or validate.
 const CodeConfigInvalid = Name + domain.ConfigInvalid
 
-// A UseCase starts a profile in worktrees of one repository: the meta records it reads the ordinal a start numbered with from, and the services it shares with the other commands, the start of jobs among them.
+// A UseCase starts a profile in worktrees of one repository: the meta records it reads the ordinal a start numbered with from, run.toml it remembers keeping the others' jobs in, and the services it shares with the other commands, the start of jobs among them.
 type UseCase struct {
 	Meta       Meta
+	RunConfig  RunConfig
 	Repository repository.Service
 	Operations operation.Service
 	Teardown   teardown.Service
@@ -121,6 +123,7 @@ func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (
 	op.Finished(result.Failure())
 
 	applied := u.renumbered(plan)
+	applied.remembered = plan.RememberParallel && !slices.ContainsFunc(result.Warnings, func(w domain.Warning) bool { return w.Code == CodeRememberFailed })
 	applied.Recap = applied.recap()
 	outcome.Result, outcome.Plan = &result, applied
 	outcome.Warnings = op.Warnings(append(outcome.Warnings, result.Warnings...))
@@ -168,6 +171,9 @@ const (
 	CodeOwedLost       = Name + teardown.OwedLost
 )
 
+// CodeRememberFailed warns of a start that could not write keeping the others' jobs into run.toml: it starts all the same.
+const CodeRememberFailed = Name + ".remember_failed"
+
 // CodeStopFailed warns of a worktree whose jobs an exclusive start could not stop.
 const CodeStopFailed = Name + runjobs.StopFailed
 
@@ -185,7 +191,7 @@ const (
 	CodeNamespaceUnrecorded = Name + runjobs.NamespaceUnrecorded
 )
 
-// Apply makes sure of a daemon of this build, stops the other worktrees' jobs when the plan says so, then starts each worktree's jobs (runjobs.Service.Start), the worktrees at once, each one's in order; a worktree that fails stops none of the others. Then the drops owed the plan pays are made (teardown.Service.Pay). Once ctx is cancelled, the jobs the daemon took keep running and the jobs not reached are not started. The items keep the plan's order.
+// Apply writes concurrency = "parallel" into run.toml when the plan remembers it, makes sure of a daemon of this build, stops the other worktrees' jobs when the plan says so, then starts each worktree's jobs (runjobs.Service.Start), the worktrees at once, each one's in order; a worktree that fails stops none of the others. Then the drops owed the plan pays are made (teardown.Service.Pay). Once ctx is cancelled, the jobs the daemon took keep running and the jobs not reached are not started. The items keep the plan's order.
 func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Result {
 	// The worktrees report from several goroutines; a surface draws one event at a time.
 	var mu sync.Mutex
@@ -195,15 +201,20 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 		report(event)
 	}
 
+	var remembered []domain.Warning
+	if plan.RememberParallel {
+		remembered = u.rememberParallel(ctx)
+	}
+
 	items := make([]Item, len(plan.Worktrees))
 	if failure := u.Jobs.Ensure(ctx, Name, u.Repository.Restart); failure != nil {
 		for i, t := range plan.Worktrees {
 			items[i] = Item{Subject: t.Worktree, Status: domain.StatusFailed, Err: failure, Detail: plan.notStarted(t)}
 		}
-		return Result{Items: append(items, paidItems(teardown.Unpaid(plan.Owed))...)}
+		return Result{Items: append(items, paidItems(teardown.Unpaid(plan.Owed))...), Warnings: remembered}
 	}
 
-	warnings := u.Jobs.StopOthers(ctx, runjobs.StopOthersParams{Command: Name, Others: plan.Others, CorrelationID: plan.correlationID})
+	warnings := append(remembered, u.Jobs.StopOthers(ctx, runjobs.StopOthersParams{Command: Name, Others: plan.Others, CorrelationID: plan.correlationID})...)
 
 	var wg sync.WaitGroup
 	for i, t := range plan.Worktrees {
@@ -215,6 +226,19 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 	paid, withdrawn := u.Teardown.Pay(ctx, teardown.PayParams{Command: Name, Facts: plan.facts.teardown(), Debts: plan.Owed})
 
 	return Result{Items: append(items, paidItems(paid)...), Warnings: append(warnings, withdrawn...), FollowUps: plan.next(items)}
+}
+
+// rememberParallel writes concurrency = "parallel" into run.toml as it stands, so the next start keeps the others' jobs without asking; a write that fails is a warning, never a failure of the start.
+func (u UseCase) rememberParallel(ctx context.Context) []domain.Warning {
+	saved, err := u.RunConfig.SavedRun()
+	if err == nil {
+		saved.Run.Concurrency = project.Parallel
+		_, err = u.RunConfig.SaveRun(ctx, project.RunRewrite{Run: saved.Run, Replaces: saved.Digest})
+	}
+	if err != nil {
+		return []domain.Warning{{Code: CodeRememberFailed, Message: "could not remember keeping the other worktrees' jobs in run.toml: " + err.Error()}}
+	}
+	return nil
 }
 
 // start starts the profile's jobs in t, its item what became of them.

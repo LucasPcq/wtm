@@ -21,7 +21,7 @@
       "path": "exclusive",
       "value": false,
       "no_first": true,
-      "rememberable": false,
+      "rememberable": true,
       "remember": false
     },
     {

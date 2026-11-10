@@ -38,6 +38,7 @@
         --output string               Output format: text or json (default "text")
         --parallel                    Keep the other worktrees' jobs running, whatever run.toml's concurrency says
         --profile string              The profile of run.toml to start (default: the one marked default, or the only one)
+        --remember stringArray        The answers to always use in this repository: exclusive (repeatable)
     -y, --yes                         Run unattended: no question, no confirmation (the worktree you stand in and run.toml's default profile unless given; the other worktrees' jobs keep running unless --exclusive)
 
   Global Flags:

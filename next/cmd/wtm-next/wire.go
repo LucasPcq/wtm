@@ -287,6 +287,7 @@ func wire(params wireParams) app {
 		},
 		RunUp: runup.UseCase{
 			Meta:       meta,
+			RunConfig:  projectConfig,
 			Repository: facts,
 			Operations: operations,
 			Teardown:   teardowns,

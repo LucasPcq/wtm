@@ -48,6 +48,7 @@
     "exclusive": false,
     "others": [],
     "no_probe": false,
+    "remember_parallel": false,
     "recap": [
       {
         "key": "worktrees",
@@ -91,7 +92,7 @@
       }
     ]
   },
-  "fingerprint": "45db16f1c0f950cc90ec87fa",
+  "fingerprint": "fdd65be32647909664f8b8d9",
   "follow_ups": [],
   "warnings": []
 }

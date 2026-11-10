@@ -151,6 +151,7 @@ func newWorld(t *testing.T) *world {
 	}}
 	w.usecase = runup.UseCase{
 		Meta:       meta,
+		RunConfig:  config.Project{StateDir: stateDir},
 		Repository: repository.Service{Config: config.Project{StateDir: stateDir, GlobalPath: filepath.Join(root, "no-global.toml")}, Git: repo, MainPath: main, Restart: &domain.FollowUp{Command: "daemon restart"}},
 		Operations: operation.Service{
 			Locker:    locks{oplock.Locks{StateDir: stateDir}},
