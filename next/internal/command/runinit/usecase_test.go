@@ -11,6 +11,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/runinit"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/ui/formtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -228,6 +229,91 @@ func TestAPortVariableRenamedOnAReInitIsTheOneDockerComposeReads(t *testing.T) {
 	file := readFile(t, filepath.Join(w.main, "docker-compose.yml"))
 	assert.Contains(t, file, `"${CACHE_PORT:-6379}:6379"`)
 	assert.NotContains(t, file, "REDIS_PORT")
+}
+
+func TestAProfileNamedWrongIsRefusedBeforeAnyFileIsWritten(t *testing.T) {
+	cases := map[string]struct {
+		profiles []string
+		code     string
+	}{
+		"space": {profiles: []string{"my web=postgres,api"}, code: runinit.CodeProfileName},
+		"empty": {profiles: []string{"=postgres"}, code: runinit.CodeProfileName},
+		"twice": {profiles: []string{"web=postgres", "web=api"}, code: runinit.CodeProfileTwice},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			w := newWorld(t)
+			compose := readFile(t, filepath.Join(w.main, "docker-compose.yml"))
+
+			_, err := w.usecase.Run(t.Context(), runinit.Request{Profiles: c.profiles}, domain.RunOptions{DryRun: true})
+			assert.Equal(t, []string{c.code}, fieldCodes(err))
+			_, err = w.usecase.Run(t.Context(), runinit.Request{Profiles: c.profiles}, domain.RunOptions{})
+
+			require.Error(t, err)
+			assert.Equal(t, compose, readFile(t, filepath.Join(w.main, "docker-compose.yml")))
+			assert.NoFileExists(t, filepath.Join(w.stateDir, "run.toml"))
+		})
+	}
+}
+
+func TestApplyChecksRunTomlBeforeRewritingCompose(t *testing.T) {
+	w := newWorld(t)
+	compose := readFile(t, filepath.Join(w.main, "docker-compose.yml"))
+	plan, _, err := w.usecase.Plan(t.Context(), runinit.Request{})
+	require.NoError(t, err)
+	plan.Run.Profiles = append(plan.Run.Profiles, project.Profile{Name: "ghost", Jobs: []string{"nobody"}})
+
+	result := w.usecase.Apply(t.Context(), plan, func(domain.Event) {})
+
+	require.NotNil(t, result.Failure())
+	assert.Equal(t, compose, readFile(t, filepath.Join(w.main, "docker-compose.yml")))
+	assert.NoFileExists(t, filepath.Join(w.stateDir, "run.toml"))
+}
+
+func TestATaskKeepsTouchingTheRunnerItRunsThrough(t *testing.T) {
+	w := newWorld(t)
+	w.apply(t, runinit.Request{Runner: runinit.Through})
+	writeFile(t, filepath.Join(w.stateDir, "run.toml"), strings.Replace(w.runToml(t), `touches = ["postgres"]`, `touches = ["postgres", "dev"]`, 1))
+
+	w.apply(t, runinit.Request{Ports: []string{"postgres.POSTGRES_PORT=5432", "redis.REDIS_PORT=6380", "mailpit.MAILPIT_PORT=8025", "mailpit.MAILPIT_PORT_1025=1025", "admin.ADMIN_PORT=3001", "api.PORT=4000", "web.PORT=3000", "worker="}})
+
+	assert.Equal(t, []string{"postgres", "dev"}, w.job(t, "migrate").Touches)
+}
+
+func TestAReInitOfARunTomlWithNoDefaultProfileMakesNone(t *testing.T) {
+	w := newWorld(t)
+	w.apply(t, runinit.Request{})
+	writeFile(t, filepath.Join(w.stateDir, "run.toml"), strings.Replace(w.runToml(t), "  default = true\n", "", 1))
+
+	w.apply(t, runinit.Request{Ports: []string{"postgres.POSTGRES_PORT=5432", "redis.REDIS_PORT=6380", "mailpit.MAILPIT_PORT=8025", "mailpit.MAILPIT_PORT_1025=1025", "admin.ADMIN_PORT=3001", "api.PORT=4000", "web.PORT=3000", "worker="}})
+
+	for _, profile := range w.run(t).Profiles {
+		assert.False(t, profile.Default, profile.Name)
+	}
+}
+
+func TestADetachedWorktreesRecordKeepsItsNumberOutOfThePreview(t *testing.T) {
+	w := newWorld(t, worktree.Worktree{Path: "detached", State: worktree.Detached{}})
+	w.usecase.Meta = store.Meta{StateDir: t.TempDir()}
+	_, err := w.usecase.Meta.(store.Meta).Update(t.Context(), worktree.MetaUpdate{Branch: "feat/old", Change: func(stored *worktree.Meta) error {
+		stored.Ordinal, stored.SourceBranch = 1, "main"
+		return nil
+	}})
+	require.NoError(t, err)
+
+	plan, _, err := w.usecase.Plan(t.Context(), runinit.Request{})
+
+	require.NoError(t, err)
+	assert.Equal(t, 2, plan.Preview.Ordinal)
+}
+
+func TestAProfileNamingTheRunnerIsRefusedWhenNothingRunsThroughIt(t *testing.T) {
+	w := newWorld(t)
+	writeFile(t, filepath.Join(w.main, "package.json"), `{"name": "acme", "packageManager": "pnpm@9.12.0", "scripts": {"build": "turbo run build"}}`)
+
+	_, err := w.usecase.Run(t.Context(), runinit.Request{Profiles: []string{"all=api,dev"}}, domain.RunOptions{DryRun: true})
+
+	assert.Equal(t, []string{runinit.CodeUnknownJob}, fieldCodes(err))
 }
 
 func TestDockerComposeIsLeftAloneWhenAsked(t *testing.T) {

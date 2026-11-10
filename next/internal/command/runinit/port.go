@@ -9,10 +9,11 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
-// RunConfig reads run.toml as written, with its digest, and writes it whole, refusing one changed since (project.ErrRunChanged).
+// RunConfig reads run.toml as written, with its digest, checks a run config as it would write it, and writes it whole, refusing one changed since (project.ErrRunChanged).
 type RunConfig interface {
 	SavedRun() (project.SavedRun, error)
 	SaveRun(ctx context.Context, rewrite project.RunRewrite) (domain.Written, error)
+	CheckRun(run project.Run) error
 }
 
 // Settings reads config.toml as written, with its digest, and writes it whole, refusing one changed since (project.ErrConfigChanged).
@@ -38,7 +39,8 @@ type EnvFiles interface {
 	Read(path string) ([]dotenv.Line, error)
 }
 
-// Meta reads a worktree's meta record by its branch: run init previews a worktree at the ordinal it records.
+// Meta reads the worktrees' meta records, one by its branch or the branches every record names: run init previews a worktree at the ordinal it records, else at the one run up would give it.
 type Meta interface {
 	Load(branch string) (worktree.Meta, error)
+	List() ([]string, error)
 }

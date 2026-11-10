@@ -1,6 +1,7 @@
 package runinit_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -155,4 +156,17 @@ func jobNames(run project.Run) []string {
 		names = append(names, job.Name)
 	}
 	return names
+}
+
+// fieldCodes are the codes of the fields err refuses.
+func fieldCodes(err error) []string {
+	var refused *domain.Error
+	if !errors.As(err, &refused) {
+		return nil
+	}
+	var codes []string
+	for _, field := range refused.Fields {
+		codes = append(codes, field.Code)
+	}
+	return codes
 }

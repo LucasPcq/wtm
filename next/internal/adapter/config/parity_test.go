@@ -123,6 +123,18 @@ func TestTheProjectAndItsFakeSaveARunTomlAndReadItBack(t *testing.T) {
 	}
 }
 
+func TestTheProjectAndItsFakeCheckARunConfigWithoutWritingIt(t *testing.T) {
+	for _, impl := range implementations(t, seed{Config: seeded()}) {
+		t.Run(impl.name, func(t *testing.T) {
+			require.NoError(t, impl.port.CheckRun(savedRun()))
+
+			saved, err := impl.port.SavedRun()
+			require.NoError(t, err)
+			assert.Empty(t, saved.Digest)
+		})
+	}
+}
+
 func TestTheProjectAndItsFakeRefuseARunTomlTheyNoLongerHold(t *testing.T) {
 	for _, impl := range implementations(t, seed{Config: seeded()}) {
 		t.Run(impl.name, func(t *testing.T) {

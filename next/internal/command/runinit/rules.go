@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/dotenv"
@@ -20,10 +21,11 @@ import (
 // ----------------------------------------------------------------------------
 // Facts
 
-// Facts are what run init decides from, as Observe read them: the repository's name, its worktrees (the main one first) with their ordinals, the proxy's port; run.toml and config.toml as written; its docker compose file, its package manifests, and every .env file a worktree may hold, config.toml's and the repository's, with the lines each holds or its template does.
+// Facts are what run init decides from, as Observe read them: the repository's name, its worktrees (the main one first) with their ordinals, the ordinals every record holds as run up counts them (a detached worktree's included), the proxy's port; run.toml and config.toml as written; its docker compose file, its package manifests, and every .env file a worktree may hold, config.toml's and the repository's, with the lines each holds or its template does.
 type Facts struct {
 	Project   string
 	Worktrees []Previewable
+	Taken     []int
 	ProxyPort int
 	Run       project.SavedRun
 	Config    *project.Saved
@@ -887,6 +889,15 @@ func (d Decision) needs(name string) []string {
 	return order
 }
 
+// left reports whether a job run.toml may name is left out of what the decision writes: a candidate not picked, the runner unless the apps run through it.
+func (d Decision) left(job string) bool {
+	if job == runnerName && d.Runnable != nil {
+		return d.Runner != Through
+	}
+	_, candidate := d.candidate(job)
+	return candidate && !slices.Contains(d.Picked, job)
+}
+
 // startedByRunner reports whether the runner starts the job of name: an app's service.
 func (d Decision) startedByRunner(name string) bool {
 	c, ok := d.candidate(name)
@@ -902,23 +913,15 @@ func (f Facts) decideProfiles(d *Decision, req Request) {
 		given = append(given, project.Profile{Name: strings.TrimSpace(name), Jobs: filled(strings.Split(jobs, ","))})
 	}
 	d.Profiles = settle(d, PathProfiles, given, req.Profiles != nil, func() []project.Profile { return onDisk }, d.ProposedProfiles, f.declared())
-	runnerLeft := d.Runnable != nil && d.Runner != Through
-	left := func(job string) bool {
-		if job == runnerName {
-			return runnerLeft
-		}
-		_, candidate := d.candidate(job)
-		return candidate && !slices.Contains(d.Picked, job)
-	}
 	// A profile goes with the job it is named after, and with its last job; the apps the runner started take its place.
-	d.Profiles = slices.DeleteFunc(slices.Clone(d.Profiles), func(profile project.Profile) bool { return left(profile.Name) })
+	d.Profiles = slices.DeleteFunc(slices.Clone(d.Profiles), func(profile project.Profile) bool { return d.left(profile.Name) })
 	for i, profile := range d.Profiles {
 		var jobs []string
 		for _, job := range profile.Jobs {
 			switch {
-			case job == runnerName && runnerLeft:
+			case job == runnerName && d.left(job):
 				jobs = append(jobs, slices.DeleteFunc(slices.Clone(d.Picked), func(name string) bool { return !d.startedByRunner(name) || slices.Contains(profile.Jobs, name) })...)
-			case !left(job):
+			case !d.left(job):
 				jobs = append(jobs, job)
 			}
 		}
@@ -930,9 +933,13 @@ func (f Facts) decideProfiles(d *Decision, req Request) {
 	if len(d.Profiles) > 0 {
 		fallback = d.Profiles[0].Name
 	}
+	// a run.toml with no default keeps none, so a bare run up starts what it did; one whose default went with its job takes the first
 	defaultOnDisk := fallback
-	// a default run.toml holds stays one only while its profile does
-	if at := slices.IndexFunc(f.Run.Run.Profiles, func(p project.Profile) bool { return p.Default }); at >= 0 && slices.ContainsFunc(d.Profiles, func(p project.Profile) bool { return p.Name == f.Run.Run.Profiles[at].Name }) {
+	at := slices.IndexFunc(f.Run.Run.Profiles, func(p project.Profile) bool { return p.Default })
+	switch {
+	case at < 0 && f.declared():
+		defaultOnDisk = ""
+	case at >= 0 && slices.ContainsFunc(d.Profiles, func(p project.Profile) bool { return p.Name == f.Run.Run.Profiles[at].Name }):
 		defaultOnDisk = f.Run.Run.Profiles[at].Name
 	}
 	d.DefaultProfile = settle(d, PathDefaultProfile, req.DefaultProfile, req.DefaultProfile != "", func() string { return defaultOnDisk }, fallback, f.declared())
@@ -987,7 +994,7 @@ func names(candidates []Candidate) []string {
 // ----------------------------------------------------------------------------
 // The problems
 
-// The codes of a request's problems: a job, a port, a profile or a link naming nothing run init knows; a port spelled wrong or that two jobs declare; a space with a name and no command to make it; a service built here asked shared. Then the problems a surface shows in their part to check, which never refuse the request: a command that binds its port as a literal, ignoring the variable wtm gives it (CodePortIgnored, with the command that reads it when run init can write one), and an .env file whose linked keys a new worktree never gets, config.toml not copying it (CodeEnvNotCopied).
+// The codes of a request's problems: a job, a port, a profile or a link naming nothing run init knows; a profile with no name, a name holding a space or one given twice; a port spelled wrong or that two jobs declare; a space with a name and no command to make it; a service built here asked shared. Then the problems a surface shows in their part to check, which never refuse the request: a command that binds its port as a literal, ignoring the variable wtm gives it (CodePortIgnored, with the command that reads it when run init can write one), and an .env file whose linked keys a new worktree never gets, config.toml not copying it (CodeEnvNotCopied).
 const (
 	CodeUnknownJob     = Name + ".unknown_job"
 	CodePortInvalid    = Name + ".port_invalid"
@@ -996,6 +1003,8 @@ const (
 	CodeSharedBuilt    = Name + ".shared_built"
 	CodeUnknownLink    = Name + ".unknown_link"
 	CodeUnknownProfile = Name + ".unknown_profile"
+	CodeProfileName    = Name + ".profile_name"
+	CodeProfileTwice   = Name + ".profile_twice"
 	CodePortIgnored    = Name + ".port_variable_ignored"
 	CodeEnvNotCopied   = Name + ".env_file_not_copied"
 )
@@ -1031,9 +1040,21 @@ func (d Decision) problems(f Facts) []domain.FieldError {
 			problems = append(problems, domain.FieldError{Path: PathLinks + "[" + strconv.Itoa(i) + "]", Code: CodeUnknownLink, Template: "{value} holds no port of a job", Params: domain.Params{"value": link.Spelled()}})
 		}
 	}
+	named := map[string]bool{}
+	for i, profile := range d.Profiles {
+		at := PathProfiles + "[" + strconv.Itoa(i) + "]"
+		switch {
+		case profile.Name == "" || strings.ContainsFunc(profile.Name, unicode.IsSpace):
+			problems = append(problems, domain.FieldError{Path: at, Code: CodeProfileName, Template: "{value} is no profile name: one word", Params: domain.Params{"value": profile.Name}})
+		case named[profile.Name]:
+			problems = append(problems, domain.FieldError{Path: at, Code: CodeProfileTwice, Template: "profile {value} is given twice", Params: domain.Params{"value": profile.Name}})
+		}
+		named[profile.Name] = true
+	}
 	for i, profile := range d.Profiles {
 		for _, job := range profile.Jobs {
-			if _, declared := f.job(job); !slices.Contains(d.Picked, job) && !declared && job != runnerName {
+			written := job == runnerName && d.Runnable != nil && d.Runner == Through
+			if _, declared := f.job(job); !slices.Contains(d.Picked, job) && !declared && !written {
 				problems = append(problems, unknown(PathProfiles+"["+strconv.Itoa(i)+"]", job))
 			}
 		}
@@ -1237,10 +1258,7 @@ func (d Decision) job(f Facts, c Candidate) project.Job {
 		}
 	}
 	// what run.toml says a task touches, but a job left out
-	touches := slices.DeleteFunc(slices.Clone(job.Touches), func(name string) bool {
-		_, candidate := d.candidate(name)
-		return candidate && !slices.Contains(d.Picked, name)
-	})
+	touches := slices.DeleteFunc(slices.Clone(job.Touches), d.left)
 	job.Touches = nil
 	if slices.Contains(d.Touches, c.Name) && len(touches) > 0 {
 		job.Touches = touches
@@ -1613,15 +1631,6 @@ type PreviewEnv struct {
 	Keys []string `json:"keys"`
 }
 
-// ordinals are the numbers the worktrees hold.
-func (f Facts) ordinals() []int {
-	taken := make([]int, 0, len(f.Worktrees))
-	for _, w := range f.Worktrees {
-		taken = append(taken, w.Ordinal)
-	}
-	return taken
-}
-
 func (f Facts) preview(d Decision, run project.Run) Preview {
 	preview := Preview{Worktree: d.Preview, Services: []string{}, Tasks: []string{}, Joins: []string{}, Data: []PreviewData{}, Ports: []PreviewPort{}, Addresses: []PreviewAddress{}, Env: []PreviewEnv{}}
 	slug := worktree.Slug(d.Preview)
@@ -1630,7 +1639,7 @@ func (f Facts) preview(d Decision, run project.Run) Preview {
 		preview.Ordinal = f.Worktrees[at].Ordinal
 		if preview.Ordinal == 0 {
 			// run up numbers a worktree the first time it starts there, with the lowest number free
-			preview.Ordinal, preview.Numbered = worktree.FreeOrdinal(f.ordinals()), false
+			preview.Ordinal, preview.Numbered = worktree.FreeOrdinal(f.Taken), false
 		}
 		preview.Offset = preview.Ordinal * env.OffsetBlock(run)
 	}

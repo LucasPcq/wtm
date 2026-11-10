@@ -46,17 +46,32 @@ func (p Project) SavedRun() (project.SavedRun, error) {
 	return project.SavedRun{Run: run, Digest: digest(data)}, nil
 }
 
+// CheckRun refuses, writing nothing, a run config SaveRun would refuse: one LoadRun or the legacy wtm would refuse.
+func (p Project) CheckRun(run project.Run) error {
+	_, err := p.checked(run)
+	return err
+}
+
+// checked is run.toml as SaveRun writes run, refused when LoadRun or the legacy wtm would refuse it.
+func (p Project) checked(run project.Run) ([]byte, error) {
+	data, err := renderRun(run)
+	if err != nil {
+		return nil, err
+	}
+	if problems := writeProblems(run); len(problems) > 0 {
+		return nil, fmt.Errorf("invalid run config: %s", strings.Join(problems, "; "))
+	}
+	if _, err := parseRun(filepath.Join(p.StateDir, runFileName), data); err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
 // SaveRun writes run.toml whole from rewrite.Run, laid out as the legacy wtm writes it so both read it, then the JSON schema beside it, and returns what it wrote. A run config LoadRun or the legacy wtm would refuse is never written; a file whose bytes are no longer those rewrite replaces, created or removed since included, is refused with project.ErrRunChanged, and one a newer wtm wrote with the statefile's schema error.
 func (p Project) SaveRun(ctx context.Context, rewrite project.RunRewrite) (domain.Written, error) {
 	path := filepath.Join(p.StateDir, runFileName)
-	data, err := renderRun(rewrite.Run)
+	data, err := p.checked(rewrite.Run)
 	if err != nil {
-		return domain.Written{}, err
-	}
-	if problems := writeProblems(rewrite.Run); len(problems) > 0 {
-		return domain.Written{}, fmt.Errorf("invalid run config: %s", strings.Join(problems, "; "))
-	}
-	if _, err := parseRun(path, data); err != nil {
 		return domain.Written{}, err
 	}
 

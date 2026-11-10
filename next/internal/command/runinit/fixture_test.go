@@ -71,11 +71,17 @@ type world struct {
 	usecase  runinit.UseCase
 }
 
-func newWorld(t *testing.T) *world {
+// newWorld is acme, its worktrees feat/billing and the others given, each under acme.trees.
+func newWorld(t *testing.T, others ...worktree.Worktree) *world {
 	t.Helper()
 	root := gittest.TempDir(t)
 	main := filepath.Join(root, "acme")
-	repo := gittest.Build(t, gittest.FakeParams{Main: main, Branch: "main", Worktrees: []worktree.Worktree{{Path: filepath.Join(root, "acme.trees", "feat-billing"), State: worktree.OnBranch{Branch: billing}}}})
+	worktrees := []worktree.Worktree{{Path: filepath.Join(root, "acme.trees", "feat-billing"), State: worktree.OnBranch{Branch: billing}}}
+	for _, other := range others {
+		other.Path = filepath.Join(root, "acme.trees", other.Path)
+		worktrees = append(worktrees, other)
+	}
+	repo := gittest.Build(t, gittest.FakeParams{Main: main, Branch: "main", Worktrees: worktrees})
 	for name, content := range acme {
 		writeFile(t, filepath.Join(main, filepath.FromSlash(name)), content)
 	}

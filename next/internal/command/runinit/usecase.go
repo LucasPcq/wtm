@@ -10,6 +10,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/dotenv"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
+	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/service/operation"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
 )
@@ -118,11 +119,22 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 // CodeFileChanged fails a run init whose file changed on disk since it was read: nothing is written, and the same answers planned again read it anew.
 const CodeFileChanged = Name + ".file_changed"
 
-// Apply writes the plan's files, all or none, each a unit between its started and finished events: each is checked against the digest it was read with before any is written, then docker-compose.yml, run.toml and config.toml in turn, the plan's order. A file changed since fails its item and leaves every file as it was; a write that fails after another stops the ones after it.
+// Apply writes the plan's files, each a unit between its started and finished events: run.toml is checked as it would be written and each file against the digest it was read with before any is written, then docker-compose.yml, run.toml and config.toml in turn, the plan's order. A file changed since, or a run.toml refused, fails its item and leaves every file as it was. A write that fails after another stops the ones after it: run.toml changed on disk between that check and its write leaves docker-compose.yml rewritten, which reads the variables run.toml declares or will declare, and the same answers write it again.
 func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Result {
 	items := make([]Item, 0, len(plan.Files))
 	for _, file := range plan.Files {
 		items = append(items, Item{Subject: file.Path, Status: domain.StatusSkipped, Detail: &Detail{Path: file.Path, Tracked: file.Tracked}})
+	}
+	// run.toml is checked as SaveRun would before any file is written: a plan it refuses never leaves compose rewritten
+	if slices.ContainsFunc(plan.Files, func(file File) bool { return file.Path == runFile }) {
+		if err := u.RunConfig.CheckRun(plan.Run); err != nil {
+			for i := range items {
+				if items[i].Subject == runFile {
+					items[i].Status, items[i].Err = domain.StatusFailed, &domain.Error{Kind: domain.KindInternal, Code: CodeWriteFailed, Message: "could not write run.toml", Params: domain.Params{"file": runFile}, Cause: err}
+				}
+			}
+			return Result{Items: items}
+		}
 	}
 	if changed := u.changed(plan); changed != "" {
 		for i := range items {
@@ -249,5 +261,29 @@ func (u UseCase) Observe(ctx context.Context) (Facts, error) {
 			facts.Worktrees = append(facts.Worktrees, previewable)
 		}
 	}
+	facts.Taken = u.taken(repo.Snapshot.Worktrees)
 	return facts, nil
+}
+
+// taken are the ordinals the records hold, as run up counts them: the linked worktrees' and, when one is detached and so names no branch, every record no worktree lists, since it may be the detached one's.
+func (u UseCase) taken(worktrees []worktree.Worktree) []int {
+	var holders []string
+	detached := false
+	for _, w := range worktrees {
+		_, isDetached := w.State.(worktree.Detached)
+		detached = detached || !w.Main && isDetached
+		if !w.Main && w.Branch() != "" {
+			holders = append(holders, w.Branch())
+		}
+	}
+	if recorded, err := u.Meta.List(); detached && err == nil {
+		holders = append(holders, slices.DeleteFunc(recorded, func(branch string) bool { return slices.Contains(holders, branch) })...)
+	}
+	var taken []int
+	for _, branch := range holders {
+		if record, err := u.Meta.Load(branch); err == nil {
+			taken = append(taken, record.Ordinal)
+		}
+	}
+	return taken
 }

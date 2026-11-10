@@ -75,6 +75,7 @@ type port interface {
 	LoadRun() (project.Run, error)
 	Remember(ctx context.Context, answers map[string]string) (domain.Written, error)
 	SavedRun() (project.SavedRun, error)
+	CheckRun(run project.Run) error
 	SaveRun(ctx context.Context, rewrite project.RunRewrite) (domain.Written, error)
 }
 

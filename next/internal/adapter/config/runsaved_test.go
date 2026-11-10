@@ -152,6 +152,7 @@ func TestSaveRunNeverWritesWhatTheLegacyWtmRefuses(t *testing.T) {
 			_, err := Project{StateDir: stateDir}.SaveRun(t.Context(), project.RunRewrite{Run: c.run})
 
 			assert.ErrorContains(t, err, c.want)
+			assert.ErrorContains(t, Project{StateDir: stateDir}.CheckRun(c.run), c.want)
 			assert.NoFileExists(t, filepath.Join(stateDir, "run.toml"))
 		})
 	}

@@ -33,6 +33,13 @@ func (f *Fake) SaveRun(_ context.Context, rewrite project.RunRewrite) (domain.Wr
 	return domain.Written{Changed: true}, nil
 }
 
+// CheckRun refuses nothing: the fake writes any run config, and config.Project checks it.
+func (f *Fake) CheckRun(project.Run) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.enter("CheckRun")
+}
+
 // EditRun replaces run.toml behind the use case's back, as a user editing it would.
 func (f *Fake) EditRun(run project.Run) {
 	f.mu.Lock()
