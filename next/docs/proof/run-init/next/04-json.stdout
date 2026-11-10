@@ -29,9 +29,9 @@
           "subject": "postgres",
           "what": "port",
           "at": {
-            "Line": 7,
-            "Column": 9,
-            "Text": "\"5432:5432\""
+            "line": 7,
+            "column": 9,
+            "text": "\"5432:5432\""
           },
           "before": "\"5432:5432\"",
           "after": "\"${POSTGRES_PORT:-5432}:5432\""
@@ -40,9 +40,9 @@
           "subject": "redis",
           "what": "port",
           "at": {
-            "Line": 11,
-            "Column": 9,
-            "Text": "\"6379:6379\""
+            "line": 11,
+            "column": 9,
+            "text": "\"6379:6379\""
           },
           "before": "\"6379:6379\"",
           "after": "\"${REDIS_PORT:-6379}:6379\""
@@ -51,9 +51,9 @@
           "subject": "mailpit",
           "what": "port",
           "at": {
-            "Line": 15,
-            "Column": 9,
-            "Text": "\"8025:8025\""
+            "line": 15,
+            "column": 9,
+            "text": "\"8025:8025\""
           },
           "before": "\"8025:8025\"",
           "after": "\"${MAILPIT_PORT:-8025}:8025\""
@@ -62,9 +62,9 @@
           "subject": "mailpit",
           "what": "port",
           "at": {
-            "Line": 16,
-            "Column": 9,
-            "Text": "\"1025:1025\""
+            "line": 16,
+            "column": 9,
+            "text": "\"1025:1025\""
           },
           "before": "\"1025:1025\"",
           "after": "\"${MAILPIT_PORT_1025:-1025}:1025\""
@@ -113,82 +113,82 @@
       ],
       "places": [
         {
-          "Dir": ".",
-          "Name": "acme",
-          "Scripts": [
+          "dir": ".",
+          "name": "acme",
+          "scripts": [
             {
-              "Name": "build",
-              "Cmd": "turbo run build"
+              "name": "build",
+              "cmd": "turbo run build"
             },
             {
-              "Name": "dev",
-              "Cmd": "turbo run dev"
+              "name": "dev",
+              "cmd": "turbo run dev"
             }
           ]
         },
         {
-          "Dir": "apps/admin",
-          "Name": "admin",
-          "Scripts": [
+          "dir": "apps/admin",
+          "name": "admin",
+          "scripts": [
             {
-              "Name": "build",
-              "Cmd": "next build"
+              "name": "build",
+              "cmd": "next build"
             },
             {
-              "Name": "dev",
-              "Cmd": "next dev -p 3001"
+              "name": "dev",
+              "cmd": "next dev -p 3001"
             }
           ]
         },
         {
-          "Dir": "apps/api",
-          "Name": "api",
-          "Scripts": [
+          "dir": "apps/api",
+          "name": "api",
+          "scripts": [
             {
-              "Name": "build",
-              "Cmd": "tsc"
+              "name": "build",
+              "cmd": "tsc"
             },
             {
-              "Name": "dev",
-              "Cmd": "tsx watch src/server.ts"
+              "name": "dev",
+              "cmd": "tsx watch src/server.ts"
             }
           ]
         },
         {
-          "Dir": "apps/web",
-          "Name": "web",
-          "Scripts": [
+          "dir": "apps/web",
+          "name": "web",
+          "scripts": [
             {
-              "Name": "build",
-              "Cmd": "next build"
+              "name": "build",
+              "cmd": "next build"
             },
             {
-              "Name": "dev",
-              "Cmd": "next dev"
+              "name": "dev",
+              "cmd": "next dev"
             }
           ]
         },
         {
-          "Dir": "apps/worker",
-          "Name": "worker",
-          "Scripts": [
+          "dir": "apps/worker",
+          "name": "worker",
+          "scripts": [
             {
-              "Name": "dev",
-              "Cmd": "tsx watch src/worker.ts"
+              "name": "dev",
+              "cmd": "tsx watch src/worker.ts"
             }
           ]
         },
         {
-          "Dir": "packages/db",
-          "Name": "db",
-          "Scripts": [
+          "dir": "packages/db",
+          "name": "db",
+          "scripts": [
             {
-              "Name": "migrate",
-              "Cmd": "prisma migrate deploy"
+              "name": "migrate",
+              "cmd": "prisma migrate deploy"
             },
             {
-              "Name": "seed",
-              "Cmd": "tsx seed.ts"
+              "name": "seed",
+              "cmd": "tsx seed.ts"
             }
           ]
         }
@@ -620,7 +620,9 @@
     "preview": {
       "worktree": "main",
       "ordinal": 0,
+      "numbered": true,
       "offset": 0,
+      "spacing": 10,
       "services": [
         "redis",
         "admin",
@@ -744,8 +746,8 @@
         }
       ],
       "up": {
-        "Name": "all",
-        "Jobs": [
+        "name": "all",
+        "jobs": [
           "postgres",
           "redis",
           "mailpit",
@@ -756,7 +758,7 @@
           "migrate",
           "seed"
         ],
-        "Default": true
+        "default": true
       }
     },
     "recap": [

@@ -7397,6 +7397,9 @@
             }
           ]
         },
+        "numbered": {
+          "type": "boolean"
+        },
         "offset": {
           "type": "integer"
         },
@@ -7429,6 +7432,9 @@
             }
           ]
         },
+        "spacing": {
+          "type": "integer"
+        },
         "tasks": {
           "anyOf": [
             {
@@ -7452,7 +7458,9 @@
       "required": [
         "worktree",
         "ordinal",
+        "numbered",
         "offset",
+        "spacing",
         "services",
         "tasks",
         "joins",

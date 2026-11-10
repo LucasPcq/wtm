@@ -1544,11 +1544,13 @@ func (f Facts) detection(d Decision) Detection {
 // ----------------------------------------------------------------------------
 // The preview
 
-// Preview is what the worktree previewed gets from the plan: its branch, ordinal and how far its ports sit above main's; the services and tasks it runs and the shared services it joins; the space each shared service gives it; each port with its base; the address of each job answering under its name; the keys of each .env file written in it; and what run up starts there.
+// Preview is what the worktree previewed gets from the plan: its branch; its ordinal, and whether it holds it already or gets it when run up first starts there; how far its ports sit above main's, and the spacing between two worktrees' ports; the services and tasks it runs and the shared services it joins; the space each shared service gives it; each port with its base; the address of each job answering under its name; the keys of each .env file written in it; and what run up starts there.
 type Preview struct {
 	Worktree  string           `json:"worktree"`
 	Ordinal   int              `json:"ordinal"`
+	Numbered  bool             `json:"numbered"`
 	Offset    int              `json:"offset"`
+	Spacing   int              `json:"spacing"`
 	Services  []string         `json:"services"`
 	Tasks     []string         `json:"tasks"`
 	Joins     []string         `json:"joins"`
@@ -1587,13 +1589,28 @@ type PreviewEnv struct {
 	Keys []string `json:"keys"`
 }
 
+// ordinals are the numbers the worktrees hold.
+func (f Facts) ordinals() []int {
+	taken := make([]int, 0, len(f.Worktrees))
+	for _, w := range f.Worktrees {
+		taken = append(taken, w.Ordinal)
+	}
+	return taken
+}
+
 func (f Facts) preview(d Decision, run project.Run) Preview {
 	preview := Preview{Worktree: d.Preview, Services: []string{}, Tasks: []string{}, Joins: []string{}, Data: []PreviewData{}, Ports: []PreviewPort{}, Addresses: []PreviewAddress{}, Env: []PreviewEnv{}}
 	slug := worktree.Slug(d.Preview)
+	preview.Numbered = true
 	if at := slices.IndexFunc(f.Worktrees, func(w Previewable) bool { return w.Branch == d.Preview }); at >= 0 && !f.Worktrees[at].Main {
 		preview.Ordinal = f.Worktrees[at].Ordinal
+		if preview.Ordinal == 0 {
+			// run up numbers a worktree the first time it starts there, with the lowest number free
+			preview.Ordinal, preview.Numbered = worktree.FreeOrdinal(f.ordinals()), false
+		}
 		preview.Offset = preview.Ordinal * env.OffsetBlock(run)
 	}
+	preview.Spacing = env.OffsetBlock(run)
 	offset := preview.Offset
 
 	for _, job := range run.Jobs {

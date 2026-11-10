@@ -485,7 +485,9 @@
     "preview": {
       "worktree": "feat/billing",
       "ordinal": 2,
+      "numbered": true,
       "offset": 20,
+      "spacing": 10,
       "services": [
         "redis",
         "admin",

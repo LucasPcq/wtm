@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/adapter/store"
 	"github.com/LucasPcq/wtm/next/internal/command/runinit"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
@@ -266,6 +267,18 @@ func TestTheDryRunPreviewsAWorktreeAtItsOrdinal(t *testing.T) {
 	assert.Contains(t, preview.Ports, runinit.PreviewPort{Job: "postgres", Variable: "POSTGRES_PORT", Base: 5432, Port: 5432, Shared: true})
 	assert.Contains(t, preview.Data, runinit.PreviewData{Service: "postgres", Name: "acme_feat-billing", Template: "acme_{worktree}"})
 	assert.Contains(t, preview.Addresses, runinit.PreviewAddress{Job: "api", URL: "http://api.feat-billing.acme.localhost:11080"})
+}
+
+func TestAWorktreeNeverNumberedIsPreviewedAtTheNumberItsFirstRunUpGivesIt(t *testing.T) {
+	w := newWorld(t)
+	w.usecase.Meta = store.Meta{StateDir: t.TempDir()}
+
+	plan, _, err := w.usecase.Plan(t.Context(), runinit.Request{})
+
+	require.NoError(t, err)
+	assert.Equal(t, 1, plan.Preview.Ordinal)
+	assert.False(t, plan.Preview.Numbered)
+	assert.Contains(t, plan.Preview.Ports, runinit.PreviewPort{Job: "api", Variable: "PORT", Base: 4000, Port: 4010})
 }
 
 func TestAPortVariableRenamedIsTheOneDockerComposeReads(t *testing.T) {

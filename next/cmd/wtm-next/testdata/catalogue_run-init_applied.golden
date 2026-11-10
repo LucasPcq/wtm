@@ -100,7 +100,9 @@
     "preview": {
       "worktree": "main",
       "ordinal": 0,
+      "numbered": true,
       "offset": 0,
+      "spacing": 10,
       "services": [
         "web"
       ],
