@@ -10001,6 +10001,40 @@
         }
       ]
     },
+    "web.Place": {
+      "additionalProperties": false,
+      "description": "A path as POST /api/repos/check and POST /api/repos read it: where it stands for wtm and, in a repository, its id, main worktree and name.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "root": {
+          "type": "string"
+        },
+        "state": {
+          "description": "missing: nothing is there; not_a_repository: outside any git repository; not_set_up: in one wtm is not set up in; set_up: in one set up that the web does not list; known: in one the web lists.",
+          "enum": [
+            "missing",
+            "not_a_repository",
+            "not_set_up",
+            "set_up",
+            "known"
+          ]
+        }
+      },
+      "required": [
+        "path",
+        "state"
+      ],
+      "type": "object"
+    },
     "web.Refusal": {
       "additionalProperties": false,
       "description": "The body of a request the server refuses itself, before any command runs: a v2 envelope of no command, its error one of the server's codes.",
@@ -10039,7 +10073,7 @@
     },
     "web.Repo": {
       "additionalProperties": false,
-      "description": "A repository wtm knows, as GET /api/repos lists it: its id, the {repo} of a route, and where it is.",
+      "description": "A repository as GET /api/repos lists it: its id, the {repo} of a route, where it is, and whether wtm is set up in it.",
       "properties": {
         "common_dir": {
           "description": "git rev-parse --git-common-dir, absolute: the repository's key.",
@@ -10055,12 +10089,17 @@
           "description": "The main worktree.",
           "minLength": 1,
           "type": "string"
+        },
+        "set_up": {
+          "description": "false for a repository a client added that init has not set up yet.",
+          "type": "boolean"
         }
       },
       "required": [
         "id",
         "root",
-        "common_dir"
+        "common_dir",
+        "set_up"
       ],
       "type": "object"
     },

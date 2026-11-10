@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/url"
@@ -17,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/LucasPcq/wtm/next/internal/adapter/config"
 	"github.com/LucasPcq/wtm/next/internal/adapter/daemon"
 	reposjson "github.com/LucasPcq/wtm/next/internal/adapter/registry"
 	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
@@ -71,6 +73,7 @@ func uiCmd(env cli.Env) *cobra.Command {
 			return err
 		}
 
+		addRepo(cmd.Context(), record, env.ProjectDir)
 		page := pageURL(record, repoID(cmd.Context(), env.ProjectDir))
 		fmt.Fprintln(cmd.OutOrStdout(), page)
 		if *noOpen {
@@ -136,12 +139,16 @@ func positive(idle time.Duration) error {
 // webParams are what the server of this process serves, with token, stopping after idle.
 func webParams(token string, idle time.Duration) web.Params {
 	return web.Params{
-		Catalogue:   catalogue(),
-		Events:      eventsStream(),
-		Logs:        jobLines(),
-		LogFile:     jobLogFile,
-		DaemonLog:   func() string { return daemonLogOf(daemon.SocketPath()) },
-		Repos:       knownRepos(reposjson.Path(), daemon.SocketPath()).Prune,
+		Catalogue: catalogue(),
+		Events:    eventsStream(),
+		Logs:      jobLines(),
+		LogFile:   jobLogFile,
+		DaemonLog: func() string { return daemonLogOf(daemon.SocketPath()) },
+		Repos:     knownRepos(reposjson.Path(), daemon.SocketPath()).Prune,
+		Locate:    locateRepo,
+		Register: func(ctx context.Context, repo domain.Repo) {
+			knownRepos(reposjson.Path(), daemon.SocketPath()).Register(ctx, repo)
+		},
 		Version:     version,
 		Token:       token,
 		Kill:        shell.KillCancelled,
@@ -214,6 +221,33 @@ func ensureServer(ctx context.Context, idle time.Duration) (webserver.Record, er
 	return started, nil
 }
 
+// locateRepo is the repository of path for the web server, and whether wtm is set up in it.
+func locateRepo(ctx context.Context, path string) (web.Located, error) {
+	if info, err := os.Stat(path); err != nil || !info.IsDir() {
+		return web.Located{}, fmt.Errorf("%s: %w", path, fs.ErrNotExist)
+	}
+	params, err := locate(ctx, path)
+	if err != nil {
+		return web.Located{}, err
+	}
+
+	return web.Located{Repo: params.repo(), SetUp: config.Project{StateDir: params.StateDir}.Initialized()}, nil
+}
+
+// addRepo asks the server record names to serve the repository of dir, so that one wtm is not set up in opens on its set-up; a directory in none, or a server that does not answer, leaves the page to say so.
+func addRepo(ctx context.Context, record webserver.Record, dir string) {
+	ctx, cancel := context.WithTimeout(ctx, webAsk)
+	defer cancel()
+	path, err := json.Marshal(map[string]string{"path": dir})
+	if err != nil {
+		return
+	}
+	response, err := ask(ctx, askParams{Record: record, Method: http.MethodPost, Path: "/api/repos", Body: string(path)})
+	if err == nil {
+		_ = response.Body.Close()
+	}
+}
+
 // askVersion returns the version of the server record names, and whether it answered with record's token.
 func askVersion(ctx context.Context, record webserver.Record) (string, bool) {
 	ctx, cancel := context.WithTimeout(ctx, webAsk)
@@ -260,11 +294,12 @@ type askParams struct {
 	Record webserver.Record
 	Method string
 	Path   string
+	Body   string
 }
 
 // ask sends a request to the server params.Record names, with its token.
 func ask(ctx context.Context, params askParams) (*http.Response, error) {
-	request, err := http.NewRequestWithContext(ctx, params.Method, "http://"+net.JoinHostPort("127.0.0.1", strconv.Itoa(params.Record.Port))+params.Path, nil)
+	request, err := http.NewRequestWithContext(ctx, params.Method, "http://"+net.JoinHostPort("127.0.0.1", strconv.Itoa(params.Record.Port))+params.Path, strings.NewReader(params.Body))
 	if err != nil {
 		return nil, err
 	}

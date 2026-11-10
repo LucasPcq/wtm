@@ -161,6 +161,8 @@ func TestEachResponseOfTheWebServerMatchesTheSchema(t *testing.T) {
 		"unspellable": {def: "web.CommandLine", response: func() *http.Response {
 			return post(t, server, "/api/command-line", `{"code":"x","message":"Nothing to run"}`)
 		}},
+		"place":        {def: "web.Place", response: func() *http.Response { return post(t, server, "/api/repos/check", `{"path":"`+main+`"}`) }},
+		"place_none":   {def: "web.Place", response: func() *http.Response { return post(t, server, "/api/repos/check", `{"path":"`+t.TempDir()+`"}`) }},
 		"no_token":     {def: "web.Refusal", response: func() *http.Response { return get(t, server, "/api/version", true) }},
 		"repo_unknown": {def: "web.Refusal", response: func() *http.Response { return post(t, server, "/api/repos/nope/commands/list", `{}`) }},
 		"wrong_method": {def: "web.Refusal", response: func() *http.Response { return post(t, server, "/api/version", ``) }},

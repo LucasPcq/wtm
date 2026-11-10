@@ -87,7 +87,7 @@ func TestTheVersionIsTheBinarys(t *testing.T) {
 func TestTheReposAreListedByTheirID(t *testing.T) {
 	response := do(t, serving(t, Params{}), req{method: http.MethodGet, path: "/api/repos"})
 
-	assert.Equal(t, []Repo{{ID: RepoID(repo), Root: repo.Root, CommonDir: repo.CommonDir}}, decoded[[]Repo](t, response))
+	assert.Equal(t, []Repo{{ID: RepoID(repo), Root: repo.Root, CommonDir: repo.CommonDir, SetUp: true}}, decoded[[]Repo](t, response))
 }
 
 func TestARepoNoneKnowsIsNotFound(t *testing.T) {

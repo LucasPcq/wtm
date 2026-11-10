@@ -5,78 +5,148 @@
       "description": "GET /api/version: the version of the binary that serves.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["version"],
+      "required": [
+        "version"
+      ],
       "properties": {
-        "version": { "type": "string", "minLength": 1 }
+        "version": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "web.Repo": {
-      "description": "A repository wtm knows, as GET /api/repos lists it: its id, the {repo} of a route, and where it is.",
+      "description": "A repository as GET /api/repos lists it: its id, the {repo} of a route, where it is, and whether wtm is set up in it.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "root", "common_dir"],
+      "required": [
+        "id",
+        "root",
+        "common_dir",
+        "set_up"
+      ],
       "properties": {
-        "id": { "type": "string", "minLength": 1, "description": "A digest of its common directory." },
-        "root": { "type": "string", "minLength": 1, "description": "The main worktree." },
-        "common_dir": { "type": "string", "minLength": 1, "description": "git rev-parse --git-common-dir, absolute: the repository's key." }
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A digest of its common directory."
+        },
+        "root": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The main worktree."
+        },
+        "common_dir": {
+          "type": "string",
+          "minLength": 1,
+          "description": "git rev-parse --git-common-dir, absolute: the repository's key."
+        },
+        "set_up": {
+          "type": "boolean",
+          "description": "false for a repository a client added that init has not set up yet."
+        }
       }
     },
     "web.Repos": {
       "description": "GET /api/repos: the repositories wtm knows, those no longer initialized left out.",
       "type": "array",
-      "items": { "$ref": "#/$defs/web.Repo" }
+      "items": {
+        "$ref": "#/$defs/web.Repo"
+      }
     },
     "web.Command": {
       "description": "A command of the catalogue as GET /api/repos/{repo}/commands lists it: its name and its form outside any repository.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "form"],
+      "required": [
+        "name",
+        "form"
+      ],
       "properties": {
-        "name": { "$ref": "#/$defs/api.CommandName" },
-        "form": { "$ref": "#/$defs/domain.Form" }
+        "name": {
+          "$ref": "#/$defs/api.CommandName"
+        },
+        "form": {
+          "$ref": "#/$defs/domain.Form"
+        }
       }
     },
     "web.Commands": {
       "description": "GET /api/repos/{repo}/commands: the catalogue.",
       "type": "array",
-      "items": { "$ref": "#/$defs/web.Command" }
+      "items": {
+        "$ref": "#/$defs/web.Command"
+      }
     },
     "web.Call": {
       "description": "The body of POST /api/repos/{repo}/commands/{name} and of its /questions: the answer of each field by its path, none leaving every field to its default, and, to run it, whether it plans only and the fingerprint its apply is held to.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "answers": { "type": "array", "items": { "$ref": "#/$defs/domain.Answered" } },
-        "dry_run": { "type": "boolean" },
-        "expect_fingerprint": { "type": "string" }
+        "answers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/domain.Answered"
+          }
+        },
+        "dry_run": {
+          "type": "boolean"
+        },
+        "expect_fingerprint": {
+          "type": "string"
+        }
       }
     },
     "web.Warning": {
       "description": "The data of an event named warning on an event stream: what kept a line or a repository from it for a while.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["message"],
+      "required": [
+        "message"
+      ],
       "properties": {
-        "message": { "type": "string", "minLength": 1 },
-        "code": { "type": "string", "minLength": 1 }
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "code": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "web.Busy": {
       "description": "POST /api/stop refused, 409: the correlation IDs of the operations still running.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["operations"],
+      "required": [
+        "operations"
+      ],
       "properties": {
-        "operations": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 }
+        "operations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        }
       }
     },
     "web.CommandLine": {
       "description": "POST /api/command-line: a follow-up as the command line runs it, empty when it cannot be spelled (no command and no pull request to open).",
       "type": "object",
       "additionalProperties": false,
-      "required": ["argv"],
+      "required": [
+        "argv"
+      ],
       "properties": {
-        "argv": { "type": "array", "items": { "type": "string" } }
+        "argv": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
       }
     },
     "web.JobLine": {
@@ -85,59 +155,133 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["type", "worktree", "job", "text"],
+          "required": [
+            "type",
+            "worktree",
+            "job",
+            "text"
+          ],
           "properties": {
-            "type": { "const": "line" },
-            "worktree": { "type": "string" },
-            "job": { "type": "string" },
-            "at": { "type": "string", "format": "date-time", "description": "When it printed it, absent for a line of a log that kept no time." },
-            "text": { "type": "string" },
-            "n": { "type": "integer", "minimum": 1, "description": "Its number in the whole log, for a line a search or a time read from it." },
-            "mark": { "type": "boolean", "description": "The daemon's run mark, where a run of the job begins; absent on any other line." }
+            "type": {
+              "const": "line"
+            },
+            "worktree": {
+              "type": "string"
+            },
+            "job": {
+              "type": "string"
+            },
+            "at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "When it printed it, absent for a line of a log that kept no time."
+            },
+            "text": {
+              "type": "string"
+            },
+            "n": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Its number in the whole log, for a line a search or a time read from it."
+            },
+            "mark": {
+              "type": "boolean",
+              "description": "The daemon's run mark, where a run of the job begins; absent on any other line."
+            }
           }
         },
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["type", "worktree"],
+          "required": [
+            "type",
+            "worktree"
+          ],
           "properties": {
-            "type": { "const": "absent" },
-            "worktree": { "type": "string" },
-            "job": { "type": "string", "description": "The job named, which never ran there; absent: no job ran in the worktree." }
+            "type": {
+              "const": "absent"
+            },
+            "worktree": {
+              "type": "string"
+            },
+            "job": {
+              "type": "string",
+              "description": "The job named, which never ran there; absent: no job ran in the worktree."
+            }
           }
         },
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["type", "worktree", "job", "state"],
+          "required": [
+            "type",
+            "worktree",
+            "job",
+            "state"
+          ],
           "properties": {
-            "type": { "const": "ended" },
-            "worktree": { "type": "string" },
-            "job": { "type": "string" },
-            "state": { "$ref": "#/$defs/runlogs.JobState" },
-            "exit_code": { "type": "integer" }
+            "type": {
+              "const": "ended"
+            },
+            "worktree": {
+              "type": "string"
+            },
+            "job": {
+              "type": "string"
+            },
+            "state": {
+              "$ref": "#/$defs/runlogs.JobState"
+            },
+            "exit_code": {
+              "type": "integer"
+            }
           }
         },
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["type", "code", "message"],
+          "required": [
+            "type",
+            "code",
+            "message"
+          ],
           "properties": {
-            "type": { "const": "warning" },
-            "code": { "type": "string", "minLength": 1 },
-            "message": { "type": "string" },
-            "params": { "type": "object", "additionalProperties": { "type": "string" } },
-            "follow_up": { "$ref": "#/$defs/domain.FollowUp" },
+            "type": {
+              "const": "warning"
+            },
+            "code": {
+              "type": "string",
+              "minLength": 1
+            },
+            "message": {
+              "type": "string"
+            },
+            "params": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "follow_up": {
+              "$ref": "#/$defs/domain.FollowUp"
+            },
             "ports": {}
           }
         },
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["type", "error"],
+          "required": [
+            "type",
+            "error"
+          ],
           "properties": {
-            "type": { "const": "error" },
-            "error": { "$ref": "#/$defs/domain.Error" }
+            "type": {
+              "const": "error"
+            },
+            "error": {
+              "$ref": "#/$defs/domain.Error"
+            }
           }
         }
       ]
@@ -146,14 +290,70 @@
       "description": "The body of a request the server refuses itself, before any command runs: a v2 envelope of no command, its error one of the server's codes.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["v", "command", "ok", "follow_ups", "warnings", "error"],
+      "required": [
+        "v",
+        "command",
+        "ok",
+        "follow_ups",
+        "warnings",
+        "error"
+      ],
       "properties": {
-        "v": { "const": 2 },
-        "command": { "const": "" },
-        "ok": { "const": false },
-        "follow_ups": { "type": "array", "maxItems": 0 },
-        "warnings": { "type": "array", "maxItems": 0 },
-        "error": { "$ref": "#/$defs/domain.Error", "description": "Its code is the server's own (web.token_invalid, web.host_refused, web.origin_refused, web.not_found, web.method_not_allowed, web.repo_unknown, web.command_unknown, web.operation_unknown, web.schema_unavailable, web.stopping, web.log_missing), request.invalid for a body that does not decode, or the code of what failed while the repositories were read." }
+        "v": {
+          "const": 2
+        },
+        "command": {
+          "const": ""
+        },
+        "ok": {
+          "const": false
+        },
+        "follow_ups": {
+          "type": "array",
+          "maxItems": 0
+        },
+        "warnings": {
+          "type": "array",
+          "maxItems": 0
+        },
+        "error": {
+          "$ref": "#/$defs/domain.Error",
+          "description": "Its code is the server's own (web.token_invalid, web.host_refused, web.origin_refused, web.not_found, web.method_not_allowed, web.repo_unknown, web.command_unknown, web.operation_unknown, web.schema_unavailable, web.stopping, web.log_missing), request.invalid for a body that does not decode, or the code of what failed while the repositories were read."
+        }
+      }
+    },
+    "web.Place": {
+      "description": "A path as POST /api/repos/check and POST /api/repos read it: where it stands for wtm and, in a repository, its id, main worktree and name.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "state"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state": {
+          "enum": [
+            "missing",
+            "not_a_repository",
+            "not_set_up",
+            "set_up",
+            "known"
+          ],
+          "description": "missing: nothing is there; not_a_repository: outside any git repository; not_set_up: in one wtm is not set up in; set_up: in one set up that the web does not list; known: in one the web lists."
+        },
+        "id": {
+          "type": "string"
+        },
+        "root": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
       }
     }
   }
