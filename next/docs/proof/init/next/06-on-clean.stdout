@@ -3,7 +3,7 @@
 
   Worktrees folder  ../.trees
   Base branch       develop
-  .env from         example
+  .env from         the template
   .env files        apps/api/.env
   On create         pnpm install
   On clean          make down

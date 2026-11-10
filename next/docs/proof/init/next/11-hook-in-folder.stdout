@@ -3,7 +3,7 @@
 
   Worktrees folder  ../.trees
   Base branch       main
-  .env from         example
+  .env from         the template
   .env files        apps/api/.env, apps/web/.env
   On create         pnpm install, pnpm db:generate (in apps/api) (goes on if it fails)
   On clean          docker compose down

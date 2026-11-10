@@ -38,7 +38,7 @@
         }
       ]
     },
-    "changed": null,
+    "changed": [],
     "recap": [
       {
         "key": "base_path",

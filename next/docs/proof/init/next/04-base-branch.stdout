@@ -3,7 +3,7 @@
 
   Worktrees folder  ../.trees
   Base branch       develop (was main)
-  .env from         example
+  .env from         the template
   .env files        apps/api/.env, apps/web/.env
   On create         pnpm install
   On clean          docker compose down
