@@ -10,6 +10,7 @@ $ api $U/api/repos | jq .
 ]
 
 $ api $U/api/repos/$A/commands | jq -c ".[] | {name, questions: [.form.fields[]?.path]}"
+{"name":"init","questions":["base_path","base_branch","env_strategy","env_files","on_create","on_clean"]}
 {"name":"create","questions":["branches","from","env_from","isolation","fast_forward","if_not_exists"]}
 {"name":"extract","questions":["source","files","to","to","from","env_from","isolation","fast_forward","keep","on_conflict"]}
 {"name":"checkout","questions":["pr","from","env_from","isolation","fast_forward","mine","review","no_fetch"]}
