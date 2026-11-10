@@ -93,6 +93,8 @@ export const skipWords: Record<DomainSkip, string | null> = {
   alone: 'no other worktree runs jobs',
   configured: 'run.toml answers it',
   task: 'a task binds no port and is gone once done',
+  no_key_conflict: 'no key differs from its source',
+  no_key_orphan: 'no key is in no source',
 }
 
 export const actionWords: Record<CreateAction, string> = {
