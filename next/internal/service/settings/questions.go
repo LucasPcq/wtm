@@ -68,9 +68,9 @@ func (g Given) Answer(path string, values []string) (Given, error) {
 	case PathEnvFiles:
 		next.EnvFiles = filled(values)
 	case PathOnCreate:
-		next.OnCreate = domain.HooksOf(filled(values))
+		next.OnCreate, err = domain.HooksOf(path, filled(values))
 	case PathOnClean:
-		next.OnClean = domain.HooksOf(filled(values))
+		next.OnClean, err = domain.HooksOf(path, filled(values))
 	default:
 		err = domain.Unknown(path)
 	}
