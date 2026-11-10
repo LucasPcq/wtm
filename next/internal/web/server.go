@@ -36,14 +36,16 @@ type Params struct {
 	DaemonLog func() string
 	// Repos lists the repositories wtm knows, dropping those no longer initialized.
 	Repos func(ctx context.Context) ([]domain.Repo, error)
-	// Locate finds the repository of a path, set up or not: an error wrapping fs.ErrNotExist when nothing is there, a *domain.Error coded domain.CodeNotARepository outside any.
+	// Locate finds the repository of a path, set up or not: an error wrapping fs.ErrNotExist when nothing is there, ErrNotAFolder for a file, a *domain.Error coded domain.CodeNotARepository outside any.
 	Locate func(ctx context.Context, path string) (Located, error)
 	// Register lists a repository set up among those wtm knows; it never fails.
 	Register func(ctx context.Context, repo domain.Repo)
 	// Home is the user's home, where a path typed ~/… starts; empty reads ~ as it is.
-	Home    string
-	Version string
-	Token   string
+	Home string
+	// NotSetUp are the commands a repository added but not set up yet takes: its set-up, and those on the machine rather than on it.
+	NotSetUp []string
+	Version  string
+	Token    string
 	// Kill stops at once the children of every operation of the process already cancelled, as a second Ctrl+C does: it is process-wide, never one operation's.
 	Kill func()
 	// CommandLine spells a follow-up as the command line runs it, for one the catalogue cannot run.
@@ -273,16 +275,43 @@ func (s *Server) repos(w http.ResponseWriter, r *http.Request) {
 		listed = append(listed, Repo{ID: RepoID(repo), Root: repo.Root, CommonDir: repo.CommonDir, SetUp: true})
 	}
 	s.mu.Lock()
-	for _, id := range slices.Sorted(maps.Keys(s.pending)) {
-		repo := s.pending[id]
+	pending := maps.Clone(s.pending)
+	s.mu.Unlock()
+	for _, id := range slices.Sorted(maps.Keys(pending)) {
+		repo := pending[id]
 		if slices.ContainsFunc(listed, func(known Repo) bool { return known.ID == id }) {
-			delete(s.pending, id) // set up since it was added
+			s.mu.Lock()
+			delete(s.pending, id) // listed since it was added
+			s.mu.Unlock()
 			continue
 		}
-		listed = append(listed, Repo{ID: id, Root: repo.Root, CommonDir: repo.CommonDir})
+		listed = append(listed, Repo{ID: id, Root: repo.Root, CommonDir: repo.CommonDir, SetUp: s.setUp(r.Context(), repo)})
 	}
-	s.mu.Unlock()
 	writeJSON(w, http.StatusOK, listed)
+}
+
+// setUp reports whether wtm is set up in repo as its files stand now: a repository added is set up once init wrote its settings, whether or not the registry lists it yet.
+func (s *Server) setUp(ctx context.Context, repo domain.Repo) bool {
+	located, err := s.params.Locate(ctx, repo.Root)
+	return err == nil && located.SetUp
+}
+
+// CodeNotSetUp refuses a command on a repository added but not set up yet, other than those it takes (Params.NotSetUp).
+const CodeNotSetUp = "web.not_set_up"
+
+// awaitsSetUp reports whether id names a repository added but not listed, whose settings are not written yet.
+func (s *Server) awaitsSetUp(ctx context.Context, id string) bool {
+	s.mu.Lock()
+	repo, added := s.pending[id]
+	s.mu.Unlock()
+	if !added {
+		return false
+	}
+	repos, err := s.params.Repos(ctx)
+	if err == nil && slices.ContainsFunc(repos, func(known domain.Repo) bool { return RepoID(known) == id }) {
+		return false
+	}
+	return !s.setUp(ctx, repo)
 }
 
 // A listedCommand is a command of the catalogue as GET …/commands lists it: its name and its form outside any repository.
@@ -333,6 +362,10 @@ func (s *Server) call(w http.ResponseWriter, r *http.Request) (domain.Repo, api.
 	command, found := s.params.Catalogue.Find(r.PathValue("name"))
 	if !found {
 		writeError(w, http.StatusNotFound, &domain.Error{Kind: domain.KindInvalid, Code: CodeCommandUnknown, Message: "the catalogue has no command " + r.PathValue("name")})
+		return domain.Repo{}, api.Command{}, body{}, false
+	}
+	if !slices.Contains(s.params.NotSetUp, command.Name) && s.awaitsSetUp(r.Context(), RepoID(repo)) {
+		writeError(w, http.StatusPreconditionFailed, &domain.Error{Kind: domain.KindPrecondition, Code: CodeNotSetUp, Message: repo.Root + " is not set up yet: set it up first", Params: domain.Params{"command": command.Name}})
 		return domain.Repo{}, api.Command{}, body{}, false
 	}
 

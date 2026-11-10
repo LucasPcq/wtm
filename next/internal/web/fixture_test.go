@@ -147,20 +147,25 @@ var (
 	other = domain.Repo{Root: "/code/other", CommonDir: "/code/other/.git"}
 )
 
-// places locates repo, fresh and other by any path under their root, a path of /missing as nothing, any other outside a repository; it records each repository registered.
+// places locates repo, fresh and other by any path under their root, a path of /missing as nothing, any other outside a repository; it records each repository registered, which the server's Repos never lists.
 type places struct {
 	mu         sync.Mutex
 	registered []domain.Repo
+	written    bool // fresh set up since: init wrote its settings
 }
 
 func (p *places) locate(_ context.Context, path string) (Located, error) {
 	switch {
+	case strings.HasSuffix(path, ".txt"):
+		return Located{}, fmt.Errorf("%s: %w", path, ErrNotAFolder)
 	case strings.HasPrefix(path, "/missing"):
 		return Located{}, fmt.Errorf("%s: %w", path, fs.ErrNotExist)
 	case strings.HasPrefix(path, repo.Root):
 		return Located{Repo: repo, SetUp: true}, nil
 	case strings.HasPrefix(path, fresh.Root):
-		return Located{Repo: fresh}, nil
+		p.mu.Lock()
+		defer p.mu.Unlock()
+		return Located{Repo: fresh, SetUp: p.written}, nil
 	case strings.HasPrefix(path, other.Root):
 		return Located{Repo: other, SetUp: true}, nil
 	}

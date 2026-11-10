@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/fs"
 	"net"
 	"net/http"
 	"net/url"
@@ -150,6 +149,7 @@ func webParams(token string, idle time.Duration) web.Params {
 			knownRepos(reposjson.Path(), daemon.SocketPath()).Register(ctx, repo)
 		},
 		Home:        home(),
+		NotSetUp:    beforeSetUp(),
 		Version:     version,
 		Token:       token,
 		Kill:        shell.KillCancelled,
@@ -233,12 +233,13 @@ func ensureServer(ctx context.Context, idle time.Duration) (webserver.Record, er
 
 // locateRepo is the repository of path for the web server, and whether wtm is set up in it.
 func locateRepo(ctx context.Context, path string) (web.Located, error) {
+	// os.Stat's error wraps fs.ErrNotExist only for nothing there: a folder it may not read stays that
 	info, err := os.Stat(path)
 	if err != nil {
-		return web.Located{}, fmt.Errorf("%s: %w", path, fs.ErrNotExist)
+		return web.Located{}, err
 	}
 	if !info.IsDir() {
-		return web.Located{}, &domain.Error{Kind: domain.KindPrecondition, Code: domain.CodeNotARepository, Message: path + " is a file, not a folder"}
+		return web.Located{}, fmt.Errorf("%s: %w", path, web.ErrNotAFolder)
 	}
 	params, err := locate(ctx, path)
 	if err != nil {

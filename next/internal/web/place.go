@@ -33,6 +33,7 @@ type PlaceState string
 const (
 	PlaceMissing       PlaceState = "missing"          // nothing is there
 	PlaceNotRepository PlaceState = "not_a_repository" // a directory outside any git repository
+	PlaceNotFolder     PlaceState = "not_a_folder"     // a file
 	PlaceNotSetUp      PlaceState = "not_set_up"       // in a git repository wtm is not set up in
 	PlaceSetUp         PlaceState = "set_up"           // in a repository set up, which the web does not list
 	PlaceKnown         PlaceState = "known"            // in a repository the web lists already
@@ -43,8 +44,14 @@ type placeCall struct {
 	Path string `json:"path"`
 }
 
-// CodePlaceRefused refuses to add a path that is in no git repository.
-const CodePlaceRefused = "web.place_refused"
+// ErrNotAFolder is what Locate wraps for a path to a file.
+var ErrNotAFolder = errors.New("a file, not a folder")
+
+// CodePlaceRefused refuses to add a path that is in no git repository; CodePlaceUnreadable is a path the server could not read (a folder it may not open).
+const (
+	CodePlaceRefused    = "web.place_refused"
+	CodePlaceUnreadable = "web.place_unreadable"
+)
 
 // check answers where a path stands, changing nothing.
 func (s *Server) check(w http.ResponseWriter, r *http.Request) {
@@ -54,7 +61,7 @@ func (s *Server) check(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// add lists the repository of a path: one set up joins the repositories wtm knows, one not set up is served until the server stops, so that it can be set up; a path in none is refused.
+// add lists the repository of a path: one set up joins the repositories wtm knows (served all the same when the registry does not list it), one not set up is served until the server stops, so that it can be set up; a path in none is refused.
 func (s *Server) add(w http.ResponseWriter, r *http.Request) {
 	place, located, ok := s.place(w, r)
 	if !ok {
@@ -62,12 +69,18 @@ func (s *Server) add(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch place.State {
-	case PlaceMissing, PlaceNotRepository:
+	case PlaceMissing, PlaceNotRepository, PlaceNotFolder:
 		writeError(w, http.StatusBadRequest, &domain.Error{Kind: domain.KindInvalid, Code: CodePlaceRefused, Message: place.Path + " is in no git repository", Params: domain.Params{"path": place.Path, "state": string(place.State)}})
 		return
 	case PlaceSetUp:
 		s.params.Register(r.Context(), located.Repo)
 		place.State = PlaceKnown
+		// a register that did not land (its timeout, a state dir set aside) leaves it served all the same, set up as its files say
+		if listed, err := s.known(r.Context(), place.ID); err != nil || !listed {
+			s.mu.Lock()
+			s.pending[place.ID] = located.Repo
+			s.mu.Unlock()
+		}
 	case PlaceNotSetUp:
 		s.mu.Lock()
 		s.pending[place.ID] = located.Repo
@@ -91,7 +104,8 @@ func (s *Server) place(w http.ResponseWriter, r *http.Request) (Place, Located, 
 
 	place, located, err := s.placeOf(r.Context(), filepath.Clean(call.Path))
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, domain.AsError(domain.AsErrorParams{Err: err}))
+		// a path the server may not read says so, as git and the filesystem word it
+		writeError(w, http.StatusInternalServerError, domain.AsError(domain.AsErrorParams{Err: err, Code: CodePlaceUnreadable, Message: err.Error()}))
 		return Place{}, Located{}, false
 	}
 	return place, located, true
@@ -103,6 +117,10 @@ func (s *Server) placeOf(ctx context.Context, path string) (Place, Located, erro
 	located, err := s.params.Locate(ctx, path)
 	if failure, ok := errors.AsType[*domain.Error](err); ok && failure.Code == domain.CodeNotARepository {
 		place.State = PlaceNotRepository
+		return place, Located{}, nil
+	}
+	if errors.Is(err, ErrNotAFolder) {
+		place.State = PlaceNotFolder
 		return place, Located{}, nil
 	}
 	if errors.Is(err, fs.ErrNotExist) {

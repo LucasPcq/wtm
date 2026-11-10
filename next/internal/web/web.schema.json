@@ -339,11 +339,12 @@
           "enum": [
             "missing",
             "not_a_repository",
+            "not_a_folder",
             "not_set_up",
             "set_up",
             "known"
           ],
-          "description": "missing: nothing is there; not_a_repository: outside any git repository; not_set_up: in one wtm is not set up in; set_up: in one set up that the web does not list; known: in one the web lists."
+          "description": "missing: nothing is there; not_a_repository: outside any git repository; not_a_folder: a file; not_set_up: in one wtm is not set up in; set_up: in one set up that the web does not list; known: in one the web lists."
         },
         "id": {
           "type": "string"
