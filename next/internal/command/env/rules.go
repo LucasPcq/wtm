@@ -81,7 +81,7 @@ func (f Facts) subject(name string) (worktree.Worktree, bool) {
 // prechecked is the pick a person is offered, the main one first: the worktrees out of step under req's switches, as options counts them, and the one the caller stands in on the command line: a call of the web or the API stands in none.
 func (f Facts) prechecked(req Request, options []domain.Option) []string {
 	var current []string
-	if surface := req.Caller.Surface; surface != domain.SurfaceWeb && surface != domain.SurfaceAPI {
+	if req.Caller.Surface == domain.SurfaceCLI {
 		current = names(f.targets(Request{Caller: req.Caller}))
 	}
 	found := []string{}
@@ -624,13 +624,17 @@ func (p Plan) retry(items []Item) *domain.FollowUp {
 	return &domain.FollowUp{Command: Name, Answers: domain.AnswersOf(Questions{}.Form(), req), Code: CodeRetry, Message: "reconcile them again"}
 }
 
-// restarts are the warnings of the jobs up in each worktree p writes that would run on the old values until restarted.
+// restarts are the warnings of the jobs up in each worktree p writes that would run on the old values until restarted, said on its dry run.
 func (p Plan) restarts() []domain.Warning {
 	var warnings []domain.Warning
 	for _, r := range p.Worktrees {
-		if r.writes() && len(r.Restart) > 0 {
-			warnings = append(warnings, restartWarning(r))
+		if !r.writes() || len(r.Restart) == 0 {
+			continue
 		}
+		// before the apply, the restart has nothing to do: the warning names the worktree and follows up with nothing
+		warning := restartWarning(r)
+		warning.Message, warning.FollowUp = r.Worktree+": "+strings.Join(r.Restart, ", ")+" would run on the old values until restarted", nil
+		warnings = append(warnings, warning)
 	}
 	return warnings
 }

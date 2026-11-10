@@ -64,7 +64,7 @@ func TestAReconciledWorktreeHasNothingLeftToReconcile(t *testing.T) {
 func TestTheDefaultPickIsTheCallersAndAPersonIsOfferedTheWorktreesOutOfStepToo(t *testing.T) {
 	w := newWorld(acmeSeed())
 
-	q := w.questions(t, env.Request{Caller: domain.Caller{Cwd: "/repo/.trees/" + login + "/apps"}})
+	q := w.questions(t, env.Request{Caller: domain.Caller{Cwd: "/repo/.trees/" + login + "/apps", Surface: domain.SurfaceCLI}})
 
 	assert.Equal(t, domain.OriginDefault, q.Worktrees.Picked.Origin)
 	assert.Equal(t, []string{login}, q.Worktrees.Picked.Value)
@@ -81,8 +81,8 @@ func TestACallOfTheWebIsOfferedTheWorktreesOutOfStepAlone(t *testing.T) {
 		want   []string
 	}{
 		"web":          {caller: domain.Caller{Dir: at, Named: true, Cwd: at, Surface: domain.SurfaceWeb}, want: []string{billing, fresh}},
-		"project_dir":  {caller: domain.Caller{Dir: "/repo/main", Named: true, Cwd: at}, want: []string{billing, fresh, login}},
-		"command_line": {caller: domain.Caller{Dir: at, Cwd: at}, want: []string{billing, fresh, login}},
+		"project_dir":  {caller: domain.Caller{Dir: "/repo/main", Named: true, Cwd: at, Surface: domain.SurfaceCLI}, want: []string{billing, fresh, login}},
+		"command_line": {caller: domain.Caller{Dir: at, Cwd: at, Surface: domain.SurfaceCLI}, want: []string{billing, fresh, login}},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -180,7 +180,8 @@ func TestADryRunSaysTheJobsItsApplyWouldLeaveOnTheOldValues(t *testing.T) {
 	applied := w.run(t, naming(billing), domain.RunOptions{})
 
 	assert.Equal(t, []string{env.CodeRestart}, codes(planned.Warnings))
-	assert.Equal(t, "web runs on the old values until restarted", planned.Warnings[0].Message)
+	assert.Equal(t, billing+": web would run on the old values until restarted", planned.Warnings[0].Message)
+	assert.Nil(t, planned.Warnings[0].FollowUp)
 	assert.Empty(t, codes(applied.Warnings))
 }
 
@@ -301,7 +302,7 @@ func TestAnUnattendedRunWithNoneNamedWritesTheCallersWorktreeAlone(t *testing.T)
 	// the review: run from main, it wrote into every worktree out of step, which nobody named
 	w := newWorld(acmeSeed())
 
-	outcome := w.run(t, env.Request{Caller: domain.Caller{Cwd: mainPath}}, domain.RunOptions{})
+	outcome := w.run(t, env.Request{Caller: domain.Caller{Cwd: mainPath, Surface: domain.SurfaceCLI}}, domain.RunOptions{})
 
 	require.Len(t, outcome.Result.Items, 1)
 	assert.Equal(t, "main", outcome.Result.Items[0].Subject)

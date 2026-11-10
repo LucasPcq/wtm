@@ -1,6 +1,6 @@
 package domain
 
-// A Caller is where the caller of a command stands. Dir is the directory the command runs on: $WTM_PROJECT_DIR on the command line, else its working directory; a surface's call's directory, "" when the call names none. Named says whether the caller chose Dir rather than merely ran from it. Cwd is the directory the caller is in, its symbolic links resolved: a relative path it gives is read from it, and the worktree it stands in is found by it. Surface is the surface a call of the catalogue comes from, empty on the command line.
+// A Caller is where the caller of a command stands. Dir is the directory the command runs on: $WTM_PROJECT_DIR on the command line, else its working directory; a surface's call's directory, "" when the call names none. Named says whether the caller chose Dir rather than merely ran from it. Cwd is the directory the caller is in, its symbolic links resolved: a relative path it gives is read from it, and the worktree it stands in is found by it. Surface is the surface the call comes from: the command line's, or the one a call of the catalogue names.
 type Caller struct {
 	Dir     string
 	Named   bool

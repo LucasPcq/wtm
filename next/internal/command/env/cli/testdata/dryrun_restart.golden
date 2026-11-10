@@ -1,0 +1,11 @@
+
+  env · dry run, nothing applied
+  feat/billing  apps/api/.env  + JWT_SECRET
+                apps/web/.env  PORT → 3020
+                apps/api/.env  OLD left: in no source
+
+  ! feat/billing: web would run on the old values until restarted
+
+  fingerprint  c53e47dcdbdac3c815b66129
+  → wtm-next env feat/billing --expect-fingerprint c53e47dcdbdac3c815b66129   apply this plan
+
