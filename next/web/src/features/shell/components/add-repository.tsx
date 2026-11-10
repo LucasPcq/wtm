@@ -74,7 +74,10 @@ export function AddRepository({ open, onOpenChange }: { open: boolean; onOpenCha
             placeholder="~/dev/billing-api"
             aria-invalid={answer?.ok === false}
             value={typed}
-            onChange={(e) => setTyped(e.target.value)}
+            onChange={(e) => {
+              add.reset()
+              setTyped(e.target.value)
+            }}
           />
           {place.isFetching && path !== '' && (
             <p className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -96,7 +99,14 @@ export function AddRepository({ open, onOpenChange }: { open: boolean; onOpenCha
         </Field>
 
         <DialogFooter className="items-center">
-          <Button variant="ghost" className="mr-auto" onClick={() => onOpenChange(false)}>
+          <Button
+            variant="ghost"
+            className="mr-auto"
+            onClick={() => {
+              setTyped('')
+              onOpenChange(false)
+            }}
+          >
             Cancel
           </Button>
           <Button

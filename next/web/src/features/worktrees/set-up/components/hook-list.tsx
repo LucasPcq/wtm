@@ -1,3 +1,4 @@
+import { SortableKeyboardPlugin } from '@dnd-kit/dom/sortable'
 import { DragDropProvider, KeyboardSensor, PointerSensor } from '@dnd-kit/react'
 import { isSortable, useSortable } from '@dnd-kit/react/sortable'
 import { GripVertical, Plus, X } from 'lucide-react'
@@ -27,9 +28,9 @@ export function HookList({
     <DragDropProvider
       sensors={[PointerSensor, KeyboardSensor]}
       onDragEnd={({ canceled, operation }) => {
-        const { source } = operation
-        if (canceled || !isSortable(source) || source.initialIndex === source.index) return
-        onChange(moved(values, source.initialIndex, source.index))
+        const { source, target } = operation
+        if (canceled || !isSortable(source) || !isSortable(target) || source.index === target.index) return
+        onChange(moved(values, source.index, target.index))
       }}
     >
       <ul id={id} aria-label={label} className="divide-y rounded-lg border">
@@ -72,7 +73,9 @@ function HookRow({
   onChange: (change: { cmd?: string; cwd?: string; continue_on_error?: boolean }) => void
   onRemove: () => void
 }) {
-  const { ref, handleRef } = useSortable({ id: `${group}-${index}`, index, group })
+  // no optimistic sorting: it moves the rows in the DOM while React keys them by place, so the list would show its old
+  // order over the new one; the list is answered again on the drop instead
+  const { ref, handleRef } = useSortable({ id: `${group}-${index}`, index, group, plugins: [SortableKeyboardPlugin] })
   const hook = hookOf(value)
   const where = hook.cwd ?? root
 

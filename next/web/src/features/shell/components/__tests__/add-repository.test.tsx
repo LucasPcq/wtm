@@ -52,3 +52,18 @@ test('a repository not set up is added, then opens on its set-up dialog', async 
   const setUp = await screen.findByRole('dialog', { name: 'Set up billing-api' })
   expect(await within(setUp).findByDisplayValue('../.trees')).toBeDefined()
 })
+
+test('an add the server refused is forgotten once another path is typed', async () => {
+  const { user, dialog } = await openAdd()
+  server.use(
+    http.post('/api/repos', () => HttpResponse.json({ error: { message: 'the server is stopping' } }, { status: 503 })),
+  )
+  const path = within(dialog).getByRole('textbox', { name: 'Path' })
+
+  await user.type(path, '~/dev/billing-api')
+  await user.click(await within(dialog).findByRole('button', { name: 'Set up billing-api' }))
+  expect(await within(dialog).findByText('the server is stopping')).toBeDefined()
+  await user.type(path, 'x')
+
+  await waitFor(() => expect(within(dialog).queryByText('the server is stopping')).toBeNull())
+})
