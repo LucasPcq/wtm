@@ -253,9 +253,14 @@ func (f Facts) file(read envs.FileRead, writes map[string]map[string]written) Fi
 			key.Writes, key.OutOfStep = &w.value, w.outOfStep
 		}
 		key.Main, key.Here = lookup(inMain, k.Name), lookup(here, k.Name)
-		if key.Writes == nil && key.Follows != FollowsPort && key.Follows != FollowsAddress && key.Follows != FollowsValue && key.Follows != FollowsOwned && !f.ShowValues {
+		switch {
+		case f.ShowValues:
+		case key.Writes == nil && key.Follows != FollowsPort && key.Follows != FollowsAddress && key.Follows != FollowsValue && key.Follows != FollowsOwned:
 			key.Withheld = true
 			key.Main, key.Here = withheld(key.Main), withheld(key.Here)
+		default:
+			// wtm writes the port or the address, never the credentials a url may carry beside them
+			key.Main, key.Here, key.Writes = uncredentialed(key.Main), uncredentialed(key.Here), uncredentialed(key.Writes)
 		}
 		file.Keys = append(file.Keys, key)
 	}
@@ -377,6 +382,30 @@ func withheld(value *string) *string {
 	}
 	empty := ""
 	return &empty
+}
+
+// uncredentialed is value with the user and password of each url in it masked.
+func uncredentialed(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	masked, rest := "", *value
+	for {
+		at := strings.Index(rest, "://")
+		if at < 0 {
+			masked += rest
+			break
+		}
+		masked, rest = masked+rest[:at+3], rest[at+3:]
+		end := strings.IndexAny(rest, "/?#, ")
+		if end < 0 {
+			end = len(rest)
+		}
+		if user := strings.LastIndex(rest[:end], "@"); user >= 0 {
+			masked, rest = masked+"•••", rest[user:]
+		}
+	}
+	return &masked
 }
 
 func hasScheme(value string) bool {

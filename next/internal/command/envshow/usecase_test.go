@@ -84,3 +84,15 @@ func TestAnUnreadableRunTomlSaysWhatWtmWritesIsUnknown(t *testing.T) {
 	require.Len(t, warnings, 1)
 	assert.Equal(t, envshow.CodeUnsettled, warnings[0].Code)
 }
+
+func TestTheCredentialsOfALinkedUrlAreWithheld(t *testing.T) {
+	// the review: a linked DATABASE_URL printed its password, which wtm does not write
+	s := acmeSeed()
+	s.Files[linkedPath(billing)+"/"+webEnv] = "PORT=3010\nAPI_URL=http://admin:hunter2@localhost:4020/v1\n"
+
+	hidden, _ := read(t, s, envshow.Request{Worktree: billing})
+	shown, _ := read(t, s, envshow.Request{Worktree: billing, ShowValues: true})
+
+	assert.Equal(t, ptr("http://•••@localhost:4020/v1"), keyOf(t, hidden, webEnv, "API_URL").Here)
+	assert.Equal(t, ptr("http://admin:hunter2@localhost:4020/v1"), keyOf(t, shown, webEnv, "API_URL").Here)
+}

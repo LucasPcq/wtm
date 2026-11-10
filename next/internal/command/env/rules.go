@@ -409,17 +409,17 @@ func (r Request) Locks() []domain.Lock {
 
 // The notes of the recap's values: a file created, a key added, overwritten, dropped, or left with its status, a linked value rewritten, a value wtm owns set, a worktree numbered; a worktree in step, one whose directory is gone.
 const (
-	NoteCreated   = "created"
-	NoteAdded     = "added"
-	NoteOverwrit  = "overwritten"
-	NotePruned    = "pruned"
-	NoteLeft      = "left"
-	NoteRewrite   = "rewrite"
-	NoteOwned     = "owned"
-	NoteNumbered  = "numbered"
-	NoteIsolation = "isolation"
-	NoteInStep    = "in_step"
-	NoteMissing   = "missing"
+	NoteCreated     = "created"
+	NoteAdded       = "added"
+	NoteOverwritten = "overwritten"
+	NotePruned      = "pruned"
+	NoteLeft        = "left"
+	NoteRewrite     = "rewrite"
+	NoteOwned       = "owned"
+	NoteNumbered    = "numbered"
+	NoteIsolation   = "isolation"
+	NoteInStep      = "in_step"
+	NoteMissing     = "missing"
 )
 
 // empty reports whether applying the plan changes nothing.
@@ -467,7 +467,7 @@ func (r Reconcile) leaves() bool {
 
 // keyNotes are the notes of a key settled, by its status, and the words of a key left.
 var (
-	keyNotes  = map[envs.KeyStatus]string{envs.KeyAdd: NoteAdded, envs.KeyConflict: NoteOverwrit, envs.KeyOrphan: NotePruned}
+	keyNotes  = map[envs.KeyStatus]string{envs.KeyAdd: NoteAdded, envs.KeyConflict: NoteOverwritten, envs.KeyOrphan: NotePruned}
 	keyMarks  = map[envs.KeyStatus]string{envs.KeyAdd: "+ ", envs.KeyConflict: "~ ", envs.KeyOrphan: "− "}
 	leftWords = map[envs.KeyStatus]string{envs.KeyMissing: "no source gives it a value", envs.KeyConflict: "differs from its source", envs.KeyOrphan: "in no source"}
 )
