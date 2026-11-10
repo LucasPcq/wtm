@@ -15,6 +15,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/daemonstop"
 	"github.com/LucasPcq/wtm/next/internal/command/daemonstopjobs"
 	"github.com/LucasPcq/wtm/next/internal/command/rundown"
+	"github.com/LucasPcq/wtm/next/internal/command/runinit"
 	"github.com/LucasPcq/wtm/next/internal/command/runstart"
 	"github.com/LucasPcq/wtm/next/internal/command/runstop"
 	"github.com/LucasPcq/wtm/next/internal/command/runup"
@@ -158,6 +159,26 @@ func mutations() []mutation {
 			applied: func(t *testing.T, main string) {
 				assert.NoDirExists(t, filepath.Join(filepath.Dir(main), ".trees", "feat-done"))
 				assert.Empty(t, gittest.Output(t, main, "branch", "--list", "feat/done"))
+			},
+		},
+		{
+			name:     runinit.Name,
+			answers:  []domain.Answered{{Path: runinit.PathJobs, Values: []string{"web"}}},
+			complete: true,
+			// an app with a dev script and its port in its .env
+			setup: func(t *testing.T, main string) {
+				writeFile(t, filepath.Join(main, "package.json"), `{"name": "web", "scripts": {"dev": "vite"}}`)
+				writeFile(t, filepath.Join(main, ".env"), "PORT=5173\n")
+			},
+			// the app's port moved: the plan declares another
+			stale: func(t *testing.T, main string) {
+				writeFile(t, filepath.Join(main, ".env"), "PORT=5174\n")
+			},
+			untouched: func(t *testing.T, main string) {
+				assert.NoFileExists(t, filepath.Join(main, ".git", "wtm", "run.toml"))
+			},
+			applied: func(t *testing.T, main string) {
+				assert.FileExists(t, filepath.Join(main, ".git", "wtm", "run.toml"))
 			},
 		},
 		{

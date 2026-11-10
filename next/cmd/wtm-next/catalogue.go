@@ -21,6 +21,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/reparent"
 	"github.com/LucasPcq/wtm/next/internal/command/resolve"
 	"github.com/LucasPcq/wtm/next/internal/command/rundown"
+	"github.com/LucasPcq/wtm/next/internal/command/runinit"
 	"github.com/LucasPcq/wtm/next/internal/command/runlist"
 	"github.com/LucasPcq/wtm/next/internal/command/runlogs"
 	"github.com/LucasPcq/wtm/next/internal/command/runps"
@@ -51,6 +52,7 @@ func catalogue() api.Catalogue {
 		api.Bind(resolve.Name, openResolve, resolve.UseCase.Questions, resolve.UseCase.Run),
 		api.Bind(status.Name, openStatus, status.UseCase.Questions, status.UseCase.Run),
 		api.Bind(tree.Name, openTree, tree.UseCase.Questions, tree.UseCase.Run),
+		api.Bind(runinit.Name, openRunInit, runinit.UseCase.Questions, runinit.UseCase.Run),
 		api.Bind(runup.Name, openRunUp, runup.UseCase.Questions, runup.UseCase.Run),
 		api.Bind(runlogs.Name, openRunLogs, runlogs.UseCase.Questions, runlogs.UseCase.Run),
 		api.Bind(rundown.Name, openRunDown, rundown.UseCase.Questions, rundown.UseCase.Run),

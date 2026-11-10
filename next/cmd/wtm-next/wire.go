@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/LucasPcq/wtm/next/internal/adapter/compose"
 	"github.com/LucasPcq/wtm/next/internal/adapter/config"
 	"github.com/LucasPcq/wtm/next/internal/adapter/daemon"
 	"github.com/LucasPcq/wtm/next/internal/adapter/detect"
@@ -50,6 +51,8 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/resolve"
 	"github.com/LucasPcq/wtm/next/internal/command/rundown"
 	rundowncli "github.com/LucasPcq/wtm/next/internal/command/rundown/cli"
+	"github.com/LucasPcq/wtm/next/internal/command/runinit"
+	runinitcli "github.com/LucasPcq/wtm/next/internal/command/runinit/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/runlist"
 	"github.com/LucasPcq/wtm/next/internal/command/runlogs"
 	runlogscli "github.com/LucasPcq/wtm/next/internal/command/runlogs/cli"
@@ -99,6 +102,7 @@ type app struct {
 	Resolve     resolve.UseCase
 	Status      status.UseCase
 	Tree        tree.UseCase
+	RunInit     runinit.UseCase
 	RunUp       runup.UseCase
 	RunLogs     runlogs.UseCase
 	RunDown     rundown.UseCase
@@ -285,6 +289,16 @@ func wire(params wireParams) app {
 			PullRequests: gh.PullRequestsOf,
 			Repository:   facts,
 		},
+		RunInit: runinit.UseCase{
+			RunConfig:  projectConfig,
+			Settings:   projectConfig,
+			Compose:    compose.Repository{Dir: params.MainPath},
+			Detector:   detect.Repository{Dir: params.MainPath},
+			EnvFiles:   store.EnvFiles{},
+			Meta:       meta,
+			Repository: facts,
+			Operations: operations,
+		},
 		RunUp: runup.UseCase{
 			Meta:       meta,
 			RunConfig:  projectConfig,
@@ -447,6 +461,8 @@ func commandLine(followUp domain.FollowUp) []string {
 		return initcli.Line(followUp)
 	case create.Name:
 		return createcli.Line(followUp)
+	case runinit.Name:
+		return runinitcli.Line(followUp)
 	case runup.Name:
 		return runupcli.Line(followUp)
 	case runlogs.Name:

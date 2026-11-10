@@ -1,0 +1,200 @@
+{
+  "fields": [
+    {
+      "kind": "multi_select",
+      "path": "jobs",
+      "section": "runs",
+      "picked": [],
+      "options": []
+    },
+    {
+      "kind": "multi_select",
+      "path": "tasks",
+      "section": "runs",
+      "picked": [],
+      "options": []
+    },
+    {
+      "kind": "select",
+      "path": "runner",
+      "section": "runs",
+      "value": "",
+      "options": [
+        {
+          "value": "one_by_one"
+        },
+        {
+          "value": "through"
+        }
+      ],
+      "rememberable": false,
+      "remember": false,
+      "refreshable": false,
+      "closed": true
+    },
+    {
+      "kind": "multi_select",
+      "path": "shared",
+      "section": "shared",
+      "picked": [],
+      "options": []
+    },
+    {
+      "kind": "text_list",
+      "path": "spaces",
+      "section": "shared",
+      "entries": [],
+      "options": []
+    },
+    {
+      "kind": "multi_select",
+      "path": "touches",
+      "section": "shared",
+      "picked": [],
+      "options": []
+    },
+    {
+      "kind": "text_list",
+      "path": "ports",
+      "section": "ports",
+      "entries": [],
+      "options": []
+    },
+    {
+      "kind": "text_list",
+      "path": "commands",
+      "section": "ports",
+      "entries": [],
+      "options": []
+    },
+    {
+      "kind": "select",
+      "path": "addressing",
+      "section": "addresses",
+      "value": "",
+      "options": [
+        {
+          "value": "names"
+        },
+        {
+          "value": "ports"
+        }
+      ],
+      "rememberable": false,
+      "remember": false,
+      "refreshable": false,
+      "closed": true
+    },
+    {
+      "kind": "multi_select",
+      "path": "urls",
+      "section": "addresses",
+      "picked": [],
+      "options": []
+    },
+    {
+      "kind": "multi_select",
+      "path": "env_copy",
+      "section": "env",
+      "picked": [],
+      "options": []
+    },
+    {
+      "kind": "multi_select",
+      "path": "links",
+      "section": "env",
+      "picked": [],
+      "options": []
+    },
+    {
+      "kind": "text_list",
+      "path": "profiles",
+      "section": "profiles",
+      "entries": [],
+      "options": []
+    },
+    {
+      "kind": "select",
+      "path": "default_profile",
+      "section": "profiles",
+      "value": "",
+      "options": [],
+      "rememberable": false,
+      "remember": false,
+      "refreshable": false,
+      "closed": false
+    },
+    {
+      "kind": "confirm",
+      "path": "patch_compose",
+      "section": "ports",
+      "value": false,
+      "no_first": false,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "select",
+      "path": "preview",
+      "skip": "flag_only",
+      "value": "",
+      "options": [],
+      "rememberable": false,
+      "remember": false,
+      "refreshable": false,
+      "closed": false
+    }
+  ],
+  "problems": [],
+  "sections": [
+    {
+      "id": "runs",
+      "state": "answered"
+    },
+    {
+      "id": "shared",
+      "state": "answered",
+      "waits_for": [
+        "runs"
+      ]
+    },
+    {
+      "id": "ports",
+      "state": "answered",
+      "waits_for": [
+        "runs",
+        "shared"
+      ]
+    },
+    {
+      "id": "addresses",
+      "state": "answered",
+      "waits_for": [
+        "runs",
+        "shared",
+        "ports"
+      ]
+    },
+    {
+      "id": "env",
+      "state": "answered",
+      "waits_for": [
+        "runs",
+        "shared",
+        "ports",
+        "addresses"
+      ]
+    },
+    {
+      "id": "profiles",
+      "state": "answered",
+      "waits_for": [
+        "runs",
+        "shared",
+        "ports",
+        "addresses",
+        "env"
+      ]
+    }
+  ]
+}

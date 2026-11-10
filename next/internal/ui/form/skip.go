@@ -24,6 +24,10 @@ var skipped = map[domain.Skip]string{
 	domain.SkipTask:            "a task binds no port and is gone once done",
 	domain.SkipNoEnv:           "no .env file is copied",
 	domain.SkipNoEnvFile:       "the repository holds no .env file",
+	domain.SkipNoRunner:        "no root script starts the apps",
+	domain.SkipNoCompose:       "no docker-compose.yml, nothing to share",
+	domain.SkipNothingToAsk:    "nothing to ask",
+	domain.SkipNoProfile:       "no profile",
 }
 
 // Skipped is how the wizard's trail words why a step is not asked, empty when it has no words for it; a command may

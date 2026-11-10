@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+  redis:
+    image: redis:7
+    container_name: "${COMPOSE_PROJECT_NAME:-acme}-redis"
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - "${MAILPIT_PORT:-8025}:8025"
+      - "${MAILPIT_PORT_1025:-1025}:1025"

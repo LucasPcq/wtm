@@ -43,6 +43,8 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
 	"github.com/LucasPcq/wtm/next/internal/command/rundown"
 	rundowncli "github.com/LucasPcq/wtm/next/internal/command/rundown/cli"
+	"github.com/LucasPcq/wtm/next/internal/command/runinit"
+	runinitcli "github.com/LucasPcq/wtm/next/internal/command/runinit/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/runlist"
 	"github.com/LucasPcq/wtm/next/internal/command/runlogs"
 	runlogscli "github.com/LucasPcq/wtm/next/internal/command/runlogs/cli"
@@ -971,6 +973,12 @@ func daemonLog(t *testing.T, socket string) string {
 }
 
 // writeRun writes content as the run.toml of the repository whose main worktree is main.
+func writeFile(t *testing.T, path, content string) {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
+}
+
 func writeRun(t *testing.T, main, content string) {
 	t.Helper()
 	require.NoError(t, os.WriteFile(filepath.Join(main, ".git", "wtm", "run.toml"), []byte(content), 0o644))
@@ -993,9 +1001,11 @@ func shortDir(t *testing.T) string {
 	return dir
 }
 
-// spelling is how the command line spells a command a follow-up names: run up for the catalogue's run-up, run down for its run-down, run start for its run-start, run stop for its run-stop.
+// spelling is how the command line spells a command a follow-up names: run init for the catalogue's run-init, run up for the catalogue's run-up, run down for its run-down, run start for its run-start, run stop for its run-stop.
 func spelling(command string) string {
 	switch command {
+	case runinit.Name:
+		return runinitcli.Use
 	case runup.Name:
 		return runupcli.Use
 	case runlogs.Name:

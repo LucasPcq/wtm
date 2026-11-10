@@ -1,0 +1,279 @@
+{
+  "fields": [
+    {
+      "kind": "multi_select",
+      "path": "jobs",
+      "origin": "request",
+      "section": "runs",
+      "picked": [
+        "web"
+      ],
+      "options": [
+        {
+          "value": "web"
+        }
+      ]
+    },
+    {
+      "kind": "multi_select",
+      "path": "tasks",
+      "origin": "detected",
+      "section": "runs",
+      "picked": [],
+      "options": [
+        {
+          "value": "web"
+        }
+      ]
+    },
+    {
+      "kind": "select",
+      "path": "runner",
+      "skip": "no_runner",
+      "section": "runs",
+      "value": "one_by_one",
+      "options": [
+        {
+          "value": "one_by_one"
+        },
+        {
+          "value": "through"
+        }
+      ],
+      "rememberable": false,
+      "remember": false,
+      "refreshable": false,
+      "closed": true
+    },
+    {
+      "kind": "multi_select",
+      "path": "shared",
+      "origin": "detected",
+      "skip": "no_compose",
+      "section": "shared",
+      "picked": [],
+      "options": []
+    },
+    {
+      "kind": "text_list",
+      "path": "spaces",
+      "origin": "detected",
+      "skip": "nothing_to_ask",
+      "section": "shared",
+      "entries": [],
+      "options": []
+    },
+    {
+      "kind": "multi_select",
+      "path": "touches",
+      "origin": "detected",
+      "skip": "nothing_to_ask",
+      "section": "shared",
+      "picked": [],
+      "options": []
+    },
+    {
+      "kind": "text_list",
+      "path": "ports",
+      "origin": "detected",
+      "section": "ports",
+      "entries": [
+        "web.PORT=5173"
+      ],
+      "options": [
+        {
+          "value": "web.PORT=5173"
+        }
+      ]
+    },
+    {
+      "kind": "text_list",
+      "path": "commands",
+      "origin": "detected",
+      "section": "ports",
+      "entries": [],
+      "options": []
+    },
+    {
+      "kind": "select",
+      "path": "addressing",
+      "origin": "detected",
+      "section": "addresses",
+      "value": "names",
+      "options": [
+        {
+          "value": "names"
+        },
+        {
+          "value": "ports"
+        }
+      ],
+      "rememberable": false,
+      "remember": false,
+      "refreshable": false,
+      "closed": true
+    },
+    {
+      "kind": "multi_select",
+      "path": "urls",
+      "origin": "detected",
+      "section": "addresses",
+      "picked": [
+        "web"
+      ],
+      "options": [
+        {
+          "value": "web"
+        }
+      ]
+    },
+    {
+      "kind": "multi_select",
+      "path": "env_copy",
+      "origin": "detected",
+      "section": "env",
+      "picked": [],
+      "options": [
+        {
+          "value": ".env"
+        }
+      ]
+    },
+    {
+      "kind": "multi_select",
+      "path": "links",
+      "origin": "detected",
+      "section": "env",
+      "picked": [
+        ".env#PORT"
+      ],
+      "options": [
+        {
+          "value": ".env#PORT"
+        }
+      ]
+    },
+    {
+      "kind": "text_list",
+      "path": "profiles",
+      "origin": "detected",
+      "section": "profiles",
+      "entries": [
+        "all=web",
+        "web=web"
+      ],
+      "options": [
+        {
+          "value": "all=web"
+        },
+        {
+          "value": "web=web"
+        }
+      ]
+    },
+    {
+      "kind": "select",
+      "path": "default_profile",
+      "origin": "detected",
+      "section": "profiles",
+      "value": "all",
+      "options": [
+        {
+          "value": "all"
+        },
+        {
+          "value": "web"
+        }
+      ],
+      "rememberable": false,
+      "remember": false,
+      "refreshable": false,
+      "closed": false
+    },
+    {
+      "kind": "confirm",
+      "path": "patch_compose",
+      "origin": "default",
+      "skip": "nothing_to_ask",
+      "section": "ports",
+      "value": true,
+      "no_first": false,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "select",
+      "path": "preview",
+      "origin": "default",
+      "skip": "flag_only",
+      "value": "main",
+      "options": [
+        {
+          "value": "main"
+        }
+      ],
+      "rememberable": false,
+      "remember": false,
+      "refreshable": false,
+      "closed": false
+    }
+  ],
+  "problems": [],
+  "sections": [
+    {
+      "id": "runs",
+      "state": "answered"
+    },
+    {
+      "id": "shared",
+      "state": "skipped",
+      "reason": "no_compose",
+      "waits_for": [
+        "runs"
+      ]
+    },
+    {
+      "id": "ports",
+      "state": "answered",
+      "waits_for": [
+        "runs",
+        "shared"
+      ]
+    },
+    {
+      "id": "addresses",
+      "state": "answered",
+      "waits_for": [
+        "runs",
+        "shared",
+        "ports"
+      ]
+    },
+    {
+      "id": "env",
+      "state": "to_check",
+      "reason": "run-init.env_file_not_copied",
+      "params": {
+        "file": ".env",
+        "path": "env_copy[0]"
+      },
+      "waits_for": [
+        "runs",
+        "shared",
+        "ports",
+        "addresses"
+      ]
+    },
+    {
+      "id": "profiles",
+      "state": "answered",
+      "waits_for": [
+        "runs",
+        "shared",
+        "ports",
+        "addresses",
+        "env"
+      ]
+    }
+  ]
+}

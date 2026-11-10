@@ -95,6 +95,10 @@ export const skipWords: Record<DomainSkip, string | null> = {
   task: 'a task binds no port and is gone once done',
   no_env: 'no .env file is copied',
   no_env_file: 'the repository holds no .env file',
+  no_runner: 'no root script starts the apps',
+  no_compose: 'no docker-compose.yml, nothing to share',
+  nothing_to_ask: 'nothing to ask',
+  no_profile: 'no profile',
 }
 
 export const actionWords: Record<CreateAction, string> = {

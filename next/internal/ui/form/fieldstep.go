@@ -257,9 +257,13 @@ type textListStep struct {
 	list *widget.TextList
 }
 
-// Open builds the list from the entries answered so far and starts the cursor blinking.
+// Open builds the list from the entries answered so far, else those the field settled on, and starts the cursor blinking.
 func (s *textListStep) Open() tea.Cmd {
-	s.list = widget.NewTextList(s.sheet.values(s.path()), s.check, s.badge)
+	entries := s.sheet.values(s.path())
+	if field, ok := s.sheet.Field(s.at).(domain.TextListField); ok && entries == nil {
+		entries = field.Entries
+	}
+	s.list = widget.NewTextList(entries, s.check, s.badge)
 	return textinput.Blink
 }
 

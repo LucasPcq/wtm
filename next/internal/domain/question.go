@@ -53,11 +53,15 @@ const (
 	SkipTask            Skip = "task"             // the job is a task: it binds no port and is gone once done, nothing to keep or stop
 	SkipNoEnv           Skip = "no_env"           // no .env file is copied: there are none to list
 	SkipNoEnvFile       Skip = "no_env_file"      // the repository holds no .env file to pick
+	SkipNoRunner        Skip = "no_runner"        // no root script starts the apps
+	SkipNoCompose       Skip = "no_compose"       // the repository has no docker compose file: nothing to share
+	SkipNothingToAsk    Skip = "nothing_to_ask"   // the parts before leave nothing to pick
+	SkipNoProfile       Skip = "no_profile"       // no profile is declared: none to start by default
 )
 
 // Skips returns every Skip.
 func Skips() []Skip {
-	return []Skip{SkipFlagOnly, SkipExists, SkipNotBehind, SkipHeld, SkipRunUnread, SkipNothingIsolated, SkipNoConflict, SkipAll, SkipNoOrphan, SkipSafe, SkipNoDataOwed, SkipNoCandidate, SkipNoDescendant, SkipNoRebase, SkipNothingToPush, SkipOneProfile, SkipAlone, SkipConfigured, SkipTask, SkipNoEnv, SkipNoEnvFile}
+	return []Skip{SkipFlagOnly, SkipExists, SkipNotBehind, SkipHeld, SkipRunUnread, SkipNothingIsolated, SkipNoConflict, SkipAll, SkipNoOrphan, SkipSafe, SkipNoDataOwed, SkipNoCandidate, SkipNoDescendant, SkipNoRebase, SkipNothingToPush, SkipOneProfile, SkipAlone, SkipConfigured, SkipTask, SkipNoEnv, SkipNoEnvFile, SkipNoRunner, SkipNoCompose, SkipNothingToAsk, SkipNoProfile}
 }
 
 // Answer is the value a question settled on, and where that value came from.

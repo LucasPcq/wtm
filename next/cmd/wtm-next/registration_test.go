@@ -19,6 +19,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/events"
 	"github.com/LucasPcq/wtm/next/internal/command/initialize"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
+	"github.com/LucasPcq/wtm/next/internal/command/runinit"
 	"github.com/LucasPcq/wtm/next/internal/command/status"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
@@ -38,7 +39,11 @@ func TestEachRegisteredCommandIsInTheCatalogueOrItsStreamsAndWired(t *testing.T)
 	var listed, streamed []string
 	for _, command := range catalogue() {
 		// a command's folder spells its name without dashes, command/fastforward is fast-forward, and init, Go's name for a package's set-up, as command/initialize
-		listed = append(listed, strings.ReplaceAll(strings.Replace(command.Name, "init", "initialize", 1), "-", ""))
+		name := command.Name
+		if name == "init" {
+			name = "initialize"
+		}
+		listed = append(listed, strings.ReplaceAll(name, "-", ""))
 	}
 	for _, stream := range streams() {
 		streamed = append(streamed, stream.Name)
@@ -112,7 +117,7 @@ func TestEachFollowUpOfAMigratedCommandIsSpelledFromItsSchema(t *testing.T) {
 			continue
 		}
 
-		require.Contains(t, []string{initialize.Name, domain.CommandCreate, clean.Name, prune.Name, exec.Name, domain.CommandSync, runup.Name, runlogs.Name, rundown.Name, runstart.Name, runstop.Name, daemonrestart.Name}, followUp.Command, "%s has migrated: spell its follow-ups from its schema in commandLine", followUp.Command)
+		require.Contains(t, []string{initialize.Name, runinit.Name, domain.CommandCreate, clean.Name, prune.Name, exec.Name, domain.CommandSync, runup.Name, runlogs.Name, rundown.Name, runstart.Name, runstop.Name, daemonrestart.Name}, followUp.Command, "%s has migrated: spell its follow-ups from its schema in commandLine", followUp.Command)
 		argv := commandLine(followUp)
 		assert.Equal(t, append([]string{cli.Program}, strings.Fields(spelling(followUp.Command))...), argv[:min(1+len(strings.Fields(spelling(followUp.Command))), len(argv))], "%s's follow-up %v does not fold into its request", followUp.Command, followUp.Answers)
 	}
