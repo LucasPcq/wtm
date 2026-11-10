@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/LucasPcq/wtm/next/internal/command/runinit"
 	"github.com/LucasPcq/wtm/next/internal/ui/form"
@@ -32,6 +33,6 @@ func applyLabel(previewed runinit.Outcome) string {
 	case 1:
 		return "Yes, write " + previewed.Plan.Files[0].Path
 	default:
-		return "Yes, write the " + itoa(n) + " files"
+		return "Yes, write the " + strconv.Itoa(n) + " files"
 	}
 }

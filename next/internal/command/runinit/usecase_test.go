@@ -3,6 +3,7 @@ package runinit_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/runinit"
@@ -174,6 +175,7 @@ func TestDockerComposeIsLeftAloneWhenAsked(t *testing.T) {
 	assert.Equal(t, before, readFile(t, filepath.Join(w.main, "docker-compose.yml")))
 	assert.Equal(t, []string{"run.toml"}, subjects(outcome.Result.Items))
 	assert.Empty(t, w.job(t, "redis").Ports, "a literal port the file keeps binds the same in every worktree: none is declared")
+	assert.False(t, w.job(t, "redis").BindsNoPort, "it binds one all the same")
 }
 
 func TestAReInitThatChangesNothingWritesNothing(t *testing.T) {
@@ -264,4 +266,24 @@ func TestTheDryRunPreviewsAWorktreeAtItsOrdinal(t *testing.T) {
 	assert.Contains(t, preview.Ports, runinit.PreviewPort{Job: "postgres", Variable: "POSTGRES_PORT", Base: 5432, Port: 5432, Shared: true})
 	assert.Contains(t, preview.Data, runinit.PreviewData{Service: "postgres", Name: "acme_feat-billing", Template: "acme_{worktree}"})
 	assert.Contains(t, preview.Addresses, runinit.PreviewAddress{Job: "api", URL: "http://api.feat-billing.acme.localhost:11080"})
+}
+
+func TestAPortVariableRenamedIsTheOneDockerComposeReads(t *testing.T) {
+	w := newWorld(t)
+
+	w.apply(t, runinit.Request{Ports: []string{"postgres.POSTGRES_PORT=5432", "redis.CACHE_PORT=6379", "mailpit.MAILPIT_PORT=8025", "mailpit.MAILPIT_PORT_1025=1025", "admin.ADMIN_PORT=3001", "api.PORT=4000", "web.PORT=3000", "worker="}})
+
+	assert.Equal(t, map[string]int{"CACHE_PORT": 6379}, w.job(t, "redis").Ports)
+	assert.Contains(t, readFile(t, filepath.Join(w.main, "docker-compose.yml")), `"${CACHE_PORT:-6379}:6379"`)
+}
+
+func TestAReInitKeepsWhatRunTomlSaysOfAJobRunInitDoesNotAsk(t *testing.T) {
+	w := newWorld(t)
+	w.apply(t, runinit.Request{})
+	edited := strings.Replace(w.runToml(t), "  cwd = \"apps/api\"\n", "  cwd = \"apps/api\"\n  stop = \"pkill -f tsx\"\n", 1)
+	writeFile(t, filepath.Join(w.stateDir, "run.toml"), edited)
+
+	w.apply(t, runinit.Request{Addressing: project.AddressPorts})
+
+	assert.Equal(t, "pkill -f tsx", w.job(t, "api").Stop)
 }

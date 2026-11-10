@@ -320,11 +320,6 @@ func (f Facts) decideRuns(d *Decision, req Request) {
 	d.Runner = settle(d, PathRunner, req.Runner, req.Runner != "", func() Runner { return through }, OneByOne, f.declared())
 }
 
-// TaskNames are the jobs picked that run once.
-func (d Decision) TaskNames() []string {
-	return d.Tasks
-}
-
 // candidate is the candidate of name.
 func (d Decision) candidate(name string) (Candidate, bool) {
 	if at := slices.IndexFunc(d.Candidates, func(c Candidate) bool { return c.Name == name }); at >= 0 {
@@ -470,7 +465,15 @@ func (f Facts) decideCompose(d *Decision, req Request) {
 	if req.PatchCompose != nil {
 		d.PatchCompose, d.Origins[PathPatchCompose] = *req.PatchCompose, domain.OriginRequest
 	}
-	if len(d.composeEdits(f)) == 0 {
+	var proposed []Port
+	taken := map[string]bool{}
+	for _, read := range f.Compose.Reads {
+		taken[read] = true
+	}
+	for _, service := range f.Compose.Services {
+		proposed = append(proposed, f.composePorts(composePortsParams{Service: service.Name, Patch: true, Taken: taken})...)
+	}
+	if len(d.editsFor(f, proposed)) == 0 {
 		d.Skips[PathPatchCompose] = domain.SkipNothingToAsk
 	}
 }
@@ -1184,7 +1187,7 @@ func (d Decision) run(f Facts) project.Run {
 // job is the job of c as run.toml writes it: run.toml's own when it declares it, what the decision settles over it.
 func (d Decision) job(f Facts, c Candidate) project.Job {
 	job, _ := f.job(c.Name)
-	job.Name, job.Kind, job.Stop = c.Name, project.Service, c.Stop
+	job.Name, job.Kind, job.Stop = c.Name, project.Service, cmp.Or(c.Stop, job.Stop)
 	job.Cmd = cmp.Or(d.Commands[c.Name], c.Cmd)
 	job.Cwd = ""
 	if c.Place != "" && c.Place != "." {
@@ -1197,7 +1200,7 @@ func (d Decision) job(f Facts, c Candidate) project.Job {
 	job.Ports, job.BindsNoPort, job.URL = nil, false, nil
 	for _, port := range portsOf(d.Ports, c.Name) {
 		if port.Variable == "" {
-			job.BindsNoPort = job.Kind == project.Service && c.Name != runnerName
+			job.BindsNoPort = job.Kind == project.Service && !c.Compose && c.Name != runnerName
 			continue
 		}
 		if job.Ports == nil {
@@ -1220,8 +1223,11 @@ func (d Decision) job(f Facts, c Candidate) project.Job {
 			job.Namespace = &space
 		}
 	}
+	touches := job.Touches
 	job.Touches = nil
-	if slices.Contains(d.Touches, c.Name) {
+	if slices.Contains(d.Touches, c.Name) && len(touches) > 0 {
+		job.Touches = touches
+	} else if slices.Contains(d.Touches, c.Name) {
 		for _, service := range d.Shared {
 			if d.Spaces[service].Name != "" {
 				job.Touches = append(job.Touches, service)
@@ -1242,16 +1248,17 @@ type ComposeEdit struct {
 
 // composeEdits are docker-compose.yml's values the rewrite changes: each literal host port of a service picked, to read the variable its port is declared under with the literal as its default; each name a service kept per worktree pins (container_name), a volume's or a network's, fronted with the compose project, so two worktrees never meet on it.
 func (d Decision) composeEdits(f Facts) []ComposeEdit {
+	return d.editsFor(f, d.Ports)
+}
+
+// editsFor are docker-compose.yml's edits for ports, each literal host port read through the variable its port is declared under.
+func (d Decision) editsFor(f Facts, ports []Port) []ComposeEdit {
 	var edits []ComposeEdit
-	taken := map[string]bool{}
-	for _, read := range f.Compose.Reads {
-		taken[read] = true
-	}
 	for _, service := range f.Compose.Services {
 		if !slices.Contains(d.Picked, service.Name) || slices.Contains(d.Tasks, service.Name) {
 			continue
 		}
-		for _, port := range f.composePorts(composePortsParams{Service: service.Name, Patch: true, Taken: maps.Clone(taken)}) {
+		for _, port := range portsOf(ports, service.Name) {
 			for _, published := range service.Ports {
 				if published.Unreadable != "" || published.Host != strconv.Itoa(port.Base) || port.Variable == "" {
 					continue

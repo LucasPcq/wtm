@@ -210,7 +210,7 @@ func (q Questions) Form() domain.Form {
 	}
 	fields = append(fields,
 		domain.TextListField{FieldSpec: d.spec(PathSpaces), Entries: spelledSpaces(d.Shared, d.Spaces), Options: options(spelledSpaces(d.Shared, d.ProposedSpaces))},
-		domain.MultiSelectField{FieldSpec: d.spec(PathTouches), Picked: d.Touches, Options: options(d.TaskNames()), Optional: true},
+		domain.MultiSelectField{FieldSpec: d.spec(PathTouches), Picked: d.Touches, Options: options(d.Tasks), Optional: true},
 		domain.TextListField{FieldSpec: d.spec(PathPorts), Entries: spelledPorts(d.Ports), Options: options(spelledPorts(d.ProposedPorts))},
 		domain.TextListField{FieldSpec: d.spec(PathCommands), Entries: spelledCommands(d.Commands), Options: options(spelledCommands(d.Rewrites))},
 		domain.SelectField{FieldSpec: d.spec(PathAddressing), Value: string(d.Addressing), Options: domain.OptionsOf([]project.Addressing{project.AddressNames, project.AddressPorts}), Closed: true},
