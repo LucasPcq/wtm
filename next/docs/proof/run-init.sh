@@ -105,7 +105,10 @@ tty_side() {
     screen() { tmux capture-pane -p -t "$session" | cat -s; }
     tmux new-session -d -s "$session" -x 110 -y 50 -c "$root/acme" "zsh -f"
     tmux send-keys -t "$session" "export HOME=$root/home PATH=$root/bin:\$PATH PS1='$ ' && clear && wtmx run init; echo EXIT=\$?" Enter
-    sleep 3
+    # the first screen, once drawn: a fixed wait sometimes read the pane still blank
+    local tries=0
+    until [[ -n $(screen | tr -d '[:space:]') ]] || ((tries++ > 40)); do sleep 0.25; done
+    sleep 1
     local step=1 last=""
     while ((step <= 20)); do
       local now
