@@ -5,9 +5,11 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/adapter/config"
 	"github.com/LucasPcq/wtm/next/internal/adapter/store"
 	"github.com/LucasPcq/wtm/next/internal/command/runinit"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/stretchr/testify/require"
 )
@@ -48,4 +50,93 @@ func (w *world) apply(t *testing.T, req runinit.Request) runinit.Outcome {
 func (w *world) runToml(t *testing.T) string {
 	t.Helper()
 	return readFile(t, filepath.Join(w.stateDir, "run.toml"))
+}
+
+func (w *world) run(t *testing.T) project.Run {
+	t.Helper()
+	run, err := config.Project{StateDir: w.stateDir}.LoadRun()
+	require.NoError(t, err)
+	return run
+}
+
+// job is the job of name run.toml declares.
+func (w *world) job(t *testing.T, name string) project.Job {
+	t.Helper()
+	for _, job := range w.run(t).Jobs {
+		if job.Name == name {
+			return job
+		}
+	}
+	t.Fatalf("run.toml declares no job %s", name)
+	return project.Job{}
+}
+
+func linkedKeys(run project.Run) []string {
+	var keys []string
+	for _, link := range run.EnvPorts {
+		keys = append(keys, link.File+"#"+link.Key)
+	}
+	return keys
+}
+
+func subjects(items []runinit.Item) []string {
+	found := []string{}
+	for _, item := range items {
+		found = append(found, item.Subject)
+	}
+	return found
+}
+
+func codes(followUps []domain.FollowUp) []string {
+	var found []string
+	for _, followUp := range followUps {
+		found = append(found, followUp.Code)
+	}
+	return found
+}
+
+func warningCodes(warnings []domain.Warning) []string {
+	var found []string
+	for _, warning := range warnings {
+		found = append(found, warning.Code)
+	}
+	return found
+}
+
+func toCheckCodes(problems []domain.FieldError) []string {
+	var found []string
+	for _, problem := range problems {
+		found = append(found, problem.Code)
+	}
+	return found
+}
+
+func candidates(d runinit.Decision) []string {
+	var found []string
+	for _, c := range d.Candidates {
+		found = append(found, c.Name)
+	}
+	return found
+}
+
+func sectionOf(t *testing.T, form domain.Form, id string) domain.Section {
+	t.Helper()
+	for _, section := range form.Sections {
+		if section.ID == id {
+			return section
+		}
+	}
+	t.Fatalf("no section %s", id)
+	return domain.Section{}
+}
+
+func recapRow(t *testing.T, recap []domain.RecapRow, key string) domain.RecapRow {
+	t.Helper()
+	for _, row := range recap {
+		if row.Key == key {
+			return row
+		}
+	}
+	t.Fatalf("no recap row %s", key)
+	return domain.RecapRow{}
 }

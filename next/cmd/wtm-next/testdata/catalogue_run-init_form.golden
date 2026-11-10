@@ -5,14 +5,16 @@
       "path": "jobs",
       "section": "runs",
       "picked": [],
-      "options": []
+      "options": [],
+      "optional": false
     },
     {
       "kind": "multi_select",
       "path": "tasks",
       "section": "runs",
       "picked": [],
-      "options": []
+      "options": [],
+      "optional": true
     },
     {
       "kind": "select",
@@ -37,7 +39,8 @@
       "path": "shared",
       "section": "shared",
       "picked": [],
-      "options": []
+      "options": [],
+      "optional": true
     },
     {
       "kind": "text_list",
@@ -51,7 +54,8 @@
       "path": "touches",
       "section": "shared",
       "picked": [],
-      "options": []
+      "options": [],
+      "optional": true
     },
     {
       "kind": "text_list",
@@ -90,21 +94,24 @@
       "path": "urls",
       "section": "addresses",
       "picked": [],
-      "options": []
+      "options": [],
+      "optional": true
     },
     {
       "kind": "multi_select",
       "path": "env_copy",
       "section": "env",
       "picked": [],
-      "options": []
+      "options": [],
+      "optional": true
     },
     {
       "kind": "multi_select",
       "path": "links",
       "section": "env",
       "picked": [],
-      "options": []
+      "options": [],
+      "optional": true
     },
     {
       "kind": "text_list",

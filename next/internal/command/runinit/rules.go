@@ -497,7 +497,10 @@ func (f Facts) proposedPorts(d *Decision) []Port {
 	}
 	var ports []Port
 	for _, name := range d.services() {
-		c, _ := d.candidate(name)
+		c, known := d.candidate(name)
+		if !known {
+			continue
+		}
 		if c.Compose {
 			ports = append(ports, f.composePorts(composePortsParams{Service: name, Patch: d.PatchCompose, Taken: taken})...)
 			continue
@@ -1100,6 +1103,7 @@ func Decide(f Facts, d Decision) Plan {
 		}
 		plan.config = &project.Rewrite{Config: config, Replaces: f.Config.Digest}
 	}
+	plan.Parts = d.parts()
 	plan.Files = plan.written(f)
 	plan.Preview = f.preview(d, plan.Run)
 	plan.Recap = plan.recap(d)
@@ -1285,6 +1289,7 @@ type Plan struct {
 	Config    *ConfigChange  `json:"config,omitempty"`
 	Files     []File         `json:"files"`
 	Detection Detection      `json:"detection"`
+	Parts     Parts          `json:"parts"`
 	Preview   Preview        `json:"preview"`
 	domain.Recapped
 	compose  *project.ComposeRewrite
@@ -1366,6 +1371,96 @@ func equalJSON(a, b any) bool {
 	left, errA := json.Marshal(a)
 	right, errB := json.Marshal(b)
 	return errA == nil && errB == nil && string(left) == string(right)
+}
+
+// ----------------------------------------------------------------------------
+// The parts
+
+// Parts are the rows of the parts a surface lays out as a table, each as the decision settled it, with the answer that spells it (Spelled), which a surface sends back unchanged, never builds: the ports, the commands changed and those proposed, each shared service's space, the .env keys that can follow a job and whether each does, and the profiles, those proposed besides.
+type Parts struct {
+	Ports    []PortRow    `json:"ports"`
+	Commands []CommandRow `json:"commands"`
+	Spaces   []SpaceRow   `json:"spaces"`
+	Links    []LinkRow    `json:"links"`
+	Profiles []ProfileRow `json:"profiles"`
+}
+
+// A PortRow is a job's port, spelled.
+type PortRow struct {
+	Port
+	Spelled string `json:"spelled"`
+}
+
+// A CommandRow is a job's command: as it runs, the one run init proposes so it reads its port's variable (none when it proposes none), and whether the request changed it; Spelled answers it with the proposal.
+type CommandRow struct {
+	Job      string `json:"job"`
+	Cmd      string `json:"cmd"`
+	Proposed string `json:"proposed,omitempty"`
+	Changed  bool   `json:"changed"`
+	Spelled  string `json:"spelled,omitempty"`
+}
+
+// A SpaceRow is what each worktree gets of a shared service, and the answers that spell it.
+type SpaceRow struct {
+	Service string   `json:"service"`
+	Name    string   `json:"name"`
+	Create  string   `json:"create"`
+	Remove  string   `json:"remove"`
+	Spelled []string `json:"spelled"`
+}
+
+// A LinkRow is an .env key that can follow a job, whether it does, and its answer.
+type LinkRow struct {
+	Link
+	Linked  bool   `json:"linked"`
+	Spelled string `json:"spelled"`
+}
+
+// A ProfileRow is a profile: its jobs, whether it is the default, whether run init proposes it rather than run.toml or the request holding it, and its answer.
+type ProfileRow struct {
+	Name     string   `json:"name"`
+	Jobs     []string `json:"jobs"`
+	Default  bool     `json:"default"`
+	Proposed bool     `json:"proposed"`
+	Spelled  string   `json:"spelled"`
+}
+
+func (d Decision) parts() Parts {
+	parts := Parts{Ports: []PortRow{}, Commands: []CommandRow{}, Spaces: []SpaceRow{}, Links: []LinkRow{}, Profiles: []ProfileRow{}}
+	for _, port := range d.Ports {
+		parts.Ports = append(parts.Ports, PortRow{Port: port, Spelled: port.Spelled()})
+	}
+	for _, name := range d.Picked {
+		c, ok := d.candidate(name)
+		_, changed := d.Commands[name]
+		if !ok || d.Rewrites[name] == "" && !changed {
+			continue
+		}
+		row := CommandRow{Job: name, Cmd: cmp.Or(d.Commands[name], c.Cmd), Proposed: d.Rewrites[name], Changed: changed}
+		if row.Proposed != "" {
+			row.Spelled = name + "=" + row.Proposed
+		}
+		parts.Commands = append(parts.Commands, row)
+	}
+	for _, service := range d.Shared {
+		space := d.Spaces[service]
+		parts.Spaces = append(parts.Spaces, SpaceRow{Service: service, Name: space.Name, Create: space.Create, Remove: space.Remove, Spelled: spelledSpaces([]string{service}, d.Spaces)})
+	}
+	for _, link := range d.Linkable {
+		linked := slices.ContainsFunc(d.Links, func(l Link) bool { return l.Spelled() == link.Spelled() })
+		parts.Links = append(parts.Links, LinkRow{Link: link, Linked: linked, Spelled: link.Spelled()})
+	}
+	profiles := slices.Clone(d.Profiles)
+	for _, proposed := range d.ProposedProfiles {
+		if !slices.ContainsFunc(profiles, func(p project.Profile) bool { return p.Name == proposed.Name }) {
+			profiles = append(profiles, proposed)
+		}
+	}
+	for i, profile := range profiles {
+		proposed := i >= len(d.Profiles) || d.Origins[PathProfiles] == domain.OriginDetected
+		parts.Profiles = append(parts.Profiles, ProfileRow{Name: profile.Name, Jobs: profile.Jobs, Default: profile.Name == d.DefaultProfile && i < len(d.Profiles), Proposed: proposed, Spelled: profile.Name + "=" + strings.Join(profile.Jobs, ",")})
+	}
+	return parts
 }
 
 // ----------------------------------------------------------------------------

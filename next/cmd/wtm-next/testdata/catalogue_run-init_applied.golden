@@ -63,6 +63,40 @@
         }
       ]
     },
+    "parts": {
+      "ports": [
+        {
+          "job": "web",
+          "variable": "PORT",
+          "base": 5173,
+          "from": "request",
+          "spelled": "web.PORT=5173"
+        }
+      ],
+      "commands": [],
+      "spaces": [],
+      "links": [],
+      "profiles": [
+        {
+          "name": "all",
+          "jobs": [
+            "web"
+          ],
+          "default": true,
+          "proposed": false,
+          "spelled": "all=web"
+        },
+        {
+          "name": "web",
+          "jobs": [
+            "web"
+          ],
+          "default": false,
+          "proposed": false,
+          "spelled": "web=web"
+        }
+      ]
+    },
     "preview": {
       "worktree": "main",
       "ordinal": 0,

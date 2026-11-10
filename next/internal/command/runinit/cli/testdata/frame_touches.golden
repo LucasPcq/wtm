@@ -1,0 +1,15 @@
+
+  Step 6/17 • Tasks that change data
+
+  ✓ What runs: postgres, redis, mailpit, admin, api, web, worker, migrate, seed
+  ✓ Run once: migrate, seed
+  ✓ Root dev script: one by one
+  ✓ Shared: postgres, mailpit
+  ✓ Each worktree's space: postgres.name=acme_{worktree}, postgres.create=docker compose exec -T postgres cre…
+
+  The tasks that change a shared service's data: they run on each worktree's own space (repeatable)
+
+▌› [x] migrate
+   [x] seed
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc back

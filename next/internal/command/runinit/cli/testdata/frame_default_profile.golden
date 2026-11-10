@@ -1,0 +1,26 @@
+
+  Step 14/17 • Default profile
+
+  ✓ What runs: postgres, redis, mailpit, admin, api, web, worker, migrate, seed
+  ✓ Run once: migrate, seed
+  ✓ Root dev script: one by one
+  ✓ Shared: postgres, mailpit
+  ✓ Each worktree's space: postgres.name=acme_{worktree}, postgres.create=docker compose exec -T postgres cre…
+  ✓ Tasks that change data: migrate, seed
+  ✓ Ports: postgres.POSTGRES_PORT=5432, redis.REDIS_PORT=6379, mailpit.MAILPIT_PORT=8025, mailpit.MAILPIT_POR…
+  ✓ Commands:
+  ✓ Addresses: named URLs
+  ✓ Named jobs: admin, api, web
+  ✓ Copy into worktrees:
+  ✓ .env keys: apps/admin/.env#NEXT_PUBLIC_API_URL, apps/api/.env#PORT, apps/api/.env#DATABASE_URL, apps/api/…
+  ✓ Profiles: all=postgres,redis,mailpit,admin,api,web,worker,migrate,seed, admin=postgres,redis,api,admin, a…
+
+  The profile run up starts when none is named
+
+▌› all
+   admin
+   api
+   web
+   worker
+
+  ↑↓ navigate • / filter • enter confirm • esc back

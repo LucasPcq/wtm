@@ -12,7 +12,8 @@
         {
           "value": "web"
         }
-      ]
+      ],
+      "optional": false
     },
     {
       "kind": "multi_select",
@@ -24,7 +25,8 @@
         {
           "value": "web"
         }
-      ]
+      ],
+      "optional": true
     },
     {
       "kind": "select",
@@ -52,7 +54,8 @@
       "skip": "no_compose",
       "section": "shared",
       "picked": [],
-      "options": []
+      "options": [],
+      "optional": true
     },
     {
       "kind": "text_list",
@@ -70,7 +73,8 @@
       "skip": "nothing_to_ask",
       "section": "shared",
       "picked": [],
-      "options": []
+      "options": [],
+      "optional": true
     },
     {
       "kind": "text_list",
@@ -125,7 +129,8 @@
         {
           "value": "web"
         }
-      ]
+      ],
+      "optional": true
     },
     {
       "kind": "multi_select",
@@ -137,7 +142,8 @@
         {
           "value": ".env"
         }
-      ]
+      ],
+      "optional": true
     },
     {
       "kind": "multi_select",
@@ -151,7 +157,8 @@
         {
           "value": ".env#PORT"
         }
-      ]
+      ],
+      "optional": true
     },
     {
       "kind": "text_list",

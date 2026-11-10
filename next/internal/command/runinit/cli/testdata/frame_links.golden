@@ -1,0 +1,27 @@
+
+  Step 12/17 • .env keys
+
+  ✓ What runs: postgres, redis, mailpit, admin, api, web, worker, migrate, seed
+  ✓ Run once: migrate, seed
+  ✓ Root dev script: one by one
+  ✓ Shared: postgres, mailpit
+  ✓ Each worktree's space: postgres.name=acme_{worktree}, postgres.create=docker compose exec -T postgres cre…
+  ✓ Tasks that change data: migrate, seed
+  ✓ Ports: postgres.POSTGRES_PORT=5432, redis.REDIS_PORT=6379, mailpit.MAILPIT_PORT=8025, mailpit.MAILPIT_POR…
+  ✓ Commands:
+  ✓ Addresses: named URLs
+  ✓ Named jobs: admin, api, web
+  ✓ Copy into worktrees:
+
+  The .env keys that follow a job, file#KEY (repeatable; default: every key holding a job's port)
+
+▌› [x] apps/admin/.env · NEXT_PUBLIC_API_URL follows api (address)
+   [x] apps/api/.env · PORT follows api (port)
+   [x] apps/api/.env · DATABASE_URL follows postgres (data)
+   [x] apps/api/.env · REDIS_URL follows redis (port)
+   [x] apps/worker/.env · REDIS_URL follows redis (port)
+   [x] packages/db/.env · DATABASE_URL follows postgres (data)
+   [x] apps/web/.env.local · PORT follows web (port)
+   [x] apps/web/.env.local · NEXT_PUBLIC_API_URL follows api (address)
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc back
