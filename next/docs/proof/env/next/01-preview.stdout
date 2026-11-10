@@ -1,0 +1,8 @@
+
+  env · dry run, nothing applied
+  feat/a  apps/web/.env  PORT → 24610
+          apps/web/.env  API_URL → http://api.feat-a.acme.localhost:24602
+          apps/api/.env  OLD left: in no source
+  fingerprint  <FP>
+  → wtm-next env feat/a --expect-fingerprint <FP>   apply this plan
+

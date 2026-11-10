@@ -95,6 +95,8 @@ export const skipWords: Record<DomainSkip, string | null> = {
   task: 'a task binds no port and is gone once done',
   no_env: 'no .env file is copied',
   no_env_file: 'the repository holds no .env file',
+  no_key_conflict: 'every key matches its source',
+  no_key_orphan: 'every key has a source',
 }
 
 export const actionWords: Record<CreateAction, string> = {

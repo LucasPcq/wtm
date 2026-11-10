@@ -23,6 +23,11 @@ const (
 	StatusSecureScheme Status = "secure_scheme"
 )
 
+// Statuses returns every Status.
+func Statuses() []Status {
+	return []Status{StatusRewrite, StatusUnchanged, StatusMissingKey, StatusNotFound, StatusAmbiguous, StatusForeignHost, StatusSecureScheme}
+}
+
 // A Move is one port a key links to and where it moves for the worktree: from Base to Resolved, or to Origin when the key is addressed by name.
 type Move struct {
 	Port     string `json:"port"`
@@ -279,4 +284,14 @@ func Redact(plan Plan) Redacted {
 	}
 	plan.Entries = entries
 	return Redacted(plan)
+}
+
+// SpelledByPorts reports whether p rewrites an address spelled with a port of this machine into a name: the main checkout, addressed as without wtm, keeps its ports.
+func (p Plan) SpelledByPorts() bool {
+	for _, entry := range p.Rewrites() {
+		if entry.Addressing == project.AddressNames && hasLoopbackOrigin(entry.CurrentValue) {
+			return true
+		}
+	}
+	return false
 }

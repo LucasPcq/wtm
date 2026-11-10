@@ -88,7 +88,7 @@ func PreviewOf[P output.RecappedPlan, D any](previewed domain.Outcome[P, D]) Pre
 
 // text is the preview as the recap draws it, in width columns.
 func (p Preview) text(width int, st *output.Styles) string {
-	return strings.Join(output.PlanLines(output.PlanParams{Rows: p.Rows, Warnings: output.Messages(p.Warnings), Hint: output.RecalledHintOf(p.Recalled), Width: width, Styles: st}), "\n")
+	return strings.Join(output.PlanLines(output.PlanParams{Rows: p.Rows, Warnings: output.WarningMessages(p.Warnings), Hint: output.RecalledHintOf(p.Recalled), Width: width, Styles: st}), "\n")
 }
 
 // Opener is open, a command's opener of its own use case, as a [Command]'s Open.

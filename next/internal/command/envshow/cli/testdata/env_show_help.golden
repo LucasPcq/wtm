@@ -1,0 +1,28 @@
+
+  Read one worktree's .env files app by app, file by file, key by key: where each file
+  comes from, what each key follows (a job's port or address, a value of run.toml, a value
+  wtm owns, or nothing), its value in the main checkout and here, and what wtm writes into
+  it. The keys to check come first: one that follows nothing although it holds a port or an
+  address, and one out of step with what wtm writes, which `wtm env` brings back.
+
+  Only the values wtm writes are shown; every other value, secrets included, is withheld
+  unless --show-values. With no worktree named, a terminal asks which one, the one you
+  stand in first; anywhere else it is that one. It changes nothing.
+
+  Usage:
+    wtm-next show [worktree] [flags]
+
+  Examples:
+    # Pick a worktree, the cursor on the one you are in
+    wtm env show
+
+    wtm env show feat/login --output json
+
+  Flags:
+    -h, --help            help for show
+        --output string   Output format: text or json (default "text")
+        --show-values     Show every value whole, secrets included; by default only what wtm writes is shown
+
+  Global Flags:
+    -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+

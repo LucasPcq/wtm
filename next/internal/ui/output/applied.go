@@ -58,7 +58,7 @@ func DrawApplied[P RecappedPlan, D any](w io.Writer, outcome domain.Outcome[P, D
 			warnings = append(warnings, itemWarnings(item)...)
 		}
 	}
-	warnings = append(warnings, Messages(outcome.Warnings)...)
+	warnings = append(warnings, WarningMessages(outcome.Warnings)...)
 
 	if len(rows) > 0 {
 		Blank(w)

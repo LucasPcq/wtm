@@ -361,7 +361,7 @@ func (s *TextStep) Answer() string {
 // ----------------------------------------------------------------------------
 // A multi-select
 
-// MultiSelectStep asks any of a field's options, those the field picks (the answer so far, else its default pick) picked, each tag in the Tone a command's own step gives it (muted otherwise); none picked is refused with the Empty problem of its words. Chosen answers no value when the field's default pick is confirmed as it was: the command's choice, not the user's, so the command picks again on its own facts (prune, fast-forward and sync tell a worktree the user named from one they chose).
+// MultiSelectStep asks any of a field's options, those the field picks (the answer so far, else the pick it offers a person, else its default pick) picked, each tag in the Tone a command's own step gives it (muted otherwise); none picked is refused with the Empty problem of its words. Chosen answers no value when the field's default pick is confirmed as it was: the command's choice, not the user's, so the command picks again on its own facts (prune, fast-forward and sync tell a worktree the user named from one they chose).
 type MultiSelectStep struct {
 	Asked
 	Tone   func(option domain.Option) widget.Tone
@@ -373,9 +373,13 @@ type MultiSelectStep struct {
 func (s *MultiSelectStep) Open() tea.Cmd {
 	field, _ := s.sheet.Field(s.at).(domain.MultiSelectField)
 	words := s.sheet.Words(s.at)
+	picked := field.Picked
+	if field.Origin == domain.OriginDefault && field.Prechecked != nil {
+		picked = field.Prechecked
+	}
 	options := make([]widget.Pick, 0, len(field.Options))
 	for _, o := range field.Options {
-		pick := widget.Pick{Label: optionLabel(o, words), Value: o.Value, Tag: badgeOf(o), Picked: slices.Contains(field.Picked, o.Value)}
+		pick := widget.Pick{Label: optionLabel(o, words), Value: o.Value, Tag: badgeOf(o), Picked: slices.Contains(picked, o.Value)}
 		if s.Tone != nil {
 			pick.Tone = s.Tone(o)
 		}
@@ -391,11 +395,11 @@ func (s *MultiSelectStep) Widget() widget.Widget {
 	return s.picks
 }
 
-// Answer records the options picked, or none with Chosen when they are the field's default pick, untouched.
+// Answer records the options picked, or none with Chosen when they are the field's default pick, untouched. A field that offers a person another pick than its default (Prechecked) always names what was picked: none would run the default instead.
 func (s *MultiSelectStep) Answer() string {
 	picked := s.picks.Values()
 	answer := domain.Answered{Path: s.path(), Values: picked}
-	if field, ok := s.sheet.Field(s.at).(domain.MultiSelectField); ok && s.Chosen && field.Origin == domain.OriginDefault && slices.Equal(picked, field.Picked) {
+	if field, ok := s.sheet.Field(s.at).(domain.MultiSelectField); ok && s.Chosen && field.Origin == domain.OriginDefault && field.Prechecked == nil && slices.Equal(picked, field.Picked) {
 		answer.Values = nil
 	}
 	s.sheet.Answer(s.at, answer)

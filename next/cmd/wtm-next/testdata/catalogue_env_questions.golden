@@ -1,0 +1,101 @@
+{
+  "fields": [
+    {
+      "kind": "multi_select",
+      "path": "worktree",
+      "origin": "request",
+      "picked": [
+        "feat/e"
+      ],
+      "options": [
+        {
+          "value": "main",
+          "tag": "current"
+        },
+        {
+          "value": "feat/e",
+          "out_of_step": 1
+        }
+      ]
+    },
+    {
+      "kind": "confirm",
+      "path": "all",
+      "skip": "flag_only",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "select",
+      "path": "from",
+      "skip": "flag_only",
+      "value": "",
+      "options": [
+        {
+          "value": "example"
+        },
+        {
+          "value": "main"
+        },
+        {
+          "value": "parent"
+        }
+      ],
+      "rememberable": false,
+      "remember": false,
+      "refreshable": false,
+      "closed": true
+    },
+    {
+      "kind": "confirm",
+      "path": "overwrite",
+      "origin": "default",
+      "skip": "no_key_conflict",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "confirm",
+      "path": "prune",
+      "origin": "default",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    },
+    {
+      "kind": "select",
+      "path": "isolation",
+      "origin": "default",
+      "skip": "flag_only",
+      "value": "",
+      "options": [
+        {
+          "value": "isolated"
+        },
+        {
+          "value": "verbatim"
+        }
+      ],
+      "rememberable": false,
+      "remember": false,
+      "refreshable": false,
+      "closed": true
+    },
+    {
+      "kind": "confirm",
+      "path": "show_values",
+      "skip": "flag_only",
+      "value": false,
+      "no_first": true,
+      "rememberable": false,
+      "remember": false
+    }
+  ],
+  "problems": [],
+  "sections": []
+}

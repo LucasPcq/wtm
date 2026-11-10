@@ -18,6 +18,8 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/checkout"
 	"github.com/LucasPcq/wtm/next/internal/command/clean"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
+	envcommand "github.com/LucasPcq/wtm/next/internal/command/env"
+	"github.com/LucasPcq/wtm/next/internal/command/envshow"
 	"github.com/LucasPcq/wtm/next/internal/command/events"
 	"github.com/LucasPcq/wtm/next/internal/command/exec"
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
@@ -58,6 +60,8 @@ var (
 	openClean       = opener(func(a app) clean.UseCase { return a.Clean })
 	openPrune       = opener(func(a app) prune.UseCase { return a.Prune })
 	openFastForward = opener(func(a app) fastforward.UseCase { return a.FastForward })
+	openEnv         = opener(func(a app) envcommand.UseCase { return a.Env })
+	openEnvShow     = opener(func(a app) envshow.UseCase { return a.EnvShow })
 	openSync        = opener(func(a app) synccommand.UseCase { return a.Sync })
 	openExec        = opener(func(a app) exec.UseCase { return a.Exec })
 	openReparent    = opener(func(a app) reparent.UseCase { return a.Reparent })

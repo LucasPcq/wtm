@@ -1,0 +1,51 @@
+
+  Bring each worktree's .env files back in step: a key its source has and a file lacks is added,
+  a missing file is rebuilt, then the ports and addresses run.toml links and the values wtm owns
+  are settled for the worktree. Values come from the strategy each worktree was created with
+  (example, main or parent); --from overrides it for one run.
+
+  A key whose value differs from its source is kept unless --overwrite; a key in no source is
+  kept unless --prune. Without arguments, the wizard asks which worktrees to reconcile, those out
+  of step and the one you stand in checked; unattended, the one you stand in alone. A worktree is
+  named by its branch or its path; --all asks for every worktree.
+
+  Only what wtm writes is shown (the ports and addresses it moves); every other value, secrets
+  included, is withheld unless --show-values. A job up in a worktree whose .env changed runs on
+  the old values until restarted: the run says which, with the line that restarts it.
+
+  Usage:
+    wtm-next env [worktree...] [flags]
+
+  Examples:
+    # Pick the worktrees to reconcile
+    wtm env
+
+    wtm env feat/login
+
+    # Also settle the values that differ from their source, and drop the keys no source has
+    wtm env feat/login --overwrite --prune --yes
+
+    # See the plan first, then apply exactly that plan
+    wtm env --all --dry-run
+    wtm env --all --expect-fingerprint <hash>
+
+    # For a script or an agent, with the v2 JSON envelope
+    wtm env --all --yes --output json
+
+  Flags:
+        --all                         Reconcile every worktree
+        --ask                         Ask again the questions this repository remembers an answer to, to change or forget it
+    -n, --dry-run                     Show the plan and its fingerprint, apply nothing
+        --expect-fingerprint string   Apply only if the facts still have this fingerprint, the one --dry-run printed
+        --from string                 Where the values come from for this run: example, main or parent; each worktree's own strategy by default
+    -h, --help                        help for env
+        --isolation string            Switch the worktrees to isolated (ports, compose project and namespaces of their own) or verbatim (the values wtm owns back to the source's); the one each has by default
+        --output string               Output format: text or json (default "text")
+        --overwrite                   Give a key whose value differs from its source the source's value
+        --prune                       Drop a key no source has
+        --show-values                 Show every value whole, secrets included; by default only what wtm writes is shown
+    -y, --yes                         Run unattended: no question, no confirmation (without worktrees, the one you stand in; a conflict kept unless --overwrite, an orphan unless --prune)
+
+  Global Flags:
+    -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+

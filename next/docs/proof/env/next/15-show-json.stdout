@@ -1,0 +1,148 @@
+{
+  "v": 2,
+  "command": "env-show",
+  "ok": true,
+  "items": [
+    {
+      "subject": "feat/b",
+      "status": "done",
+      "detail": {
+        "worktree": "feat/b",
+        "path": "<SB>/acme.trees/feat-b",
+        "main": false,
+        "strategy": "main",
+        "isolation": "isolated",
+        "pending": false,
+        "apps": [
+          {
+            "dir": "apps/api",
+            "jobs": [
+              "api"
+            ],
+            "keys": 3,
+            "following": 1,
+            "to_check": 1,
+            "files": [
+              {
+                "target": "apps/api/.env",
+                "name": ".env",
+                "origin": "main",
+                "missing": false,
+                "keys": [
+                  {
+                    "key": "PORT",
+                    "follows": "port",
+                    "job": "api",
+                    "port": "PORT",
+                    "main": "24601",
+                    "here": "24621",
+                    "writes": "24621",
+                    "withheld": false,
+                    "status": "in_step",
+                    "out_of_step": false
+                  },
+                  {
+                    "key": "JWT_SECRET",
+                    "follows": "copied",
+                    "main": "",
+                    "here": "",
+                    "withheld": true,
+                    "status": "in_step",
+                    "out_of_step": false
+                  },
+                  {
+                    "key": "MAILER_URL",
+                    "follows": "nothing",
+                    "main": "",
+                    "here": "",
+                    "withheld": true,
+                    "status": "in_step",
+                    "out_of_step": false
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "dir": "apps/web",
+            "jobs": [
+              "web"
+            ],
+            "keys": 2,
+            "following": 2,
+            "to_check": 0,
+            "files": [
+              {
+                "target": "apps/web/.env",
+                "name": ".env",
+                "origin": "main",
+                "missing": false,
+                "keys": [
+                  {
+                    "key": "PORT",
+                    "follows": "port",
+                    "job": "web",
+                    "port": "PORT",
+                    "main": "24600",
+                    "here": "24620",
+                    "writes": "24620",
+                    "withheld": false,
+                    "status": "in_step",
+                    "out_of_step": false
+                  },
+                  {
+                    "key": "API_URL",
+                    "follows": "address",
+                    "job": "api",
+                    "port": "PORT",
+                    "main": "http://localhost:24601",
+                    "here": "http://api.feat-b.acme.localhost:24602",
+                    "writes": "http://api.feat-b.acme.localhost:24602",
+                    "withheld": false,
+                    "status": "in_step",
+                    "out_of_step": false
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "dir": "apps/docs",
+            "jobs": [],
+            "keys": 1,
+            "following": 0,
+            "to_check": 0,
+            "files": [
+              {
+                "target": "apps/docs/.env",
+                "name": ".env",
+                "origin": "main",
+                "missing": false,
+                "keys": [
+                  {
+                    "key": "DOCS_TITLE",
+                    "follows": "copied",
+                    "main": "",
+                    "here": "",
+                    "withheld": true,
+                    "status": "in_step",
+                    "out_of_step": false
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "checks": [
+          {
+            "file": "apps/api/.env",
+            "key": "MAILER_URL",
+            "kind": "unlinked"
+          }
+        ]
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}

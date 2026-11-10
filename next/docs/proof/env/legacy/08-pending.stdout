@@ -1,0 +1,15 @@
+
+  = No changes written.
+
+  Worktree  feat/p
+  Mode      add
+
+  apps/api/.env   strategy: main  ·  source: main
+  = in sync — nothing to reconcile
+
+  apps/web/.env   strategy: main  ·  source: main
+  = in sync — nothing to reconcile
+
+  apps/docs/.env   strategy: main  ·  source: main
+  = in sync — nothing to reconcile
+

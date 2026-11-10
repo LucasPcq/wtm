@@ -349,6 +349,28 @@ func mutations() []mutation {
 			},
 		},
 		{
+			name:     "env",
+			answers:  []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/e"}}},
+			complete: true,
+			// feat/e lacks the key main's .env has, which env adds from main
+			setup: func(t *testing.T, main string) {
+				writeConfig(t, main, "[env]\nstrategy = \"main\"\n\n[[env.file]]\ntarget = \".env\"\n")
+				require.NoError(t, os.WriteFile(filepath.Join(main, ".env"), []byte("KEY=main\n"), 0o644))
+				gittest.Git(t, main, "worktree", "add", "-q", "-b", "feat/e", filepath.Join(filepath.Dir(main), ".trees", "feat-e"))
+				require.NoError(t, os.WriteFile(filepath.Join(filepath.Dir(main), ".trees", "feat-e", ".env"), []byte("OWN=1\n"), 0o644))
+			},
+			// the file the plan reconciles is edited since
+			stale: func(t *testing.T, main string) {
+				require.NoError(t, os.WriteFile(filepath.Join(filepath.Dir(main), ".trees", "feat-e", ".env"), []byte("OWN=2\n"), 0o644))
+			},
+			untouched: func(t *testing.T, main string) {
+				assert.NotContains(t, string(readFile(t, filepath.Join(filepath.Dir(main), ".trees", "feat-e", ".env"))), "KEY=")
+			},
+			applied: func(t *testing.T, main string) {
+				assert.Contains(t, string(readFile(t, filepath.Join(filepath.Dir(main), ".trees", "feat-e", ".env"))), "KEY=main")
+			},
+		},
+		{
 			name:     "sync",
 			answers:  []domain.Answered{{Path: domain.PathWorktree, Values: []string{"feat/s"}}},
 			complete: true,
@@ -430,7 +452,7 @@ func pushOnOrigin(t *testing.T, main, name string) {
 }
 
 // reads are the commands of the catalogue that change nothing.
-var reads = []string{"list", "resolve", "status", "tree", "run-logs", "run-ps", "run-list", "daemon-status"}
+var reads = []string{"list", "resolve", "status", "tree", "run-logs", "run-ps", "run-list", "env-show", "daemon-status"}
 
 // machine are the commands on wtm's daemon, the machine's one: they run on no repository, so wire.go builds none of them per repository and none refuses a directory with no wtm config.
 var machine = []string{"daemon-status", "daemon-stop", "daemon-restart", "daemon-stop-jobs"}

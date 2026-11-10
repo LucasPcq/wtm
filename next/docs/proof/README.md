@@ -22,6 +22,7 @@ sandboxes=$(./create.sh "$wtm" "$next" create)   # the sandboxes it leaves behin
 ./prune.sh "$wtm" "$next" prune
 ./fast-forward.sh "$wtm" "$next" fast-forward
 ./sync.sh "$wtm" "$next" sync
+./env.sh "$wtm" "$next" env
 ./exec.sh "$wtm" "$next" exec
 ./reparent.sh "$wtm" "$next" reparent
 ./init.sh "$wtm" "$next" init
@@ -616,6 +617,48 @@ The reference is the legacy `wtm sync` of 0.30.1. Its output differs by design (
   - The tty: legacy asks On conflict, Parent branches (when a parent is behind origin), Confirm, then whether to push once the rebases ran; next asks Descendants (when a worktree named has some, naming them), On conflict, Parents and Push before the recap, which names every worktree it rebases. Next's wizard asks on origin as last fetched while its plan fetches first, so it asks each question the fetch could make matter: On conflict when a worktree may rebase, Parents when a branch rebased onto is on origin, Push when a worktree that may rebase is on origin, Force when a worktree named has uncommitted changes. 5 is a dry run on `feat/tty-b`, already on its parent; a run with nothing to do ends without a confirmation (`TestNothingToSyncEndsWithoutAskingToConfirm`).
   - Next takes each worktree's lock (legacy none) and its first Ctrl+C lets the git step under way finish.
   - Next's outcome has one item per branch it fast-forwards first, before the worktrees (2: `sync: 2 done`, main then `feat/solo`): done with the commits it took, skipped with `sync.ff_failed` when refused (its children rebased onto it as it stands; it never fails the run), or interrupted. With `--descendants=false` (2), the worktrees left out get their own sync as a next step (`sync.left_out`).
+
+# Proof: `wtm env` (legacy `flow/env`) vs `wtm-next env` and `wtm-next env show`
+
+The reference is the legacy `wtm env` of 0.30.1. Its output differs by design (next speaks the v2 envelope, plans before it acts and takes several worktrees), so the proof compares what each leaves on disk and keeps both outputs side by side. Every scenario leaves the same files and isolations on both sides: `env/states.diff` holds no difference.
+
+- `env.sh <wtm> <wtm-next> env`: two identical sandboxes (the `docs/demos` "acme" project, a third app `apps/docs` declared with its template, the api's `.env` in main holding a secret and a `MAILER_URL` on port 8025 no link follows; `feat/a`, `feat/b` and `feat/p` created with their values from main, `feat/c` from the templates; `feat/a`'s web `PORT` and `API_URL` drifted back to main's and an `OLD` key no source has, `feat/b`'s secret its own and its docs `.env` deleted, `feat/p`'s record without its isolation, as a worktree made before the choice existed), the same scenarios run by each binary in order, each with its own flags where they differ; after each, the exit code, stdout, stderr and the state (every `.env` of every worktree, each record's isolation). Paths, op ids and fingerprints are normalised. Then, in a fresh sandbox per side, the wizard in tmux at 100×40 from `feat/a`, each question at its default: `env/tty/legacy/` and `env/tty/next/`.
+  1. `feat/a`, legacy `--check`, next `--dry-run`
+  2. the same, `--output json`
+  3. `feat/a --yes`
+  4. the preview again, after the apply
+  5. `feat/b`, legacy `--mode refresh --on-conflict overwrite`, next `--overwrite`, `--yes`
+  6. `feat/a --prune --yes`
+  7. no worktree, without a terminal, from `feat/c`
+  8. `feat/p --yes`
+  9. `feat/p --isolation isolated --yes`
+  10. `feat/c --isolation verbatim --yes`
+  11. `main --isolation verbatim --yes`
+  12. a name that is no worktree
+  13. `feat/c --yes --output json`
+  14. legacy `feat/b --check --show-values`, next `env show feat/b --show-values`
+  15. legacy `feat/b --check --output json`, next `env show feat/b --output json`
+  16. `-q`
+  17. legacy `main --yes`, next `--all --yes`
+  18. `feat/b --yes` with its web `PORT` set by hand to a number that is no port of its job: both leave it, and say so
+  19. from main, `feat/a` drifted again, legacy `main --yes`, next `--yes`: only main is reconciled
+- The bugs of the legacy, each fixed with its test:
+  - B1, 4: legacy's `--check` exits 18 right after a successful `--yes`, counting the orphans and conflicts an unattended run leaves; next's dry run plans what the same request writes, empty once applied (`TestAReconciledWorktreeHasNothingLeftToReconcile`).
+  - B2, 14: legacy's `--show-values` changes nothing in its text report; next's `env show --show-values` prints every value, and `env` shows the values of its changes (`TestShowValuesShowsEveryValueAndTheJSONTheTree`).
+  - B3: legacy's "Move onto names" promises `http://<job>.<repo>.localhost` and writes `http://<job>.main.<repo>.localhost`; next has no addressing switch (D5).
+  - B4: legacy prints "Addresses carry the proxy's port … then `wtm env` drops it" on every run, even one that wrote nothing; next says nothing it did not do.
+  - B5: legacy's wizard prints the secrets its report withholds; next withholds every value wtm does not write, everywhere, unless `--show-values` (`TestValuesAreWithheldUnlessShown`).
+- Found by the proofs and fixed: a port wtm finds nothing to move in was said in step, where legacy warns it is left alone (18, `TestAPortWtmFindsNothingToMoveInIsLeftAloneAndSaid`, and in `env show` a key to check, `TestAPortWtmLeavesAloneIsToCheck`); switching a worktree whose values come from its template to verbatim left the ports wtm had written, the template giving none (10, `TestAWorktreeSwitchedToVerbatimFromItsTemplateGetsTheMainValues`); recording an isolation alone was said `unchanged` (9, `TestRecordingAnIsolationAloneIsAChange`).
+- The differences, approved by the owner (2026-11-10):
+  - D1: next takes several worktrees (`env [worktree...]`, `--all`); with none named, the one you stand in, the wizard offering those out of step checked beside it; unattended, it alone (7: legacy refuses, exit 1; next reconciles `feat/c`, in step; 19: run from main while `feat/a` drifts, next writes main alone).
+  - D2: `--check` is next's `--dry-run`, exit 0 with its fingerprint (1, 2, 4: legacy exits 18).
+  - D3: `--mode add|refresh` and `--on-conflict` are one `--overwrite`: a key whose value differs from its source is always planned, kept unless `--overwrite`, like a key in no source unless `--prune` (5).
+  - D4: legacy's per-key resolve step, and its `e` that types a value, give way to the dry run of the worktrees picked (the recap) and the two switches, asked only when the worktrees picked have such a key; a key no source gives a value is left, said so.
+  - D5: `--addressing` (the main checkout's) is not env's: `run addressing` (LUC-347) moves the main checkout onto names; env keeps the main checkout on the addressing its `.env` spells. `--isolation` stays, its follow-ups being `status`'s and `extract`'s.
+  - D7: next's exit codes: an invalid request 2 (11, 12: legacy 1).
+  - The output: next draws a line per change (`+ KEY` added, `~ KEY` overwritten, `− KEY` dropped, `KEY → port or address` moved, `KEY left: why`), the tally, the row of each worktree written with its ports; a job up in a worktree whose `.env` changed is warned with the line that restarts it (`env.restart`).
+  - `env show` (next only) reads one worktree's files app by app, file by file, key by key: what each follows, its value in main and here, what wtm writes, and the keys to check (one following nothing that holds a port or an address, one out of step); legacy's `--check --show-values` is the nearest (14, 15).
+  - The tty: legacy asks the worktree, its isolation (or the main checkout's addressing), each key's resolution, then the recap; next asks the worktrees (those out of step and yours checked), then overwrite and prune when a worktree picked has such a key, then the recap of every change.
 
 # Proof: `wtm-next ui`, the local web server
 

@@ -1,0 +1,9 @@
+
+  = env: 1 unchanged
+
+  Left as is  feat/b (ports left alone)
+
+  ! feat/b: env ports left alone
+    ── apps/web/.env ─────────────────────────
+    PORT  PORT  no 24600 to shift in the value
+

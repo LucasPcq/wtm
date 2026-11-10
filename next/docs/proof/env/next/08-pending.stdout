@@ -1,0 +1,9 @@
+
+  = env: 1 unchanged
+
+  In step  feat/p
+
+  ! feat/p has yet to choose its isolation: its ports and the values wtm owns are left as they are
+
+  → wtm-next env feat/p --isolation isolated   give it ports of its own
+
