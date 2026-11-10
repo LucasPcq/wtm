@@ -20,7 +20,10 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 )
 
-var variable = regexp.MustCompile(`\$\{?([A-Za-z_][A-Za-z0-9_]*)`)
+var (
+	variable    = regexp.MustCompile(`\$\{?([A-Za-z_][A-Za-z0-9_]*)`)
+	withDefault = regexp.MustCompile(`^\$\{[A-Za-z_][A-Za-z0-9_]*:?-([0-9]+)\}$`)
+)
 
 // Repository is the working tree of a repository at Dir.
 type Repository struct {
@@ -97,7 +100,7 @@ func Apply(content string, edits []project.ComposeEdit) (string, error) {
 	return strings.Join(lines, "\n"), nil
 }
 
-// readsBack checks a rewrite against the file it rewrites: it parses, and each service publishes the same ports on the same addresses and container sides, a host side changed only to a variable.
+// readsBack checks a rewrite against the file it rewrites: it parses, and each service publishes the same ports on the same addresses and container sides, a host side changed only to a variable defaulting to the port it bound.
 func readsBack(before, after project.Compose) error {
 	if after.Err != "" {
 		return errors.New(after.Err)
@@ -112,12 +115,20 @@ func readsBack(before, after project.Compose) error {
 		}
 		for j, was := range service.Ports {
 			now := ports[j]
-			if now.IP != was.IP || now.Container != was.Container || now.Host != was.Host && !variable.MatchString(now.Host) {
+			if now.IP != was.IP || now.Container != was.Container || now.Host != was.Host && (!variable.MatchString(now.Host) || base(now.Host) != base(was.Host)) {
 				return fmt.Errorf("service %s: port %s:%s:%s reads %s:%s:%s", service.Name, was.IP, was.Host, was.Container, now.IP, now.Host, now.Container)
 			}
 		}
 	}
 	return nil
+}
+
+// base is the port a host side binds when no variable says otherwise: the literal, or its variable's default.
+func base(host string) string {
+	if match := withDefault.FindStringSubmatch(host); match != nil {
+		return match[1]
+	}
+	return host
 }
 
 func parse(file string, data []byte) project.Compose {

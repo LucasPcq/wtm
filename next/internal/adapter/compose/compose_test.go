@@ -84,6 +84,7 @@ func TestSaveComposeRefusesARewriteThatWouldNotReadBack(t *testing.T) {
 		"not_yaml":        `"${POSTGRES_PORT:-5432}:5432`,
 		"container_moved": `"${POSTGRES_PORT:-5432}:5433"`,
 		"host_literal":    `"5433:5432"`,
+		"other_default":   `"${POSTGRES_PORT:-5433}:5432"`,
 	}
 	for name, edit := range cases {
 		t.Run(name, func(t *testing.T) {
