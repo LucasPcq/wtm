@@ -1,111 +1,10 @@
 import { HttpResponse, http } from 'msw'
-import type { EnvReconcile, EnvshowDetail, WebCall } from '@/api/types.gen'
+import type { EnvReconcile, WebCall } from '@/api/types.gen'
+import { billingFiles } from '@/test/env-files'
 import { envelope } from '@/test/fixtures'
 import { line, streamed } from '@/test/stream'
 
 const asked = (call: WebCall, path: string) => call.answers?.find((answer) => answer.path === path)?.values
-
-// acme's .env files: feat/billing's web PORT out of step and a MAILER_URL that follows nothing, its secret withheld
-export const billingFiles = (shown: boolean): EnvshowDetail => ({
-  worktree: 'feat/billing',
-  path: '/acme.trees/feat-billing',
-  main: false,
-  strategy: 'example',
-  isolation: 'isolated',
-  pending: false,
-  apps: [
-    {
-      dir: 'apps/api',
-      jobs: ['api'],
-      keys: 3,
-      following: 1,
-      to_check: 1,
-      files: [
-        {
-          target: 'apps/api/.env',
-          name: '.env',
-          origin: 'template',
-          missing: false,
-          keys: [
-            {
-              key: 'API_PORT',
-              follows: 'port',
-              job: 'api',
-              port: 'PORT',
-              main: '4000',
-              here: '4020',
-              writes: '4020',
-              withheld: false,
-              status: 'in_step',
-              out_of_step: false,
-            },
-            {
-              key: 'MAILER_URL',
-              follows: 'nothing',
-              job: 'stack',
-              port: 'MAILPIT_UI',
-              main: shown ? 'http://localhost:8025' : '',
-              here: shown ? 'http://localhost:8025' : '',
-              withheld: !shown,
-              status: 'in_step',
-              out_of_step: false,
-            },
-            {
-              key: 'JWT_SECRET',
-              follows: 'copied',
-              main: shown ? 's3cret' : '',
-              here: shown ? 's3cret' : '',
-              withheld: !shown,
-              status: 'in_step',
-              out_of_step: false,
-            },
-          ],
-        },
-      ],
-    },
-    {
-      dir: 'apps/web',
-      jobs: ['web'],
-      keys: 1,
-      following: 1,
-      to_check: 1,
-      files: [
-        {
-          target: 'apps/web/.env',
-          name: '.env',
-          origin: 'template',
-          missing: false,
-          keys: [
-            {
-              key: 'PORT',
-              follows: 'port',
-              job: 'web',
-              port: 'PORT',
-              main: '3000',
-              here: '3010',
-              writes: '3020',
-              withheld: false,
-              status: 'in_step',
-              out_of_step: true,
-            },
-          ],
-        },
-      ],
-    },
-    {
-      dir: 'apps/docs',
-      jobs: [],
-      keys: 0,
-      following: 0,
-      to_check: 0,
-      files: [{ target: 'apps/docs/.env', name: '.env', origin: 'none', missing: true, keys: [] }],
-    },
-  ],
-  checks: [
-    { file: 'apps/api/.env', key: 'MAILER_URL', kind: 'unlinked', job: 'stack', port: 'MAILPIT_UI' },
-    { file: 'apps/web/.env', key: 'PORT', kind: 'out_of_step', job: 'web', port: 'PORT', here: '3010', writes: '3020' },
-  ],
-})
 
 const worktrees = ['main', 'feat/billing', 'fix/login', 'feat/onboarding']
 
@@ -183,8 +82,33 @@ const planOf = (call: WebCall) => {
 
 const fingerprintOf = (call: WebCall) => `env:${JSON.stringify(call.answers ?? [])}`
 
-// answers env show and env: a read of the worktree asked, the questions, a dry run, and a run that writes each worktree
-export function answeringEnv({ failing = [], noFile = false }: { failing?: string[]; noFile?: boolean } = {}) {
+// feat/onboarding has yet to choose its isolation: env leaves its ports, and says how to give it its own
+const pendingWarning = {
+  code: 'env.isolation_pending',
+  message: 'feat/onboarding has yet to choose its isolation: its ports and the values wtm owns are left as they are',
+  params: { worktree: 'feat/onboarding' },
+  follow_up: {
+    command: 'env',
+    code: 'env.isolate',
+    message: 'give it ports of its own',
+    answers: [
+      { path: 'worktree', values: ['feat/onboarding'] },
+      { path: 'isolation', values: ['isolated'] },
+    ],
+  },
+}
+
+// answers env show and env: a read of the worktree asked, the questions, a dry run, and a run that writes each worktree;
+// a worktree failing is offered again
+export function answeringEnv({
+  failing = [],
+  noFile = false,
+  pending = false,
+}: {
+  failing?: string[]
+  noFile?: boolean
+  pending?: boolean
+} = {}) {
   return [
     http.post('/api/repos/r1/commands/env-show/questions', () =>
       HttpResponse.json({
@@ -227,7 +151,9 @@ export function answeringEnv({ failing = [], noFile = false }: { failing?: strin
     http.post('/api/repos/r1/commands/env', async ({ request }) => {
       const call = (await request.json()) as WebCall
       const plan = planOf(call)
-      if (call.dry_run) return HttpResponse.json({ ...envelope('env', []), plan, fingerprint: fingerprintOf(call) })
+      const left = pending && plan.worktrees.some((r) => r.worktree === 'feat/onboarding') ? [pendingWarning] : []
+      if (call.dry_run)
+        return HttpResponse.json({ ...envelope('env', []), warnings: left, plan, fingerprint: fingerprintOf(call) })
 
       const going = plan.worktrees.filter((r) => (r.phases ?? []).length > 0)
       const failed = (subject: string) => failing.includes(subject)
@@ -243,6 +169,16 @@ export function answeringEnv({ failing = [], noFile = false }: { failing?: strin
             ...envelope('env', []),
             ok: !going.some((r) => failed(r.worktree)),
             plan,
+            follow_ups: going.some((r) => failed(r.worktree))
+              ? [
+                  {
+                    command: 'env',
+                    code: 'env.retry',
+                    message: 'reconcile them again',
+                    answers: [{ path: 'worktree', values: going.map((r) => r.worktree).filter(failed) }],
+                  },
+                ]
+              : [],
             items: going.map((r) =>
               failed(r.worktree)
                 ? {

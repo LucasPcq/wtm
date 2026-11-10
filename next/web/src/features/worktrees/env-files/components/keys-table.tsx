@@ -67,7 +67,7 @@ function FileRows({ file, main }: { file: EnvshowFile; main: boolean }) {
             <File className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             <span className="font-mono">{file.name}</span>
             <span className="text-muted-foreground">
-              {file.missing && file.origin !== 'none' ? 'missing: Reconcile rebuilds it, ' : ''}
+              {file.missing ? 'missing · ' : ''}
               {originWords[file.origin](file.parent)}
             </span>
           </div>

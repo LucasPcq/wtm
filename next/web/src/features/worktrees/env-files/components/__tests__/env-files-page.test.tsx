@@ -13,7 +13,7 @@ test('the page reads the worktree in its toolbar: the keys to check first, then 
   const port = screen.getByRole('row', { name: 'PORT' })
   expect(within(port).getByText("web's port")).toBeTruthy()
   expect(within(port).getByText('→ 3020')).toBeTruthy()
-  expect(screen.getByText('not copied: its source has none')).toBeTruthy()
+  expect(screen.getByText('missing · not copied: its source has none')).toBeTruthy()
 })
 
 test('a value wtm does not write is withheld until Show values asks for it', async () => {
@@ -43,6 +43,7 @@ test("main's read has one column of values, its own", async () => {
   await renderApp('/r/r1/env?worktree=main')
 
   expect(await screen.findByRole('columnheader', { name: 'In main' })).toBeTruthy()
+  expect(screen.getByText('Its keys and values. Reconcile starts with it.')).toBeTruthy()
   expect(screen.getAllByRole('columnheader')).toHaveLength(3)
   expect(within(screen.getByRole('row', { name: 'JWT_SECRET' })).getAllByText('••••••••')).toHaveLength(1)
 })

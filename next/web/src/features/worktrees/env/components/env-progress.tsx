@@ -1,3 +1,5 @@
+import { RotateCcw } from 'lucide-react'
+import type { DomainFollowUp } from '@/api/types.gen'
 import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Progress as Bar } from '@/components/ui/progress'
@@ -26,6 +28,7 @@ export function EnvProgress({
   onCancel,
   onDone,
   onRestart,
+  onAgain,
 }: {
   progress: Progress<'env'>
   running: boolean
@@ -33,12 +36,14 @@ export function EnvProgress({
   onCancel: (force: boolean) => void
   onDone: () => void
   onRestart: (worktree: string, job: string) => void
+  onAgain: (retry: DomainFollowUp) => void
 }) {
   const { done, total } = doneOf(progress)
   const { cancelled, failure } = ending(progress)
   const items = progress.envelope?.items ?? []
   const refused = progress.refused ?? (items.some((item) => item.error) ? undefined : progress.envelope?.error?.message)
   const { groups, warnings, reconciled } = recapOf(progress, onRestart)
+  const retry = progress.envelope?.follow_ups?.find((followUp) => followUp.code === 'env.retry')
 
   const description = () => {
     if (running && progress.cancelling) return 'Cancelling: the worktree under way finishes first.'
@@ -81,7 +86,15 @@ export function EnvProgress({
             onCancel={onCancel}
           />
         ) : (
-          <Button onClick={onDone}>Done</Button>
+          <>
+            {retry && (
+              <Button variant="outline" onClick={() => onAgain(retry)}>
+                <RotateCcw />
+                Run again
+              </Button>
+            )}
+            <Button onClick={onDone}>Done</Button>
+          </>
         )}
       </DialogFooter>
     </>

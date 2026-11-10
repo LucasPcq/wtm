@@ -15,8 +15,8 @@ export const leftWords: Record<EnvKeyStatus, string> = {
   in_step: 'in step',
   add: 'not added',
   missing: 'no source gives it a value: write it by hand',
-  conflict: 'differs from its source: kept, unless overwritten',
-  orphan: 'in no source: kept, unless pruned',
+  conflict: 'differs from its source: kept as it is',
+  orphan: 'in no source: kept as it is',
 }
 
 export const isolationWords: Record<ProjectIsolation, string> = {
@@ -24,8 +24,10 @@ export const isolationWords: Record<ProjectIsolation, string> = {
   verbatim: 'verbatim: its env is copied as it is',
 }
 
-export const failureWords: Record<string, string> = {
-  'env.failed': "couldn't write its .env files",
+// why the picker offers a worktree it cannot reconcile, by the core's code; another code keeps the core's words
+export const problemWords: Record<string, string> = {
+  'env.missing': 'its folder is gone',
+  'env.unreadable': "its .env files couldn't be read",
 }
 
 export const outcomeWords: Record<OutcomeKind, string> = {

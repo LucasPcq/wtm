@@ -123,7 +123,9 @@ export function EnvFilesPage({ repo, search }: { repo: string; search: EnvFilesS
           </DropdownMenuContent>
         </DropdownMenu>
         <span className="text-muted-foreground">
-          Its keys and values, main's beside them. Reconcile starts with it.
+          {detail?.main
+            ? 'Its keys and values. Reconcile starts with it.'
+            : "Its keys and values, main's beside them. Reconcile starts with it."}
         </span>
         <div className="ml-auto flex items-center gap-4 text-muted-foreground">
           <Glyph icon={Linked} tone="muted">

@@ -78,9 +78,12 @@ func (f Facts) subject(name string) (worktree.Worktree, bool) {
 	return f.Worktrees[at], true
 }
 
-// prechecked is the pick a person is offered, the main one first: the worktrees out of step under req's switches, as options counts them, and the one the caller stands in.
+// prechecked is the pick a person is offered, the main one first: the worktrees out of step under req's switches, as options counts them, and the one the caller stands in, none for a caller that named its directory (a surface's call, $WTM_PROJECT_DIR).
 func (f Facts) prechecked(req Request, options []domain.Option) []string {
-	current := names(f.targets(Request{Caller: req.Caller}))
+	var current []string
+	if !req.Caller.Named {
+		current = names(f.targets(Request{Caller: req.Caller}))
+	}
 	found := []string{}
 	for _, option := range options {
 		if option.OutOfStep > 0 || slices.Contains(current, option.Value) {
@@ -354,7 +357,7 @@ func Decide(f Facts, req Request) (Plan, []domain.Warning, error) {
 		reconciles = []Reconcile{}
 	}
 
-	planned := Plan{Worktrees: reconciles, Overwrite: req.Overwrite, Prune: req.Prune, ShowValues: req.ShowValues}
+	planned := Plan{Worktrees: reconciles, Overwrite: req.Overwrite, Prune: req.Prune, ShowValues: req.ShowValues, asked: req}
 	return planned, f.warnings(planned), nil
 }
 
@@ -430,6 +433,7 @@ type Plan struct {
 	Prune      bool        `json:"prune"`
 	ShowValues bool        `json:"show_values"`
 	domain.Recapped
+	asked Request
 }
 
 // Locks are the locks the plan needs: the repository shared, and each worktree it writes exclusive.
@@ -594,6 +598,25 @@ func (r Reconcile) recap() []domain.RecapValue {
 
 // CodeFailed is a worktree whose files could not be written, or that could not be numbered.
 const CodeFailed = Name + ".failed"
+
+// CodeRetry is the follow-up of a run where some worktree failed or was not reached: env again, on those, with the same switches.
+const CodeRetry = Name + ".retry"
+
+// retry reconciles again each worktree of items that failed or was not reached, with the switches asked; none when every one passed.
+func (p Plan) retry(items []Item) *domain.FollowUp {
+	var again []string
+	for _, item := range items {
+		if item.Status == domain.StatusFailed || item.Reason == domain.ReasonInterrupted {
+			again = append(again, item.Subject)
+		}
+	}
+	if len(again) == 0 {
+		return nil
+	}
+
+	req := Request{Worktrees: again, Strategy: p.asked.Strategy, Overwrite: p.Overwrite, Prune: p.Prune, Isolation: p.asked.Isolation, ShowValues: p.ShowValues}
+	return &domain.FollowUp{Command: Name, Answers: domain.AnswersOf(Questions{}.Form(), req), Code: CodeRetry, Message: "reconcile them again"}
+}
 
 // restartWarning is the warning that the jobs of r up run on the old values until restarted, followed by the restart of the first one.
 func restartWarning(r Reconcile) domain.Warning {

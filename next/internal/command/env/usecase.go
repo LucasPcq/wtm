@@ -123,14 +123,23 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 // ----------------------------------------------------------------------------
 // Apply
 
-// Apply carries out the plan, reporting each step: it reconciles each worktree that changes in turn, a failure stopping none of the others, and reports the others as they stand. Once ctx is cancelled, the worktrees not yet started are skipped.
+// Apply carries out the plan, reporting each step: it reconciles each worktree that changes in turn, a failure stopping none of the others, and reports the others as they stand. Once ctx is cancelled, the worktrees not yet started are skipped. Those that failed or were skipped are offered again (CodeRetry).
 func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Result {
 	items := make([]Item, 0, len(plan.Worktrees))
 	for _, r := range plan.Worktrees {
 		items = append(items, u.reconcile(ctx, r, plan.ShowValues, report))
 	}
 
-	return Result{Items: items}
+	result := Result{Items: items}
+	if retry := plan.retry(items); retry != nil {
+		for _, item := range items {
+			if item.Err != nil {
+				item.Err.FollowUp = retry
+			}
+		}
+		result.FollowUps = []domain.FollowUp{*retry}
+	}
+	return result
 }
 
 // ----------------------------------------------------------------------------

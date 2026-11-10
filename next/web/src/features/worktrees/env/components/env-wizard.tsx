@@ -10,8 +10,10 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/
 import { Item, ItemTitle } from '@/components/ui/item'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert } from '@/features/worktrees/components/alert'
+import { Details } from '@/features/worktrees/components/details'
 import { DialogBand } from '@/features/worktrees/components/dialog-band'
 import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
+import { Facts } from '@/features/worktrees/components/facts'
 import { ItemBox } from '@/features/worktrees/components/item-box'
 import { ItemList } from '@/features/worktrees/components/item-list'
 import { LeftRow } from '@/features/worktrees/components/left-row'
@@ -19,25 +21,30 @@ import { ListHeader } from '@/features/worktrees/components/list-header'
 import { PlanWarnings } from '@/features/worktrees/components/plan-warnings'
 import { ReasonButton } from '@/features/worktrees/components/reason-button'
 import { Stepper } from '@/features/worktrees/components/stepper'
-import { changesOf, keptOf, unitsOf, writes } from '@/features/worktrees/env/utils/plan'
-import { isolationWords, leftWords } from '@/features/worktrees/env/utils/words'
+import { leftRowsOf } from '@/features/worktrees/env/utils/left'
+import { changesOf, unitsOf, writes } from '@/features/worktrees/env/utils/plan'
+import { isolationWords, problemWords } from '@/features/worktrees/env/utils/words'
 import type { Start } from '@/features/worktrees/hooks/use-run'
 import { searched } from '@/features/worktrees/utils/filters'
 import { planWide } from '@/features/worktrees/utils/outcome'
+import { phaseLabel } from '@/features/worktrees/utils/phases'
+import { sentence } from '@/features/worktrees/utils/sentence'
 import { plural } from '@/lib/plural'
 
 export function EnvWizard({
   repo,
   worktree,
+  again,
   onStart,
   onCancel,
 }: {
   repo: string
   worktree: string
+  again?: string[] | undefined
   onStart: (start: Start) => void
   onCancel: () => void
 }) {
-  const [confirming, setConfirming] = useState(false)
+  const [confirming, setConfirming] = useState(again !== undefined)
   const [ticks, setTicks] = useState<Record<string, boolean>>({})
   const [query, setQuery] = useState('')
 
@@ -45,7 +52,11 @@ export function EnvWizard({
   const field = form.data?.fields.find((one) => one.path === 'worktree')
   const options = field?.kind === 'multi_select' ? field.options : []
   // the core offers those out of step; the worktree on screen goes with them
-  const prechecked = [...(field?.kind === 'multi_select' ? (field.prechecked ?? field.picked) : []), worktree]
+  const offered = () => {
+    if (again) return again
+    return [...(field?.kind === 'multi_select' ? (field.prechecked ?? field.picked) : []), worktree]
+  }
+  const prechecked = offered()
   const isChecked = (option: DomainOption) => ticks[option.value] ?? prechecked.includes(option.value)
   const named = options.filter(isChecked).map((option) => option.value)
   const visible = options.filter((option) => searched(option.value, query))
@@ -53,12 +64,11 @@ export function EnvWizard({
     setTicks((now) => ({ ...now, ...Object.fromEntries(names.map((name) => [name, on])) }))
 
   const answers = [{ path: 'worktree', values: named }]
-  const review = useQuery({ ...dryRunQuery(repo, 'env', answers), enabled: confirming })
+  const review = useQuery({ ...dryRunQuery(repo, 'env', answers), enabled: confirming && form.isSuccess })
   const plan = review.data?.error ? undefined : review.data?.plan
   const fingerprint = review.data?.fingerprint
   const reconciles = plan?.worktrees ?? []
   const going = reconciles.filter(writes)
-  const inStep = reconciles.filter((r) => !writes(r) && !r.missing && keptOf(r).length === 0)
   const changed = going.reduce((count, r) => count + changesOf(r).length, 0)
 
   const description = () => {
@@ -66,58 +76,7 @@ export function EnvWizard({
     return `${plural(changed, 'key')} in ${plural(going.length, 'worktree')} go back to what wtm writes.`
   }
 
-  const leftRows = [
-    ...reconciles.flatMap((r) =>
-      keptOf(r).map((kept) => (
-        <LeftRow
-          key={`${r.worktree}:${kept.file}:${kept.key}`}
-          row={{
-            key: kept.key,
-            tone: 'muted',
-            title: `${kept.key} · ${r.worktree}`,
-            message: `${kept.file}: ${leftWords[kept.status]}`,
-          }}
-        />
-      )),
-    ),
-    ...reconciles
-      .filter((r) => r.unreadable)
-      .map((r) => (
-        <LeftRow
-          key={`u:${r.worktree}`}
-          row={{ key: r.worktree, tone: 'attention', title: r.worktree, message: "its .env files couldn't be read" }}
-        />
-      )),
-    ...reconciles
-      .filter((r) => r.missing)
-      .map((r) => (
-        <LeftRow
-          key={r.worktree}
-          row={{ key: r.worktree, tone: 'attention', title: r.worktree, message: 'its folder is gone' }}
-        />
-      )),
-    ...reconciles
-      .filter((r) => r.isolation === 'verbatim' && !writes(r))
-      .map((r) => (
-        <LeftRow
-          key={`v:${r.worktree}`}
-          row={{ key: r.worktree, tone: 'muted', title: r.worktree, message: isolationWords.verbatim }}
-        />
-      )),
-    ...(inStep.length > 0
-      ? [
-          <LeftRow
-            key="in-step"
-            row={{
-              key: 'in-step',
-              tone: 'muted',
-              title: inStep.length === 1 ? (inStep[0]?.worktree ?? '') : `${inStep.length} other worktrees`,
-              message: 'in step: nothing to rewrite',
-            }}
-          />,
-        ]
-      : []),
-  ]
+  const leftRows = leftRowsOf(reconciles, review.data?.warnings ?? []).map((row) => <LeftRow key={row.key} row={row} />)
 
   const body = () => {
     if (!confirming) {
@@ -183,6 +142,18 @@ export function EnvWizard({
           <h3 className="text-xs font-medium text-muted-foreground">How it runs</h3>
           <p className="text-sm">Only these keys change; the rest of each file stays as it is.</p>
         </section>
+        <Details label="Details" summary="the folder and steps of each worktree">
+          {going.map((r) => (
+            <Facts
+              key={r.worktree}
+              heading={r.worktree}
+              facts={[
+                { label: 'Folder', values: [r.path], mono: true },
+                { label: 'Steps', values: (r.phases ?? []).map((phase) => phaseLabel[phase]) },
+              ]}
+            />
+          ))}
+        </Details>
       </>
     )
   }
@@ -257,7 +228,7 @@ function PickRow({
     if (option.problem)
       return (
         <span className="text-muted-foreground">
-          {option.problem.code === 'env.missing' ? 'its folder is gone' : "its .env files couldn't be read"}
+          {problemWords[option.problem.code] ?? sentence(option.problem.message)}
         </span>
       )
     if (changes > 0)

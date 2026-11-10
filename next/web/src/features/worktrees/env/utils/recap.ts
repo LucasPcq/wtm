@@ -1,5 +1,4 @@
 import type { DomainWarning } from '@/api/types.gen'
-import { failureWords } from '@/features/worktrees/env/utils/words'
 import { type OutcomeGroup, type OutcomeRow, planWide } from '@/features/worktrees/utils/outcome'
 import type { Progress } from '@/features/worktrees/utils/progress'
 import { sentence } from '@/features/worktrees/utils/sentence'
@@ -27,6 +26,19 @@ export function recapOf(
     }),
   )
 
+  // what the plan left as it is in a worktree, the core's fix beside it
+  const leftAlone = (envelope?.warnings ?? [])
+    .filter((warning) => !planWide(warning))
+    .map(
+      (warning): OutcomeRow => ({
+        key: `${warning.params?.worktree}:${warning.code}`,
+        tone: 'attention',
+        title: warning.params?.worktree ?? '',
+        message: sentence(warning.message),
+        followUp: warning.follow_up,
+      }),
+    )
+
   return {
     groups: [
       {
@@ -46,12 +58,12 @@ export function recapOf(
               key: item.subject,
               tone: 'failed' as const,
               title: item.subject,
-              message: item.error && (failureWords[item.error.code] ?? sentence(item.error.message)),
+              message: item.error && sentence(item.error.message),
               output: cause ? { lines: cause.split('\n') } : undefined,
             }
           }),
       },
-      { kind: 'check', rows: toCheck },
+      { kind: 'check', rows: [...toCheck, ...leftAlone] },
       {
         kind: 'done',
         rows: written.map((item) => ({

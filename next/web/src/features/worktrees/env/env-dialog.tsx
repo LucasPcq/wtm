@@ -4,13 +4,14 @@ import { Dialog } from '@/components/ui/dialog'
 import { RunDialogContent } from '@/features/worktrees/components/run-dialog-content'
 import { EnvProgress } from '@/features/worktrees/env/components/env-progress'
 import { EnvWizard } from '@/features/worktrees/env/components/env-wizard'
-import { useEnvDialog } from '@/features/worktrees/hooks/use-env-dialog'
+import { openEnv, useEnvDialog } from '@/features/worktrees/hooks/use-env-dialog'
 import { succeeded, useRun } from '@/features/worktrees/hooks/use-run'
 import { openRunStart } from '@/features/worktrees/hooks/use-run-start-dialog'
+import { subjectsOf } from '@/features/worktrees/utils/actions'
 
 // one reconcile at a time: opened while one runs, or one that failed is still to be read, the dialog shows it
 export function EnvDialog({ repo }: { repo: string }) {
-  const { open, worktree } = useEnvDialog()
+  const { open, worktree, again } = useEnvDialog()
   const run = useRun(repo, 'env')
   const close = () => useEnvDialog.setState({ open: false })
 
@@ -38,6 +39,10 @@ export function EnvDialog({ repo }: { repo: string }) {
           onHide={close}
           onCancel={run.cancel}
           onRestart={restart}
+          onAgain={(retry) => {
+            run.dismiss()
+            openEnv(repo, { worktree: '', again: subjectsOf(retry) })
+          }}
           onDone={() => {
             run.dismiss()
             close()
@@ -48,9 +53,10 @@ export function EnvDialog({ repo }: { repo: string }) {
     if (!open) return null
     return (
       <EnvWizard
-        key={worktree}
+        key={again ? again.join(',') : worktree}
         repo={repo}
         worktree={worktree}
+        again={again}
         onStart={(start) => run.start(start, (envelope) => told(envelope, start.units.length))}
         onCancel={close}
       />
