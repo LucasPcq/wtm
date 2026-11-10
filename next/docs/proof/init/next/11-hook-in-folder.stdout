@@ -4,8 +4,10 @@
   Worktrees folder  ../.trees
   Base branch       main
   .env from         the template
-  .env files        apps/api/.env, apps/web/.env
-  On create         pnpm install, pnpm db:generate (in apps/api) (goes on if it fails)
+  .env files        apps/api/.env
+                    apps/web/.env
+  On create         pnpm install
+                    pnpm db:generate (in apps/api) (goes on if it fails)
   On clean          docker compose down
   Settings file     .git/wtm/config.toml
 

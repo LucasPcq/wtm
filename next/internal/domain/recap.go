@@ -14,13 +14,14 @@ func (r Recapped) Recaps() Recapped {
 	return r
 }
 
-// A RecapRow is one line of a plan's recap, as every surface shows it: what it shows under a stable Key, its label, the field whose answer it shows if one does, the mark of that answer, and its values, in order.
+// A RecapRow is one line of a plan's recap, as every surface shows it: what it shows under a stable Key, its label, the field whose answer it shows if one does, the mark of that answer, and its values, in order. Stacked says its values are commands or paths, which a text surface lists one per line, where short names share one; the JSON leaves it out, each value being its own already.
 type RecapRow struct {
-	Key    string       `json:"key"`
-	Label  string       `json:"label"`
-	Path   string       `json:"path,omitempty"`
-	Mark   Mark         `json:"mark,omitempty"`
-	Values []RecapValue `json:"values"`
+	Key     string       `json:"key"`
+	Label   string       `json:"label"`
+	Path    string       `json:"path,omitempty"`
+	Mark    Mark         `json:"mark,omitempty"`
+	Values  []RecapValue `json:"values"`
+	Stacked bool         `json:"-"`
 }
 
 // A RecapValue is one value of a recap's row: the value, the stable Note that qualifies it with its params, and Text, both spelled as the command line prints them.

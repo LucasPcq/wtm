@@ -111,3 +111,19 @@ func TestAStrategyNoOptionNamesIsRecappedAsItIs(t *testing.T) {
 	assert.Equal(t, "main's (was copy)", values[0].Text)
 	assert.Equal(t, "copy", values[1].Text)
 }
+
+// The owner's rule: a recap lists commands and paths one per line, in the dry run as in the outcome.
+func TestARecapListsEachHookAndEachEnvFileOnALineOfItsOwn(t *testing.T) {
+	for _, dryRun := range []bool{true, false} {
+		args := []string{"--yes", "--on-create", "pnpm install", "--on-create", "docker compose up -d"}
+		if dryRun {
+			args = append(args, "--dry-run")
+		}
+
+		got := runInit(t, newWorld(seed{}), args...)
+
+		require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
+		assert.Contains(t, got.Stdout, "  .env files        apps/api/.env\n                    apps/web/.env\n", "dry run: %v", dryRun)
+		assert.Contains(t, got.Stdout, "  On create         pnpm install\n                    docker compose up -d\n", "dry run: %v", dryRun)
+	}
+}

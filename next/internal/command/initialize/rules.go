@@ -146,9 +146,9 @@ func (p Plan) recap() []domain.RecapRow {
 		{Key: "base_path", Label: "Worktrees folder", Path: settings.PathBasePath, Values: []domain.RecapValue{p.one(settings.PathBasePath, s.BasePath, p.was.BasePath)}},
 		{Key: "base_branch", Label: "Base branch", Path: settings.PathBaseBranch, Values: []domain.RecapValue{p.one(settings.PathBaseBranch, s.BaseBranch, p.was.BaseBranch)}},
 		{Key: "env_strategy", Label: ".env from", Path: settings.PathEnvStrategy, Values: []domain.RecapValue{p.one(settings.PathEnvStrategy, s.EnvStrategy, p.was.EnvStrategy)}},
-		{Key: "env_files", Label: ".env files", Path: settings.PathEnvFiles, Values: listed(files)},
-		{Key: "on_create", Label: "On create", Path: settings.PathOnCreate, Values: listed(hooksText(s.OnCreate))},
-		{Key: "on_clean", Label: "On clean", Path: settings.PathOnClean, Values: listed(hooksText(s.OnClean))},
+		{Key: "env_files", Label: ".env files", Path: settings.PathEnvFiles, Stacked: true, Values: listed(files)},
+		{Key: "on_create", Label: "On create", Path: settings.PathOnCreate, Stacked: true, Values: listed(hooksText(s.OnCreate))},
+		{Key: "on_clean", Label: "On clean", Path: settings.PathOnClean, Stacked: true, Values: listed(hooksText(s.OnClean))},
 		{Key: "file", Label: "Settings file", Values: []domain.RecapValue{{Value: p.Path, Text: p.shownPath}}},
 	}
 }

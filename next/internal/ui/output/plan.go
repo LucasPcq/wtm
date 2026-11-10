@@ -41,10 +41,11 @@ func MarkText(mark domain.Mark) string {
 	return ""
 }
 
-// A PlanRow is one line of a plan: a label and the values it applies to.
+// A PlanRow is one line of a plan: a label and the values it applies to, one per line when Stacked (commands or paths), else on one line while they fit.
 type PlanRow struct {
-	Label  string
-	Values []string
+	Label   string
+	Values  []string
+	Stacked bool
 }
 
 // RecapRows are the rows of recap as a plan draws them: each value's text, the last carrying the row's mark.
@@ -58,7 +59,7 @@ func RecapRows(recap []domain.RecapRow) []PlanRow {
 		if last := len(values) - 1; last >= 0 {
 			values[last] += MarkText(row.Mark)
 		}
-		rows = append(rows, PlanRow{Label: row.Label, Values: values})
+		rows = append(rows, PlanRow{Label: row.Label, Values: values, Stacked: row.Stacked})
 	}
 
 	return rows
@@ -129,7 +130,7 @@ func planRows(params PlanParams, st *Styles) []string {
 
 	var lines []string
 	for _, row := range params.Rows {
-		values := planValues(row.Values, params.Width-column)
+		values := planValues(row, params.Width-column)
 		lines = append(lines, st.Muted.Render(row.Label)+strings.Repeat(" ", column-lipgloss.Width(row.Label))+values[0])
 		for _, value := range values[1:] {
 			lines = append(lines, strings.Repeat(" ", column)+value)
@@ -138,15 +139,16 @@ func planRows(params PlanParams, st *Styles) []string {
 	return lines
 }
 
-// planValues returns values on one line when they fit width, else one value per line, each wrapped to width.
-func planValues(values []string, width int) []string {
-	joined := strings.Join(values, planSeparator)
-	if len(values) < 2 || width < 1 || lipgloss.Width(joined) <= width {
+// planValues returns the row's values one per line, each wrapped to width, when it is stacked or they do not fit width; else on one line.
+func planValues(row PlanRow, width int) []string {
+	joined := strings.Join(row.Values, planSeparator)
+	fits := width < 1 || lipgloss.Width(joined) <= width
+	if len(row.Values) < 2 || (fits && !row.Stacked) {
 		return wrapped(joined, width)
 	}
 
 	var lines []string
-	for _, value := range values {
+	for _, value := range row.Values {
 		lines = append(lines, wrapped(value, width)...)
 	}
 	return lines

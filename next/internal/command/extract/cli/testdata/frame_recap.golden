@@ -15,7 +15,8 @@
   ┃  Review & confirm
   ┃
   ┃  Source  feat/login
-  ┃  Files   mod apps/api/a.txt, new apps/api/new.txt
+  ┃  Files   mod apps/api/a.txt
+  ┃          new apps/api/new.txt
   ┃  Target  feat/other
   ┃  Mode    move
 
