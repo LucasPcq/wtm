@@ -1,0 +1,39 @@
+## run.toml
+#:schema ./schemas/run.schema.json
+
+concurrency = "parallel"
+
+[[job]]
+  name = "hello"
+  kind = "task"
+  cmd = "echo hello"
+## docker-compose.yml
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+## config.toml, its .env files
+strategy = "example"
+target = "apps/admin/.env"
+template = "apps/admin/.env.example"
+target = "apps/api/.env"
+template = "apps/api/.env.example"
+target = "apps/web/.env.local"
+local = true
+target = "apps/worker/.env"
+template = "apps/worker/.env.example"
+target = "packages/db/.env"
+template = "packages/db/.env.example"
+## git status

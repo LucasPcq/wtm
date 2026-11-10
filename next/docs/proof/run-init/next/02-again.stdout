@@ -1,0 +1,7 @@
+
+  = run-init: nothing to do
+
+  ! admin binds 3001 whatever ADMIN_PORT says: run it as pnpm exec next dev -p ${ADMIN_PORT} (--command)
+
+  → wtm run up   start the jobs
+

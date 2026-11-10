@@ -1,0 +1,14 @@
+
+  Step 4/17 • Shared
+
+  ✓ What runs: postgres, redis, mailpit, admin, api, web, worker, migrate, seed
+  ✓ Run once: migrate, seed
+  ✓ Root dev script: one by one
+
+  The compose services one copy serves for every worktree, the others one each (repeatable)
+
+▌› [x] postgres
+   [ ] redis
+   [x] mailpit
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc back

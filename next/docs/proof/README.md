@@ -26,6 +26,7 @@ sandboxes=$(./create.sh "$wtm" "$next" create)   # the sandboxes it leaves behin
 ./reparent.sh "$wtm" "$next" reparent
 ./init.sh "$wtm" "$next" init
 ./checkout.sh "$wtm" "$next" checkout
+./run-init.sh "$wtm" "$next" run-init
 ./ui.sh "$next" ui
 other=$(mktemp -d)/wtm-next && (cd ../../.. && go build -ldflags "-X main.version=0.31.0-other" -o "$other" ./next/cmd/wtm-next)
 ./daemon.sh "$wtm" "$next" "$other" daemon
@@ -920,3 +921,42 @@ The reference is the legacy `wtm init` of 0.30.1. Next's init writes the same co
   - **Detection** (D6): next also proposes `docker compose down` before a removal when a compose file sits at the root (2: legacy's `on_clean` is empty), and reads package.json's `packageManager` before the lockfiles.
   - **A recap and a confirm on the first init too** (D5, bug 7): legacy writes a first init without one (`tty/legacy/5-outcome.txt`), next shows `tty/next/5-recap.txt`.
   - **The uniform system**: the v2 envelope (7, legacy refuses `--output json`, exit 2) and dry run (1, exit 2 on legacy); an invalid value is an invalid request naming its flag, exit 2 (8: next refuses `copy`; legacy, set up already, says it exists and exits 0, and refuses `copy` with exit 1 on a first init, bug 3); outside a repository `not a git repository`, exit 21 (12, legacy exit 1 with git's error, bug 5); the trail names each step once (bug 4: legacy's "Post-create hooks" twice, "1 files selected"); `relocate` follows up only while a worktree sits outside the folder (bug 6), and `run init` only while run.toml declares nothing (the demo's does, so next does not offer it).
+
+# Proof: `wtm run init` (legacy `flow/run/initrun`, `surface/tui/inittui`) vs `wtm-next run init`
+
+The reference is the legacy `wtm run init` of 0.30.1, on the monorepo of the ticket (`run-init-repo.sh`: pnpm workspaces with a `packageManager` field and no lockfile, a turbo root dev script, apps api, web, admin whose script binds `-p 3001` and worker, packages/db with migrate and seed, docker-compose.yml with postgres, redis and mailpit on 8025 and 1025, five .env files, `wtm init --yes` done by the legacy binary). Each scenario that starts from no run.toml gets a fresh copy.
+
+- `run-init.sh <wtm> <wtm-next> run-init`: the same scenarios run by each binary without a terminal; after each, the exit code, stdout, stderr and the state (run.toml, docker-compose.yml, config.toml's .env files, git status). `run-init/states.diff` holds the differences of state.
+  1. a first `run init --yes`
+  2. the same again
+  3. `run init` with no flag and no terminal, on a fresh copy
+  4. `--yes --output json`
+  5. legacy `--yes --patch-compose --link-env`, next `--yes --patch-compose=false`
+  6. next only: `--yes --dry-run`
+  7. next only: `--yes --command 'admin=pnpm exec next dev -p ${ADMIN_PORT}'`, the fix of the problem to check
+  8. next only: a re-init with worker left out (`--job` each other one)
+  9. next only: the legacy binary's `wtm run list` reading the run.toml next wrote
+  10. next only: `run up main --parallel --remember exclusive --yes -d` on a run.toml of one task: run.toml gets `concurrency = "parallel"`, the recap `Others' jobs  kept · saved for next runs`
+- Then the wizard in tmux at 110×50, on a tmux server of its own (`tty/legacy`, `tty/next`), Enter on each step: next to its end (`tty/next/state.txt` what it wrote); legacy until its ports step, where Enter edits a port, then left.
+- The legacy's bugs and what next does (LUC-340), each under its test in `command/runinit`:
+  - web's .env links target `apps/web/.env.local`, which a new worktree may not get: next makes it to check (`run-init.env_file_not_copied`), `--env-copy` adds it to config.toml (`TestAnEnvFileNoWorktreeGetsIsToCheckAndCopyingItWritesConfigToml`).
+  - mailpit's 1025 never asked and then withdrawn against worker's `SMTP_PORT`, which the legacy declared as worker's own port with a named URL (1, 5): next declares `MAILPIT_PORT_1025` and rewrites `"1025:1025"`; worker binds no port, its `SMTP_PORT` follows the shared mailpit, whose port never moves, so it is not linked (`TestEveryPortAComposeServicePublishesIsDeclaredMailpits1025Included`, `TestAPortAJobOnlyDialsIsNeitherItsOwnNorLinkedToASharedService`).
+  - a named URL pre-checked for postgres and redis: next offers a name only to a port that speaks HTTP, a compose service's only when asked (`TestOnlyAJobThatSpeaksHTTPIsOfferedAName`).
+  - the false "never mentions the port" warning for compose services: next warns only of a command binding its port as a literal, with the command that reads it (`TestOnlyACommandThatBindsItsPortAsALiteralIsToCheckWithTheCommandThatReadsIt`, `TestTheCommandProposedIsWrittenOnceAnsweredAndNothingIsLeftToCheck`).
+  - counts that disagree: next's recap counts what run.toml declares (`TestTheRecapCountsWhatRunTomlDeclares`).
+  - `DATABASE_URL` templated and also listed as following a port: next links it once, as data (`TestADatabaseURLFollowsItsSharedServiceOnceAsData`).
+  - the per-worktree redis job named `docker-compose`, commands on `docker-compose` v1: next names each job after its service, on `docker compose` (`TestAComposeServicesJobIsNamedAfterItAndRunsThroughDockerComposeV2`).
+  - the profile editor that cannot add or remove a job nor move the default: next's profiles are answered whole, `name=job,job`, and `--default-profile` (`TestProfilesAreAnsweredWholeTheirJobsAndTheDefault`); a re-init drops the profile of a job left out (`TestAReInitKeepsOutWhatWasLeftOutAndAddsNothingFoundSince`).
+  - the package manager read from the lockfile only (the wizard showed `none run dev` while `--yes` wrote `pnpm run dev`): next reads `packageManager` first, one detection for every path (`adapter/detect`, `TestThePackageManagerIsThePackageManagerFieldElseALockfile`).
+  - an unattended re-init that brought back worker's withdrawn `SMTP_PORT` and changed run.toml (2): next's re-init that changes nothing writes nothing (`TestAReInitThatChangesNothingWritesNothing`).
+  - the root turbo script offered unchecked and never asked unattended: next asks `runner`, one by one by default (`TestTheRootScriptThatStartsTheAppsRunsThemThroughIt`).
+  - the texts and layout: mailpit gets no pre-filled namespace (`TestADatabaseIsSharedWithASpaceEachAndAMailCatcherWithNothingOfItsOwn`); the compose rewrite answers yes by default; the trail and the recap name every part, scopes and spaces included; the examples name the repository; Enter confirms every step.
+- The differences, all approved by the owner (LUC-340):
+  - **Jobs named after their subject** (D1): `api`, `postgres`, `migrate`, not `api-dev` and `docker-compose`; one job per compose service (`docker compose up -d <service>`, `docker compose stop <service>`), not one per file. A re-init over a legacy run.toml takes a script's job under its legacy name (same folder and script); the legacy's whole-file `docker-compose` job is kept as a job run init does not propose.
+  - **Every script a candidate** (D2): an app's dev or start script as a service, a package's other scripts as tasks (migrate and seed checked); build, test, lint and the like never.
+  - **A port a job only dials is never its own** (D3, bug above).
+  - **The compose rewrite on by default** (D4, Q4), in the wizard and unattended; `--patch-compose=false` declines (5: next leaves docker-compose.yml alone and declares no port for a literal it keeps, as the legacy did when it declined).
+  - **The .env part on by default** (Q5): every key holding a job's port is linked unless `--link` answers otherwise (`--link=` links none); `--link-env` is gone. `--write-port-keys` is gone (no place in the design; the links cover an app started by hand).
+  - **A re-init adds nothing unattended** (Q2 b): everything absent from run.toml is left out; nothing marks a candidate found since as new.
+  - **The uniform system** (D5, D6): the v2 envelope (4: the legacy refuses `--output json`, exit 2), a dry run and a fingerprint, the next/ outcome (an item per file, `run up` next) instead of the legacy boxes; the proxy hint is not repeated (the proxy's own commands say it).
+  - **A dashed branch in a database name** is not wtm's to quote (Q6): the space's name is the project's and the worktree's, `{worktree}` filled in as the namespace expands it.

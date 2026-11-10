@@ -17,7 +17,7 @@ Pure (no port, no context), in three sections:
 | Kind | Asks |
 | -- | -- |
 | `SelectField` | one option; may be `Pinned`, `Refreshable` (r reads the options again), `Rememberable`; `Refused` lists the values it leaves out of its options, each as the field error it would raise if given (reparent's parents that would close a cycle), so a surface says why before the request does |
-| `MultiSelectField` | any options |
+| `MultiSelectField` | any options; `Optional` when confirming none picked answers it (its step then takes an empty pick, and its words need no problem of none) |
 | `TextField` | one line |
 | `TextListField` | a list of entries, with the values the repository knows as `Options` |
 | `ConfirmField` | yes or no, valued `true`/`false`, no first when `NoFirst`; may be `Rememberable` |

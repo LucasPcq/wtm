@@ -1,0 +1,13 @@
+
+  ✓ run-init: 1 done
+
+  Jobs       postgres, redis, mailpit, admin, api, web, migrate, seed
+  Shared     postgres, mailpit
+  Ports      postgres POSTGRES_PORT 5432, redis REDIS_PORT 6379, mailpit MAILPIT_PORT 8025, mailpit MAILPIT_PORT_1025 1025, admin ADMIN_PORT 3001, api PORT 4000, web PORT 3000
+  Addresses  names
+  .env keys  8 linked
+  Profiles   all (default), admin, api, web
+  Writes     run.toml
+
+  → wtm run up   start the jobs
+

@@ -1,0 +1,21 @@
+
+  Step 10/17 • Named jobs
+
+  ✓ What runs: postgres, redis, mailpit, admin, api, web, worker, migrate, seed
+  ✓ Run once: migrate, seed
+  ✓ Root dev script: one by one
+  ✓ Shared: postgres, mailpit
+  ✓ Each worktree's space: postgres.name=acme_{worktree}, postgres.create=docker compose exec -T postgres cre…
+  ✓ Tasks that change data: migrate, seed
+  ✓ Ports: postgres.POSTGRES_PORT=5432, redis.REDIS_PORT=6379, mailpit.MAILPIT_PORT=8025, mailpit.MAILPIT_POR…
+  ✓ Commands:
+  ✓ Addresses: named URLs
+
+  The jobs answering under their own name through the proxy (repeatable)
+
+▌› [ ] mailpit
+   [x] admin
+   [x] api
+   [x] web
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc back

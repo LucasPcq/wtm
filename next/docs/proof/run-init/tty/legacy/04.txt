@@ -1,0 +1,29 @@
+
+  Step 9/17 • One port per service, so two worktrees never collide
+
+  ✓ Docker services: 1 files selected
+  ✓ Package scripts: 4 scripts selected
+  ⊘ Job type — every checked script is a dev server
+  ✓ Shared services: 0 shared, 3 per worktree
+  ⊘ Shared service namespaces — no shared service to give namespaces
+  ⊘ Shared service keys — no shared service declares a namespace
+  ⊘ Runners — no root-level service that could start the others
+  ⊘ Data tasks — no task, or no service holding data
+
+  ┃  Each port below is injected into its job under the variable's name, shifted by
+  ┃  the worktree's offset — 3001 on main, 3011 on the next worktree.
+  ┃
+  ┃  A service with no port declared binds the same one everywhere: the second
+  ┃  worktree to start it will fail. Detection filled in what it could find in your
+  ┃  compose files and .env; declare the rest, or leave one blank to accept it.
+
+▸ docker-compose · MAILPIT_PORT    = 8025
+  docker-compose · POSTGRES_PORT   = 5432
+  docker-compose · REDIS_PORT      = 6379
+  admin-dev      · ADMIN_DEV_PORT  = —   not declared — every worktree binds the same port
+  api-dev        · PORT            = 4000
+  web-dev        · PORT            = 3000
+  worker-dev     · WORKER_DEV_PORT = —   not declared — every worktree binds the same port
+  ✓ Done
+
+  ↑↓ navigate • n binds no port • enter select • esc back

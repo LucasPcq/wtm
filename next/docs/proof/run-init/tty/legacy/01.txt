@@ -1,0 +1,8 @@
+
+  Step 1/17 • Docker Compose services
+
+  ┃  Each selected docker-compose file becomes a service you can start and stop with `wtm run`.
+
+▌ [✓] docker-compose.yml
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc cancel

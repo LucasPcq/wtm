@@ -1,0 +1,1056 @@
+=== 01-first: exit legacy 0, next 0
+--- legacy/01-first
++++ next/01-first
+@@ -1,23 +1,53 @@
+ ## run.toml
+ #:schema ./schemas/run.schema.json
+ 
++addressing = "names"
++
+ [[job]]
+-  name = "docker-compose"
++  name = "postgres"
+   kind = "service"
+-  cmd = "docker-compose -f docker-compose.yml up -d"
+-  stop = "docker-compose -f docker-compose.yml down --remove-orphans"
+-  cwd = "."
++  cmd = "docker compose up -d postgres"
++  stop = "docker compose stop postgres"
++  scope = "shared"
++  [job.ports]
++    POSTGRES_PORT = 5432
++  [job.namespace]
++    name = "acme_{worktree}"
++    create = "docker compose exec -T postgres createdb -U postgres \"$WTM_NAMESPACE\""
++    remove = "docker compose exec -T postgres dropdb -U postgres --if-exists \"$WTM_NAMESPACE\""
+ 
+ [[job]]
+-  name = "admin-dev"
++  name = "redis"
+   kind = "service"
+-  cmd = "pnpm run dev"
++  cmd = "docker compose up -d redis"
++  stop = "docker compose stop redis"
++  [job.ports]
++    REDIS_PORT = 6379
++
++[[job]]
++  name = "mailpit"
++  kind = "service"
++  cmd = "docker compose up -d mailpit"
++  stop = "docker compose stop mailpit"
++  scope = "shared"
++  [job.ports]
++    MAILPIT_PORT = 8025
++    MAILPIT_PORT_1025 = 1025
++
++[[job]]
++  name = "admin"
++  kind = "service"
++  cmd = "pnpm dev"
+   cwd = "apps/admin"
++  [job.ports]
++    ADMIN_PORT = 3001
++  [job.url]
++    port = "ADMIN_PORT"
+ 
+ [[job]]
+-  name = "api-dev"
++  name = "api"
+   kind = "service"
+-  cmd = "pnpm run dev"
++  cmd = "pnpm dev"
+   cwd = "apps/api"
+   [job.ports]
+     PORT = 4000
+@@ -25,9 +55,9 @@
+     port = "PORT"
+ 
+ [[job]]
+-  name = "web-dev"
++  name = "web"
+   kind = "service"
+-  cmd = "pnpm run dev"
++  cmd = "pnpm dev"
+   cwd = "apps/web"
+   [job.ports]
+     PORT = 3000
+@@ -35,39 +65,98 @@
+     port = "PORT"
+ 
+ [[job]]
+-  name = "worker-dev"
++  name = "worker"
+   kind = "service"
+-  cmd = "pnpm run dev"
++  cmd = "pnpm dev"
+   cwd = "apps/worker"
+-  [job.ports]
+-    SMTP_PORT = 1025
+-  [job.url]
+-    port = "SMTP_PORT"
++  binds_no_port = true
+ 
++[[job]]
++  name = "migrate"
++  kind = "task"
++  cmd = "pnpm migrate"
++  cwd = "packages/db"
++  touches = ["postgres"]
++
++[[job]]
++  name = "seed"
++  kind = "task"
++  cmd = "pnpm seed"
++  cwd = "packages/db"
++  touches = ["postgres"]
++
+ [[profile]]
++  name = "all"
++  jobs = ["postgres", "redis", "mailpit", "admin", "api", "web", "worker", "migrate", "seed"]
++  default = true
++
++[[profile]]
+   name = "admin"
+-  jobs = ["docker-compose", "admin-dev"]
++  jobs = ["postgres", "redis", "api", "admin"]
+   default = false
+ 
+ [[profile]]
+   name = "api"
+-  jobs = ["docker-compose", "api-dev"]
++  jobs = ["postgres", "redis", "api"]
+   default = false
+ 
+ [[profile]]
+   name = "web"
+-  jobs = ["docker-compose", "web-dev"]
++  jobs = ["postgres", "redis", "api", "web"]
+   default = false
+ 
+ [[profile]]
+   name = "worker"
+-  jobs = ["docker-compose", "worker-dev"]
++  jobs = ["redis", "worker"]
+   default = false
+ 
+-[[profile]]
+-  name = "all"
+-  jobs = ["docker-compose", "admin-dev", "api-dev", "web-dev", "worker-dev"]
+-  default = true
++[[env_port]]
++  file = "apps/admin/.env"
++  key = "NEXT_PUBLIC_API_URL"
++  job = "api"
++  port = "PORT"
++
++[[env_port]]
++  file = "apps/api/.env"
++  key = "PORT"
++  job = "api"
++  port = "PORT"
++
++[[env_port]]
++  file = "apps/api/.env"
++  key = "REDIS_URL"
++  job = "redis"
++  port = "REDIS_PORT"
++
++[[env_port]]
++  file = "apps/web/.env.local"
++  key = "PORT"
++  job = "web"
++  port = "PORT"
++
++[[env_port]]
++  file = "apps/web/.env.local"
++  key = "NEXT_PUBLIC_API_URL"
++  job = "api"
++  port = "PORT"
++
++[[env_port]]
++  file = "apps/worker/.env"
++  key = "REDIS_URL"
++  job = "redis"
++  port = "REDIS_PORT"
++
++[[env]]
++  file = "apps/api/.env"
++  key = "DATABASE_URL"
++  job = "postgres"
++  value = "postgres://postgres:postgres@localhost:{port.POSTGRES_PORT}/{namespace}"
++
++[[env]]
++  file = "packages/db/.env"
++  key = "DATABASE_URL"
++  job = "postgres"
++  value = "postgres://postgres:postgres@localhost:{port.POSTGRES_PORT}/{namespace}"
+ ## docker-compose.yml
+ services:
+   postgres:
+@@ -75,16 +164,16 @@
+     environment:
+       POSTGRES_PASSWORD: postgres
+     ports:
+-      - "5432:5432"
++      - "${POSTGRES_PORT:-5432}:5432"
+   redis:
+     image: redis:7
+     ports:
+-      - "6379:6379"
++      - "${REDIS_PORT:-6379}:6379"
+   mailpit:
+     image: axllent/mailpit
+     ports:
+-      - "8025:8025"
+-      - "1025:1025"
++      - "${MAILPIT_PORT:-8025}:8025"
++      - "${MAILPIT_PORT_1025:-1025}:1025"
+ ## config.toml, its .env files
+ strategy = "example"
+ target = "apps/admin/.env"
+@@ -98,3 +187,4 @@
+ target = "packages/db/.env"
+ template = "packages/db/.env.example"
+ ## git status
++ M docker-compose.yml
+=== 02-again: exit legacy 0, next 0
+--- legacy/02-again
++++ next/02-again
+@@ -1,23 +1,53 @@
+ ## run.toml
+ #:schema ./schemas/run.schema.json
+ 
++addressing = "names"
++
+ [[job]]
+-  name = "docker-compose"
++  name = "postgres"
+   kind = "service"
+-  cmd = "docker-compose -f docker-compose.yml up -d"
+-  stop = "docker-compose -f docker-compose.yml down --remove-orphans"
+-  cwd = "."
++  cmd = "docker compose up -d postgres"
++  stop = "docker compose stop postgres"
++  scope = "shared"
++  [job.ports]
++    POSTGRES_PORT = 5432
++  [job.namespace]
++    name = "acme_{worktree}"
++    create = "docker compose exec -T postgres createdb -U postgres \"$WTM_NAMESPACE\""
++    remove = "docker compose exec -T postgres dropdb -U postgres --if-exists \"$WTM_NAMESPACE\""
+ 
+ [[job]]
+-  name = "admin-dev"
++  name = "redis"
+   kind = "service"
+-  cmd = "pnpm run dev"
++  cmd = "docker compose up -d redis"
++  stop = "docker compose stop redis"
++  [job.ports]
++    REDIS_PORT = 6379
++
++[[job]]
++  name = "mailpit"
++  kind = "service"
++  cmd = "docker compose up -d mailpit"
++  stop = "docker compose stop mailpit"
++  scope = "shared"
++  [job.ports]
++    MAILPIT_PORT = 8025
++    MAILPIT_PORT_1025 = 1025
++
++[[job]]
++  name = "admin"
++  kind = "service"
++  cmd = "pnpm dev"
+   cwd = "apps/admin"
++  [job.ports]
++    ADMIN_PORT = 3001
++  [job.url]
++    port = "ADMIN_PORT"
+ 
+ [[job]]
+-  name = "api-dev"
++  name = "api"
+   kind = "service"
+-  cmd = "pnpm run dev"
++  cmd = "pnpm dev"
+   cwd = "apps/api"
+   [job.ports]
+     PORT = 4000
+@@ -25,9 +55,9 @@
+     port = "PORT"
+ 
+ [[job]]
+-  name = "web-dev"
++  name = "web"
+   kind = "service"
+-  cmd = "pnpm run dev"
++  cmd = "pnpm dev"
+   cwd = "apps/web"
+   [job.ports]
+     PORT = 3000
+@@ -35,39 +65,98 @@
+     port = "PORT"
+ 
+ [[job]]
+-  name = "worker-dev"
++  name = "worker"
+   kind = "service"
+-  cmd = "pnpm run dev"
++  cmd = "pnpm dev"
+   cwd = "apps/worker"
+-  [job.ports]
+-    SMTP_PORT = 1025
+-  [job.url]
+-    port = "SMTP_PORT"
++  binds_no_port = true
+ 
++[[job]]
++  name = "migrate"
++  kind = "task"
++  cmd = "pnpm migrate"
++  cwd = "packages/db"
++  touches = ["postgres"]
++
++[[job]]
++  name = "seed"
++  kind = "task"
++  cmd = "pnpm seed"
++  cwd = "packages/db"
++  touches = ["postgres"]
++
+ [[profile]]
++  name = "all"
++  jobs = ["postgres", "redis", "mailpit", "admin", "api", "web", "worker", "migrate", "seed"]
++  default = true
++
++[[profile]]
+   name = "admin"
+-  jobs = ["docker-compose", "admin-dev"]
++  jobs = ["postgres", "redis", "api", "admin"]
+   default = false
+ 
+ [[profile]]
+   name = "api"
+-  jobs = ["docker-compose", "api-dev"]
++  jobs = ["postgres", "redis", "api"]
+   default = false
+ 
+ [[profile]]
+   name = "web"
+-  jobs = ["docker-compose", "web-dev"]
++  jobs = ["postgres", "redis", "api", "web"]
+   default = false
+ 
+ [[profile]]
+   name = "worker"
+-  jobs = ["docker-compose", "worker-dev"]
++  jobs = ["redis", "worker"]
+   default = false
+ 
+-[[profile]]
+-  name = "all"
+-  jobs = ["docker-compose", "admin-dev", "api-dev", "web-dev", "worker-dev"]
+-  default = true
++[[env_port]]
++  file = "apps/admin/.env"
++  key = "NEXT_PUBLIC_API_URL"
++  job = "api"
++  port = "PORT"
++
++[[env_port]]
++  file = "apps/api/.env"
++  key = "PORT"
++  job = "api"
++  port = "PORT"
++
++[[env_port]]
++  file = "apps/api/.env"
++  key = "REDIS_URL"
++  job = "redis"
++  port = "REDIS_PORT"
++
++[[env_port]]
++  file = "apps/web/.env.local"
++  key = "PORT"
++  job = "web"
++  port = "PORT"
++
++[[env_port]]
++  file = "apps/web/.env.local"
++  key = "NEXT_PUBLIC_API_URL"
++  job = "api"
++  port = "PORT"
++
++[[env_port]]
++  file = "apps/worker/.env"
++  key = "REDIS_URL"
++  job = "redis"
++  port = "REDIS_PORT"
++
++[[env]]
++  file = "apps/api/.env"
++  key = "DATABASE_URL"
++  job = "postgres"
++  value = "postgres://postgres:postgres@localhost:{port.POSTGRES_PORT}/{namespace}"
++
++[[env]]
++  file = "packages/db/.env"
++  key = "DATABASE_URL"
++  job = "postgres"
++  value = "postgres://postgres:postgres@localhost:{port.POSTGRES_PORT}/{namespace}"
+ ## docker-compose.yml
+ services:
+   postgres:
+@@ -75,16 +164,16 @@
+     environment:
+       POSTGRES_PASSWORD: postgres
+     ports:
+-      - "5432:5432"
++      - "${POSTGRES_PORT:-5432}:5432"
+   redis:
+     image: redis:7
+     ports:
+-      - "6379:6379"
++      - "${REDIS_PORT:-6379}:6379"
+   mailpit:
+     image: axllent/mailpit
+     ports:
+-      - "8025:8025"
+-      - "1025:1025"
++      - "${MAILPIT_PORT:-8025}:8025"
++      - "${MAILPIT_PORT_1025:-1025}:1025"
+ ## config.toml, its .env files
+ strategy = "example"
+ target = "apps/admin/.env"
+@@ -98,3 +187,4 @@
+ target = "packages/db/.env"
+ template = "packages/db/.env.example"
+ ## git status
++ M docker-compose.yml
+=== 03-no-tty: exit legacy 0, next 0
+--- legacy/03-no-tty
++++ next/03-no-tty
+@@ -1,23 +1,53 @@
+ ## run.toml
+ #:schema ./schemas/run.schema.json
+ 
++addressing = "names"
++
+ [[job]]
+-  name = "docker-compose"
++  name = "postgres"
+   kind = "service"
+-  cmd = "docker-compose -f docker-compose.yml up -d"
+-  stop = "docker-compose -f docker-compose.yml down --remove-orphans"
+-  cwd = "."
++  cmd = "docker compose up -d postgres"
++  stop = "docker compose stop postgres"
++  scope = "shared"
++  [job.ports]
++    POSTGRES_PORT = 5432
++  [job.namespace]
++    name = "acme_{worktree}"
++    create = "docker compose exec -T postgres createdb -U postgres \"$WTM_NAMESPACE\""
++    remove = "docker compose exec -T postgres dropdb -U postgres --if-exists \"$WTM_NAMESPACE\""
+ 
+ [[job]]
+-  name = "admin-dev"
++  name = "redis"
+   kind = "service"
+-  cmd = "pnpm run dev"
++  cmd = "docker compose up -d redis"
++  stop = "docker compose stop redis"
++  [job.ports]
++    REDIS_PORT = 6379
++
++[[job]]
++  name = "mailpit"
++  kind = "service"
++  cmd = "docker compose up -d mailpit"
++  stop = "docker compose stop mailpit"
++  scope = "shared"
++  [job.ports]
++    MAILPIT_PORT = 8025
++    MAILPIT_PORT_1025 = 1025
++
++[[job]]
++  name = "admin"
++  kind = "service"
++  cmd = "pnpm dev"
+   cwd = "apps/admin"
++  [job.ports]
++    ADMIN_PORT = 3001
++  [job.url]
++    port = "ADMIN_PORT"
+ 
+ [[job]]
+-  name = "api-dev"
++  name = "api"
+   kind = "service"
+-  cmd = "pnpm run dev"
++  cmd = "pnpm dev"
+   cwd = "apps/api"
+   [job.ports]
+     PORT = 4000
+@@ -25,9 +55,9 @@
+     port = "PORT"
+ 
+ [[job]]
+-  name = "web-dev"
++  name = "web"
+   kind = "service"
+-  cmd = "pnpm run dev"
++  cmd = "pnpm dev"
+   cwd = "apps/web"
+   [job.ports]
+     PORT = 3000
+@@ -35,39 +65,98 @@
+     port = "PORT"
+ 
+ [[job]]
+-  name = "worker-dev"
++  name = "worker"
+   kind = "service"
+-  cmd = "pnpm run dev"
++  cmd = "pnpm dev"
+   cwd = "apps/worker"
+-  [job.ports]
+-    SMTP_PORT = 1025
+-  [job.url]
+-    port = "SMTP_PORT"
++  binds_no_port = true
+ 
++[[job]]
++  name = "migrate"
++  kind = "task"
++  cmd = "pnpm migrate"
++  cwd = "packages/db"
++  touches = ["postgres"]
++
++[[job]]
++  name = "seed"
++  kind = "task"
++  cmd = "pnpm seed"
++  cwd = "packages/db"
++  touches = ["postgres"]
++
+ [[profile]]
++  name = "all"
++  jobs = ["postgres", "redis", "mailpit", "admin", "api", "web", "worker", "migrate", "seed"]
++  default = true
++
++[[profile]]
+   name = "admin"
+-  jobs = ["docker-compose", "admin-dev"]
++  jobs = ["postgres", "redis", "api", "admin"]
+   default = false
+ 
+ [[profile]]
+   name = "api"
+-  jobs = ["docker-compose", "api-dev"]
++  jobs = ["postgres", "redis", "api"]
+   default = false
+ 
+ [[profile]]
+   name = "web"
+-  jobs = ["docker-compose", "web-dev"]
++  jobs = ["postgres", "redis", "api", "web"]
+   default = false
+ 
+ [[profile]]
+   name = "worker"
+-  jobs = ["docker-compose", "worker-dev"]
++  jobs = ["redis", "worker"]
+   default = false
+ 
+-[[profile]]
+-  name = "all"
+-  jobs = ["docker-compose", "admin-dev", "api-dev", "web-dev", "worker-dev"]
+-  default = true
++[[env_port]]
++  file = "apps/admin/.env"
++  key = "NEXT_PUBLIC_API_URL"
++  job = "api"
++  port = "PORT"
++
++[[env_port]]
++  file = "apps/api/.env"
++  key = "PORT"
++  job = "api"
++  port = "PORT"
++
++[[env_port]]
++  file = "apps/api/.env"
++  key = "REDIS_URL"
++  job = "redis"
++  port = "REDIS_PORT"
++
++[[env_port]]
++  file = "apps/web/.env.local"
++  key = "PORT"
++  job = "web"
++  port = "PORT"
++
++[[env_port]]
++  file = "apps/web/.env.local"
++  key = "NEXT_PUBLIC_API_URL"
++  job = "api"
++  port = "PORT"
++
++[[env_port]]
++  file = "apps/worker/.env"
++  key = "REDIS_URL"
++  job = "redis"
++  port = "REDIS_PORT"
++
++[[env]]
++  file = "apps/api/.env"
++  key = "DATABASE_URL"
++  job = "postgres"
++  value = "postgres://postgres:postgres@localhost:{port.POSTGRES_PORT}/{namespace}"
++
++[[env]]
++  file = "packages/db/.env"
++  key = "DATABASE_URL"
++  job = "postgres"
++  value = "postgres://postgres:postgres@localhost:{port.POSTGRES_PORT}/{namespace}"
+ ## docker-compose.yml
+ services:
+   postgres:
+@@ -75,16 +164,16 @@
+     environment:
+       POSTGRES_PASSWORD: postgres
+     ports:
+-      - "5432:5432"
++      - "${POSTGRES_PORT:-5432}:5432"
+   redis:
+     image: redis:7
+     ports:
+-      - "6379:6379"
++      - "${REDIS_PORT:-6379}:6379"
+   mailpit:
+     image: axllent/mailpit
+     ports:
+-      - "8025:8025"
+-      - "1025:1025"
++      - "${MAILPIT_PORT:-8025}:8025"
++      - "${MAILPIT_PORT_1025:-1025}:1025"
+ ## config.toml, its .env files
+ strategy = "example"
+ target = "apps/admin/.env"
+@@ -98,3 +187,4 @@
+ target = "packages/db/.env"
+ template = "packages/db/.env.example"
+ ## git status
++ M docker-compose.yml
+=== 04-json: exit legacy 2, next 0
+--- legacy/04-json
++++ next/04-json
+@@ -1,5 +1,162 @@
+ ## run.toml
+-(none)
++#:schema ./schemas/run.schema.json
++
++addressing = "names"
++
++[[job]]
++  name = "postgres"
++  kind = "service"
++  cmd = "docker compose up -d postgres"
++  stop = "docker compose stop postgres"
++  scope = "shared"
++  [job.ports]
++    POSTGRES_PORT = 5432
++  [job.namespace]
++    name = "acme_{worktree}"
++    create = "docker compose exec -T postgres createdb -U postgres \"$WTM_NAMESPACE\""
++    remove = "docker compose exec -T postgres dropdb -U postgres --if-exists \"$WTM_NAMESPACE\""
++
++[[job]]
++  name = "redis"
++  kind = "service"
++  cmd = "docker compose up -d redis"
++  stop = "docker compose stop redis"
++  [job.ports]
++    REDIS_PORT = 6379
++
++[[job]]
++  name = "mailpit"
++  kind = "service"
++  cmd = "docker compose up -d mailpit"
++  stop = "docker compose stop mailpit"
++  scope = "shared"
++  [job.ports]
++    MAILPIT_PORT = 8025
++    MAILPIT_PORT_1025 = 1025
++
++[[job]]
++  name = "admin"
++  kind = "service"
++  cmd = "pnpm dev"
++  cwd = "apps/admin"
++  [job.ports]
++    ADMIN_PORT = 3001
++  [job.url]
++    port = "ADMIN_PORT"
++
++[[job]]
++  name = "api"
++  kind = "service"
++  cmd = "pnpm dev"
++  cwd = "apps/api"
++  [job.ports]
++    PORT = 4000
++  [job.url]
++    port = "PORT"
++
++[[job]]
++  name = "web"
++  kind = "service"
++  cmd = "pnpm dev"
++  cwd = "apps/web"
++  [job.ports]
++    PORT = 3000
++  [job.url]
++    port = "PORT"
++
++[[job]]
++  name = "worker"
++  kind = "service"
++  cmd = "pnpm dev"
++  cwd = "apps/worker"
++  binds_no_port = true
++
++[[job]]
++  name = "migrate"
++  kind = "task"
++  cmd = "pnpm migrate"
++  cwd = "packages/db"
++  touches = ["postgres"]
++
++[[job]]
++  name = "seed"
++  kind = "task"
++  cmd = "pnpm seed"
++  cwd = "packages/db"
++  touches = ["postgres"]
++
++[[profile]]
++  name = "all"
++  jobs = ["postgres", "redis", "mailpit", "admin", "api", "web", "worker", "migrate", "seed"]
++  default = true
++
++[[profile]]
++  name = "admin"
++  jobs = ["postgres", "redis", "api", "admin"]
++  default = false
++
++[[profile]]
++  name = "api"
++  jobs = ["postgres", "redis", "api"]
++  default = false
++
++[[profile]]
++  name = "web"
++  jobs = ["postgres", "redis", "api", "web"]
++  default = false
++
++[[profile]]
++  name = "worker"
++  jobs = ["redis", "worker"]
++  default = false
++
++[[env_port]]
++  file = "apps/admin/.env"
++  key = "NEXT_PUBLIC_API_URL"
++  job = "api"
++  port = "PORT"
++
++[[env_port]]
++  file = "apps/api/.env"
++  key = "PORT"
++  job = "api"
++  port = "PORT"
++
++[[env_port]]
++  file = "apps/api/.env"
++  key = "REDIS_URL"
++  job = "redis"
++  port = "REDIS_PORT"
++
++[[env_port]]
++  file = "apps/web/.env.local"
++  key = "PORT"
++  job = "web"
++  port = "PORT"
++
++[[env_port]]
++  file = "apps/web/.env.local"
++  key = "NEXT_PUBLIC_API_URL"
++  job = "api"
++  port = "PORT"
++
++[[env_port]]
++  file = "apps/worker/.env"
++  key = "REDIS_URL"
++  job = "redis"
++  port = "REDIS_PORT"
++
++[[env]]
++  file = "apps/api/.env"
++  key = "DATABASE_URL"
++  job = "postgres"
++  value = "postgres://postgres:postgres@localhost:{port.POSTGRES_PORT}/{namespace}"
++
++[[env]]
++  file = "packages/db/.env"
++  key = "DATABASE_URL"
++  job = "postgres"
++  value = "postgres://postgres:postgres@localhost:{port.POSTGRES_PORT}/{namespace}"
+ ## docker-compose.yml
+ services:
+   postgres:
+@@ -7,16 +164,16 @@
+     environment:
+       POSTGRES_PASSWORD: postgres
+     ports:
+-      - "5432:5432"
++      - "${POSTGRES_PORT:-5432}:5432"
+   redis:
+     image: redis:7
+     ports:
+-      - "6379:6379"
++      - "${REDIS_PORT:-6379}:6379"
+   mailpit:
+     image: axllent/mailpit
+     ports:
+-      - "8025:8025"
+-      - "1025:1025"
++      - "${MAILPIT_PORT:-8025}:8025"
++      - "${MAILPIT_PORT_1025:-1025}:1025"
+ ## config.toml, its .env files
+ strategy = "example"
+ target = "apps/admin/.env"
+@@ -30,3 +187,4 @@
+ target = "packages/db/.env"
+ template = "packages/db/.env.example"
+ ## git status
++ M docker-compose.yml
+=== 05-compose-flags: exit legacy 0, next 0
+--- legacy/05-compose-flags
++++ next/05-compose-flags
+@@ -1,27 +1,49 @@
+ ## run.toml
+ #:schema ./schemas/run.schema.json
+ 
++addressing = "names"
++
+ [[job]]
+-  name = "docker-compose"
++  name = "postgres"
+   kind = "service"
+-  cmd = "docker-compose -f docker-compose.yml up -d"
+-  stop = "docker-compose -f docker-compose.yml down --remove-orphans"
+-  cwd = "."
+-  [job.ports]
+-    MAILPIT_PORT = 8025
+-    POSTGRES_PORT = 5432
+-    REDIS_PORT = 6379
++  cmd = "docker compose up -d postgres"
++  stop = "docker compose stop postgres"
++  binds_no_port = true
++  scope = "shared"
++  [job.namespace]
++    name = "acme_{worktree}"
++    create = "docker compose exec -T postgres createdb -U postgres \"$WTM_NAMESPACE\""
++    remove = "docker compose exec -T postgres dropdb -U postgres --if-exists \"$WTM_NAMESPACE\""
+ 
+ [[job]]
+-  name = "admin-dev"
++  name = "redis"
+   kind = "service"
+-  cmd = "pnpm run dev"
++  cmd = "docker compose up -d redis"
++  stop = "docker compose stop redis"
++  binds_no_port = true
++
++[[job]]
++  name = "mailpit"
++  kind = "service"
++  cmd = "docker compose up -d mailpit"
++  stop = "docker compose stop mailpit"
++  binds_no_port = true
++  scope = "shared"
++
++[[job]]
++  name = "admin"
++  kind = "service"
++  cmd = "pnpm dev"
+   cwd = "apps/admin"
++  [job.ports]
++    ADMIN_PORT = 3001
++  [job.url]
++    port = "ADMIN_PORT"
+ 
+ [[job]]
+-  name = "api-dev"
++  name = "api"
+   kind = "service"
+-  cmd = "pnpm run dev"
++  cmd = "pnpm dev"
+   cwd = "apps/api"
+   [job.ports]
+     PORT = 4000
+@@ -29,9 +51,9 @@
+     port = "PORT"
+ 
+ [[job]]
+-  name = "web-dev"
++  name = "web"
+   kind = "service"
+-  cmd = "pnpm run dev"
++  cmd = "pnpm dev"
+   cwd = "apps/web"
+   [job.ports]
+     PORT = 3000
+@@ -39,83 +61,74 @@
+     port = "PORT"
+ 
+ [[job]]
+-  name = "worker-dev"
++  name = "worker"
+   kind = "service"
+-  cmd = "pnpm run dev"
++  cmd = "pnpm dev"
+   cwd = "apps/worker"
++  binds_no_port = true
+ 
++[[job]]
++  name = "migrate"
++  kind = "task"
++  cmd = "pnpm migrate"
++  cwd = "packages/db"
++  touches = ["postgres"]
++
++[[job]]
++  name = "seed"
++  kind = "task"
++  cmd = "pnpm seed"
++  cwd = "packages/db"
++  touches = ["postgres"]
++
+ [[profile]]
++  name = "all"
++  jobs = ["postgres", "redis", "mailpit", "admin", "api", "web", "worker", "migrate", "seed"]
++  default = true
++
++[[profile]]
+   name = "admin"
+-  jobs = ["docker-compose", "admin-dev"]
++  jobs = ["api", "admin"]
+   default = false
+ 
+ [[profile]]
+   name = "api"
+-  jobs = ["docker-compose", "api-dev"]
++  jobs = ["api"]
+   default = false
+ 
+ [[profile]]
+   name = "web"
+-  jobs = ["docker-compose", "web-dev"]
++  jobs = ["api", "web"]
+   default = false
+ 
+ [[profile]]
+   name = "worker"
+-  jobs = ["docker-compose", "worker-dev"]
++  jobs = ["worker"]
+   default = false
+ 
+-[[profile]]
+-  name = "all"
+-  jobs = ["docker-compose", "admin-dev", "api-dev", "web-dev", "worker-dev"]
+-  default = true
+-
+ [[env_port]]
+   file = "apps/admin/.env"
+   key = "NEXT_PUBLIC_API_URL"
+-  job = "api-dev"
++  job = "api"
+   port = "PORT"
+ 
+ [[env_port]]
+   file = "apps/api/.env"
+   key = "PORT"
+-  job = "api-dev"
++  job = "api"
+   port = "PORT"
+ 
+ [[env_port]]
+-  file = "apps/api/.env"
+-  key = "DATABASE_URL"
+-  job = "docker-compose"
+-  port = "POSTGRES_PORT"
+-
+-[[env_port]]
+-  file = "apps/api/.env"
+-  key = "REDIS_URL"
+-  job = "docker-compose"
+-  port = "REDIS_PORT"
+-
+-[[env_port]]
+   file = "apps/web/.env.local"
+   key = "PORT"
+-  job = "web-dev"
++  job = "web"
+   port = "PORT"
+ 
+ [[env_port]]
+   file = "apps/web/.env.local"
+   key = "NEXT_PUBLIC_API_URL"
+-  job = "api-dev"
++  job = "api"
+   port = "PORT"
+-
+-[[env_port]]
+-  file = "apps/worker/.env"
+-  key = "REDIS_URL"
+-  job = "docker-compose"
+-  port = "REDIS_PORT"
+-
+-[[env_port]]
+-  file = "packages/db/.env"
+-  key = "DATABASE_URL"
+-  job = "docker-compose"
+-  port = "POSTGRES_PORT"
+ ## docker-compose.yml
+ services:
+   postgres:
+@@ -123,15 +136,15 @@
+     environment:
+       POSTGRES_PASSWORD: postgres
+     ports:
+-      - "${POSTGRES_PORT:-5432}:5432"
++      - "5432:5432"
+   redis:
+     image: redis:7
+     ports:
+-      - "${REDIS_PORT:-6379}:6379"
++      - "6379:6379"
+   mailpit:
+     image: axllent/mailpit
+     ports:
+-      - "${MAILPIT_PORT:-8025}:8025"
++      - "8025:8025"
+       - "1025:1025"
+ ## config.toml, its .env files
+ strategy = "example"
+@@ -146,4 +159,3 @@
+ target = "packages/db/.env"
+ template = "packages/db/.env.example"
+ ## git status
+- M docker-compose.yml

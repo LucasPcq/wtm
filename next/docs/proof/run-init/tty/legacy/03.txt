@@ -1,0 +1,16 @@
+
+  Step 4/17 • Which services run once for the whole repository?
+
+  ✓ Docker services: 1 files selected
+  ✓ Package scripts: 4 scripts selected
+  ⊘ Job type — every checked script is a dev server
+
+  ┃  A shared service runs once instead of once per worktree — a postgres, a keycloak. Its data is then
+  ┃  every worktree's, unless it declares a namespace — each worktree's own database or realm, asked
+  ┃  next. Space toggles, enter confirms.
+
+▸ postgres — postgres:16     ● per worktree   ○ shared
+  redis — redis:7            ● per worktree   ○ shared
+  mailpit — axllent/mailpit  ● per worktree   ○ shared
+
+  ↑↓ navigate • ←→ set scope • enter confirm • esc back
