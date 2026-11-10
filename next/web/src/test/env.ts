@@ -198,7 +198,7 @@ export function answeringEnv({ failing = [], noFile = false }: { failing?: strin
       const call = (await request.json()) as WebCall
       const detail = billingFiles(asked(call, 'show_values')?.[0] === 'true')
       const worktree = asked(call, 'worktree')?.[0] ?? 'feat/billing'
-      const read = { ...detail, worktree, apps: noFile ? [] : detail.apps }
+      const read = { ...detail, worktree, main: worktree === 'main', apps: noFile ? [] : detail.apps }
       return HttpResponse.json({
         ...envelope('env-show', []),
         items: [{ subject: worktree, status: 'done', detail: read }],

@@ -78,7 +78,7 @@ export function EnvFilesPage({ repo, search }: { repo: string; search: EnvFilesS
         <section aria-label="Keys by file" className="flex flex-col gap-2">
           <h2 className="text-xs font-medium text-muted-foreground">Keys by file</h2>
           <div className="rounded-md border">
-            <KeysTable apps={apps} worktree={detail.worktree} />
+            <KeysTable apps={apps} worktree={detail.worktree} main={detail.main} />
           </div>
         </section>
       </div>
@@ -144,7 +144,7 @@ export function EnvFilesPage({ repo, search }: { repo: string; search: EnvFilesS
           </Label>
         </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto">{body()}</div>
+      <div className="flex min-h-0 flex-1 flex-col overflow-auto">{body()}</div>
       <EnvDialog repo={repo} />
       <RunStartDialog repo={repo} />
     </div>

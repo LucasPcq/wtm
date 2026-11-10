@@ -39,6 +39,14 @@ test('another worktree is picked from the toolbar, and the address keeps it', as
   expect(await screen.findByRole('columnheader', { name: 'In fix/login' })).toBeTruthy()
 })
 
+test("main's read has one column of values, its own", async () => {
+  await renderApp('/r/r1/env?worktree=main')
+
+  expect(await screen.findByRole('columnheader', { name: 'In main' })).toBeTruthy()
+  expect(screen.getAllByRole('columnheader')).toHaveLength(3)
+  expect(within(screen.getByRole('row', { name: 'JWT_SECRET' })).getAllByText('••••••••')).toHaveLength(1)
+})
+
 test('a project that declares no .env file says where to declare one', async () => {
   server.use(...answeringEnv({ noFile: true }))
   await renderApp('/r/r1/env')

@@ -7,27 +7,27 @@ import { plural } from '@/lib/plural'
 
 const withheld = '••••••••'
 
-export function KeysTable({ apps, worktree }: { apps: EnvshowApp[]; worktree: string }) {
+export function KeysTable({ apps, worktree, main }: { apps: EnvshowApp[]; worktree: string; main: boolean }) {
   return (
     <Table aria-label="Keys by file">
       <TableHeader>
         <TableRow>
           <TableHead className="pl-14">Key</TableHead>
           <TableHead>Follows</TableHead>
-          <TableHead>In main</TableHead>
+          {!main && <TableHead>In main</TableHead>}
           <TableHead className="text-foreground">In {worktree}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {apps.map((app) => (
-          <AppRows key={app.dir} app={app} />
+          <AppRows key={app.dir} app={app} main={main} />
         ))}
       </TableBody>
     </Table>
   )
 }
 
-function AppRows({ app }: { app: EnvshowApp }) {
+function AppRows({ app, main }: { app: EnvshowApp; main: boolean }) {
   const jobs = app.jobs ?? []
 
   const counts = () => {
@@ -38,7 +38,7 @@ function AppRows({ app }: { app: EnvshowApp }) {
   return (
     <>
       <TableRow className="bg-muted/40 hover:bg-muted/40">
-        <TableCell colSpan={4}>
+        <TableCell colSpan={main ? 3 : 4}>
           <div className="flex items-center gap-3">
             <Folder className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             <span className="font-mono">{app.dir === '.' ? '/' : app.dir}</span>
@@ -52,17 +52,17 @@ function AppRows({ app }: { app: EnvshowApp }) {
         </TableCell>
       </TableRow>
       {(app.files ?? []).map((file) => (
-        <FileRows key={file.target} file={file} />
+        <FileRows key={file.target} file={file} main={main} />
       ))}
     </>
   )
 }
 
-function FileRows({ file }: { file: EnvshowFile }) {
+function FileRows({ file, main }: { file: EnvshowFile; main: boolean }) {
   return (
     <>
       <TableRow aria-label={file.target}>
-        <TableCell colSpan={4} className="pl-8">
+        <TableCell colSpan={main ? 3 : 4} className="pl-8">
           <div className="flex items-center gap-2">
             <File className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             <span className="font-mono">{file.name}</span>
@@ -74,13 +74,13 @@ function FileRows({ file }: { file: EnvshowFile }) {
         </TableCell>
       </TableRow>
       {(file.keys ?? []).map((key) => (
-        <KeyRow key={key.key} envKey={key} />
+        <KeyRow key={key.key} envKey={key} main={main} />
       ))}
     </>
   )
 }
 
-function KeyRow({ envKey }: { envKey: EnvshowKey }) {
+function KeyRow({ envKey, main }: { envKey: EnvshowKey; main: boolean }) {
   const status = statusWords[envKey.status]
 
   const shown = (value: string | null) => {
@@ -117,9 +117,11 @@ function KeyRow({ envKey }: { envKey: EnvshowKey }) {
         </span>
       </TableCell>
       <TableCell>{follows()}</TableCell>
-      <TableCell className="max-w-64 truncate font-mono text-muted-foreground" title={shown(envKey.main)}>
-        {shown(envKey.main)}
-      </TableCell>
+      {!main && (
+        <TableCell className="max-w-64 truncate font-mono text-muted-foreground" title={shown(envKey.main)}>
+          {shown(envKey.main)}
+        </TableCell>
+      )}
       <TableCell className="max-w-72 font-mono">
         <span className="block truncate" title={shown(envKey.here)}>
           {shown(envKey.here)}
