@@ -12,6 +12,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/daemonstop"
 	"github.com/LucasPcq/wtm/next/internal/command/daemonstopjobs"
 	envcommand "github.com/LucasPcq/wtm/next/internal/command/env"
+	"github.com/LucasPcq/wtm/next/internal/command/envshow"
 	"github.com/LucasPcq/wtm/next/internal/command/events"
 	"github.com/LucasPcq/wtm/next/internal/command/exec"
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
@@ -58,6 +59,7 @@ func catalogue() api.Catalogue {
 		api.Bind(runstop.Name, openRunStop, runstop.UseCase.Questions, runstop.UseCase.Run),
 		api.Bind(runps.Name, openRunPs, runps.UseCase.Questions, runps.UseCase.Run),
 		api.Bind(runlist.Name, openRunList, runlist.UseCase.Questions, runlist.UseCase.Run),
+		api.Bind(envshow.Name, openEnvShow, envshow.UseCase.Questions, envshow.UseCase.Run),
 		api.Bind(daemonstatus.Name, openDaemonStatus, daemonstatus.UseCase.Questions, daemonstatus.UseCase.Run),
 		api.Bind(daemonstop.Name, openDaemonStop, daemonstop.UseCase.Questions, daemonstop.UseCase.Run),
 		api.Bind(daemonrestart.Name, openDaemonRestart, daemonrestart.UseCase.Questions, daemonrestart.UseCase.Run),

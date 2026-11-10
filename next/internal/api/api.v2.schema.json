@@ -24,6 +24,7 @@
         "run-stop",
         "run-ps",
         "run-list",
+        "env-show",
         "daemon-status",
         "daemon-stop",
         "daemon-restart",
@@ -2395,6 +2396,88 @@
       ],
       "type": "object"
     },
+    "env-show.envelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/domain.Envelope"
+        }
+      ],
+      "properties": {
+        "command": {
+          "const": "env-show"
+        },
+        "items": {
+          "items": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/envshow.Detail"
+                  },
+                  {
+                    "maxProperties": 0,
+                    "type": "object"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "plan": false
+      }
+    },
+    "env-show.request": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "worktree"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "show_values"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "type": "array"
+    },
     "env.Detail": {
       "additionalProperties": false,
       "properties": {
@@ -2543,7 +2626,7 @@
           "type": "string"
         },
         "status": {
-          "type": "string"
+          "$ref": "#/$defs/env.KeyStatus"
         },
         "value": {
           "type": "string"
@@ -2555,6 +2638,16 @@
         "settled"
       ],
       "type": "object"
+    },
+    "env.KeyStatus": {
+      "description": "How a key of a worktree's .env file stands against its source.",
+      "enum": [
+        "in_step",
+        "add",
+        "missing",
+        "conflict",
+        "orphan"
+      ]
     },
     "env.Move": {
       "additionalProperties": false,
@@ -2981,6 +3074,282 @@
         ]
       },
       "type": "array"
+    },
+    "envshow.App": {
+      "additionalProperties": false,
+      "properties": {
+        "dir": {
+          "type": "string"
+        },
+        "files": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/envshow.File"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "following": {
+          "type": "integer"
+        },
+        "jobs": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "keys": {
+          "type": "integer"
+        },
+        "to_check": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "dir",
+        "jobs",
+        "keys",
+        "following",
+        "to_check",
+        "files"
+      ],
+      "type": "object"
+    },
+    "envshow.Check": {
+      "additionalProperties": false,
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "here": {
+          "type": "string"
+        },
+        "job": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/envshow.CheckKind"
+        },
+        "port": {
+          "type": "string"
+        },
+        "writes": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "file",
+        "key",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "envshow.CheckKind": {
+      "description": "Why a key of a .env file is to check.",
+      "enum": [
+        "unlinked",
+        "out_of_step"
+      ]
+    },
+    "envshow.Detail": {
+      "additionalProperties": false,
+      "properties": {
+        "apps": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/envshow.App"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "checks": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/envshow.Check"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "isolation": {
+          "$ref": "#/$defs/project.Isolation"
+        },
+        "main": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string"
+        },
+        "pending": {
+          "type": "boolean"
+        },
+        "strategy": {
+          "$ref": "#/$defs/project.EnvStrategy"
+        },
+        "unsettled": {
+          "type": "string"
+        },
+        "worktree": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "worktree",
+        "path",
+        "main",
+        "strategy",
+        "isolation",
+        "pending",
+        "apps",
+        "checks"
+      ],
+      "type": "object"
+    },
+    "envshow.File": {
+      "additionalProperties": false,
+      "properties": {
+        "keys": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/envshow.Key"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "missing": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "origin": {
+          "$ref": "#/$defs/envshow.Origin"
+        },
+        "parent": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "target",
+        "name",
+        "origin",
+        "missing",
+        "keys"
+      ],
+      "type": "object"
+    },
+    "envshow.Follows": {
+      "description": "What a key of a .env file follows: a job's port or address, a value of run.toml, a value wtm owns, nothing although it looks like a port or an address, or nothing but its source.",
+      "enum": [
+        "port",
+        "address",
+        "value",
+        "owned",
+        "nothing",
+        "copied"
+      ]
+    },
+    "envshow.Key": {
+      "additionalProperties": false,
+      "properties": {
+        "follows": {
+          "$ref": "#/$defs/envshow.Follows"
+        },
+        "here": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "job": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "main": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "out_of_step": {
+          "type": "boolean"
+        },
+        "port": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/env.KeyStatus"
+        },
+        "withheld": {
+          "type": "boolean"
+        },
+        "writes": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "follows",
+        "main",
+        "here",
+        "withheld",
+        "status",
+        "out_of_step"
+      ],
+      "type": "object"
+    },
+    "envshow.Origin": {
+      "description": "Where a worktree's .env file comes from.",
+      "enum": [
+        "template",
+        "main",
+        "parent",
+        "fallback",
+        "own",
+        "none"
+      ]
     },
     "events.envelope": {
       "allOf": [

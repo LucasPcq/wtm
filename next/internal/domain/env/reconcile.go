@@ -128,3 +128,62 @@ func (p ReconcileParams) settles(key Key) bool {
 	}
 	return false
 }
+
+// SettleParams describe a worktree whose .env files are reconciled: what its writes resolve from and how its files are reconciled (their Writes left to Settle), whether it is the main checkout, whether it holds the ordinal its ports need (Numbered), whether it has yet to choose its isolation (Pending), and why run.toml could not be read (RunErr).
+type SettleParams struct {
+	Resolve   ResolveParams
+	Reconcile ReconcileParams
+	Main      bool
+	Numbered  bool
+	Pending   bool
+	RunErr    error
+}
+
+// Settled is a worktree's .env files reconciled with what wtm writes into them, the params they were reconciled with, and why its ports are not settled when they are not ("" when they are).
+type Settled struct {
+	Reconciled
+	Params    ReconcileParams
+	Unsettled string
+}
+
+// Settle reconciles a worktree's .env files with what wtm writes into them, the one place both env and its read decide it: nothing when run.toml cannot be read or the worktree has yet to choose its isolation; only the values wtm owns when it is not numbered yet, or when a value of run.toml cannot be expanded or needs a proxy that serves none; the main checkout, addressed as without wtm, keeps its addresses spelled with ports when its .env spells them so.
+func Settle(params SettleParams) Settled {
+	reconcile := params.Reconcile
+	if params.RunErr != nil || params.Pending {
+		reconcile.Writes = Writes{}
+		settled := Settled{Reconciled: Reconcile(reconcile), Params: reconcile}
+		if params.RunErr != nil {
+			settled.Unsettled = params.RunErr.Error()
+		}
+		return settled
+	}
+
+	resolve := params.Resolve
+	var unsettled string
+	reconcile.Writes, unsettled = resolved(resolve, params.Numbered)
+	reconciled := Reconcile(reconcile)
+	if params.Main && reconciled.Ports.SpelledByPorts() {
+		resolve.Run.Addressing = project.AddressPorts
+		reconcile.Writes, unsettled = resolved(resolve, params.Numbered)
+		reconciled = Reconcile(reconcile)
+	}
+	return Settled{Reconciled: reconciled, Params: reconcile, Unsettled: unsettled}
+}
+
+// resolved are the writes resolve gives, only the values wtm owns when the worktree is not numbered, and why its ports are not settled when resolving them fails.
+func resolved(resolve ResolveParams, numbered bool) (Writes, string) {
+	kept, _ := Targets(resolve.Run, resolve.Files)
+	owned := kept
+	owned.EnvPorts, owned.EnvValues = nil, nil
+	if !numbered {
+		resolve.Run = owned
+	}
+	writes, err := Resolve(resolve)
+	if err == nil {
+		return writes, ""
+	}
+
+	resolve.Run = owned
+	writes, _ = Resolve(resolve)
+	return writes, err.Error()
+}

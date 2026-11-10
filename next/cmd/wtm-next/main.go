@@ -15,6 +15,7 @@ import (
 	daemonstopcli "github.com/LucasPcq/wtm/next/internal/command/daemonstop/cli"
 	daemonstopjobscli "github.com/LucasPcq/wtm/next/internal/command/daemonstopjobs/cli"
 	envcli "github.com/LucasPcq/wtm/next/internal/command/env/cli"
+	envshowcli "github.com/LucasPcq/wtm/next/internal/command/envshow/cli"
 	eventscli "github.com/LucasPcq/wtm/next/internal/command/events/cli"
 	execcli "github.com/LucasPcq/wtm/next/internal/command/exec/cli"
 	extractcli "github.com/LucasPcq/wtm/next/internal/command/extract/cli"
@@ -66,7 +67,7 @@ func commands(streams *output.Streams, env cli.Env) []*cobra.Command {
 		prunecli.New(streams, env, openPrune, commandLine),
 		fastforwardcli.New(streams, env, openFastForward, commandLine),
 		synccli.New(streams, env, openSync, commandLine),
-		envcli.New(streams, env, openEnv, commandLine),
+		withSubcommands(envcli.New(streams, env, openEnv, commandLine), envshowcli.New(streams, env, openEnvShow, commandLine)),
 		execcli.New(streams, env, openExec, commandLine),
 		reparentcli.New(streams, env, openReparent, commandLine),
 		listcli.New(streams, env, openList, commandLine),
@@ -86,6 +87,12 @@ func liveView() runview.View {
 }
 
 // runCmd is run, the parent of the commands that start, watch and stop the jobs of run.toml.
+// withSubcommands is cmd with commands under it: env and env show.
+func withSubcommands(cmd *cobra.Command, commands ...*cobra.Command) *cobra.Command {
+	cmd.AddCommand(commands...)
+	return cmd
+}
+
 func runCmd(commands ...*cobra.Command) *cobra.Command {
 	cmd := &cobra.Command{Use: "run", Short: "Start, watch and stop the jobs of run.toml", Args: cobra.NoArgs}
 	cmd.AddCommand(commands...)

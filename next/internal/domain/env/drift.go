@@ -52,6 +52,11 @@ const (
 	KeyOrphan   KeyStatus = "orphan"
 )
 
+// KeyStatuses returns every KeyStatus.
+func KeyStatuses() []KeyStatus {
+	return []KeyStatus{KeyInStep, KeyAdd, KeyMissing, KeyConflict, KeyOrphan}
+}
+
 // A Key is one key of a worktree's .env file against its sources: its status, its value in the file (none when absent) and its source's (none when no source gives one).
 type Key struct {
 	Name   string

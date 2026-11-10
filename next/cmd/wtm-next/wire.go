@@ -34,6 +34,7 @@ import (
 	daemonstopjobscli "github.com/LucasPcq/wtm/next/internal/command/daemonstopjobs/cli"
 	envcommand "github.com/LucasPcq/wtm/next/internal/command/env"
 	envcli "github.com/LucasPcq/wtm/next/internal/command/env/cli"
+	"github.com/LucasPcq/wtm/next/internal/command/envshow"
 	"github.com/LucasPcq/wtm/next/internal/command/events"
 	"github.com/LucasPcq/wtm/next/internal/command/exec"
 	execcli "github.com/LucasPcq/wtm/next/internal/command/exec/cli"
@@ -103,6 +104,7 @@ type app struct {
 	RunStop     runstop.UseCase
 	RunPs       runps.UseCase
 	RunList     runlist.UseCase
+	EnvShow     envshow.UseCase
 }
 
 // wire builds each adapter of the repository params locates once and injects it into every use case.
@@ -311,6 +313,13 @@ func wire(params wireParams) app {
 			Jobs:       starts,
 		},
 		RunPs: runPs(),
+		EnvShow: envshow.UseCase{
+			Git:        repo,
+			Meta:       meta,
+			Files:      store.EnvFiles{},
+			PublicPort: provisions.PublicPort,
+			Repository: facts,
+		},
 		RunList: runlist.UseCase{
 			Git:        repo,
 			Meta:       meta,

@@ -217,7 +217,7 @@ func (u UseCase) reconcile(ctx context.Context, r Reconcile, show bool, report d
 		}
 		resolve := r.settle.resolve
 		resolve.Ordinal = ordinal
-		params.Writes, _ = writes(resolve, true)
+		params = envs.Settle(envs.SettleParams{Resolve: resolve, Reconcile: params, Numbered: true}).Params
 	}
 
 	report(domain.PhaseStarted{Subject: r.Worktree, Phase: domain.PhaseEnv})

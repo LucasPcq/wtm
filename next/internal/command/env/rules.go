@@ -205,44 +205,22 @@ func (f Facts) reconcile(name string, req Request) Reconcile {
 		r.Numbered = false
 	}
 	verbatim := r.Isolation == project.Verbatim
-	params := envs.ReconcileParams{Reads: f.Reads[name], Strategy: r.Strategy, Run: f.Run, Verbatim: verbatim, Restore: verbatim && r.Records != "", Overwrite: req.Overwrite, Prune: req.Prune}
-	params.Writes, r.Unsettled = writes(resolve, r.Numbered)
-	reconciled := envs.Reconcile(params)
-	if w.Main && reconciled.Ports.SpelledByPorts() {
-		resolve.Run.Addressing = project.AddressPorts
-		params.Writes, r.Unsettled = writes(resolve, r.Numbered)
-		reconciled = envs.Reconcile(params)
-	}
-	if f.RunErr != nil || r.Pending {
-		params.Writes, r.Unsettled = envs.Writes{}, ""
-		if f.RunErr != nil {
-			r.Unsettled = f.RunErr.Error()
-		}
-		reconciled = envs.Reconcile(params)
-	}
-
-	r.settle = settle{reconcile: params, resolve: resolve, planned: reconciled}
+	settled := envs.Settle(envs.SettleParams{
+		Resolve:   resolve,
+		Reconcile: envs.ReconcileParams{Reads: f.Reads[name], Strategy: r.Strategy, Run: f.Run, Verbatim: verbatim, Restore: verbatim && r.Records != "", Overwrite: req.Overwrite, Prune: req.Prune},
+		Main:      w.Main,
+		Numbered:  r.Numbered,
+		Pending:   r.Pending,
+		RunErr:    f.RunErr,
+	})
+	reconciled := settled.Reconciled
+	r.Unsettled = settled.Unsettled
+	r.settle = settle{reconcile: settled.Params, resolve: resolve, planned: reconciled}
 	r.Files = files(reconciled, req.ShowValues)
 	reconciled.Ports.Applied = false
 	r.Ports = shown(reconciled.Ports, req.ShowValues)
 	r.Restart = f.restart(w, r.Files)
 	return r
-}
-
-// writes are what wtm writes into the worktree resolve describes, and why its ports are not settled when they are not: only the values wtm owns when the worktree is not numbered yet (the apply settles its ports once it is), or when a value of run.toml cannot be expanded or needs a proxy that serves none.
-func writes(resolve envs.ResolveParams, numbered bool) (envs.Writes, string) {
-	kept, _ := envs.Targets(resolve.Run, resolve.Files)
-	if !numbered {
-		resolve.Run = ownedOnly(kept)
-	}
-	writes, err := envs.Resolve(resolve)
-	if err == nil {
-		return writes, ""
-	}
-
-	resolve.Run = ownedOnly(kept)
-	owned, _ := envs.Resolve(resolve)
-	return owned, err.Error()
 }
 
 // shown is plan with its values when they are shown, else without them.
@@ -251,12 +229,6 @@ func shown(plan envs.Plan, show bool) envs.Redacted {
 		return envs.Redacted(plan)
 	}
 	return envs.Redact(plan)
-}
-
-// ownedOnly returns run without its links, which leaves only the values wtm owns to write.
-func ownedOnly(run project.Run) project.Run {
-	run.EnvPorts, run.EnvValues = nil, nil
-	return run
 }
 
 // files are the files reconciled as the plan shows them, their values only when shown.

@@ -38,6 +38,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/checkout"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/command/daemonrestart"
+	"github.com/LucasPcq/wtm/next/internal/command/envshow"
 	"github.com/LucasPcq/wtm/next/internal/command/fastforward"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
@@ -56,6 +57,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/status"
 	synccommand "github.com/LucasPcq/wtm/next/internal/command/sync"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/env"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
@@ -555,6 +557,10 @@ var enums = map[reflect.Type]struct {
 	reflect.TypeFor[fastforward.Standing]():      {"Where a worktree stands for a fast-forward, the first that applies; only behind moves.", fastforward.Standings()},
 	reflect.TypeFor[fastforward.Blocker]():       {"What makes a worktree behind origin unsafe to fast-forward, a safety refusal only force lifts.", fastforward.Blockers()},
 	reflect.TypeFor[synccommand.Standing]():      {"Where a worktree stands for a sync, the first that applies; only rebases moves it onto its parent.", synccommand.Standings()},
+	reflect.TypeFor[env.KeyStatus]():             {"How a key of a worktree's .env file stands against its source.", env.KeyStatuses()},
+	reflect.TypeFor[envshow.Origin]():            {"Where a worktree's .env file comes from.", envshow.Origins()},
+	reflect.TypeFor[envshow.Follows]():           {"What a key of a .env file follows: a job's port or address, a value of run.toml, a value wtm owns, nothing although it looks like a port or an address, or nothing but its source.", envshow.AllFollows()},
+	reflect.TypeFor[envshow.CheckKind]():         {"Why a key of a .env file is to check.", envshow.CheckKinds()},
 	reflect.TypeFor[synccommand.Blocker]():       {"What makes a branch unsafe to move in a sync, a safety refusal only force lifts.", synccommand.Blockers()},
 	reflect.TypeFor[worktree.Divergence]():       {"Where a branch stands against origin's branch of the same name.", worktree.Divergences()},
 	reflect.TypeFor[worktree.Operation]():        {"What git stopped in the middle of in a worktree, to continue or abort there.", worktree.Operations()},
