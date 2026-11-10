@@ -78,9 +78,12 @@ func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (
 		return Outcome{Op: op.ID}, err
 	}
 
-	// 3. Fingerprint what would be applied, the files as they stand among it; a dry run ends here with the plan and its fingerprint.
+	// 3. Fingerprint what would be applied, the files as they stand among it; a dry run ends here with the plan, its fingerprint and the jobs its apply would leave on the old values (the apply warns of those it did on their worktree).
 	outcome := Outcome{Op: op.ID, Plan: plan, Warnings: warnings}
 	outcome.Fingerprint, err = operation.Fingerprint(plan.Fingerprinted())
+	if opts.DryRun {
+		outcome.Warnings = append(outcome.Warnings, plan.restarts()...)
+	}
 	if err != nil || opts.DryRun {
 		return outcome, err
 	}

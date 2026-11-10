@@ -201,10 +201,10 @@ func Show(f Facts) (Item, []domain.Warning) {
 	switch {
 	case detail.Pending:
 		isolate := domain.FollowUp{Command: domain.CommandEnv, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{w.Name()}}, {Path: domain.PathIsolation, Values: []string{string(project.Isolated)}}}, Code: CodeIsolate, Message: "give it ports of its own"}
-		warnings = append(warnings, domain.Warning{Code: CodePending, Message: w.Name() + " has yet to choose its isolation: wtm writes nothing in its .env files until it does", Params: params, FollowUp: &isolate})
+		warnings = append(warnings, domain.Warning{Code: CodePending, Message: w.Name() + " has yet to choose its isolation: its ports are not settled until it does", Params: params, FollowUp: &isolate})
 	case detail.Unsettled != "":
 		params["cause"] = detail.Unsettled
-		warnings = append(warnings, domain.Warning{Code: CodeUnsettled, Message: detail.Unsettled + " — what wtm writes is unknown", Params: params})
+		warnings = append(warnings, domain.Warning{Code: CodeUnsettled, Message: detail.Unsettled + " — its ports are unknown", Params: params})
 	}
 	return Item{Subject: w.Name(), Status: domain.StatusDone, Detail: &detail}, warnings
 }

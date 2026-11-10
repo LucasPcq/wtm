@@ -1,6 +1,7 @@
 package env
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -112,10 +113,16 @@ func hasLoopbackOrigin(value string) bool {
 	return false
 }
 
-// passwordParams are the query parameters that carry a password, whose values WithoutCredentials masks.
-var passwordParams = []string{"password", "passwd", "pwd", "secret", "token"}
+// secretSuffixes end the names of the parameters that carry a secret, whose values WithoutCredentials masks.
+var secretSuffixes = []string{"password", "passwd", "pwd", "secret", "token", "key"}
 
-// WithoutCredentials returns value with the user and password of each url in it masked, and the value of each query parameter that carries a password: what wtm writes is the port or the address, never the credentials beside them.
+// paramStarts are what a parameter's name follows, beside the start of a value: a query string, a fragment, a connection string's ; and a libpq DSN's spaces; paramEnds end its value.
+const (
+	paramStarts = "?&#; \t"
+	paramEnds   = "&#;, \t"
+)
+
+// WithoutCredentials returns value with the user and password of each url in it masked, and the value of each parameter whose name says it holds a secret (a query string's, a fragment's, a connection string's, a DSN's): what wtm writes is the port or the address, never the credentials beside them.
 func WithoutCredentials(value string) string {
 	masked, rest := "", value
 	for {
@@ -138,21 +145,35 @@ func WithoutCredentials(value string) string {
 	}
 }
 
-// maskedParams returns value with the value of each password parameter of its query strings masked.
+// maskedParams returns value with the value of each parameter whose name ends as a secret's masked, wherever its name starts a parameter.
 func maskedParams(value string) string {
-	for _, name := range passwordParams {
-		for _, sep := range []string{"?", "&"} {
-			key := sep + name + "="
-			for at := 0; at+len(key) <= len(value); at++ {
-				// matched on the value's own bytes: lowering it could change its length
-				if !strings.EqualFold(value[at:at+len(key)], key) {
-					continue
-				}
-				start := at + len(key)
-				end := start + strings.IndexAny(value[start:]+"&", "&#, ")
-				value = value[:start] + "•••" + value[end:]
-			}
+	var masked strings.Builder
+	last := 0
+	for i := 0; i < len(value); i++ {
+		if value[i] != '=' {
+			continue
 		}
+		start := i
+		for start > 0 && isNameByte(value[start-1]) {
+			start--
+		}
+		if start == i || start > 0 && !strings.ContainsRune(paramStarts, rune(value[start-1])) || !isSecretName(value[start:i]) {
+			continue
+		}
+		end := i + 1 + strings.IndexAny(value[i+1:]+"&", paramEnds)
+		masked.WriteString(value[last:i+1] + "•••")
+		last, i = end, end-1
 	}
-	return value
+	return masked.String() + value[last:]
+}
+
+// isNameByte reports whether b may be part of a parameter's name: ASCII alone, so lowering a name keeps its length.
+func isNameByte(b byte) bool {
+	return 'a' <= b && b <= 'z' || 'A' <= b && b <= 'Z' || '0' <= b && b <= '9' || b == '_' || b == '-' || b == '.'
+}
+
+// isSecretName reports whether name ends as the name of a secret, whatever its case.
+func isSecretName(name string) bool {
+	lower := strings.ToLower(name)
+	return slices.ContainsFunc(secretSuffixes, func(suffix string) bool { return strings.HasSuffix(lower, suffix) })
 }

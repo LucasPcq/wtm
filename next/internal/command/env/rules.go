@@ -78,10 +78,10 @@ func (f Facts) subject(name string) (worktree.Worktree, bool) {
 	return f.Worktrees[at], true
 }
 
-// prechecked is the pick a person is offered, the main one first: the worktrees out of step under req's switches, as options counts them, and the one the caller stands in, none for a caller that named its directory (a surface's call, $WTM_PROJECT_DIR).
+// prechecked is the pick a person is offered, the main one first: the worktrees out of step under req's switches, as options counts them, and the one the caller stands in on the command line: a call of the web or the API stands in none.
 func (f Facts) prechecked(req Request, options []domain.Option) []string {
 	var current []string
-	if !req.Caller.Named {
+	if surface := req.Caller.Surface; surface != domain.SurfaceWeb && surface != domain.SurfaceAPI {
 		current = names(f.targets(Request{Caller: req.Caller}))
 	}
 	found := []string{}
@@ -125,7 +125,7 @@ func (f Facts) pending(w worktree.Worktree) bool {
 // ----------------------------------------------------------------------------
 // The decision of each worktree
 
-// A Reconcile is one worktree asked: its name and path, whether it is the main checkout, whether its directory is gone (left as it is), the strategy its values come from, its isolation, whether it has yet to choose one (Pending: its ports and the values wtm owns are left as they are), the isolation the apply records when it changes (Records), the phases of its apply (none when it is left as it is), whether it holds an ordinal (Numbered: one that needs it and has none is numbered by the apply, which settles its ports then), each .env file, what wtm writes into them (its values withheld unless shown), why its ports cannot be settled when they cannot, why its files could not be read (left as it is), and the jobs up in it that read a file that changes, which run on the old values until restarted.
+// A Reconcile is one worktree asked: its name and path, whether it is the main checkout, whether its directory is gone (left as it is), the strategy its values come from, its isolation, whether it has yet to choose one (Pending: its ports and owned values are left as they are), the isolation the apply records when it changes (Records), the phases of its apply (none when it is left as it is), whether it holds an ordinal (Numbered: one that needs it and has none is numbered by the apply, which settles its ports then), each .env file, what wtm writes into them (its values withheld unless shown), why its ports cannot be settled when they cannot, why its files could not be read (left as it is), and the jobs up in it that read a file that changes, which run on the old values until restarted.
 type Reconcile struct {
 	Worktree   string              `json:"worktree"`
 	Path       string              `json:"path"`
@@ -406,7 +406,7 @@ func (f Facts) warnings(planned Plan) []domain.Warning {
 			warnings = append(warnings, domain.Warning{Code: CodeUnreadable, Message: "couldn't read " + r.Worktree + "'s .env files: " + r.Unreadable + " — left as it is", Params: params})
 		case r.Pending:
 			isolate := domain.FollowUp{Command: Name, Answers: append(on(r.Worktree), domain.Answered{Path: domain.PathIsolation, Values: []string{string(project.Isolated)}}), Code: CodeIsolate, Message: "give it ports of its own"}
-			warnings = append(warnings, domain.Warning{Code: CodePending, Message: r.Worktree + " has yet to choose its isolation: its ports and the values wtm owns are left as they are", Params: params, FollowUp: &isolate})
+			warnings = append(warnings, domain.Warning{Code: CodePending, Message: r.Worktree + " has yet to choose its isolation: its ports and owned values are left as they are", Params: params, FollowUp: &isolate})
 		case r.Unsettled != "":
 			params["cause"] = r.Unsettled
 			warnings = append(warnings, domain.Warning{Code: CodeUnsettled, Message: r.Unsettled + " — " + r.Worktree + "'s ports not settled", Params: params})
@@ -602,20 +602,37 @@ const CodeFailed = Name + ".failed"
 // CodeRetry is the follow-up of a run where some worktree failed or was not reached: env again, on those, with the same switches.
 const CodeRetry = Name + ".retry"
 
-// retry reconciles again each worktree of items that failed or was not reached, with the switches asked; none when every one passed.
+// retry reconciles again each worktree of items, one per worktree of p in its order, that failed or was not reached, with the switches asked, the isolation only when one of them switched it; none when every one passed.
 func (p Plan) retry(items []Item) *domain.FollowUp {
 	var again []string
-	for _, item := range items {
-		if item.Status == domain.StatusFailed || item.Reason == domain.ReasonInterrupted {
-			again = append(again, item.Subject)
+	var isolation project.Isolation
+	for i, item := range items {
+		if item.Status != domain.StatusFailed && item.Reason != domain.ReasonInterrupted {
+			continue
+		}
+		again = append(again, item.Subject)
+		// a worktree the run did not switch keeps its isolation: the switch goes with those it switched alone
+		if p.Worktrees[i].Records != "" {
+			isolation = p.asked.Isolation
 		}
 	}
 	if len(again) == 0 {
 		return nil
 	}
 
-	req := Request{Worktrees: again, Strategy: p.asked.Strategy, Overwrite: p.Overwrite, Prune: p.Prune, Isolation: p.asked.Isolation, ShowValues: p.ShowValues}
+	req := Request{Worktrees: again, Strategy: p.asked.Strategy, Overwrite: p.Overwrite, Prune: p.Prune, Isolation: isolation, ShowValues: p.ShowValues}
 	return &domain.FollowUp{Command: Name, Answers: domain.AnswersOf(Questions{}.Form(), req), Code: CodeRetry, Message: "reconcile them again"}
+}
+
+// restarts are the warnings of the jobs up in each worktree p writes that would run on the old values until restarted.
+func (p Plan) restarts() []domain.Warning {
+	var warnings []domain.Warning
+	for _, r := range p.Worktrees {
+		if r.writes() && len(r.Restart) > 0 {
+			warnings = append(warnings, restartWarning(r))
+		}
+	}
+	return warnings
 }
 
 // restartWarning is the warning that the jobs of r up run on the old values until restarted, followed by the restart of the first one.
