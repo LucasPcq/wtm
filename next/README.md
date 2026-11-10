@@ -234,8 +234,8 @@ Go's doc-comment conventions, as the `go-style` skill states them ([`comments.md
 | -- | -- |
 | `GET /api/version` | `{"version"}` of the binary |
 | `GET /api/repos` | the repositories wtm knows, then those added but not set up yet: `[{id, root, common_dir, set_up}]`, those no longer initialized pruned |
-| `POST /api/repos/check` | `{"path"}`, absolute or `~/…` from the home → where it stands, changing nothing: `{path, state, id, root, name}`, `state` one of `missing`, `not_a_repository`, `not_set_up`, `set_up` (set up, not listed), `known` |
-| `POST /api/repos` | `{"path"}` → its repository added: one set up is registered, one not set up is served until the server stops, so that the web sets it up (`init`); 400 `web.place_refused` for a path in no repository |
+| `POST /api/repos/check` | `{"path"}`, absolute or `~/…` from the home → where it stands, changing nothing: `{path, state, id, root, name}`, `state` one of `missing`, `not_a_repository`, `not_a_folder` (a file), `not_set_up`, `set_up` (set up, not listed), `known`; a path it may not read, 500 `web.place_unreadable` |
+| `POST /api/repos` | `{"path"}` → its repository added: one set up is registered, one not set up is served until the server stops, so that the web sets it up: it takes `init` and the daemon's commands alone (`Params.NotSetUp`), any other 412 `web.not_set_up`, and reads `set_up` from its files; 400 `web.place_refused` for a path in no repository |
 | `GET /api/repos/{repo}/commands` | the catalogue: `[{name, form}]`, each form outside any repository |
 | `POST /api/repos/{repo}/commands/{name}/questions` | `{"answers": [{path, values}]}` → the form as the repository stands |
 | `POST /api/repos/{repo}/commands/{name}` | `{"answers", "dry_run", "expect_fingerprint"}` → the v2 envelope, the status of its error's kind (400 invalid, 403 refused, 409 conflict, 412 precondition, 499 cancelled, 500 internal); with `Accept: text/event-stream`, each event as a line of the event stream (`domain.Line`: `v`, `type`, `ts`, `repo`, `correlation_id`), then the envelope as the event named `envelope` |
