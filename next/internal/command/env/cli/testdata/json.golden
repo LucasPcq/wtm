@@ -155,7 +155,14 @@
               "status": "add"
             },
             "text": "apps/api/.env  + JWT_SECRET"
-          },
+          }
+        ]
+      },
+      {
+        "key": "worktree",
+        "label": "",
+        "path": "worktree",
+        "values": [
           {
             "value": "PORT",
             "note": "rewrite",
@@ -165,7 +172,14 @@
               "to": "3020"
             },
             "text": "apps/web/.env  PORT → 3020"
-          },
+          }
+        ]
+      },
+      {
+        "key": "worktree",
+        "label": "",
+        "path": "worktree",
+        "values": [
           {
             "value": "OLD",
             "note": "left",

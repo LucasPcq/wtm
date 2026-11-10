@@ -94,13 +94,15 @@ func (r Request) Values(path string) []string {
 // ----------------------------------------------------------------------------
 // The form
 
-// Questions is the request as a form: the worktrees to reconcile and those it may, whether every one is, the strategy for this run, whether to overwrite the conflicts and prune the orphans of the worktrees asked, each asked only when they have some, the isolation to switch them to, asked only when one has yet to choose it, whether to show the values, and the request's problems as field errors.
+// Questions is the request as a form: the worktrees to reconcile and those it may, whether every one is, the strategy for this run, whether to overwrite the conflicts and prune the orphans of the worktrees asked (the keys of each), each asked only when they have some, the isolation to switch them to, asked only when one has yet to choose it, whether to show the values, and the request's problems as field errors.
 type Questions struct {
 	Worktrees  Worktrees
 	All        bool
 	From       project.EnvStrategy
 	Overwrite  domain.Confirm
 	Prune      domain.Confirm
+	Conflicts  []KeyAt
+	Orphans    []KeyAt
 	Isolation  domain.Choice[project.Isolation]
 	ShowValues bool
 	Errors     []domain.FieldError
@@ -125,8 +127,9 @@ func NewQuestions(f Facts, req Request) Questions {
 	if len(req.Worktrees) == 0 && !req.All {
 		questions.Worktrees.Picked = domain.Answer[[]string]{Value: f.picked(req), Origin: domain.OriginDefault}
 	}
-	questions.Overwrite = confirm(req.Overwrite, has(reconciles, envs.KeyConflict), domain.SkipNoKeyConflict)
-	questions.Prune = confirm(req.Prune, has(reconciles, envs.KeyOrphan), domain.SkipNoKeyOrphan)
+	questions.Conflicts, questions.Orphans = keysOf(reconciles, envs.KeyConflict), keysOf(reconciles, envs.KeyOrphan)
+	questions.Overwrite = confirm(req.Overwrite, len(questions.Conflicts) > 0, domain.SkipNoKeyConflict)
+	questions.Prune = confirm(req.Prune, len(questions.Orphans) > 0, domain.SkipNoKeyOrphan)
 	questions.Isolation = domain.Choice[project.Isolation]{Answer: domain.Answer[project.Isolation]{Value: req.Isolation, Origin: domain.OriginRequest}, Options: []project.Isolation{project.Isolated, project.Verbatim}}
 	switch {
 	case req.Isolation == "" && slices.ContainsFunc(reconciles, func(r Reconcile) bool { return r.Pending }):

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/command/envshow"
+	"github.com/LucasPcq/wtm/next/internal/domain/env"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 )
 
@@ -111,6 +112,12 @@ var follows = map[envshow.Follows]string{
 }
 
 func followsWords(key envshow.Key) string {
+	switch {
+	case key.Follows == envshow.FollowsCopied && key.Status == env.KeyOrphan:
+		return "in no source"
+	case key.Follows == envshow.FollowsCopied && key.Here == nil:
+		return "not here yet"
+	}
 	switch key.Follows {
 	case envshow.FollowsPort, envshow.FollowsAddress, envshow.FollowsValue:
 		return key.Job + follows[key.Follows]

@@ -1,6 +1,8 @@
 
   env · dry run, nothing applied
-  feat/billing  apps/api/.env  + JWT_SECRET, apps/web/.env  PORT → 3020, apps/api/.env  OLD left: in no source
+  feat/billing  apps/api/.env  + JWT_SECRET
+                apps/web/.env  PORT → 3020
+                apps/api/.env  OLD left: in no source
   In step       main, fix/login
   fingerprint  d56f5a117a658a11db73b733
   → wtm-next env --all --expect-fingerprint d56f5a117a658a11db73b733   apply this plan

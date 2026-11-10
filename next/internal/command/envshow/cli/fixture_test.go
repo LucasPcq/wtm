@@ -51,6 +51,6 @@ func open(context.Context, string) (envshow.UseCase, error) {
 	}, nil
 }
 
-func env() uicli.Env {
+func cliEnv() uicli.Env {
 	return uicli.Env{Cwd: billingPath, ProjectDir: mainPath}
 }

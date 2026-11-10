@@ -11,6 +11,6 @@ import (
 func runShow(t *testing.T, words ...string) formtest.Printed {
 	t.Helper()
 	return formtest.Run(t.Context(), func(streams *output.Streams) *cobra.Command {
-		return New(streams, env(), open, formtest.CommandLine)
+		return New(streams, cliEnv(), open, formtest.CommandLine)
 	}, append([]string{"show"}, words...)...)
 }

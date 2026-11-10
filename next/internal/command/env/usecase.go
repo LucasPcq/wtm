@@ -196,7 +196,7 @@ func (u UseCase) reconcile(ctx context.Context, r Reconcile, show bool, report d
 		item.Status, item.Reason = domain.StatusSkipped, domain.ReasonRuledOut
 		return item
 	case !r.writes():
-		item.Status, item.Reason, item.Detail = domain.StatusDone, domain.ReasonUnchanged, &Detail{Path: r.Path, Written: []string{}, Ports: r.Ports}
+		item.Status, item.Reason = domain.StatusDone, domain.ReasonUnchanged
 		return item
 	case ctx.Err() != nil:
 		item.Status, item.Reason = domain.StatusSkipped, domain.ReasonInterrupted

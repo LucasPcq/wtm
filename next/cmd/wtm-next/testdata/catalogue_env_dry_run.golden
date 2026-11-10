@@ -60,7 +60,14 @@
               "status": "add"
             },
             "text": ".env  + KEY"
-          },
+          }
+        ]
+      },
+      {
+        "key": "worktree",
+        "label": "",
+        "path": "worktree",
+        "values": [
           {
             "value": "OWN",
             "note": "left",

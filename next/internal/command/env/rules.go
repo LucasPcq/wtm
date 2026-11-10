@@ -174,13 +174,26 @@ func (r Reconcile) writes() bool {
 	return !r.Missing && (!r.Numbered || r.Records != "" || slices.ContainsFunc(r.Files, func(f File) bool { return f.Writes }))
 }
 
-// has reports whether a worktree of reconciles has a key of status.
-func has(reconciles []Reconcile, status envs.KeyStatus) bool {
-	return slices.ContainsFunc(reconciles, func(r Reconcile) bool {
-		return slices.ContainsFunc(r.Files, func(f File) bool {
-			return slices.ContainsFunc(f.Keys, func(k Key) bool { return k.Status == status })
-		})
-	})
+// A KeyAt is a key of a worktree's .env file.
+type KeyAt struct {
+	Worktree string `json:"worktree"`
+	File     string `json:"file"`
+	Key      string `json:"key"`
+}
+
+// keysOf are the keys of status in the worktrees of reconciles.
+func keysOf(reconciles []Reconcile, status envs.KeyStatus) []KeyAt {
+	var found []KeyAt
+	for _, r := range reconciles {
+		for _, f := range r.Files {
+			for _, k := range f.Keys {
+				if k.Status == status {
+					found = append(found, KeyAt{Worktree: r.Worktree, File: f.Target, Key: k.Key})
+				}
+			}
+		}
+	}
+	return found
 }
 
 // reconcile decides what reconciling the worktree name does under req: its keys settled on their source, then what wtm writes over them, the main checkout keeping its addresses spelled with ports when its .env spells them so.
@@ -423,7 +436,14 @@ func (p Plan) recap() []domain.RecapRow {
 		case r.Missing:
 			left = append(left, domain.RecapValue{Value: r.Worktree, Note: NoteMissing, Text: r.Worktree + " (its directory is gone)"})
 		case r.writes() || r.leaves():
-			rows = append(rows, domain.RecapRow{Key: "worktree", Label: r.Worktree, Path: domain.PathWorktree, Values: r.recap()})
+			// a row per change, the worktree named on its first: a line each
+			for i, value := range r.recap() {
+				row := domain.RecapRow{Key: "worktree", Path: domain.PathWorktree, Values: []domain.RecapValue{value}}
+				if i == 0 {
+					row.Label = r.Worktree
+				}
+				rows = append(rows, row)
+			}
 		default:
 			current = append(current, domain.RecapValue{Value: r.Worktree, Note: NoteInStep, Text: r.Worktree})
 		}
