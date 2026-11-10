@@ -6872,6 +6872,32 @@
       ],
       "type": "object"
     },
+    "runinit.CommandRow": {
+      "additionalProperties": false,
+      "properties": {
+        "changed": {
+          "type": "boolean"
+        },
+        "cmd": {
+          "type": "string"
+        },
+        "job": {
+          "type": "string"
+        },
+        "proposed": {
+          "type": "string"
+        },
+        "spelled": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "job",
+        "cmd",
+        "changed"
+      ],
+      "type": "object"
+    },
     "runinit.ComposeChange": {
       "additionalProperties": false,
       "properties": {
@@ -7115,6 +7141,127 @@
       ],
       "type": "object"
     },
+    "runinit.LinkRow": {
+      "additionalProperties": false,
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "job": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "linked": {
+          "type": "boolean"
+        },
+        "port": {
+          "type": "string"
+        },
+        "spelled": {
+          "type": "string"
+        },
+        "template": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "file",
+        "key",
+        "value",
+        "job",
+        "port",
+        "kind",
+        "linked",
+        "spelled"
+      ],
+      "type": "object"
+    },
+    "runinit.Parts": {
+      "additionalProperties": false,
+      "properties": {
+        "commands": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runinit.CommandRow"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "links": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runinit.LinkRow"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ports": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runinit.PortRow"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "profiles": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runinit.ProfileRow"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "spaces": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runinit.SpaceRow"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "ports",
+        "commands",
+        "spaces",
+        "links",
+        "profiles"
+      ],
+      "type": "object"
+    },
     "runinit.Plan": {
       "additionalProperties": false,
       "properties": {
@@ -7143,6 +7290,9 @@
             }
           ]
         },
+        "parts": {
+          "$ref": "#/$defs/runinit.Parts"
+        },
         "preview": {
           "$ref": "#/$defs/runinit.Preview"
         },
@@ -7162,7 +7312,33 @@
       "required": [
         "files",
         "detection",
+        "parts",
         "preview"
+      ],
+      "type": "object"
+    },
+    "runinit.PortRow": {
+      "additionalProperties": false,
+      "properties": {
+        "base": {
+          "type": "integer"
+        },
+        "from": {
+          "type": "string"
+        },
+        "job": {
+          "type": "string"
+        },
+        "spelled": {
+          "type": "string"
+        },
+        "variable": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "job",
+        "spelled"
       ],
       "type": "object"
     },
@@ -7378,6 +7554,44 @@
       ],
       "type": "object"
     },
+    "runinit.ProfileRow": {
+      "additionalProperties": false,
+      "properties": {
+        "default": {
+          "type": "boolean"
+        },
+        "jobs": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "proposed": {
+          "type": "boolean"
+        },
+        "spelled": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "jobs",
+        "default",
+        "proposed",
+        "spelled"
+      ],
+      "type": "object"
+    },
     "runinit.Service": {
       "additionalProperties": false,
       "properties": {
@@ -7405,6 +7619,44 @@
         "name",
         "image",
         "ports"
+      ],
+      "type": "object"
+    },
+    "runinit.SpaceRow": {
+      "additionalProperties": false,
+      "properties": {
+        "create": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "remove": {
+          "type": "string"
+        },
+        "service": {
+          "type": "string"
+        },
+        "spelled": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "service",
+        "name",
+        "create",
+        "remove",
+        "spelled"
       ],
       "type": "object"
     },
