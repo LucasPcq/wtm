@@ -35,32 +35,49 @@ const (
 	SectionSkipped  SectionState = "skipped"  // nothing in it is asked
 )
 
-// SectionsOf are the sections ids of fields, in order, each as its fields and problems stand: skipped when every field of it is, to do when a field of it is required and unanswered, to check when another problem names one of its fields, else answered.
+// SectionsOf are the sections ids of fields, in order, each as its fields and problems stand: skipped when every field of it is (and no problem names it), to do when a field of it is required and unanswered, to check when another problem names one of its fields or, naming no field, a path under its id (remembered.isolation is section remembered's), else answered.
 func SectionsOf(ids []string, fields []Field, problems []FieldError) []Section {
 	sections := make([]Section, 0, len(ids))
 	for _, id := range ids {
 		section := Section{ID: id, State: SectionSkipped}
+		var owned []FieldError
 		for _, field := range fields {
 			spec := field.Spec()
 			if spec.Section != id || spec.Skip != "" {
 				continue
 			}
-			if section.State == SectionSkipped {
-				section.State = SectionAnswered
-			}
-			for _, problem := range ProblemsOf(problems, spec.Path) {
-				switch {
-				case problem.Code == CodeRequired:
-					section.State = SectionToDo
-				case section.State != SectionToDo:
-					section.State = SectionToCheck
-				}
+			section.State = SectionAnswered
+			owned = append(owned, ProblemsOf(problems, spec.Path)...)
+		}
+		owned = append(owned, unfielded(problems, fields, id)...)
+		for _, problem := range owned {
+			switch {
+			case problem.Code == CodeRequired:
+				section.State = SectionToDo
+			case section.State != SectionToDo:
+				section.State = SectionToCheck
 			}
 		}
 		sections = append(sections, section)
 	}
 
 	return sections
+}
+
+// unfielded are the problems no field of fields names whose path sits under id.
+func unfielded(problems []FieldError, fields []Field, id string) []FieldError {
+	var found []FieldError
+	for _, problem := range problems {
+		named := false
+		for _, field := range fields {
+			named = named || len(ProblemsOf([]FieldError{problem}, field.Spec().Path)) > 0
+		}
+		if !named && (problem.Path == id || strings.HasPrefix(problem.Path, id+".") || strings.HasPrefix(problem.Path, id+"[")) {
+			found = append(found, problem)
+		}
+	}
+
+	return found
 }
 
 // MarshalJSON is the form as a surface receives it: each field with its "kind" (select, multi_select, text, text_list, confirm, hooks) first, then what that kind carries, the request's problems and the form's sections.

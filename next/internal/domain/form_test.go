@@ -167,3 +167,15 @@ func TestASectionStandsAsItsFieldsDo(t *testing.T) {
 		{ID: "later", State: SectionSkipped},
 	}, sections)
 }
+
+func TestAProblemThatNamesNoFieldIsItsSectionsByPath(t *testing.T) {
+	fields := []Field{
+		TextField{FieldSpec: FieldSpec{Path: "base_path", Section: "worktrees"}},
+		ConfirmField{FieldSpec: FieldSpec{Path: "forget", Section: "remembered", Skip: SkipFlagOnly}},
+	}
+	problems := []FieldError{{Path: "remembered.isolation", Code: "config.remembered_not_allowed"}}
+
+	sections := SectionsOf([]string{"worktrees", "remembered"}, fields, problems)
+
+	assert.Equal(t, []Section{{ID: "worktrees", State: SectionAnswered}, {ID: "remembered", State: SectionToCheck}}, sections)
+}
