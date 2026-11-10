@@ -43,7 +43,7 @@ func toStep(s *session, at int, field domain.Field) form.Step {
 				return branch
 			}
 		}
-	case domain.ConfirmField, domain.MultiSelectField, domain.TextListField:
+	case domain.ConfirmField, domain.MultiSelectField, domain.TextListField, domain.HooksField:
 	}
 
 	return nil

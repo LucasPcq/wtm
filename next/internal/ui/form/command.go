@@ -152,6 +152,8 @@ func bindFields(cmd *cobra.Command, schema []worded) map[string]string {
 			flags.BoolP(name, field.Shorthand, false, usage)
 		case domain.MultiSelectField, domain.TextListField:
 			flags.StringSlice(name, nil, usage)
+		case domain.HooksField:
+			flags.StringArray(name, nil, usage)
 		case domain.SelectField:
 			flags.String(name, "", usage)
 			if accepted := accepting(kind.Options); len(accepted) > 0 {
@@ -265,6 +267,8 @@ func fieldAnswers(cmd *cobra.Command, args []string, schema []worded) []domain.A
 			values = []string{strconv.FormatBool(on)}
 		case domain.MultiSelectField, domain.TextListField:
 			values, _ = flags.GetStringSlice(name)
+		case domain.HooksField:
+			values, _ = flags.GetStringArray(name)
 		case domain.SelectField, domain.TextField:
 			value, _ := flags.GetString(name)
 			values = []string{value}
@@ -283,7 +287,7 @@ func arguments(field domain.Field, args []string) []string {
 	}
 
 	switch field.(type) {
-	case domain.TextListField, domain.MultiSelectField:
+	case domain.TextListField, domain.MultiSelectField, domain.HooksField:
 		return words
 	case domain.SelectField, domain.TextField, domain.ConfirmField:
 	}
@@ -518,6 +522,8 @@ func flagWords(field worded, values []string) []string {
 			}
 		case domain.MultiSelectField, domain.TextListField:
 			words = append(words, name, csvField(value))
+		case domain.HooksField:
+			words = append(words, name, value)
 		case domain.SelectField, domain.TextField:
 			words = append(words, name, value)
 		}

@@ -520,7 +520,7 @@ func valuesSchema(field domain.Field) map[string]any {
 		return oneValue(map[string]any{"type": "string"})
 	case domain.ConfirmField:
 		return oneValue(map[string]any{"enum": []string{"true", "false"}})
-	case domain.MultiSelectField, domain.TextListField:
+	case domain.MultiSelectField, domain.TextListField, domain.HooksField:
 	}
 	return map[string]any{"type": "array", "items": map[string]any{"type": "string"}}
 }

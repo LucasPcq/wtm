@@ -22,6 +22,8 @@ var skipped = map[domain.Skip]string{
 	domain.SkipAlone:           "no other worktree runs jobs",
 	domain.SkipConfigured:      "run.toml answers it",
 	domain.SkipTask:            "a task binds no port and is gone once done",
+	domain.SkipNoEnv:           "no .env file is copied",
+	domain.SkipNoEnvFile:       "the repository holds no .env file",
 }
 
 // Skipped is how the wizard's trail words why a step is not asked, empty when it has no words for it; a command may

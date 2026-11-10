@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"strconv"
 	"strings"
+
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 )
 
 // Form is a command's request as a schema a surface renders without knowing the command: its fields in the order a wizard asks them, as data each surface words its own way, and the request's problems, each naming a field, an entry of one, or a field the form does not list (remember[0]).
@@ -12,7 +14,7 @@ type Form struct {
 	Problems []FieldError
 }
 
-// MarshalJSON is the form as a surface receives it: each field with its "kind" (select, multi_select, text, text_list, confirm) first, then what that kind carries, and the request's problems.
+// MarshalJSON is the form as a surface receives it: each field with its "kind" (select, multi_select, text, text_list, confirm, hooks) first, then what that kind carries, and the request's problems.
 func (f Form) MarshalJSON() ([]byte, error) {
 	fields := make([]json.RawMessage, 0, len(f.Fields))
 	for _, field := range f.Fields {
@@ -46,6 +48,9 @@ func fieldKind(field Field) (string, Field) {
 		return "text_list", field
 	case ConfirmField:
 		return "confirm", field
+	case HooksField:
+		field.Entries, field.Found, field.Dirs = orEmpty(field.Entries), orEmpty(field.Found), orEmpty(field.Dirs)
+		return "hooks", field
 	}
 	return "", field
 }
@@ -72,7 +77,7 @@ const (
 
 //go-sumtype:decl Field
 
-// Field is one field of a Form, of one kind: SelectField, MultiSelectField, TextField, TextListField or ConfirmField, each carrying only what is valid for it.
+// Field is one field of a Form, of one kind: SelectField, MultiSelectField, TextField, TextListField, ConfirmField or HooksField, each carrying only what is valid for it.
 type Field interface {
 	// Spec is what a field of every kind has.
 	Spec() FieldSpec
@@ -137,6 +142,14 @@ type ConfirmField struct {
 	Remember     bool  `json:"remember"`
 }
 
+// HooksField asks a list of hooks, in the order they run: each a command, the folder it runs in and whether its failure lets the next ones run. Found are the hooks the repository suggests, each with the file it was found in, and Dirs the folders of the repository a hook can run in.
+type HooksField struct {
+	FieldSpec
+	Entries []project.Hook      `json:"entries"`
+	Found   []project.FoundHook `json:"found"`
+	Dirs    []string            `json:"dirs"`
+}
+
 // Answer is the option selected.
 func (f SelectField) Answer() []string { return []string{f.Value} }
 
@@ -149,6 +162,16 @@ func (f TextField) Answer() []string { return []string{f.Value} }
 // Answer is the entries.
 func (f TextListField) Answer() []string { return f.Entries }
 
+// Answer is each hook spelled as HookOf reads it.
+func (f HooksField) Answer() []string {
+	spelled := make([]string, 0, len(f.Entries))
+	for _, hook := range f.Entries {
+		spelled = append(spelled, SpellHook(hook))
+	}
+
+	return spelled
+}
+
 // Answer is true or false, as strconv spells it.
 func (f ConfirmField) Answer() []string { return []string{strconv.FormatBool(f.Value)} }
 
@@ -157,6 +180,7 @@ func (MultiSelectField) field() {}
 func (TextField) field()        {}
 func (TextListField) field()    {}
 func (ConfirmField) field()     {}
+func (HooksField) field()       {}
 
 // Rememberable are the paths of the fields whose answer can be remembered, in order.
 func (f Form) Rememberable() []string {
@@ -191,7 +215,7 @@ func remembers(field Field) (rememberable, remember bool) {
 		return field.Rememberable, field.Remember
 	case ConfirmField:
 		return field.Rememberable, field.Remember
-	case MultiSelectField, TextField, TextListField:
+	case MultiSelectField, TextField, TextListField, HooksField:
 	}
 
 	return false, false

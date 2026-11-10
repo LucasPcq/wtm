@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -68,6 +69,7 @@ func TestAFormIsEncodedWithTheKindOfEachField(t *testing.T) {
 			SelectField{FieldSpec: FieldSpec{Path: "isolation", Origin: OriginRemembered}, Value: "shared", Options: []Option{{Value: "shared", Base: true, Origin: &worktree.Origin{Behind: 2, State: worktree.Behind}}}, Remembered: "shared", Rememberable: true, Refreshable: true},
 			MultiSelectField{FieldSpec: FieldSpec{Path: "files"}, Options: []Option{{Value: "a.txt", Change: &worktree.Change{Path: "a.txt", Status: worktree.ChangeModified}}}},
 			TextField{FieldSpec: FieldSpec{Path: "to"}, Value: "feat/y"},
+			HooksField{FieldSpec: FieldSpec{Path: "on_create", Origin: OriginDetected}, Entries: []project.Hook{{Cmd: "pnpm install"}}, Found: []project.FoundHook{{Hook: project.Hook{Cmd: "pnpm install"}, File: "pnpm-lock.yaml"}}},
 		},
 		Problems: []FieldError{{Path: "branches[0]", Code: "required", Template: "{path} is required"}},
 	}
@@ -81,7 +83,8 @@ func TestAFormIsEncodedWithTheKindOfEachField(t *testing.T) {
 			{"kind": "confirm", "path": "keep", "skip": "not asked", "value": false, "no_first": true, "rememberable": false, "remember": false},
 			{"kind": "select", "path": "isolation", "origin": "remembered", "value": "shared", "options": [{"value": "shared", "base": true, "origin": {"ahead": 0, "behind": 2, "state": "behind"}}], "remembered": "shared", "rememberable": true, "remember": false, "refreshable": true, "closed": false},
 			{"kind": "multi_select", "path": "files", "picked": [], "options": [{"value": "a.txt", "change": {"path": "a.txt", "status": "modified"}}]},
-			{"kind": "text", "path": "to", "value": "feat/y"}
+			{"kind": "text", "path": "to", "value": "feat/y"},
+			{"kind": "hooks", "path": "on_create", "origin": "detected", "entries": [{"cmd": "pnpm install"}], "found": [{"cmd": "pnpm install", "file": "pnpm-lock.yaml"}], "dirs": []}
 		],
 		"problems": [{"path": "branches[0]", "code": "required", "flag": "branches[0]", "message": "branches[0] is required"}]
 	}`, string(data))

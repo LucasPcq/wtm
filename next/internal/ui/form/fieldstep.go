@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/ui/widget"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -57,6 +58,8 @@ func fieldStep(s sheet, at int, field domain.Field) Step {
 		return &TextStep{Asked: base}
 	case domain.MultiSelectField:
 		return &MultiSelectStep{Asked: base}
+	case domain.HooksField:
+		return &hooksStep{Asked: base}
 	}
 
 	return nil
@@ -105,6 +108,8 @@ func trailOf(field domain.Field, words Words) string {
 		return field.Value
 	case domain.MultiSelectField:
 		return strings.Join(field.Picked, ", ")
+	case domain.HooksField:
+		return hooksTrail(field.Entries)
 	}
 
 	return ""
@@ -392,3 +397,67 @@ func (s *MultiSelectStep) Answer() string {
 	s.sheet.Answer(s.at, answer)
 	return strings.Join(picked, ", ")
 }
+
+// ----------------------------------------------------------------------------
+// A list of hooks
+
+// hooksStep asks a list of hooks in a hook list, the list checked against the repository before it is confirmed.
+type hooksStep struct {
+	Asked
+	list *widget.HookList
+}
+
+// Open builds the list from the hooks answered so far.
+func (s *hooksStep) Open() tea.Cmd {
+	field, _ := s.sheet.Field(s.at).(domain.HooksField)
+	s.list = widget.NewHookList(field.Entries, s.check)
+	return nil
+}
+
+// check is the first problem of the list or of one of its hooks, as the step shows it.
+func (s *hooksStep) check(hooks []project.Hook) error {
+	problems, err := s.sheet.problems(domain.Answered{Path: s.path(), Values: spelledHooks(hooks)})
+	if err != nil {
+		return Sentence(err)
+	}
+	if found := domain.ProblemsOf(problems, s.path()); len(found) > 0 {
+		return s.sheet.Problem(found[0], s.sheet.Label(found[0].Path))
+	}
+
+	return nil
+}
+
+// Widget is the hook list.
+func (s *hooksStep) Widget() widget.Widget {
+	return s.list
+}
+
+// Answer records the hooks, none as an empty list.
+func (s *hooksStep) Answer() string {
+	s.sheet.Answer(s.at, domain.Answered{Path: s.path(), Values: spelledHooks(s.list.Hooks())})
+	return hooksTrail(s.list.Hooks())
+}
+
+func spelledHooks(hooks []project.Hook) []string {
+	spelled := make([]string, 0, len(hooks))
+	for _, hook := range hooks {
+		spelled = append(spelled, domain.SpellHook(hook))
+	}
+
+	return spelled
+}
+
+// hooksTrail names a list of hooks as the trail shows it: their commands, "none" for none.
+func hooksTrail(hooks []project.Hook) string {
+	if len(hooks) == 0 {
+		return noneTrail
+	}
+	commands := make([]string, 0, len(hooks))
+	for _, hook := range hooks {
+		commands = append(commands, hook.Cmd)
+	}
+
+	return strings.Join(commands, ", ")
+}
+
+const noneTrail = "none"

@@ -10,6 +10,21 @@ import (
 // ErrConfigNotFound is returned when the project has no config.toml: wtm init has not run.
 var ErrConfigNotFound = errors.New("config file not found")
 
+// ErrConfigChanged refuses a write of config.toml whose file changed on disk since it was read.
+var ErrConfigChanged = errors.New("config.toml changed on disk since it was read")
+
+// Saved is config.toml as written on disk, before any default applies, and the digest of its bytes, which a write of it compares with the file as it then stands.
+type Saved struct {
+	Config Config
+	Digest string
+}
+
+// Rewrite is config.toml written whole: its settings, and the digest of the file it replaces, as Saved read it ("" when there was none).
+type Rewrite struct {
+	Config   Config
+	Replaces string
+}
+
 // An InvalidConfigError is a config.toml that does not parse or does not validate; Reason says why.
 type InvalidConfigError struct {
 	Reason error
@@ -61,9 +76,9 @@ type EnvFile struct {
 
 // Hook is one command run in a new worktree: its command line, its directory relative to the worktree, and whether a failure lets the next hooks run.
 type Hook struct {
-	Cmd             string
-	Cwd             string
-	ContinueOnError bool
+	Cmd             string `json:"cmd"`
+	Cwd             string `json:"cwd,omitempty"`
+	ContinueOnError bool   `json:"continue_on_error,omitempty"`
 }
 
 // Global is the settings shared by every project of the user.

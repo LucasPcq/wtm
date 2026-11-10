@@ -439,7 +439,7 @@ func (f *firstLine) Write(p []byte) (int, error) {
 
 // fieldKinds is one field of each kind a form holds.
 func fieldKinds() []domain.Field {
-	return []domain.Field{domain.SelectField{}, domain.MultiSelectField{}, domain.TextField{}, domain.TextListField{}, domain.ConfirmField{}}
+	return []domain.Field{domain.SelectField{}, domain.MultiSelectField{}, domain.TextField{}, domain.TextListField{}, domain.ConfirmField{}, domain.HooksField{}}
 }
 
 // eventsOfEachType is one event of each type an operation reports or the event stream carries.

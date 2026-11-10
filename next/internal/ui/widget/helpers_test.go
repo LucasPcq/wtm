@@ -101,3 +101,18 @@ func pressed(m *MultiSelect, keys ...string) Verdict {
 	}
 	return verdict
 }
+
+// press hands l each of keys in turn, a name keyOf knows or text typed, and returns the verdict of the last, the check it starts run.
+func press(l *HookList, keys ...string) Verdict {
+	verdict := Stay
+	for _, name := range keys {
+		var cmd tea.Cmd
+		verdict, cmd = l.Update(keyOf(name))
+		for _, msg := range messages(cmd) {
+			if checked, ok := msg.(hooksChecked); ok {
+				verdict, _ = l.Update(checked)
+			}
+		}
+	}
+	return verdict
+}

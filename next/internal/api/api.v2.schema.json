@@ -1839,6 +1839,9 @@
         },
         {
           "$ref": "#/$defs/domain.ConfirmField"
+        },
+        {
+          "$ref": "#/$defs/domain.HooksField"
         }
       ]
     },
@@ -1950,6 +1953,49 @@
       "required": [
         "fields",
         "problems"
+      ],
+      "type": "object"
+    },
+    "domain.HooksField": {
+      "additionalProperties": false,
+      "properties": {
+        "dirs": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "entries": {
+          "items": {
+            "$ref": "#/$defs/project.Hook"
+          },
+          "type": "array"
+        },
+        "found": {
+          "items": {
+            "$ref": "#/$defs/project.FoundHook"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "const": "hooks"
+        },
+        "origin": {
+          "$ref": "#/$defs/domain.Origin"
+        },
+        "path": {
+          "type": "string"
+        },
+        "skip": {
+          "$ref": "#/$defs/domain.Skip"
+        }
+      },
+      "required": [
+        "kind",
+        "path",
+        "entries",
+        "found",
+        "dirs"
       ],
       "type": "object"
     },
@@ -2108,6 +2154,9 @@
         "tag": {
           "$ref": "#/$defs/domain.OptionTag"
         },
+        "template": {
+          "type": "string"
+        },
         "up": {
           "items": {
             "type": "string"
@@ -2141,7 +2190,8 @@
         "remembered",
         "config",
         "default",
-        "pull_request"
+        "pull_request",
+        "detected"
       ]
     },
     "domain.Phase": {
@@ -2290,7 +2340,9 @@
         "one_profile",
         "alone",
         "configured",
-        "task"
+        "task",
+        "no_env",
+        "no_env_file"
       ]
     },
     "domain.TextField": {
@@ -4047,6 +4099,46 @@
         "main",
         "parent"
       ]
+    },
+    "project.FoundHook": {
+      "additionalProperties": false,
+      "properties": {
+        "cmd": {
+          "type": "string"
+        },
+        "continue_on_error": {
+          "type": "boolean"
+        },
+        "cwd": {
+          "type": "string"
+        },
+        "file": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "cmd",
+        "file"
+      ],
+      "type": "object"
+    },
+    "project.Hook": {
+      "additionalProperties": false,
+      "properties": {
+        "cmd": {
+          "type": "string"
+        },
+        "continue_on_error": {
+          "type": "boolean"
+        },
+        "cwd": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "cmd"
+      ],
+      "type": "object"
     },
     "project.Isolation": {
       "description": "How a worktree stands against its source.",
