@@ -146,3 +146,49 @@ func TestAValueOnDiskWtmCannotUseIsAProblemOfItsSetting(t *testing.T) {
 		"remembered.isolation": "init.remembered_not_allowed",
 	}, codes)
 }
+
+// Review of #282: `--env-file` on a repository whose config.toml copies no .env file was dropped, "1 unchanged".
+func TestEnvFilesGivenWhereConfigCopiesNoneAskForTheDefaultStrategy(t *testing.T) {
+	s := saved()
+	s.Config.Env = project.Env{}
+
+	q := questions(facts(s), Given{EnvFiles: []string{"apps/api/.env"}})
+
+	assert.Equal(t, domain.Answer[string]{Value: string(project.DefaultEnvStrategy), Origin: domain.OriginDefault}, q.EnvStrategy)
+	assert.Empty(t, q.Problems())
+	assert.Equal(t, []project.EnvFile{{Target: "apps/api/.env", Template: "apps/api/.env.example"}}, q.Rewrite().Config.Env.Files)
+}
+
+func TestTheStrategyAndItsFilesMustAgree(t *testing.T) {
+	cases := map[string]struct {
+		given Given
+		path  string
+		code  string
+	}{
+		"files_with_none":   {Given{EnvStrategy: EnvNone, EnvFiles: []string{"apps/api/.env"}}, PathEnvFiles, "init.env_files_with_none"},
+		"strategy_no_files": {Given{EnvStrategy: "main", EnvFiles: []string{}}, PathEnvFiles, "init.env_files_none"},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			problems := questions(facts(nil), c.given).Problems()
+
+			require.Len(t, problems, 1)
+			assert.Equal(t, c.path, problems[0].Path)
+			assert.Equal(t, c.code, problems[0].Code)
+		})
+	}
+}
+
+// Review of #282: strategy = "none" written in config.toml is no strategy every command reads; a re-init said nothing to change.
+func TestNoneWrittenInTheConfigIsAProblemOfTheStrategy(t *testing.T) {
+	s := saved()
+	s.Config.Env.Strategy = EnvNone
+
+	problems := questions(facts(s), Given{}).Problems()
+	fixed := questions(facts(s), Given{EnvStrategy: "main"}).Problems()
+
+	require.Len(t, problems, 1)
+	assert.Equal(t, PathEnvStrategy, problems[0].Path)
+	assert.Equal(t, domain.CodeOneOf, problems[0].Code)
+	assert.Empty(t, fixed)
+}

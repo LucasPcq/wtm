@@ -172,3 +172,30 @@ func TestADryRunWritesNothingAndTakesNoLock(t *testing.T) {
 	_, statErr := os.Stat(w.usecase.ConfigPath)
 	assert.True(t, os.IsNotExist(statErr))
 }
+
+// Review of #282: `init --yes --env-file apps/api/.env` on a repository copying no .env file said "1 unchanged".
+func TestAnEnvFileGivenWhereNoneIsCopiedIsWritten(t *testing.T) {
+	w := newWorld(t)
+	w.configure(t, "[worktrees]\nbase_path = \"../.trees\"\nbase_branch = \"main\"\n")
+	req, err := initialize.Request{}.Answer(settings.PathEnvFiles, []string{"apps/api/.env"})
+	require.NoError(t, err)
+
+	outcome, err := w.usecase.Run(t.Context(), req, domain.RunOptions{})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{settings.PathEnvStrategy, settings.PathEnvFiles}, outcome.Plan.Changed)
+	assert.Equal(t, project.Env{Strategy: project.EnvExample, Files: []project.EnvFile{{Target: "apps/api/.env", Template: "apps/api/.env.example"}}}, w.saved(t).Env)
+}
+
+func TestTheSameFolderSpelledAnotherWayIsNoChange(t *testing.T) {
+	w := newWorld(t)
+	w.configure(t, reInit)
+	req, err := initialize.Request{}.Answer(settings.PathBasePath, []string{"../.trees/"})
+	require.NoError(t, err)
+
+	outcome, err := w.usecase.Run(t.Context(), req, domain.RunOptions{DryRun: true})
+
+	require.NoError(t, err)
+	assert.True(t, outcome.Plan.Empty)
+	assert.Empty(t, outcome.Warnings)
+}

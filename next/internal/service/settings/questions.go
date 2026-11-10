@@ -198,9 +198,9 @@ func NewQuestions(params QuestionsParams) Questions {
 func basePath(given Given, saved *project.Saved) domain.Answer[string] {
 	switch {
 	case given.BasePath != "":
-		return domain.Answer[string]{Value: given.BasePath, Origin: domain.OriginRequest}
+		return domain.Answer[string]{Value: path.Clean(given.BasePath), Origin: domain.OriginRequest}
 	case saved != nil && saved.Config.Worktrees.BasePath != "":
-		return domain.Answer[string]{Value: saved.Config.Worktrees.BasePath, Origin: domain.OriginConfig}
+		return domain.Answer[string]{Value: path.Clean(saved.Config.Worktrees.BasePath), Origin: domain.OriginConfig}
 	}
 
 	return domain.Answer[string]{Value: project.DefaultBasePath, Origin: domain.OriginDefault}
@@ -226,7 +226,7 @@ func baseBranch(given Given, facts Facts) BaseBranch {
 	return question
 }
 
-// envStrategy is the strategy as given, else config.toml's: none when it names neither a strategy nor a file (as init writes a skipped .env), the default when it names files alone.
+// envStrategy is the strategy as given, else config.toml's: none when it names neither a strategy nor a file (as init writes a skipped .env), unless .env files are given, which ask for the default; the default when it names files alone.
 func envStrategy(given Given, saved *project.Saved) domain.Answer[string] {
 	switch {
 	case given.EnvStrategy != "":
@@ -234,7 +234,7 @@ func envStrategy(given Given, saved *project.Saved) domain.Answer[string] {
 	case saved == nil:
 	case saved.Config.Env.Strategy != "":
 		return domain.Answer[string]{Value: string(saved.Config.Env.Strategy), Origin: domain.OriginConfig}
-	case len(saved.Config.Env.Files) == 0:
+	case len(saved.Config.Env.Files) == 0 && len(given.EnvFiles) == 0:
 		return domain.Answer[string]{Value: EnvNone, Origin: domain.OriginConfig}
 	}
 
@@ -376,6 +376,8 @@ const (
 	CodeEnvFileOutside       = "env_file_outside"
 	CodeEnvFileTwice         = "env_file_twice"
 	CodeEnvFileTemplate      = "env_file_template"
+	CodeEnvFilesWithNone     = "env_files_with_none"
+	CodeEnvFilesNone         = "env_files_none"
 	CodeHookDirOutside       = "hook_dir_outside"
 	CodeRememberedUnknown    = "remembered_unknown"
 	CodeRememberedNotAllowed = "remembered_not_allowed"
@@ -396,7 +398,7 @@ func (q Questions) Problems() []domain.FieldError {
 	case len(q.BaseBranch.Options) > 0 && !slices.Contains(q.BaseBranch.Options, branch):
 		problems = append(problems, q.problem(PathBaseBranch, CodeBaseBranchUnknown, "{path} {value} is no branch of the repository", branch))
 	}
-	problems = append(problems, domain.OneOf(domain.OneOfParams{Path: PathEnvStrategy, Value: q.EnvStrategy.Value, Accepted: EnvStrategies()})...)
+	problems = append(problems, q.strategyProblems()...)
 
 	if q.EnvStrategy.Value != EnvNone {
 		for index, target := range q.EnvFiles.Picked {
@@ -419,6 +421,24 @@ func (q Questions) Problems() []domain.FieldError {
 	problems = append(problems, q.hookProblems(PathOnCreate, q.OnCreate.Entries)...)
 	problems = append(problems, q.hookProblems(PathOnClean, q.OnClean.Entries)...)
 	return append(problems, q.rememberedProblems()...)
+}
+
+// strategyProblems are those of where .env files come from: a strategy none of those accepted, none written in config.toml (it names no strategy to copy none), .env files given while none is given, and a strategy given, or files given, that leaves none picked while the repository knows some.
+func (q Questions) strategyProblems() []domain.FieldError {
+	strategy := q.EnvStrategy
+	if strategy.Origin == domain.OriginConfig && strategy.Value == EnvNone && q.saved != nil && q.saved.Config.Env.Strategy != "" {
+		return []domain.FieldError{{Path: PathEnvStrategy, Code: domain.CodeOneOf, Template: "{path} must be one of {accepted}, not {value}", Params: domain.Params{"value": strategy.Value}, Accepted: domain.Names(project.EnvStrategies())}}
+	}
+	problems := domain.OneOf(domain.OneOfParams{Path: PathEnvStrategy, Value: strategy.Value, Accepted: EnvStrategies()})
+	asked := strategy.Origin == domain.OriginRequest || q.EnvFiles.Origin == domain.OriginRequest
+	switch {
+	case strategy.Value == EnvNone && strategy.Origin == domain.OriginRequest && len(q.EnvFiles.Picked) > 0 && q.EnvFiles.Origin == domain.OriginRequest:
+		problems = append(problems, q.problem(PathEnvFiles, CodeEnvFilesWithNone, "{path} lists files while no .env file is copied ({value}): name a strategy, or give no file", strategy.Value))
+	case strategy.Value != EnvNone && asked && len(q.EnvFiles.Picked) == 0 && len(q.EnvFiles.Options) > 0:
+		problems = append(problems, q.problem(PathEnvFiles, CodeEnvFilesNone, "{path} lists no file while they come from {value}: pick one, or copy none", strategy.Value))
+	}
+
+	return problems
 }
 
 // templatesOf are the templates target may have: itself with each template suffix.
