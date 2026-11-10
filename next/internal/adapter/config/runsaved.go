@@ -24,7 +24,7 @@ const (
 //go:embed run.schema.json
 var runSchemaJSON []byte
 
-// SavedRun returns the project's run.toml as written, with the digest of its bytes; a missing run.toml is an empty run config with no digest, and one that does not parse or validate an error naming every problem, as LoadRun says.
+// SavedRun returns the project's run.toml as written, with the digest of its bytes; a missing run.toml is an empty run config with no digest, one a newer wtm wrote a *domain.SchemaNewer, and one that does not parse or validate an error naming every problem, as LoadRun says.
 func (p Project) SavedRun() (project.SavedRun, error) {
 	path := filepath.Join(p.StateDir, runFileName)
 	data, err := os.ReadFile(path)
@@ -35,6 +35,9 @@ func (p Project) SavedRun() (project.SavedRun, error) {
 		return project.SavedRun{}, err
 	}
 
+	if err := refuseNewer(path, data, runSchema); err != nil {
+		return project.SavedRun{}, err
+	}
 	run, err := parseRun(path, data)
 	if err != nil {
 		return project.SavedRun{}, err

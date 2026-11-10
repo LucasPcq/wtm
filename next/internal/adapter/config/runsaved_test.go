@@ -133,6 +133,17 @@ func TestSaveRunNeverWritesWhatTheLegacyWtmRefuses(t *testing.T) {
 		"env_namespace":    {run: project.Run{Jobs: []project.Job{web}, EnvValues: []project.EnvValueLink{{File: ".env", Key: "DB", Job: "web", Value: "{namespace}"}}}, want: "unknown placeholder {namespace}"},
 		"env_clashes_port": {run: project.Run{Jobs: []project.Job{web}, EnvPorts: []project.EnvPortLink{{File: ".env", Key: "PORT", Job: "web", Port: "WEB_PORT"}}, EnvValues: []project.EnvValueLink{{File: ".env", Key: "PORT", Job: "web", Value: "{port.WEB_PORT}"}}}, want: "also an env_port"},
 		"env_no_job":       {run: project.Run{EnvValues: []project.EnvValueLink{{File: ".env", Key: "URL", Job: "api", Value: "{worktree}"}}}, want: `no job named "api"`},
+		"no_cmd":           {run: project.Run{Jobs: []project.Job{{Name: "web", Kind: project.Service}}}, want: "cmd is required"},
+		"no_kind":          {run: project.Run{Jobs: []project.Job{{Name: "web", Cmd: "x"}}}, want: "kind is required"},
+		"name_space":       {run: project.Run{Jobs: []project.Job{{Name: "my web", Kind: project.Service, Cmd: "x"}}}, want: "a name holds no space"},
+		"task_stop":        {run: project.Run{Jobs: []project.Job{{Name: "seed", Kind: project.Task, Cmd: "x", Stop: "y"}}}, want: "a task declares no stop command"},
+		"binds_and_ports":  {run: project.Run{Jobs: []project.Job{{Name: "web", Kind: project.Service, Cmd: "x", BindsNoPort: true, Ports: map[string]int{"PORT": 3000}}}}, want: "binds_no_port contradicts"},
+		"touches_unknown":  {run: project.Run{Jobs: []project.Job{{Name: "seed", Kind: project.Task, Cmd: "x", Touches: []string{"postgres"}}}}, want: `touches unknown job "postgres"`},
+		"runs_unknown":     {run: project.Run{Jobs: []project.Job{{Name: "dev", Kind: project.Service, Cmd: "x", Runs: []string{"web"}}}}, want: `runs unknown job "web"`},
+		"runs_cycle":       {run: project.Run{Jobs: []project.Job{{Name: "a", Kind: project.Service, Cmd: "x", Runs: []string{"b"}}, {Name: "b", Kind: project.Service, Cmd: "x", Runs: []string{"a"}}}}, want: "runs itself through"},
+		"profile_unknown":  {run: project.Run{Jobs: []project.Job{web}, Profiles: []project.Profile{{Name: "all", Jobs: []string{"dev"}}}}, want: `profile "all" references unknown job "dev"`},
+		"profile_twice":    {run: project.Run{Jobs: []project.Job{web}, Profiles: []project.Profile{{Name: "all", Jobs: []string{"web"}}, {Name: "all", Jobs: []string{"web"}}}}, want: `profile "all" is declared twice`},
+		"two_defaults":     {run: project.Run{Jobs: []project.Job{web}, Profiles: []project.Profile{{Name: "a", Jobs: []string{"web"}, Default: true}, {Name: "b", Jobs: []string{"web"}, Default: true}}}, want: "2 profiles are the default"},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -144,4 +155,12 @@ func TestSaveRunNeverWritesWhatTheLegacyWtmRefuses(t *testing.T) {
 			assert.NoFileExists(t, filepath.Join(stateDir, "run.toml"))
 		})
 	}
+}
+
+func TestARunTomlAtANewerSchemaIsNeverReadToBeRewritten(t *testing.T) {
+	_, err := Project{StateDir: stateWithRun(t, newerSchema+"future = true\n[[job]]\nname = \"web\"\ncmd = \"npm run dev\"\n")}.SavedRun()
+
+	var newer *domain.SchemaNewer
+	require.ErrorAs(t, err, &newer)
+	assert.Equal(t, 99, newer.Found)
 }
