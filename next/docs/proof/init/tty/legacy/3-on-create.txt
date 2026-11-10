@@ -1,0 +1,20 @@
+$ wtm init; echo EXIT=$?
+
+  Step 7/9 • Post-create hooks
+
+  ✓ Worktree directory: ../.trees (default)
+  ✓ Base branch: main
+  ✓ Environment files: configured
+  ✓ Env strategy: example
+  ✓ Env files: 2 files selected
+  ✓ Post-create hooks: configured
+
+  ┃  Commands run after creating a worktree. Add, edit, remove or reorder them — then select
+  ┃  Done.
+
+▸ 1. pnpm install
+  + Add a command
+  ✓ Done
+
+  ↑↓ navigate • d delete • shift+↑/↓ reorder • enter select • esc back
+

@@ -11,12 +11,13 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/BurntSushi/toml"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 )
 
 const (
 	configFileName = "config.toml"
-	projectSchema  = 1
+	projectSchema  = project.ConfigSchema
 )
 
 var templateSuffixes = [...]string{".example", ".dist", ".sample", ".template", ".tmpl"}
@@ -77,7 +78,7 @@ func (p Project) Load() (project.Config, project.Global, error) {
 
 	saved, err := parseProject(path, data)
 	if err != nil {
-		return project.Config{}, project.Global{}, &project.InvalidConfigError{Reason: err}
+		return project.Config{}, project.Global{}, invalidConfig(err)
 	}
 
 	global, err := loadGlobal(p.GlobalPath)
@@ -96,6 +97,18 @@ func (p Project) Load() (project.Config, project.Global, error) {
 	return config, global.Global, nil
 }
 
+// invalidConfig is err, a config.toml that does not parse, with where the parse stopped when the TOML decoder says.
+func invalidConfig(err error) *project.InvalidConfigError {
+	invalid := &project.InvalidConfigError{Reason: err}
+	if parse, ok := errors.AsType[toml.ParseError](err); ok {
+		invalid.Line, invalid.Column, invalid.Key = parse.Position.Line, parse.Position.Col, parse.LastKey
+	}
+	if unknown, ok := errors.AsType[*unknownKeysError](err); ok {
+		invalid.Key = unknown.Keys[0]
+	}
+	return invalid
+}
+
 // parseProject decodes the config.toml read from path, strictly, without
 // applying defaults nor validating values.
 func parseProject(path string, data []byte) (savedProject, error) {
@@ -104,6 +117,11 @@ func parseProject(path string, data []byte) (savedProject, error) {
 		return savedProject{}, err
 	}
 
+	return savedOf(file)
+}
+
+// savedOf is the config file holds, its hooks read from either of their shapes.
+func savedOf(file projectFile) (savedProject, error) {
 	onCreate, onClean, err := file.Hooks.decode()
 	if err != nil {
 		return savedProject{}, fmt.Errorf("parse hooks: %w", err)

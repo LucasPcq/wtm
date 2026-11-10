@@ -1,0 +1,12 @@
+
+  init · dry run, nothing applied
+  Worktrees folder  ../.trees
+  Base branch       main
+  .env from         none
+  .env files        none
+  On create         pnpm install
+  On clean          docker compose down
+  Settings file     .git/wtm/config.toml
+  fingerprint  0f8093dd58a58de8e1c5fba4
+  → wtm-next init --env-strategy none --expect-fingerprint 0f8093dd58a58de8e1c5fba4   apply this plan
+

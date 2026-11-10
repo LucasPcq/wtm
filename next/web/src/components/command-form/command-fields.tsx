@@ -15,6 +15,7 @@ const origin: Record<DomainOrigin, string | undefined> = {
   remembered: 'remembered',
   config: 'from config',
   pull_request: "the pull request's base",
+  detected: 'found in the repository',
 }
 
 export type Remember = { paths: string[]; toggle: (path: string) => void }

@@ -17,6 +17,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/exec"
 	"github.com/LucasPcq/wtm/next/internal/command/extract"
 	"github.com/LucasPcq/wtm/next/internal/command/fastforward"
+	"github.com/LucasPcq/wtm/next/internal/command/initialize"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
 	"github.com/LucasPcq/wtm/next/internal/command/reparent"
@@ -38,6 +39,7 @@ import (
 // catalogue lists every command for a surface other than the command line, one line per command.
 func catalogue() api.Catalogue {
 	return api.Catalogue{
+		api.Bind(initialize.Name, openInit, initialize.UseCase.Questions, initialize.UseCase.Run),
 		api.Bind(create.Name, openCreate, create.UseCase.Questions, create.UseCase.Run),
 		api.Bind(extract.Name, openExtract, extract.UseCase.Questions, extract.UseCase.Run),
 		api.Bind(checkout.Name, openCheckout, checkout.UseCase.Questions, checkout.UseCase.Run),

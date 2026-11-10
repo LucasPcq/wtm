@@ -22,6 +22,8 @@ var skipped = map[domain.Skip]string{
 	domain.SkipAlone:           "no other worktree runs jobs",
 	domain.SkipConfigured:      "run.toml answers it",
 	domain.SkipTask:            "a task binds no port and is gone once done",
+	domain.SkipNoEnv:           "no .env file is copied",
+	domain.SkipNoEnvFile:       "the repository holds no .env file",
 	domain.SkipNoKeyConflict:   "every key matches its source",
 	domain.SkipNoKeyOrphan:     "every key has a source",
 }

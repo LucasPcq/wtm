@@ -36,7 +36,17 @@ func decodeStrict(params strictParams) error {
 	}
 
 	if len(unknown) > 0 {
-		return fmt.Errorf("unknown keys in %s: %s", params.Source, strings.Join(unknown, ", "))
+		return &unknownKeysError{Source: params.Source, Keys: unknown}
 	}
 	return nil
+}
+
+// unknownKeysError is a file holding keys its shape has none for.
+type unknownKeysError struct {
+	Source string
+	Keys   []string
+}
+
+func (e *unknownKeysError) Error() string {
+	return fmt.Sprintf("unknown keys in %s: %s", e.Source, strings.Join(e.Keys, ", "))
 }

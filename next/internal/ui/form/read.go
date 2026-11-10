@@ -168,7 +168,7 @@ func subjectOf(form []worded, req domain.Valued, refused string) (askedSubject, 
 			return &Subject{Field: subject, Words: field.Words}, true
 		case domain.MultiSelectField:
 			return &Subjects{Field: subject, Words: field.Words}, true
-		case domain.ConfirmField, domain.TextField, domain.TextListField:
+		case domain.ConfirmField, domain.TextField, domain.TextListField, domain.HooksField:
 		}
 	}
 

@@ -1,0 +1,13 @@
+
+  Step 4/7 • .env files
+
+  ✓ Worktrees folder: ../.trees
+  ✓ Base branch: main
+  ✓ .env from: the template
+
+  The .env files every new worktree gets
+
+▌› [x] apps/api/.env  ← apps/api/.env.example
+   [ ] apps/web/.env  ← apps/web/.env.example
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc back

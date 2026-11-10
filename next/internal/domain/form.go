@@ -4,15 +4,83 @@ import (
 	"encoding/json"
 	"strconv"
 	"strings"
+
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 )
 
-// Form is a command's request as a schema a surface renders without knowing the command: its fields in the order a wizard asks them, as data each surface words its own way, and the request's problems, each naming a field, an entry of one, or a field the form does not list (remember[0]).
+// Form is a command's request as a schema a surface renders without knowing the command: its fields in the order a wizard asks them, as data each surface words its own way, the request's problems, each naming a field, an entry of one, or a field the form does not list (remember[0]), and the sections its fields fall in, in order, none for a form of one part.
 type Form struct {
 	Fields   []Field
 	Problems []FieldError
+	Sections []Section
 }
 
-// MarshalJSON is the form as a surface receives it: each field with its "kind" (select, multi_select, text, text_list, confirm) first, then what that kind carries, and the request's problems.
+// Section is a part of a form, which its fields name by ID (FieldSpec.Section): where it stands, why when it is skipped or to check (Reason, a code, with its Params; each surface words it), and the sections it waits for before it can be answered.
+type Section struct {
+	ID       string       `json:"id"`
+	State    SectionState `json:"state"`
+	Reason   string       `json:"reason,omitempty"`
+	Params   Params       `json:"params,omitempty"`
+	WaitsFor []string     `json:"waits_for,omitempty"`
+}
+
+// SectionState is where a section of a form stands.
+type SectionState string
+
+// The states of a section.
+const (
+	SectionToDo     SectionState = "to_do"    // a field of it is not answered yet
+	SectionAnswered SectionState = "answered" // every field of it is answered, with no problem
+	SectionToCheck  SectionState = "to_check" // a field of it has a problem
+	SectionSkipped  SectionState = "skipped"  // nothing in it is asked
+)
+
+// SectionsOf are the sections ids of fields, in order, each as its fields and problems stand: skipped when every field of it is (and no problem names it), to do when a field of it is required and unanswered, to check when another problem names one of its fields or, naming no field, a path under its id (remembered.isolation is section remembered's), else answered.
+func SectionsOf(ids []string, fields []Field, problems []FieldError) []Section {
+	sections := make([]Section, 0, len(ids))
+	for _, id := range ids {
+		section := Section{ID: id, State: SectionSkipped}
+		var owned []FieldError
+		for _, field := range fields {
+			spec := field.Spec()
+			if spec.Section != id || spec.Skip != "" {
+				continue
+			}
+			section.State = SectionAnswered
+			owned = append(owned, ProblemsOf(problems, spec.Path)...)
+		}
+		owned = append(owned, unfielded(problems, fields, id)...)
+		for _, problem := range owned {
+			switch {
+			case problem.Code == CodeRequired:
+				section.State = SectionToDo
+			case section.State != SectionToDo:
+				section.State = SectionToCheck
+			}
+		}
+		sections = append(sections, section)
+	}
+
+	return sections
+}
+
+// unfielded are the problems no field of fields names whose path sits under id.
+func unfielded(problems []FieldError, fields []Field, id string) []FieldError {
+	var found []FieldError
+	for _, problem := range problems {
+		named := false
+		for _, field := range fields {
+			named = named || len(ProblemsOf([]FieldError{problem}, field.Spec().Path)) > 0
+		}
+		if !named && (problem.Path == id || strings.HasPrefix(problem.Path, id+".") || strings.HasPrefix(problem.Path, id+"[")) {
+			found = append(found, problem)
+		}
+	}
+
+	return found
+}
+
+// MarshalJSON is the form as a surface receives it: each field with its "kind" (select, multi_select, text, text_list, confirm, hooks) first, then what that kind carries, the request's problems and the form's sections.
 func (f Form) MarshalJSON() ([]byte, error) {
 	fields := make([]json.RawMessage, 0, len(f.Fields))
 	for _, field := range f.Fields {
@@ -27,7 +95,8 @@ func (f Form) MarshalJSON() ([]byte, error) {
 	return encoded(struct {
 		Fields   []json.RawMessage `json:"fields"`
 		Problems []FieldError      `json:"problems"`
-	}{fields, orEmpty(f.Problems)})
+		Sections []Section         `json:"sections"`
+	}{fields, orEmpty(f.Problems), orEmpty(f.Sections)})
 }
 
 // fieldKind returns the kind of field and the field with each of its lists an array, never null, so a surface iterates them as they are.
@@ -46,6 +115,9 @@ func fieldKind(field Field) (string, Field) {
 		return "text_list", field
 	case ConfirmField:
 		return "confirm", field
+	case HooksField:
+		field.Entries, field.Found, field.Dirs = orEmpty(field.Entries), orEmpty(field.Found), orEmpty(field.Dirs)
+		return "hooks", field
 	}
 	return "", field
 }
@@ -63,6 +135,16 @@ const PathRemember = "remember"
 // PathAsk is the path of the request's --ask: true to ask again the questions whose answer is remembered.
 const PathAsk = "ask"
 
+// The paths of config.toml's settings, one per value it holds, which init asks and a change to the settings writes.
+const (
+	PathBasePath    = "base_path"
+	PathBaseBranch  = "base_branch"
+	PathEnvStrategy = "env_strategy"
+	PathEnvFiles    = "env_files"
+	PathOnCreate    = "on_create"
+	PathOnClean     = "on_clean"
+)
+
 // The paths of the questions every command that creates a worktree asks, the fields --remember accepts: where its .env files come from, how it stands against its source, whether its source is fast-forwarded first.
 const (
 	PathEnvFrom     = "env_from"
@@ -72,7 +154,7 @@ const (
 
 //go-sumtype:decl Field
 
-// Field is one field of a Form, of one kind: SelectField, MultiSelectField, TextField, TextListField or ConfirmField, each carrying only what is valid for it.
+// Field is one field of a Form, of one kind: SelectField, MultiSelectField, TextField, TextListField, ConfirmField or HooksField, each carrying only what is valid for it.
 type Field interface {
 	// Spec is what a field of every kind has.
 	Spec() FieldSpec
@@ -83,9 +165,10 @@ type Field interface {
 
 // FieldSpec is what a field of every kind has; its words (its name, what its answer decides, its flag on the command line) are each surface's own, by its path.
 type FieldSpec struct {
-	Path   string `json:"path"`             // the request field it answers, as a field error names it
-	Origin Origin `json:"origin,omitempty"` // where its answer came from, empty when the field does not say
-	Skip   Skip   `json:"skip,omitempty"`   // why it is not asked, empty when it is
+	Path    string `json:"path"`              // the request field it answers, as a field error names it
+	Origin  Origin `json:"origin,omitempty"`  // where its answer came from, empty when the field does not say
+	Skip    Skip   `json:"skip,omitempty"`    // why it is not asked, empty when it is
+	Section string `json:"section,omitempty"` // the ID of the form's section it falls in, empty for a form of one part
 }
 
 // Spec is the spec itself, so each kind of field has it by embedding.
@@ -138,6 +221,14 @@ type ConfirmField struct {
 	Remember     bool  `json:"remember"`
 }
 
+// HooksField asks a list of hooks, in the order they run: each a command, the folder it runs in and whether its failure lets the next ones run. Found are the hooks the repository suggests, each with the file it was found in, and Dirs the folders of the repository a hook can run in.
+type HooksField struct {
+	FieldSpec
+	Entries []project.Hook      `json:"entries"`
+	Found   []project.FoundHook `json:"found"`
+	Dirs    []string            `json:"dirs"`
+}
+
 // Answer is the option selected.
 func (f SelectField) Answer() []string { return []string{f.Value} }
 
@@ -150,6 +241,16 @@ func (f TextField) Answer() []string { return []string{f.Value} }
 // Answer is the entries.
 func (f TextListField) Answer() []string { return f.Entries }
 
+// Answer is each hook spelled as HookOf reads it.
+func (f HooksField) Answer() []string {
+	spelled := make([]string, 0, len(f.Entries))
+	for _, hook := range f.Entries {
+		spelled = append(spelled, SpellHook(hook))
+	}
+
+	return spelled
+}
+
 // Answer is true or false, as strconv spells it.
 func (f ConfirmField) Answer() []string { return []string{strconv.FormatBool(f.Value)} }
 
@@ -158,6 +259,7 @@ func (MultiSelectField) field() {}
 func (TextField) field()        {}
 func (TextListField) field()    {}
 func (ConfirmField) field()     {}
+func (HooksField) field()       {}
 
 // Rememberable are the paths of the fields whose answer can be remembered, in order.
 func (f Form) Rememberable() []string {
@@ -192,7 +294,7 @@ func remembers(field Field) (rememberable, remember bool) {
 		return field.Rememberable, field.Remember
 	case ConfirmField:
 		return field.Rememberable, field.Remember
-	case MultiSelectField, TextField, TextListField:
+	case MultiSelectField, TextField, TextListField, HooksField:
 	}
 
 	return false, false

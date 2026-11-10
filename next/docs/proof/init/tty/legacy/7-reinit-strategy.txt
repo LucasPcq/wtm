@@ -1,0 +1,13 @@
+$ wtm init --only env,hooks; echo EXIT=$?
+
+  Step 1/5 • Env strategy
+
+  ┃  How wtm provisions .env files in a new worktree: copy .env.example, copy from your main
+  ┃  checkout, or from the worktree you branched from.
+
+▌▸ example — copy .env.example → .env
+   main — copy .env from the main checkout
+   parent — copy .env from source worktree
+
+  ↑↓ navigate • / filter • enter confirm • esc cancel
+

@@ -2,7 +2,8 @@
   ✓ extract: 1 done
 
   Source     feat/login
-  Files      ren scripts/dev.py → scripts/serve.py, del apps/web/package.json
+  Files      ren scripts/dev.py → scripts/serve.py
+             del apps/web/package.json
   Target     new worktree feat/misc from main
   Env        example
   Isolation  isolated

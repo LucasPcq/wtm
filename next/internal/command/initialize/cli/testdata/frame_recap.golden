@@ -1,0 +1,26 @@
+
+  Step 7/7 • Confirm
+
+  ✓ Worktrees folder: ../.trees
+  ✓ Base branch: main
+  ✓ .env from: the template
+  ✓ .env files: apps/api/.env, apps/web/.env
+  ✓ On create: pnpm install
+  ✓ On clean: docker compose down
+
+  ┃  Review & confirm
+  ┃
+  ┃  Worktrees folder  ../.trees
+  ┃  Base branch       main
+  ┃  .env from         the template
+  ┃  .env files        apps/api/.env
+  ┃                    apps/web/.env
+  ┃  On create         pnpm install
+  ┃  On clean          docker compose down
+  ┃  Settings file     .git/wtm/config.toml
+
+▌› Yes, set it up
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   No, cancel
+
+  ↑↓ navigate • / filter • enter confirm • esc back

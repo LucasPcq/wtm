@@ -1,0 +1,16 @@
+
+   ✓ Project ready                                                            
+                                                                              
+  Created .git/wtm/config.toml                                                
+                                                                              
+  base_path     ../.trees                                                     
+  base_branch   main                                                          
+  env_strategy  skipped (template)                                            
+  on_create     skipped                                                       
+  on_clean      skipped                                                       
+                                                                              
+  Next steps                                                                  
+    → wtm create <branch>   create a worktree to get started                  
+    → wtm relocate          adopt & align pre-existing worktrees              
+    → wtm run init          configure per-worktree services                   
+

@@ -1,0 +1,15 @@
+
+  ✓ init: 1 done
+
+  Worktrees folder  ../.trees
+  Base branch       develop (was main)
+  .env from         the template
+  .env files        apps/api/.env
+  On create         pnpm install
+  On clean          make down (goes on if it fails)
+  Settings file     .git/wtm/config.toml
+
+  → wtm create     create a worktree to get started
+  → wtm relocate   move the worktrees made elsewhere into the folder
+  → wtm run init   set up what runs in each worktree
+

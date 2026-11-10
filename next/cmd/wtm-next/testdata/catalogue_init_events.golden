@@ -1,0 +1,22 @@
+[
+  {
+    "type": "operation.started",
+    "command": "init",
+    "surface": "api"
+  },
+  {
+    "type": "unit.started",
+    "subject": "<root>/main/.git/wtm/config.toml"
+  },
+  {
+    "type": "unit.finished",
+    "subject": "<root>/main/.git/wtm/config.toml",
+    "status": "done"
+  },
+  {
+    "type": "operation.finished",
+    "command": "init",
+    "surface": "api",
+    "ok": true
+  }
+]

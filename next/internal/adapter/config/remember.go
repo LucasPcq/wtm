@@ -55,7 +55,7 @@ func remembered(path string, current []byte, answers map[string]string) ([]byte,
 		return nil, project.ErrConfigNotFound
 	}
 
-	if err := refuseNewer(path, current); err != nil {
+	if err := refuseNewer(path, current, projectSchema); err != nil {
 		return nil, err
 	}
 
@@ -73,7 +73,7 @@ func remembered(path string, current []byte, answers map[string]string) ([]byte,
 
 // refuseNewer returns the statefile's refusal when data carries a schema newer
 // than this wtm writes.
-func refuseNewer(path string, data []byte) error {
+func refuseNewer(path string, data []byte, supported int) error {
 	var file struct {
 		Schema int `toml:"schema"`
 	}
@@ -82,7 +82,7 @@ func refuseNewer(path string, data []byte) error {
 		return nil
 	}
 
-	return statefile.Refusal(statefile.Schema{Path: path, Found: file.Schema, Supported: projectSchema})
+	return statefile.Refusal(statefile.Schema{Path: path, Found: file.Schema, Supported: supported})
 }
 
 // writeSchema writes the JSON schema config.toml's first line points editors
