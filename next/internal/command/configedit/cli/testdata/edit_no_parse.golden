@@ -1,0 +1,4 @@
+
+  ✗ invalid config.toml, kept as edited: parse <state>/config.toml: toml: line 9 (last key "env.x"): unexpected EOF; expected value
+  → wtm config-edit   fix it
+

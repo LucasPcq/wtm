@@ -1,0 +1,4 @@
+
+  ✗ invalid config.toml, kept as edited: parse <SB>/acme/.git/wtm/config.toml: toml: line 40 (last key "hooks.x"): unexpected EOF; expected value
+  → wtm config edit   fix it
+

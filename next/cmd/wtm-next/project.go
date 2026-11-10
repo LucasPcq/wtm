@@ -17,6 +17,9 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/store"
 	"github.com/LucasPcq/wtm/next/internal/command/checkout"
 	"github.com/LucasPcq/wtm/next/internal/command/clean"
+	"github.com/LucasPcq/wtm/next/internal/command/configedit"
+	"github.com/LucasPcq/wtm/next/internal/command/configset"
+	"github.com/LucasPcq/wtm/next/internal/command/configshow"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	envcommand "github.com/LucasPcq/wtm/next/internal/command/env"
 	"github.com/LucasPcq/wtm/next/internal/command/envshow"
@@ -75,6 +78,9 @@ var (
 	openRunStart    = opener(func(a app) runstart.UseCase { return a.RunStart })
 	openRunStop     = opener(func(a app) runstop.UseCase { return a.RunStop })
 	openRunList     = opener(func(a app) runlist.UseCase { return a.RunList })
+	openConfigShow  = opener(func(a app) configshow.UseCase { return a.ConfigShow })
+	openConfigSet   = opener(func(a app) configset.UseCase { return a.ConfigSet })
+	openConfigEdit  = opener(func(a app) configedit.UseCase { return a.ConfigEdit })
 )
 
 // openRunPs opens run ps, which reads the jobs of the whole machine: from any directory, in a repository or not.

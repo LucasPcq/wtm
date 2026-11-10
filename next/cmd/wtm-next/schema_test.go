@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -79,6 +80,10 @@ func TestEachEnvelopeGoldenOfACommandsCLIMatchesTheSchema(t *testing.T) {
 
 	for _, golden := range goldens {
 		name := filepath.Base(filepath.Dir(filepath.Dir(filepath.Dir(golden))))
+		// a command only a terminal runs publishes no envelope: no surface but the command line reads it
+		if slices.Contains(terminal, name) {
+			continue
+		}
 		t.Run(name+"_"+strings.TrimSuffix(strings.TrimPrefix(filepath.Base(golden), "envelope_"), ".golden"), func(t *testing.T) {
 			// the envelope names its command, which a folder spells without its dash (fast-forward's is fastforward)
 			var envelope struct{ Command string }

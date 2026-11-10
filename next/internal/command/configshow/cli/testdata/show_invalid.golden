@@ -1,0 +1,27 @@
+
+  Worktrees
+  Worktrees folder  ../.trees · default
+                    Where new worktrees go, relative to the repository; outside it keeps the main
+                    checkout clean
+  Base branch       main · default
+                    The branch new worktrees start from by default
+
+  .env files
+  .env from         copy
+                    takes example, main, parent, none
+                    ! env.strategy must be one of example, main, parent, none, not copy
+                    Where a new worktree's .env files come from: a fresh checkout has none of your
+                    local ones
+  .env files        apps/api/.env, apps/web/.env
+                    The .env files every new worktree gets
+
+  Hooks
+  On create         pnpm install
+                    pnpm db:generate · in packages/db
+                    Commands run in a worktree once it is created, such as installing its dependencies
+  On clean          docker compose down · goes on if it fails
+                    Commands run in a worktree before it is removed, such as stopping what it started
+
+  Remembered answers
+  Env strategy      parent
+

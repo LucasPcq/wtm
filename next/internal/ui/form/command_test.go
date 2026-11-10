@@ -104,6 +104,17 @@ func TestAListEntryWithACommaReadsBackAsOneEntry(t *testing.T) {
 	assert.Equal(t, req, command.RequestOf(cmd, nil))
 }
 
+// A list answered empty was left out of the line, so the plan it applied kept the list.
+func TestAListAnsweredEmptyIsSpelledAndReadsBackEmpty(t *testing.T) {
+	req := request{"files": {}}
+	argv := fakeCommand().Argv("wtm-next fake", req)
+
+	command, cmd := bound(t, argv[2:]...)
+
+	assert.Equal(t, []string{"wtm-next", "fake", "--files="}, argv)
+	assert.Equal(t, req, command.RequestOf(cmd, nil))
+}
+
 func TestADryRunEndsOnTheLineThatAppliesExactlyItsPlan(t *testing.T) {
 	req := request{"branches": {"feat/a"}}
 

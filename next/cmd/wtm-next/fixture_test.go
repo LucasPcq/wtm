@@ -67,6 +67,21 @@ func mutations() []mutation {
 			},
 		},
 		{
+			name:     "config-set",
+			answers:  []domain.Answered{{Path: "on_clean", Values: []string{"make down"}}},
+			complete: true,
+			// a config.toml changed on disk since the preview is not the one the plan rewrites
+			stale: func(t *testing.T, main string) {
+				writeConfig(t, main, "\n")
+			},
+			untouched: func(t *testing.T, main string) {
+				assert.NotContains(t, readConfig(t, main), "make down")
+			},
+			applied: func(t *testing.T, main string) {
+				assert.Contains(t, readConfig(t, main), "make down")
+			},
+		},
+		{
 			name:    "create",
 			answers: []domain.Answered{{Path: "branches", Values: []string{"feat/x"}}},
 			// the env strategy settles where the new worktree's .env comes from: a plan made before no longer holds
@@ -452,10 +467,16 @@ func pushOnOrigin(t *testing.T, main, name string) {
 }
 
 // reads are the commands of the catalogue that change nothing.
-var reads = []string{"list", "resolve", "status", "tree", "run-logs", "run-ps", "run-list", "env-show", "daemon-status"}
+var reads = []string{"list", "resolve", "status", "tree", "run-logs", "run-ps", "run-list", "env-show", "daemon-status", "config-show"}
 
 // machine are the commands on wtm's daemon, the machine's one: they run on no repository, so wire.go builds none of them per repository and none refuses a directory with no wtm config.
 var machine = []string{"daemon-status", "daemon-stop", "daemon-restart", "daemon-stop-jobs"}
+
+// terminal are the commands only a terminal runs: out of the catalogue, since no surface but the command line has the user's editor.
+var terminal = []string{"configedit"}
+
+// asksNothing are the commands of the catalogue whose form has no field, besides those of the machine.
+var asksNothing = []string{"config-show"}
 
 // streamsListed are the commands that stream rather than return: out of the catalogue's contract, each a stream of catalogue.go's streams.
 var streamsListed = []string{"events"}

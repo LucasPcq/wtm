@@ -1,0 +1,6 @@
+
+  ✗ config.toml holds a setting wtm can't use: kept as edited
+  ! env.strategy must be one of example, main, parent, none, not copy
+
+  → wtm config-edit   fix it
+

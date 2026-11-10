@@ -1,0 +1,11 @@
+--- config.toml before
++++ config.toml after
+@@ -15,7 +15,7 @@
+ #   example — copy .env.example and rename to .env
+ #   main    — copy .env from the main checkout
+ #   parent  — copy .env from the source worktree
+-strategy = "example"
++strategy = "main"
+ 
+ # Each value file to provision, with its committed template (if any).
+ 

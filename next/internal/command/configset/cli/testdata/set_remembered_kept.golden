@@ -1,0 +1,10 @@
+
+  set · dry run, nothing applied
+  Worktrees folder  ../wt
+
+  ! wizard.remembered.env_strategy cannot remember copy: it is none of config, example, main, parent
+
+  fingerprint  5a5ed84cc95d2749dee10fd3
+  → wtm-next set --base-path ../wt --expect-fingerprint 5a5ed84cc95d2749dee10fd3   apply this plan
+  → wtm config-edit   fix it in your editor
+

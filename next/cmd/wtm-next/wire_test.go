@@ -183,7 +183,7 @@ func TestEveryFollowUpIsSpelledWhole(t *testing.T) {
 		"env":                {followUp: *fixes[1].Fix, argv: []string{"wtm-next", "env", "feat/a"}},
 		"env_example":        {followUp: *fixes[2].Fix, argv: []string{"wtm-next", "env", "feat/a", "--from", "example"}},
 		"env_main":           {followUp: *fixes[3].Fix, argv: []string{"wtm-next", "env", "feat/a", "--from", "main"}},
-		"config_edit":        {followUp: *fixes[4].Fix, argv: []string{"wtm", "config", "edit"}},
+		"config_edit":        {followUp: *fixes[4].Fix, argv: []string{"wtm-next", "config", "edit"}},
 		"isolation":          {followUp: *fixes[5].Fix, argv: []string{"wtm-next", "env", "feat/a", "--isolation", "isolated"}},
 		"run_start":          {followUp: *fixes[6].Fix, argv: []string{"wtm-next", "run", "start", "feat/a", "--detach", "--job", "api"}},
 		"shared":             {followUp: *fixes[7].Fix, argv: []string{"wtm-next", "run", "start", "main", "--detach", "--job", "db"}},

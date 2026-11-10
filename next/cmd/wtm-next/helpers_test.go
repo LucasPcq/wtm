@@ -36,6 +36,8 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/webserver"
 	"github.com/LucasPcq/wtm/next/internal/api"
 	"github.com/LucasPcq/wtm/next/internal/command/checkout"
+	"github.com/LucasPcq/wtm/next/internal/command/configedit"
+	configeditcli "github.com/LucasPcq/wtm/next/internal/command/configedit/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/command/daemonrestart"
 	"github.com/LucasPcq/wtm/next/internal/command/envshow"
@@ -1015,6 +1017,8 @@ func spelling(command string) string {
 		return runstopcli.Use
 	case daemonrestart.Name:
 		return daemonrestartcli.Use
+	case configedit.Name:
+		return configeditcli.Use
 	}
 	return command
 }

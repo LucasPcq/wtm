@@ -1,0 +1,25 @@
+
+  Read the project's config.toml as a document: where new worktrees go and the
+  branch they start from, where their .env files come from and which, the commands
+  run when one is created or removed, and the answers create remembers. Each setting
+  says its value, whether it is the default, what it does and the values it takes.
+
+  A value wtm can't use is a warning on its setting; a file that doesn't parse is
+  refused, with where it stopped. It changes nothing: `wtm config set` changes a
+  setting, `wtm config edit` opens the file in your editor.
+
+  Usage:
+    wtm-next show [flags]
+
+  Examples:
+    wtm config show
+
+    wtm config show --output json
+
+  Flags:
+    -h, --help            help for show
+        --output string   Output format: text or json (default "text")
+
+  Global Flags:
+    -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+

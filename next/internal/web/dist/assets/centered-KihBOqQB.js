@@ -1,0 +1,1 @@
+import{d as e}from"./state-page-Cf7ZIqTi.js";var t=e();function n({children:e}){return(0,t.jsx)(`div`,{className:`flex flex-1 items-center justify-center p-8`,children:e})}export{n as t};

@@ -54,6 +54,8 @@ type Command[R Request[R], Q Questions, O Outcome] struct {
 	Draw       func(w io.Writer, applied O, view output.View) // the outcome of an apply, drawn from view
 	ApplyLabel func(previewed O) string                       // the recap's option that applies, nil for "Yes, apply"
 	Unasked    func(previewed O) bool                         // whether the plan previewed applies without the recap asking to confirm it, nil for never
+	// KeptBy reports whether the field at path, answered by the command line, keeps every step it leaves unanswered (config set changes only the settings given); nil for none.
+	KeptBy func(path string) bool
 	// Special returns the step a command asks its own way for the field at, nil for the step of the field's kind.
 	Special func(s *Session[R, Q, O], at int, field domain.Field) Step
 	// Skipped words why a step is not asked the command's own way, empty for the wizard's words.
@@ -511,6 +513,14 @@ func csvField(value string) string {
 // flagWords are the words that give field its values: a switch as --name or --name=false, a list as one flag per value, any other as the flag then its value.
 func flagWords(field worded, values []string) []string {
 	name := "--" + flagName(field)
+	switch field.Field.(type) {
+	case domain.MultiSelectField, domain.TextListField, domain.HooksField:
+		// a list answered empty is an answer, none, which the flag reads back from an empty value
+		if values != nil && len(values) == 0 {
+			return []string{name + "="}
+		}
+	case domain.ConfirmField, domain.SelectField, domain.TextField:
+	}
 	var words []string
 	for _, value := range values {
 		switch field.Field.(type) {

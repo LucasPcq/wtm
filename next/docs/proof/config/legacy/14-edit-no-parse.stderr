@@ -1,0 +1,3 @@
+
+  ✗ Config no longer valid: project config: parse <SB>/acme/.git/wtm/config.toml: toml: line 40 (last key "hooks.x"): unexpected EOF; expected value
+

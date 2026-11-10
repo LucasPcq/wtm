@@ -583,7 +583,7 @@ type ProblemsParams struct {
 // The commands and the answers of the fixes, as the legacy wtm runs them until they migrate.
 const (
 	commandEnv        = domain.CommandEnv
-	commandConfigEdit = "config edit"
+	commandConfigEdit = domain.CommandConfigEdit
 	commandRunStart   = domain.CommandRunStart
 	pathFrom          = "from"
 	pathJob           = "job"

@@ -1,0 +1,8 @@
+
+  ✓ config set: 1 done
+
+  Worktrees folder  ../wt
+  On create         pnpm install
+
+  → wtm config set --base-path ../acme.trees --on-create= --replaces <DIGEST>   put back what it held
+

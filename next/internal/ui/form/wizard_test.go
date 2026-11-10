@@ -50,6 +50,7 @@ func TestASettledStepIsNotAskedAndSaysWhatSettledIt(t *testing.T) {
 		"a flag":             {Standing: form.Standing{Value: "x", Given: true, Flag: "--first"}, Line: "✓ First: x · --first"},
 		"a remembered value": {Standing: form.Standing{Value: "x", Origin: domain.OriginRemembered}, Line: "✓ First: x · remembered"},
 		"a skip":             {Standing: form.Standing{Skip: "not needed"}, Line: "· First — not needed"},
+		"a kept value":       {Standing: form.Standing{Value: "x", Kept: true}, Line: "✓ First: x · kept"},
 	}
 	for name, c := range cases {
 		f := newFake()
@@ -97,6 +98,28 @@ func TestAnErredStepIsAskedEvenWhenAFlagSettledIt(t *testing.T) {
 	d := open(t, f.script())
 
 	assert.Equal(t, 0, d.Wizard.Current())
+}
+
+func TestAKeptStepTheAnswersGivenMakeInvalidIsAsked(t *testing.T) {
+	f := newFake()
+	f.first.standing = form.Standing{Value: "x", Kept: true, Erred: true}
+	d := open(t, f.script())
+
+	assert.Equal(t, 0, d.Wizard.Current())
+}
+
+// a kept step the answers made invalid, answered then restarted by a stale plan, read "kept" in the trail
+func TestAKeptStepAnsweredReadsAsAnsweredInARestartedForm(t *testing.T) {
+	f := newFake()
+	f.first.standing = form.Standing{Value: "x", Kept: true, Erred: true}
+	d := open(t, f.script())
+	d.Keys("enter")
+	require.Equal(t, 1, d.Wizard.Current())
+
+	f.first.standing = form.Standing{Value: "x", Kept: true}
+	again := start(d.Wizard.Again())
+
+	assert.Contains(t, again.Screen(), "✓ First: x\n")
 }
 
 func TestAKeptDefaultIsItsValueAlone(t *testing.T) {

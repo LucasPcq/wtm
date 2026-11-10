@@ -1,0 +1,3 @@
+
+  ✗ parse <SB>/acme/.git/wtm/config.toml: toml: line 11 (last key "worktrees.base_branch"): expected value but found '\n' instead
+

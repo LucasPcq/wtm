@@ -501,7 +501,7 @@ func TestAMissingEnvFileIsRebuiltFromWhereItCanBe(t *testing.T) {
 		},
 		"nowhere": {
 			strategy: project.EnvExample,
-			message:  ".env is missing, with no copy to rebuild it from and no template: declare it where it exists, or write it by hand", fix: &domain.FollowUp{Command: "config edit", Code: string(status.CodeEnvMissing), Message: "declare where it comes from"},
+			message:  ".env is missing, with no copy to rebuild it from and no template: declare it where it exists, or write it by hand", fix: &domain.FollowUp{Command: domain.CommandConfigEdit, Code: string(status.CodeEnvMissing), Message: "declare where it comes from"},
 		},
 	}
 	for name, c := range cases {

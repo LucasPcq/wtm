@@ -1,0 +1,41 @@
+
+  Change one or more of the project's settings: the folder new worktrees go in,
+  the branch they start from, where their .env files come from and which, the
+  commands run when one is created or removed, and the answers create remembers.
+
+  A setting given replaces config.toml's; the others are kept, and none is asked.
+  With no flag, a terminal asks every setting. A list given replaces
+  the whole list; given empty, it is none. The file is written whole, and refused
+  when it changed on disk since the preview. Its outcome ends on the command that
+  puts back what it changed.
+
+  Usage:
+    wtm-next set [flags]
+
+  Examples:
+    wtm config set --base-path ../wt
+
+    wtm config set --env-strategy main --env-file apps/api/.env --env-file apps/web/.env
+
+    # Forget every remembered answer
+    wtm config set --remembered= --yes
+
+  Flags:
+        --ask                         Ask again the questions this repository remembers an answer to, to change or forget it
+        --base-branch string          The branch new worktrees start from by default
+        --base-path string            Where new worktrees go, relative to the repository; outside it keeps the main checkout clean
+    -n, --dry-run                     Show the plan and its fingerprint, apply nothing
+        --env-file strings            The .env files every new worktree gets
+        --env-strategy string         Where a new worktree's .env files come from: a fresh checkout has none of your local ones
+        --expect-fingerprint string   Apply only if the facts still have this fingerprint, the one --dry-run printed
+    -h, --help                        help for set
+        --on-clean stringArray        Commands run in a worktree before it is removed, such as stopping what it started
+        --on-create stringArray       Commands run in a worktree once it is created, such as installing its dependencies
+        --output string               Output format: text or json (default "text")
+        --remembered strings          The answers create remembers, each question=value; the list replaces config.toml's
+        --replaces string             The digest of the config.toml the change was made on (config show's): refused when the file changed since
+    -y, --yes                         Write without asking
+
+  Global Flags:
+    -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+

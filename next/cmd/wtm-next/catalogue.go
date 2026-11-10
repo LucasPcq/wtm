@@ -6,6 +6,8 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/api"
 	"github.com/LucasPcq/wtm/next/internal/command/checkout"
 	"github.com/LucasPcq/wtm/next/internal/command/clean"
+	"github.com/LucasPcq/wtm/next/internal/command/configset"
+	"github.com/LucasPcq/wtm/next/internal/command/configshow"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	"github.com/LucasPcq/wtm/next/internal/command/daemonrestart"
 	"github.com/LucasPcq/wtm/next/internal/command/daemonstatus"
@@ -66,6 +68,8 @@ func catalogue() api.Catalogue {
 		api.Bind(daemonstop.Name, openDaemonStop, daemonstop.UseCase.Questions, daemonstop.UseCase.Run),
 		api.Bind(daemonrestart.Name, openDaemonRestart, daemonrestart.UseCase.Questions, daemonrestart.UseCase.Run),
 		api.Bind(daemonstopjobs.Name, openDaemonStopJobs, daemonstopjobs.UseCase.Questions, daemonstopjobs.UseCase.Run),
+		api.Bind(configshow.Name, openConfigShow, configshow.UseCase.Questions, configshow.UseCase.Run),
+		api.Bind(configset.Name, openConfigSet, configset.UseCase.Questions, configset.UseCase.Run),
 	}
 }
 

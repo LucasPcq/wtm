@@ -37,6 +37,8 @@ $ api $U/api/repos/$A/commands | jq -c ".[] | {name, questions: [.form.fields[]?
 {"name":"daemon-stop","questions":[]}
 {"name":"daemon-restart","questions":["force"]}
 {"name":"daemon-stop-jobs","questions":["repo"]}
+{"name":"config-show","questions":[]}
+{"name":"config-set","questions":["base_path","base_branch","env_strategy","env_files","on_create","on_clean","remembered","replaces"]}
 
 $ api -X POST $C/questions -d '{"answers":[{"path":"branches","values":["feat/x"]}]}' | jq -c '.fields[] | {path, value, entries}'
 {"path":"branches","value":null,"entries":["feat/x"]}

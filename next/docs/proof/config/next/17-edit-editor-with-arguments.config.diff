@@ -1,0 +1,11 @@
+--- config.toml before
++++ config.toml after
+@@ -5,7 +5,7 @@
+ 
+ [worktrees]
+ # Directory where worktrees are created (relative to repo root)
+-base_path = "../acme.trees"
++base_path = "../wt"
+ 
+ # Branch used as the default base for new worktrees
+ base_branch = "main"

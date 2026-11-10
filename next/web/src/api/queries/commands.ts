@@ -6,6 +6,7 @@ import type {
   CheckoutPlan,
   CleanDetail,
   CleanPlan,
+  ConfigshowDetail,
   CreateDetail,
   CreatePlan,
   DaemonrestartDetail,
@@ -52,6 +53,7 @@ type ReadDetail = {
   'run-logs': RunlogsDetail
   'run-ps': RunpsDetail
   'daemon-status': DaemonstatusDetail
+  'config-show': ConfigshowDetail
 }
 export type ReadCommand = keyof ReadDetail
 

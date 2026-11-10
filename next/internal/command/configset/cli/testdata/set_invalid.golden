@@ -1,0 +1,4 @@
+
+  ✗ the request is invalid
+    --base-path must be relative to the repository, not /tmp/wt
+
