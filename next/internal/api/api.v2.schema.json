@@ -4399,20 +4399,20 @@
     "project.ComposeSpan": {
       "additionalProperties": false,
       "properties": {
-        "Column": {
+        "column": {
           "type": "integer"
         },
-        "Line": {
+        "line": {
           "type": "integer"
         },
-        "Text": {
+        "text": {
           "type": "string"
         }
       },
       "required": [
-        "Line",
-        "Column",
-        "Text"
+        "line",
+        "column",
+        "text"
       ],
       "type": "object"
     },
@@ -4499,13 +4499,13 @@
     "project.Place": {
       "additionalProperties": false,
       "properties": {
-        "Dir": {
+        "dir": {
           "type": "string"
         },
-        "Name": {
+        "name": {
           "type": "string"
         },
-        "Scripts": {
+        "scripts": {
           "anyOf": [
             {
               "items": {
@@ -4520,19 +4520,19 @@
         }
       },
       "required": [
-        "Dir",
-        "Name",
-        "Scripts"
+        "dir",
+        "name",
+        "scripts"
       ],
       "type": "object"
     },
     "project.Profile": {
       "additionalProperties": false,
       "properties": {
-        "Default": {
+        "default": {
           "type": "boolean"
         },
-        "Jobs": {
+        "jobs": {
           "anyOf": [
             {
               "items": {
@@ -4545,30 +4545,30 @@
             }
           ]
         },
-        "Name": {
+        "name": {
           "type": "string"
         }
       },
       "required": [
-        "Name",
-        "Jobs",
-        "Default"
+        "name",
+        "jobs",
+        "default"
       ],
       "type": "object"
     },
     "project.Script": {
       "additionalProperties": false,
       "properties": {
-        "Cmd": {
+        "cmd": {
           "type": "string"
         },
-        "Name": {
+        "name": {
           "type": "string"
         }
       },
       "required": [
-        "Name",
-        "Cmd"
+        "name",
+        "cmd"
       ],
       "type": "object"
     },

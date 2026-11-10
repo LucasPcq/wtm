@@ -53,9 +53,9 @@ type ComposeName struct {
 
 // ComposeSpan is a value written in a docker compose file: its line and column (from 1), and its text exactly as written there, quotes included.
 type ComposeSpan struct {
-	Line   int
-	Column int
-	Text   string
+	Line   int    `json:"line"`
+	Column int    `json:"column"`
+	Text   string `json:"text"`
 }
 
 // ComposeEdit replaces the value written at At with New.

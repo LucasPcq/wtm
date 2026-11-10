@@ -18,12 +18,12 @@
       "services": [],
       "places": [
         {
-          "Dir": ".",
-          "Name": "web",
-          "Scripts": [
+          "dir": ".",
+          "name": "web",
+          "scripts": [
             {
-              "Name": "dev",
-              "Cmd": "vite"
+              "name": "dev",
+              "cmd": "vite"
             }
           ]
         }
@@ -134,11 +134,11 @@
         }
       ],
       "up": {
-        "Name": "all",
-        "Jobs": [
+        "name": "all",
+        "jobs": [
           "web"
         ],
-        "Default": true
+        "default": true
       }
     },
     "recap": [

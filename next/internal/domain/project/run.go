@@ -105,9 +105,9 @@ type Namespace struct {
 
 // Profile is a named set of jobs started together; Default marks the one started when none is named.
 type Profile struct {
-	Name    string
-	Jobs    []string
-	Default bool
+	Name    string   `json:"name"`
+	Jobs    []string `json:"jobs"`
+	Default bool     `json:"default"`
 }
 
 // EnvPortLink sets Key of the .env file File to the port named Port of the job Job.

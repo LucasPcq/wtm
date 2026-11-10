@@ -11,15 +11,15 @@ type Workspace struct {
 
 // Place is a folder of the repository holding a package.json: its path relative to the repository ("." for the root), its package's name without its scope, and its scripts, sorted by name.
 type Place struct {
-	Dir     string
-	Name    string
-	Scripts []Script
+	Dir     string   `json:"dir"`
+	Name    string   `json:"name"`
+	Scripts []Script `json:"scripts"`
 }
 
 // Script is a script of a package.json: its name and the command it runs.
 type Script struct {
-	Name string
-	Cmd  string
+	Name string `json:"name"`
+	Cmd  string `json:"cmd"`
 }
 
 // ManagerOf is the package manager a packageManager field names ("pnpm@9.12.0" is pnpm), and whether it names one.

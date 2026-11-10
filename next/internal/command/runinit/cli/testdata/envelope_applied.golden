@@ -51,82 +51,82 @@
       ],
       "places": [
         {
-          "Dir": ".",
-          "Name": "acme",
-          "Scripts": [
+          "dir": ".",
+          "name": "acme",
+          "scripts": [
             {
-              "Name": "build",
-              "Cmd": "turbo run build"
+              "name": "build",
+              "cmd": "turbo run build"
             },
             {
-              "Name": "dev",
-              "Cmd": "turbo run dev"
+              "name": "dev",
+              "cmd": "turbo run dev"
             }
           ]
         },
         {
-          "Dir": "apps/admin",
-          "Name": "admin",
-          "Scripts": [
+          "dir": "apps/admin",
+          "name": "admin",
+          "scripts": [
             {
-              "Name": "build",
-              "Cmd": "next build"
+              "name": "build",
+              "cmd": "next build"
             },
             {
-              "Name": "dev",
-              "Cmd": "next dev -p 3001"
+              "name": "dev",
+              "cmd": "next dev -p 3001"
             }
           ]
         },
         {
-          "Dir": "apps/api",
-          "Name": "api",
-          "Scripts": [
+          "dir": "apps/api",
+          "name": "api",
+          "scripts": [
             {
-              "Name": "build",
-              "Cmd": "tsc"
+              "name": "build",
+              "cmd": "tsc"
             },
             {
-              "Name": "dev",
-              "Cmd": "tsx watch src/server.ts"
+              "name": "dev",
+              "cmd": "tsx watch src/server.ts"
             }
           ]
         },
         {
-          "Dir": "apps/web",
-          "Name": "web",
-          "Scripts": [
+          "dir": "apps/web",
+          "name": "web",
+          "scripts": [
             {
-              "Name": "build",
-              "Cmd": "next build"
+              "name": "build",
+              "cmd": "next build"
             },
             {
-              "Name": "dev",
-              "Cmd": "next dev"
+              "name": "dev",
+              "cmd": "next dev"
             }
           ]
         },
         {
-          "Dir": "apps/worker",
-          "Name": "worker",
-          "Scripts": [
+          "dir": "apps/worker",
+          "name": "worker",
+          "scripts": [
             {
-              "Name": "start",
-              "Cmd": "tsx watch src/worker.ts"
+              "name": "start",
+              "cmd": "tsx watch src/worker.ts"
             }
           ]
         },
         {
-          "Dir": "packages/db",
-          "Name": "db",
-          "Scripts": [
+          "dir": "packages/db",
+          "name": "db",
+          "scripts": [
             {
-              "Name": "migrate",
-              "Cmd": "prisma migrate deploy"
+              "name": "migrate",
+              "cmd": "prisma migrate deploy"
             },
             {
-              "Name": "seed",
-              "Cmd": "tsx seed.ts"
+              "name": "seed",
+              "cmd": "tsx seed.ts"
             }
           ]
         }
@@ -567,8 +567,8 @@
         }
       ],
       "up": {
-        "Name": "all",
-        "Jobs": [
+        "name": "all",
+        "jobs": [
           "postgres",
           "redis",
           "mailpit",
@@ -579,7 +579,7 @@
           "migrate",
           "seed"
         ],
-        "Default": true
+        "default": true
       }
     },
     "recap": [

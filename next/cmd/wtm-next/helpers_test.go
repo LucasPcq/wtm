@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"go/constant"
 	"go/importer"
 	"go/parser"
@@ -1020,4 +1021,28 @@ func spelling(command string) string {
 		return daemonrestartcli.Use
 	}
 	return command
+}
+
+var snakeCase = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
+
+// propertiesNotSnakeCase is the path of every property of node, at any depth, whose name is not snake_case.
+func propertiesNotSnakeCase(node any, at string) []string {
+	var found []string
+	switch n := node.(type) {
+	case map[string]any:
+		properties, _ := n["properties"].(map[string]any)
+		for name := range properties {
+			if !snakeCase.MatchString(name) {
+				found = append(found, at+"/properties/"+name)
+			}
+		}
+		for key, child := range n {
+			found = append(found, propertiesNotSnakeCase(child, at+"/"+key)...)
+		}
+	case []any:
+		for i, child := range n {
+			found = append(found, propertiesNotSnakeCase(child, fmt.Sprintf("%s/%d", at, i))...)
+		}
+	}
+	return found
 }
