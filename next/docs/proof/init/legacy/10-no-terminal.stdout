@@ -1,0 +1,15 @@
+
+   ✓ Project ready                                                            
+                                                                              
+  Created .git/wtm/config.toml                                                
+                                                                              
+  base_path     ../.trees                                                     
+  base_branch   main                                                          
+  env_strategy  example                                                       
+  on_create     pnpm install                                                  
+                                                                              
+  Next steps                                                                  
+    → wtm create <branch>   create a worktree to get started                  
+    → wtm relocate          adopt & align pre-existing worktrees              
+    → wtm run init          configure per-worktree services                   
+

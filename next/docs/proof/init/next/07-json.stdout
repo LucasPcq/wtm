@@ -1,0 +1,138 @@
+{
+  "v": 2,
+  "command": "init",
+  "ok": true,
+  "op": "<OP>",
+  "items": [
+    {
+      "subject": "<SB>/acme/.git/wtm/config.toml",
+      "status": "done",
+      "reason": "unchanged",
+      "detail": {
+        "path": "<SB>/acme/.git/wtm/config.toml",
+        "created": false
+      }
+    }
+  ],
+  "plan": {
+    "path": "<SB>/acme/.git/wtm/config.toml",
+    "created": false,
+    "settings": {
+      "base_path": "../.trees",
+      "base_branch": "develop",
+      "env_strategy": "example",
+      "env_files": [
+        {
+          "target": "apps/api/.env",
+          "template": "apps/api/.env.example"
+        }
+      ],
+      "on_create": [
+        {
+          "cmd": "pnpm install"
+        }
+      ],
+      "on_clean": [
+        {
+          "cmd": "make down"
+        }
+      ]
+    },
+    "changed": null,
+    "recap": [
+      {
+        "key": "base_path",
+        "label": "Worktrees folder",
+        "path": "base_path",
+        "values": [
+          {
+            "value": "../.trees",
+            "text": "../.trees"
+          }
+        ]
+      },
+      {
+        "key": "base_branch",
+        "label": "Base branch",
+        "path": "base_branch",
+        "values": [
+          {
+            "value": "develop",
+            "text": "develop"
+          }
+        ]
+      },
+      {
+        "key": "env_strategy",
+        "label": ".env from",
+        "path": "env_strategy",
+        "values": [
+          {
+            "value": "example",
+            "text": "example"
+          }
+        ]
+      },
+      {
+        "key": "env_files",
+        "label": ".env files",
+        "path": "env_files",
+        "values": [
+          {
+            "value": "apps/api/.env",
+            "text": "apps/api/.env"
+          }
+        ]
+      },
+      {
+        "key": "on_create",
+        "label": "On create",
+        "path": "on_create",
+        "values": [
+          {
+            "value": "pnpm install",
+            "text": "pnpm install"
+          }
+        ]
+      },
+      {
+        "key": "on_clean",
+        "label": "On clean",
+        "path": "on_clean",
+        "values": [
+          {
+            "value": "make down",
+            "text": "make down"
+          }
+        ]
+      },
+      {
+        "key": "file",
+        "label": "Settings file",
+        "values": [
+          {
+            "value": "<SB>/acme/.git/wtm/config.toml",
+            "text": ".git/wtm/config.toml"
+          }
+        ]
+      }
+    ],
+    "empty": true
+  },
+  "follow_ups": [
+    {
+      "command": "create",
+      "code": "init.create",
+      "message": "create a worktree to get started"
+    },
+    {
+      "command": "relocate",
+      "code": "init.relocate",
+      "message": "move the worktrees made elsewhere into the folder",
+      "params": {
+        "count": "1"
+      }
+    }
+  ],
+  "warnings": []
+}

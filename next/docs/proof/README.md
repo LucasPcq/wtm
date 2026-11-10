@@ -24,6 +24,7 @@ sandboxes=$(./create.sh "$wtm" "$next" create)   # the sandboxes it leaves behin
 ./sync.sh "$wtm" "$next" sync
 ./exec.sh "$wtm" "$next" exec
 ./reparent.sh "$wtm" "$next" reparent
+./init.sh "$wtm" "$next" init
 ./checkout.sh "$wtm" "$next" checkout
 ./ui.sh "$next" ui
 other=$(mktemp -d)/wtm-next && (cd ../../.. && go build -ldflags "-X main.version=0.31.0-other" -o "$other" ./next/cmd/wtm-next)
@@ -892,3 +893,30 @@ The reference is the legacy `wtm run ps` and `wtm run list` of 0.30.1. next spea
   - **A newer wtm's index is a warning of each read** (17, 18), `<command>.index_frozen`; legacy boxes it in `run daemon status` alone.
   - **New in next**: `daemon stop-jobs` (14–16), the web's "Stop every job": every job of every repository, or of one with `--repo`, the daemon and its proxy left up.
 
+
+# Proof: `wtm init` (legacy `surface/cli/initcmd`) vs `wtm-next init`
+
+The reference is the legacy `wtm init` of 0.30.1. Next's init writes the same config.toml (the template is the legacy's), so the proof compares the files each leaves, and the legacy binary reads every config.toml next wrote (`<scenario>.legacy-loads.exit`, 0 each time).
+
+- `init.sh <wtm> <wtm-next> init`: two identical sandboxes (the `docs/demos` "acme" project, its config.toml and registration removed, a `pnpm-lock.yaml` and a `docker-compose.yml` added, a branch `develop`, a worktree `feat/old` made by git outside any folder), the same scenarios run by each binary without a terminal; after each, the exit code, stdout, stderr and the state (config.toml, the repositories registered). `init/states.diff` holds the differences of state.
+  1. `--yes --dry-run`
+  2. a first init, `--yes`
+  3. the same again
+  4. `--base-branch develop --yes`
+  5. the web's .env file removed from config.toml by hand, then legacy `--only env --yes`, next `--yes`
+  6. legacy `--only hooks --yes --clean-command "make down"`, next `--yes --on-clean "make down"`
+  7. `--yes --output json`
+  8. `--yes --env-strategy copy`
+  9. config.toml removed, then legacy `--yes --skip-env --skip-hooks --skip-clean`, next `--yes --env-strategy none --on-create= --on-clean=`
+  10. config.toml removed, then `init` with no flag and no terminal
+  11. legacy `--yes --install-command "pnpm install && pnpm db:generate"`, next `--yes --on-create "pnpm install" --on-create '{"cmd": "pnpm db:generate", "cwd": "apps/api", "continue_on_error": true}'`
+  12. outside any repository
+- Then the wizard in tmux at 100×40 (`tty/legacy`, `tty/next`): a first init through every step, then the web's .env file removed by hand and a re-init (legacy `--only env,hooks`), its .env step showing that file listed and unpicked on both sides.
+- The differences, all approved by the owner (LUC-332):
+  - **No global config** (D1): next asks no shell and writes no global config; `--shell` is gone (the global `shell` is read by nothing).
+  - **Init on a repository set up is its re-init** (D2, 3, 4): legacy says `= …config.toml already exists.` and drops every flag given (bug 2: 4 leaves `base_branch = "main"`); next sets it up again from config.toml, each flag changing its own setting, nothing given writing nothing (`= init: 1 unchanged`). `--only` is gone.
+  - **The flags follow the document** (D3): `--env-strategy none` replaces `--skip-env`; `--on-create`/`--on-clean`, repeatable, each a command or a JSON hook, replace `--install-command`, `--clean-command`, `--skip-hooks`, `--skip-clean`; `--env-file` is new. Legacy cannot write a hook in a folder (11: one command at the root).
+  - **A re-init never brings back what the user removed** (bug 1, 5): legacy's `--only env --yes` rebuilt the list from what it found and wrote the web's .env back; next keeps config.toml's list.
+  - **Detection** (D6): next also proposes `docker compose down` before a removal when a compose file sits at the root (2: legacy's `on_clean` is empty), and reads package.json's `packageManager` before the lockfiles.
+  - **A recap and a confirm on the first init too** (D5, bug 7): legacy writes a first init without one (`tty/legacy/5-outcome.txt`), next shows `tty/next/5-recap.txt`.
+  - **The uniform system**: the v2 envelope (7, legacy refuses `--output json`, exit 2) and dry run (1, exit 2 on legacy); an invalid value is an invalid request naming its flag, exit 2 (8: next refuses `copy`; legacy, set up already, says it exists and exits 0, and refuses `copy` with exit 1 on a first init, bug 3); outside a repository `not a git repository`, exit 21 (12, legacy exit 1 with git's error, bug 5); the trail names each step once (bug 4: legacy's "Post-create hooks" twice, "1 files selected"); `relocate` follows up only while a worktree sits outside the folder (bug 6), and `run init` only while run.toml declares nothing (the demo's does, so next does not offer it).

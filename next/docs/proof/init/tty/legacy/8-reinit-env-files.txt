@@ -1,0 +1,13 @@
+$ wtm init --only env,hooks; echo EXIT=$?
+
+  Step 2/5 • Env files to copy
+
+  ✓ Env strategy: example
+
+  ┃  Which of the detected .env files wtm should copy into every new worktree.
+
+▌ [✓] apps/api/.env ← apps/api/.env.example
+  [ ] apps/web/.env ← apps/web/.env.example
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc back
+

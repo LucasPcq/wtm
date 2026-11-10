@@ -1,0 +1,16 @@
+$ wtm init; echo EXIT=$?
+
+  Step 5/9 • Env files to copy
+
+  ✓ Worktree directory: ../.trees (default)
+  ✓ Base branch: main
+  ✓ Environment files: configured
+  ✓ Env strategy: example
+
+  ┃  Which of the detected .env files wtm should copy into every new worktree.
+
+▌ [✓] apps/api/.env ← apps/api/.env.example
+  [✓] apps/web/.env ← apps/web/.env.example
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc back
+

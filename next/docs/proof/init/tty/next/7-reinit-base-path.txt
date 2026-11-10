@@ -1,0 +1,10 @@
+$ wtm init; echo EXIT=$?
+
+  Step 1/7 • Worktrees folder
+
+  Where new worktrees go, relative to the repository; outside it keeps the main checkout clean
+
+› ../.trees
+
+  enter confirm • esc cancel
+

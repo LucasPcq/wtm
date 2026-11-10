@@ -1,0 +1,213 @@
+=== 00-before: exit legacy , next 
+=== 01-dry-run: exit legacy 2, next 0
+=== 02-first: exit legacy 0, next 0
+--- legacy/02-first
++++ next/02-first
+@@ -38,6 +38,7 @@
+ # resources like Docker). A non-zero exit aborts the removal unless the entry
+ # sets continue_on_error.
+ on_clean = [
++  "docker compose down",
+ ]
+ ## repos.json
+ "root": "<SB>/acme"
+=== 03-again: exit legacy 0, next 0
+--- legacy/03-again
++++ next/03-again
+@@ -38,6 +38,7 @@
+ # resources like Docker). A non-zero exit aborts the removal unless the entry
+ # sets continue_on_error.
+ on_clean = [
++  "docker compose down",
+ ]
+ ## repos.json
+ "root": "<SB>/acme"
+=== 04-base-branch: exit legacy 0, next 0
+--- legacy/04-base-branch
++++ next/04-base-branch
+@@ -9,7 +9,7 @@
+ base_path = "../.trees"
+ 
+ # Branch used as the default base for new worktrees
+-base_branch = "main"
++base_branch = "develop"
+ 
+ [env]
+ # Strategy for provisioning .env files in new worktrees:
+@@ -38,6 +38,7 @@
+ # resources like Docker). A non-zero exit aborts the removal unless the entry
+ # sets continue_on_error.
+ on_clean = [
++  "docker compose down",
+ ]
+ ## repos.json
+ "root": "<SB>/acme"
+=== 05-removed-file: exit legacy 0, next 0
+--- legacy/05-removed-file
++++ next/05-removed-file
+@@ -9,7 +9,7 @@
+ base_path = "../.trees"
+ 
+ # Branch used as the default base for new worktrees
+-base_branch = "main"
++base_branch = "develop"
+ 
+ [env]
+ # Strategy for provisioning .env files in new worktrees:
+@@ -24,9 +24,6 @@
+ target = "apps/api/.env"
+ template = "apps/api/.env.example"
+ 
+-[[env.file]]
+-target = "apps/web/.env"
+-template = "apps/web/.env.example"
+ 
+ [hooks]
+ # Commands run after creating a new worktree
+@@ -38,6 +35,7 @@
+ # resources like Docker). A non-zero exit aborts the removal unless the entry
+ # sets continue_on_error.
+ on_clean = [
++  "docker compose down",
+ ]
+ ## repos.json
+ "root": "<SB>/acme"
+=== 06-on-clean: exit legacy 0, next 0
+--- legacy/06-on-clean
++++ next/06-on-clean
+@@ -9,7 +9,7 @@
+ base_path = "../.trees"
+ 
+ # Branch used as the default base for new worktrees
+-base_branch = "main"
++base_branch = "develop"
+ 
+ [env]
+ # Strategy for provisioning .env files in new worktrees:
+@@ -24,10 +24,6 @@
+ target = "apps/api/.env"
+ template = "apps/api/.env.example"
+ 
+-[[env.file]]
+-target = "apps/web/.env"
+-template = "apps/web/.env.example"
+-
+ [hooks]
+ # Commands run after creating a new worktree
+ on_create = [
+=== 07-json: exit legacy 2, next 0
+--- legacy/07-json
++++ next/07-json
+@@ -9,7 +9,7 @@
+ base_path = "../.trees"
+ 
+ # Branch used as the default base for new worktrees
+-base_branch = "main"
++base_branch = "develop"
+ 
+ [env]
+ # Strategy for provisioning .env files in new worktrees:
+@@ -24,10 +24,6 @@
+ target = "apps/api/.env"
+ template = "apps/api/.env.example"
+ 
+-[[env.file]]
+-target = "apps/web/.env"
+-template = "apps/web/.env.example"
+-
+ [hooks]
+ # Commands run after creating a new worktree
+ on_create = [
+=== 08-invalid: exit legacy 0, next 2
+--- legacy/08-invalid
++++ next/08-invalid
+@@ -9,7 +9,7 @@
+ base_path = "../.trees"
+ 
+ # Branch used as the default base for new worktrees
+-base_branch = "main"
++base_branch = "develop"
+ 
+ [env]
+ # Strategy for provisioning .env files in new worktrees:
+@@ -24,10 +24,6 @@
+ target = "apps/api/.env"
+ template = "apps/api/.env.example"
+ 
+-[[env.file]]
+-target = "apps/web/.env"
+-template = "apps/web/.env.example"
+-
+ [hooks]
+ # Commands run after creating a new worktree
+ on_create = [
+=== 09-none: exit legacy 0, next 0
+--- legacy/09-none
++++ next/09-none
+@@ -25,15 +25,13 @@
+ 
+ [hooks]
+ # Commands run after creating a new worktree
+-# Skipped during init. Add setup commands to run on worktree creation, e.g.:
+-#   on_create = ["pnpm install"]
+-on_create = []
++on_create = [
++]
+ 
+ # Commands run right before removing a worktree (e.g. tear down external
+ # resources like Docker). A non-zero exit aborts the removal unless the entry
+ # sets continue_on_error.
+-# Skipped during init. Add teardown commands to run before removal, e.g.:
+-#   on_clean = ["docker compose down"]
+-on_clean = []
++on_clean = [
++]
+ ## repos.json
+ "root": "<SB>/acme"
+=== 10-no-terminal: exit legacy 0, next 0
+--- legacy/10-no-terminal
++++ next/10-no-terminal
+@@ -38,6 +38,7 @@
+ # resources like Docker). A non-zero exit aborts the removal unless the entry
+ # sets continue_on_error.
+ on_clean = [
++  "docker compose down",
+ ]
+ ## repos.json
+ "root": "<SB>/acme"
+=== 11-hook-in-folder: exit legacy 0, next 0
+--- legacy/11-hook-in-folder
++++ next/11-hook-in-folder
+@@ -32,12 +32,14 @@
+ # Commands run after creating a new worktree
+ on_create = [
+   "pnpm install",
++  { cmd = "pnpm db:generate", cwd = "apps/api", continue_on_error = true },
+ ]
+ 
+ # Commands run right before removing a worktree (e.g. tear down external
+ # resources like Docker). A non-zero exit aborts the removal unless the entry
+ # sets continue_on_error.
+ on_clean = [
++  "docker compose down",
+ ]
+ ## repos.json
+ "root": "<SB>/acme"
+=== 12-outside-a-repository: exit legacy 1, next 21
+--- legacy/12-outside-a-repository
++++ next/12-outside-a-repository
+@@ -32,12 +32,14 @@
+ # Commands run after creating a new worktree
+ on_create = [
+   "pnpm install",
++  { cmd = "pnpm db:generate", cwd = "apps/api", continue_on_error = true },
+ ]
+ 
+ # Commands run right before removing a worktree (e.g. tear down external
+ # resources like Docker). A non-zero exit aborts the removal unless the entry
+ # sets continue_on_error.
+ on_clean = [
++  "docker compose down",
+ ]
+ ## repos.json
+ "root": "<SB>/acme"
