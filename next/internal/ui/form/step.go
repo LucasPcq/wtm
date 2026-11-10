@@ -45,7 +45,7 @@ type Standing struct {
 	Skip   domain.Skip   // why the step does not apply, if it does not: the step is not asked, whether worded or not
 	Reason string        // how the trail words Skip
 	Erred  bool          // reports whether Value is refused, so the step is asked even when a flag set it
-	Kept   bool          // reports whether Value is kept unasked, the command line having answered other steps of a command that asks only what it is given
+	Kept   bool          // reports whether Value is kept unasked, the command line having answered other steps of a command that asks only what it is given; asked still when Erred
 }
 
 // A mark is how the wizard settled a step: asked, ruled out with a reason, or settled with the line the trail shows.
@@ -61,10 +61,10 @@ func decided(st Standing, answered bool) mark {
 	switch {
 	case st.Skip != "":
 		return mark{ruled: cmp.Or(st.Reason, string(st.Skip))}
-	case st.Kept:
-		return mark{line: value + trail + kept}
 	case st.Erred:
 		return mark{asked: true}
+	case st.Kept:
+		return mark{line: value + trail + kept}
 	case st.Given && st.Flag != "":
 		return mark{line: value + trail + st.Flag}
 	case st.Given:

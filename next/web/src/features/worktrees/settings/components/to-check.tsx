@@ -26,7 +26,7 @@ export function ToCheck({ problems }: { problems: (DomainFieldError & { setting:
                 <span className="font-medium">{settingWords[problem.setting].label}</span>
                 <span className="text-muted-foreground"> · {fact}</span>
               </p>
-              <p className="col-start-2 text-xs text-muted-foreground">{consequence}</p>
+              {consequence && <p className="col-start-2 text-xs text-muted-foreground">{consequence}</p>}
             </div>
           )
         })}

@@ -42,6 +42,12 @@
         {
           "path": "on_clean",
           "values": []
+        },
+        {
+          "path": "replaces",
+          "values": [
+            "<id>"
+          ]
         }
       ],
       "code": "config-set.undo",

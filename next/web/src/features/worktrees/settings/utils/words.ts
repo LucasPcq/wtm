@@ -27,7 +27,11 @@ export const isSectionId = (id: string): id is SectionId => id in sectionWords
 export const sectionWords: Record<SectionId, { title: string; line: string; icon: LucideIcon }> = {
   worktrees: { title: 'Worktrees', line: 'Where new worktrees go and what they start from.', icon: FolderTree },
   env_files: { title: '.env files', line: 'How a new worktree gets its .env files.', icon: FileKey },
-  hooks: { title: 'Hooks', line: 'Commands wtm runs in a worktree it creates or removes.', icon: SquareTerminal },
+  hooks: {
+    title: 'Hooks',
+    line: 'Commands run in a worktree once it is created or before it is removed.',
+    icon: SquareTerminal,
+  },
 }
 
 export type Strategy = ProjectEnvStrategy | 'none'
@@ -76,12 +80,12 @@ export const rememberedWords: Record<string, { question: string; values: Record<
 
 const problemSuffix = (code: string) => code.slice(code.lastIndexOf('.') + 1)
 
-// the subject's consequence, in the screen's words where it has some; else the core's message
-export function problemLine(problem: DomainFieldError): { fact: string; consequence: string } {
+// the problem in the screen's words where it has some, else the core's message; a consequence only where the screen knows it
+export function problemLine(problem: DomainFieldError): { fact: string; consequence?: string } {
   const value = String(problem.params?.value ?? '')
-  const words: Record<string, () => { fact: string; consequence: string }> = {
+  const words: Record<string, () => { fact: string; consequence?: string }> = {
     one_of: () => ({
-      fact: `“${value}” isn't a strategy wtm knows`,
+      fact: `“${value}” isn't a known strategy`,
       consequence: 'Create refuses until one is chosen below.',
     }),
     base_branch_unknown: () => ({
@@ -94,7 +98,6 @@ export function problemLine(problem: DomainFieldError): { fact: string; conseque
   return (
     words[problemSuffix(problem.code)]?.() ?? {
       fact: problem.message,
-      consequence: 'Create refuses until it is fixed.',
     }
   )
 }

@@ -1,3 +1,4 @@
+import { focusManager } from '@tanstack/react-query'
 import { screen, waitFor, within } from '@testing-library/react'
 import { HttpResponse, http } from 'msw'
 import { expect, test } from 'vitest'
@@ -40,7 +41,10 @@ const setting = (refuse?: (call: WebCall) => DomainError | undefined) => {
       if (refusal) return HttpResponse.json({ v: 2, ok: false, command: 'config-set', error: refusal }, { status: 409 })
       const undo = {
         command: 'config-set',
-        answers: [{ path: 'env_strategy', values: ['example'] }],
+        answers: [
+          { path: 'env_strategy', values: ['example'] },
+          { path: 'replaces', values: ['d2'] },
+        ],
         code: 'config-set.undo',
         message: 'put back what it held',
       }
@@ -72,7 +76,7 @@ test('the document shows each setting, its default and its remembered answers', 
   expect(screen.getByText("Where .env files come from: the parent's")).toBeTruthy()
 })
 
-test('a choice saves at once on the file it was made on, its toast undoes it', async () => {
+test('a choice saves at once on the file it was made on, its toast undoes it on the file it wrote', async () => {
   shows(settingsDetail())
   const calls = setting()
   const { user } = await renderApp('/r/r1/settings')
@@ -89,7 +93,10 @@ test('a choice saves at once on the file it was made on, its toast undoes it', a
   })
   await user.click(await screen.findByRole('button', { name: 'Undo' }))
   await waitFor(() => expect(calls).toHaveLength(4))
-  expect(calls[3]?.answers).toEqual([{ path: 'env_strategy', values: ['example'] }])
+  expect(calls[3]?.answers).toEqual([
+    { path: 'env_strategy', values: ['example'] },
+    { path: 'replaces', values: ['d2'] },
+  ])
 })
 
 test('forgetting a remembered answer keeps the others', async () => {
@@ -163,4 +170,61 @@ test("settings that don't parse say where and offer the edit", async () => {
 
   expect(await screen.findByText("The settings don't parse")).toBeTruthy()
   expect(screen.getByText(/Line 14: “Branch they start from” doesn't parse/)).toBeTruthy()
+})
+
+// the dialog opened again after a hand edit started from the list it had read before: saved over the new file, it
+// dropped the command added by hand
+test('a list changed by hand since the dialog last opened is the one it opens on again', async () => {
+  const onDisk = { digest: 'd1', hooks: [{ cmd: 'pnpm install' }] }
+  const read = () => {
+    const detail = settingsDetail({ digest: onDisk.digest })
+    const fields = detail.settings.fields.map((field) =>
+      field.path === 'on_create' ? { ...field, entries: onDisk.hooks } : field,
+    )
+    return { ...detail, settings: { ...detail.settings, fields } }
+  }
+  const calls: WebCall[] = []
+  server.use(
+    http.post('/api/repos/r1/commands/config-show', () =>
+      HttpResponse.json({
+        v: 2,
+        ok: true,
+        command: 'config-show',
+        warnings: [],
+        follow_ups: [],
+        items: [{ subject: 'config.toml', status: 'done', detail: read() as never }],
+      } satisfies DomainEnvelope),
+    ),
+    http.post('/api/repos/r1/commands/config-set/questions', () =>
+      HttpResponse.json({ fields: read().settings.fields, problems: [] }),
+    ),
+    http.post('/api/repos/r1/commands/config-set', async ({ request }) => {
+      calls.push((await request.json()) as WebCall)
+      return HttpResponse.json({ v: 2, ok: true, command: 'config-set', fingerprint: 'fp', warnings: [], items: [] })
+    }),
+  )
+  const { user } = await renderApp('/r/r1/settings')
+  const change = 'Change the list: When a worktree is created'
+  await user.click(await screen.findByRole('button', { name: change }))
+  await within(await screen.findByRole('dialog')).findByDisplayValue('pnpm install')
+  await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancel' }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
+  onDisk.digest = 'd2'
+  onDisk.hooks = [{ cmd: 'pnpm install' }, { cmd: 'pnpm build' }]
+  focusManager.setFocused(false)
+  focusManager.setFocused(true)
+  expect(await screen.findByText('pnpm build')).toBeTruthy()
+
+  await user.click(screen.getByRole('button', { name: change }))
+  const dialog = await screen.findByRole('dialog')
+  expect(await within(dialog).findByDisplayValue('pnpm build')).toBeTruthy()
+  await user.click(within(dialog).getByRole('button', { name: 'Add a command' }))
+  await user.type(within(dialog).getAllByRole('textbox', { name: 'Command' }).at(-1) as HTMLElement, 'pnpm test')
+  await user.click(within(dialog).getByRole('button', { name: 'Save' }))
+
+  await waitFor(() => expect(calls.some((call) => !call.dry_run)).toBe(true))
+  const sent = calls.find((call) => !call.dry_run)?.answers ?? []
+  expect(sent.find(({ path }) => path === 'replaces')?.values).toEqual(['d2'])
+  expect(JSON.stringify(sent.find(({ path }) => path === 'on_create')?.values)).toContain('pnpm build')
 })

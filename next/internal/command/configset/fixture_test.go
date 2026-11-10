@@ -2,6 +2,7 @@ package configset_test
 
 import (
 	"context"
+	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
@@ -44,3 +45,6 @@ func (branches) Branches(context.Context) (worktree.Branches, error) {
 func detected() project.Detected {
 	return project.Detected{Dirs: []string{"apps", "packages", "packages/db"}}
 }
+
+// noEnv is acme's config.toml with no [env]: no .env file copied.
+var noEnv = strings.Replace(acme, "[env]\nstrategy = \"example\"\n\n[[env.file]]\ntarget = \"apps/api/.env\"\ntemplate = \"apps/api/.env.example\"\n\n[[env.file]]\ntarget = \"apps/web/.env\"\ntemplate = \"apps/web/.env.example\"\n\n", "", 1)

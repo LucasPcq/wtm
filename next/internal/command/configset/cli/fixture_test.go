@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -49,6 +50,7 @@ env_strategy = "parent"
 // A world is a repository whose config.toml a test reads, none when Config is "".
 type world struct {
 	Config string
+	Found  []project.EnvFile // the .env files the repository holds
 }
 
 func (w world) env() uicli.Env {
@@ -63,7 +65,7 @@ func (w world) opener(t *testing.T, dir string) func(context.Context, string) (c
 	return func(context.Context, string) (configset.UseCase, error) {
 		locks := &operationtest.Locks{}
 		ops := operation.Service{Locker: locks, Publisher: locks, NewOpID: func() string { return "op-1" }, Now: time.Now}
-		return configset.UseCase{Settings: settings.Service{Store: config.Project{StateDir: dir}}, Git: branches{}, Detect: func() project.Detected { return project.Detected{Dirs: []string{"packages/db"}} }, Operations: ops, Init: &domain.FollowUp{Command: domain.CommandInit}}, nil
+		return configset.UseCase{Settings: settings.Service{Store: config.Project{StateDir: dir}}, Git: branches{}, Detect: func() project.Detected { return project.Detected{EnvFiles: w.Found, Dirs: []string{"packages/db"}} }, Operations: ops, Init: &domain.FollowUp{Command: domain.CommandInit}}, nil
 	}
 }
 
@@ -73,3 +75,6 @@ type branches struct{}
 func (branches) Branches(context.Context) (worktree.Branches, error) {
 	return worktree.Branches{Local: []worktree.Branch{{Name: "main"}, {Name: "develop"}}}, nil
 }
+
+// noEnv is acme's config.toml with no [env]: no .env file copied, while the repository holds apps/api/.env.
+var noEnv = world{Config: strings.Replace(acme, "[env]\nstrategy = \"example\"\n\n[[env.file]]\ntarget = \"apps/api/.env\"\ntemplate = \"apps/api/.env.example\"\n\n[[env.file]]\ntarget = \"apps/web/.env\"\ntemplate = \"apps/web/.env.example\"\n\n", "", 1), Found: []project.EnvFile{{Target: "apps/api/.env"}}}

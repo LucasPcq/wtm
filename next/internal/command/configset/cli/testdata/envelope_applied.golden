@@ -46,6 +46,12 @@
           "values": [
             "example"
           ]
+        },
+        {
+          "path": "replaces",
+          "values": [
+            "570dad708f30cf2fd8efd2bbecd4375b959e4a18d78bb5ddd188b6a39b6c3320"
+          ]
         }
       ],
       "code": "config-set.undo",

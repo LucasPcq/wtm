@@ -127,6 +127,10 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 
 	result := Result{Items: []Item{item}}
 	if undo := plan.undo(); item.Status == domain.StatusDone && undo != nil {
+		// shortcut: the file is read back after its lock is released, so an edit landing in between is undone over; the store returning the digest it wrote closes it (adapter/config, LUC-332's)
+		if saved, err := u.Settings.Read(); err == nil && saved != nil {
+			undo.Answers = append(undo.Answers, domain.Answered{Path: PathReplaces, Values: []string{saved.Digest}})
+		}
 		result.FollowUps = []domain.FollowUp{*undo}
 	}
 	return result

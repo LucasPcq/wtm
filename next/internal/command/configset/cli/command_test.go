@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/configset"
@@ -66,6 +67,34 @@ func TestAFlagGivenInATerminalChangesItAloneWithoutAskingTheOthers(t *testing.T)
 func TestNoFlagInATerminalAsksEverySetting(t *testing.T) {
 	d := wizard(t, world{Config: acme}, configset.Request{})
 
-	assert.NotContains(t, d.Screen(), "Yes, write config.toml")
+	assert.Contains(t, d.Screen(), "Step 1/9 • Worktrees folder")
 	assert.NotContains(t, d.Screen(), "kept")
+}
+
+// a strategy given over a config.toml that copies no .env file was written with none of the repository's
+func TestAProblemTheFlagCreatesOnAnotherSettingNamesItsFlag(t *testing.T) {
+	got := runSet(t, noEnv, "--env-strategy", "main", "--yes")
+
+	assert.Equal(t, uicli.ExitUsage, got.Code)
+	assert.Contains(t, got.Stderr, "--env-file")
+	assert.Equal(t, noEnv.Config, written(t))
+}
+
+func TestAKeptStepTheFlagMakesInvalidIsAsked(t *testing.T) {
+	d := wizard(t, noEnv, configset.Request{Given: settings.Given{EnvStrategy: "main"}})
+
+	assert.Contains(t, d.Screen(), "Step 4/9")
+	assert.NotContains(t, d.Screen(), "Yes, write config.toml")
+}
+
+func TestAProblemOnDiskOfAKeptStepIsNotAsked(t *testing.T) {
+	d := wizard(t, world{Config: strings.Replace(acme, `strategy = "example"`, `strategy = "copy"`, 1)}, configset.Request{Given: settings.Given{BasePath: "../wt"}})
+
+	assert.Contains(t, d.Screen(), "Yes, write config.toml")
+}
+
+func TestTheFileAChangeIsMadeOnAloneKeepsNoSetting(t *testing.T) {
+	d := wizard(t, world{Config: acme}, configset.Request{Replaces: "d1"})
+
+	assert.Contains(t, d.Screen(), "Step 1/9 • Worktrees folder")
 }

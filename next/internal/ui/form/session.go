@@ -25,6 +25,8 @@ type Session[R Request[R], Q Questions, O Outcome] struct {
 	preview *O
 	outcome O
 	steps   []Step
+	// asked is the problems of the questions with nothing answered, read once when the command asks only what it is given: a kept step is asked only for a problem the answers given make
+	asked []domain.FieldError
 }
 
 // A stepAnswer is what one step answered: its fields' answers, and the path whose answer it remembers or forgets, if any.
@@ -137,7 +139,10 @@ func (s *Session[R, Q, O]) Standing(at int) Standing {
 	spec := field.Spec()
 	st := Standing{Value: trailOf(field, s.Words(at)), Origin: spec.Origin, Skip: spec.Skip, Reason: s.reason(spec.Skip), Erred: len(s.Problems(spec.Path)) > 0}
 	st.Given = s.given.Values(spec.Path) != nil
-	st.Kept = s.command.GivenOnly && s.given.Values(spec.Path) == nil && s.answersAny()
+	st.Kept = s.command.KeptBy != nil && s.given.Values(spec.Path) == nil && s.keeps()
+	if st.Kept {
+		st.Erred = slices.ContainsFunc(s.Problems(spec.Path), func(problem domain.FieldError) bool { return !slices.ContainsFunc(s.asked, problem.Same) })
+	}
 	if st.Given && !positional(worded{Field: field, Words: s.Words(at)}) {
 		st.Flag = s.command.Flags().Spell(spec.Path)
 	}
@@ -145,9 +150,12 @@ func (s *Session[R, Q, O]) Standing(at int) Standing {
 	return st
 }
 
-// answersAny reports whether the request as given answers one of the form's fields, even with an empty list.
-func (s *Session[R, Q, O]) answersAny() bool {
-	return slices.ContainsFunc(s.form.Fields, func(field domain.Field) bool { return s.given.Values(field.Spec().Path) != nil })
+// keeps reports whether the request as given answers, even with an empty list, a field that keeps the steps it leaves unanswered.
+func (s *Session[R, Q, O]) keeps() bool {
+	return slices.ContainsFunc(s.form.Fields, func(field domain.Field) bool {
+		path := field.Spec().Path
+		return s.given.Values(path) != nil && s.command.KeptBy(path)
+	})
 }
 
 // reason is how the trail words why a step is not asked: the command's own words, else the wizard's, else the code.
@@ -242,11 +250,20 @@ func (s *Session[R, Q, O]) rebuild() {
 // observe reads the questions for the request as answered so far.
 func (s *Session[R, Q, O]) observe(ctx context.Context) (func(), error) {
 	questions, err := s.app.Questions(ctx, s.req)
-	return func() {
-		if err == nil {
-			s.q, s.form = questions, questions.Form()
+	if err != nil {
+		return func() {}, err
+	}
+	asked := s.asked
+	if s.command.KeptBy != nil && asked == nil {
+		var none R
+		blank, err := s.app.Questions(ctx, none)
+		if err != nil {
+			return func() {}, err
 		}
-	}, err
+		asked = append([]domain.FieldError{}, blank.Form().Problems...)
+	}
+
+	return func() { s.q, s.form, s.asked = questions, questions.Form(), asked }, nil
 }
 
 // previewPlan dry-runs the request as answered, for the recap to show the plan its apply will be held to.

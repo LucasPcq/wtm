@@ -9,6 +9,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/command/configset"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/service/settings"
 
 	"github.com/stretchr/testify/assert"
@@ -39,7 +40,31 @@ func TestAnAppliedChangeIsFollowedByItsUndo(t *testing.T) {
 	outcome, err := usecase(dir, operations()).Run(t.Context(), req, domain.RunOptions{})
 
 	require.NoError(t, err)
-	assert.Equal(t, []domain.FollowUp{{Command: configset.Name, Answers: []domain.Answered{{Path: settings.PathBasePath, Values: []string{"../.trees"}}}, Code: configset.CodeUndo, Message: "put back what it held"}}, outcome.Result.FollowUps)
+	saved, err := usecase(dir, operations()).Settings.Read()
+	require.NoError(t, err)
+	assert.Equal(t, []domain.FollowUp{{Command: configset.Name, Answers: []domain.Answered{{Path: settings.PathBasePath, Values: []string{"../.trees"}}, {Path: configset.PathReplaces, Values: []string{saved.Digest}}}, Code: configset.CodeUndo, Message: "put back what it held"}}, outcome.Result.FollowUps)
+}
+
+// an Undo clicked after a hand edit wrote the old value over the edit
+func TestAnUndoAfterTheFileChangedIsRefused(t *testing.T) {
+	dir := stateDir(t, acme)
+	u := usecase(dir, operations())
+	outcome, err := u.Run(t.Context(), answered(t, map[string][]string{settings.PathBasePath: {"../wt"}}), domain.RunOptions{})
+	require.NoError(t, err)
+	edited := read(t, dir) + "\n# edited by hand\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "config.toml"), []byte(edited), 0o644))
+	req := configset.Request{}
+	for _, answer := range outcome.Result.FollowUps[0].Answers {
+		req, err = req.Answer(answer.Path, answer.Values)
+		require.NoError(t, err)
+	}
+
+	_, err = u.Run(t.Context(), req, domain.RunOptions{})
+
+	refusal, ok := errors.AsType[*domain.Error](err)
+	require.True(t, ok, "%v", err)
+	assert.Equal(t, configset.CodeChangedOnDisk, refusal.Code)
+	assert.Equal(t, edited, read(t, dir))
 }
 
 func TestTheUndoPutsTheFileBack(t *testing.T) {
@@ -208,4 +233,21 @@ func TestABlankValueIsRefusedNotIgnored(t *testing.T) {
 	require.True(t, ok, "%v", err)
 	require.Len(t, refusal.Fields, 1)
 	assert.Equal(t, domain.CodeRequired, refusal.Fields[0].Code)
+}
+
+// a strategy given over a config.toml that copies no .env file wrote one that copies none of the repository's
+func TestAProblemTheChangeCreatesOnAnotherSettingIsRefused(t *testing.T) {
+	dir := stateDir(t, noEnv)
+	u := usecase(dir, operations())
+	u.Detect = func() project.Detected {
+		return project.Detected{EnvFiles: []project.EnvFile{{Target: "apps/api/.env"}}, Dirs: detected().Dirs}
+	}
+
+	_, err := u.Run(t.Context(), answered(t, map[string][]string{settings.PathEnvStrategy: {"main"}}), domain.RunOptions{})
+
+	refusal, ok := errors.AsType[*domain.Error](err)
+	require.True(t, ok, "%v", err)
+	require.Len(t, refusal.Fields, 1)
+	assert.Equal(t, settings.PathEnvFiles, refusal.Fields[0].Path)
+	assert.Equal(t, noEnv, read(t, dir))
 }

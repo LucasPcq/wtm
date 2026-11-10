@@ -50,7 +50,7 @@ func TestASettledStepIsNotAskedAndSaysWhatSettledIt(t *testing.T) {
 		"a flag":             {Standing: form.Standing{Value: "x", Given: true, Flag: "--first"}, Line: "✓ First: x · --first"},
 		"a remembered value": {Standing: form.Standing{Value: "x", Origin: domain.OriginRemembered}, Line: "✓ First: x · remembered"},
 		"a skip":             {Standing: form.Standing{Skip: "not needed"}, Line: "· First — not needed"},
-		"a kept value":       {Standing: form.Standing{Value: "x", Kept: true, Erred: true}, Line: "✓ First: x · kept"},
+		"a kept value":       {Standing: form.Standing{Value: "x", Kept: true}, Line: "✓ First: x · kept"},
 	}
 	for name, c := range cases {
 		f := newFake()
@@ -95,6 +95,14 @@ func TestATrailLineThatFitsIsDrawnWhole(t *testing.T) {
 func TestAnErredStepIsAskedEvenWhenAFlagSettledIt(t *testing.T) {
 	f := newFake()
 	f.first.standing = form.Standing{Value: "x", Given: true, Flag: "--first", Erred: true}
+	d := open(t, f.script())
+
+	assert.Equal(t, 0, d.Wizard.Current())
+}
+
+func TestAKeptStepTheAnswersGivenMakeInvalidIsAsked(t *testing.T) {
+	f := newFake()
+	f.first.standing = form.Standing{Value: "x", Kept: true, Erred: true}
 	d := open(t, f.script())
 
 	assert.Equal(t, 0, d.Wizard.Current())

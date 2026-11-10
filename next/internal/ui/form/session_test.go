@@ -30,7 +30,7 @@ func TestAStepGivenByAFlagSaysWhichAndOneLeftOpenIsAsked(t *testing.T) {
 
 func TestACommandThatAsksOnlyWhatIsGivenKeepsEveryOtherStepOnceOneIsGiven(t *testing.T) {
 	command := fakeCommand()
-	command.GivenOnly = true
+	command.KeptBy = func(path string) bool { return path != "name" }
 	session := func(given request) *form.Session[request, questions, outcome] {
 		s := command.Session(t.Context(), &app{}, given, domain.RunOptions{})
 		apply, err := s.Observe(t.Context())
@@ -44,6 +44,7 @@ func TestACommandThatAsksOnlyWhatIsGivenKeepsEveryOtherStepOnceOneIsGiven(t *tes
 	assert.True(t, given.Standing(atFiles).Given)
 	assert.False(t, given.Standing(atFiles).Kept)
 	assert.False(t, session(nil).Standing(atKeep).Kept)
+	assert.False(t, session(request{"name": {"x"}}).Standing(atKeep).Kept, "a field that keeps nothing")
 }
 
 func TestAStepARefusedEntryNamesIsErred(t *testing.T) {

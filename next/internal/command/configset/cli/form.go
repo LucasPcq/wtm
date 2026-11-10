@@ -21,6 +21,6 @@ func newForm(open func(ctx context.Context, dir string) (configset.UseCase, erro
 		Preview:    form.PreviewOf[configset.Plan, configset.Detail],
 		Draw:       drawOutcome,
 		ApplyLabel: func(configset.Outcome) string { return "Yes, write config.toml" },
-		GivenOnly:  true,
+		KeptBy:     func(path string) bool { return path != configset.PathReplaces },
 	}
 }

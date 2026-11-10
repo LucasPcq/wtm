@@ -54,8 +54,8 @@ type Command[R Request[R], Q Questions, O Outcome] struct {
 	Draw       func(w io.Writer, applied O, view output.View) // the outcome of an apply, drawn from view
 	ApplyLabel func(previewed O) string                       // the recap's option that applies, nil for "Yes, apply"
 	Unasked    func(previewed O) bool                         // whether the plan previewed applies without the recap asking to confirm it, nil for never
-	// GivenOnly keeps every step the command line leaves unanswered once it answers one: config set changes only the settings given.
-	GivenOnly bool
+	// KeptBy reports whether the field at path, answered by the command line, keeps every step it leaves unanswered (config set changes only the settings given); nil for none.
+	KeptBy func(path string) bool
 	// Special returns the step a command asks its own way for the field at, nil for the step of the field's kind.
 	Special func(s *Session[R, Q, O], at int, field domain.Field) Step
 	// Skipped words why a step is not asked the command's own way, empty for the wizard's words.

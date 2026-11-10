@@ -26,7 +26,7 @@ const (
 	CodeConfigNewer   = Name + ".config_newer"
 )
 
-// Decide turns the request into the plan: config.toml rewritten with each setting given, refused when the file changed since the request was made on it, and with every problem of the settings it changes; a problem another setting holds on disk already is left to its own change.
+// Decide turns the request into the plan: config.toml rewritten with each setting given, refused when the file changed since the request was made on it, and with every problem of the settings it changes or that the change makes; a problem another setting holds on disk already is left to its own change.
 func Decide(facts Facts, req Request) (Plan, error) {
 	if saved := facts.Settings.Saved; saved.Newer() {
 		newer := &domain.SchemaNewer{Path: subject, Found: saved.Schema, Supported: project.ConfigSchema}
@@ -36,12 +36,14 @@ func Decide(facts Facts, req Request) (Plan, error) {
 		return Plan{}, &domain.Error{Kind: domain.KindConflict, Code: CodeChangedOnDisk, Message: "config.toml changed on disk since this change was made: nothing written"}
 	}
 
-	asked := NewQuestions(facts, req)
-	if problems := slices.DeleteFunc(asked.Problems(), func(problem domain.FieldError) bool { return req.Values(fieldOf(problem.Path)) == nil }); len(problems) > 0 {
+	asked, was := NewQuestions(facts, req), NewQuestions(facts, Request{})
+	onDisk := was.Problems()
+	if problems := slices.DeleteFunc(asked.Problems(), func(problem domain.FieldError) bool {
+		return req.Values(fieldOf(problem.Path)) == nil && slices.ContainsFunc(onDisk, problem.Same)
+	}); len(problems) > 0 {
 		return Plan{}, domain.Invalid(problems)
 	}
 
-	was := NewQuestions(facts, Request{})
 	plan := Plan{Changes: []Change{}, rewrite: asked.Questions.Rewrite()}
 	plan.rewrite.Config.Remembered = asked.remembered()
 	plan.Replaces = plan.rewrite.Replaces

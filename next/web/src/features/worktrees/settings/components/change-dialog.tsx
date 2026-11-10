@@ -63,7 +63,8 @@ export function ChangeDialog({
 }
 
 function Change({ repo, editing, onClose }: { repo: string; editing: Editing; onClose: () => void }) {
-  const form = useQuery({ ...questionsQuery(repo, 'config-set'), staleTime: Infinity, refetchOnWindowFocus: false })
+  // asked on the file the dialog opened on: a file changed by hand since is asked again, never read from the cache
+  const form = useQuery(questionsQuery(repo, 'config-set', [{ path: 'replaces', values: [editing.digest] }]))
   const label = settingWords[editing.path].label
 
   return (
@@ -163,7 +164,7 @@ function Editor({
           <Alert
             tone="red"
             title="Written by a newer wtm"
-            description="This wtm reads these settings but can't write them. Upgrade it to change them here."
+            description="These settings can be read here but not changed. Upgrade to change them."
             below={<CopyCommand text="wtm upgrade" />}
           />
         )}
