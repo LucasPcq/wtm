@@ -97,3 +97,17 @@ func TestAFollowUpNamingInitIsSpelledFromItsSchema(t *testing.T) {
 	assert.Equal(t, []string{"wtm-next", "init"}, Line(domain.FollowUp{Command: initialize.Name}))
 	assert.Equal(t, []string{"wtm-next", "init", "--on-clean", "make down"}, Line(domain.FollowUp{Command: initialize.Name, Answers: []domain.Answered{{Path: domain.PathOnClean, Values: []string{"make down"}}}}))
 }
+
+// Review of #282: a strategy no option names, as a hand-edited config.toml holds it, was recapped "main's (was )".
+func TestAStrategyNoOptionNamesIsRecappedAsItIs(t *testing.T) {
+	changed := domain.RecapValue{Value: "main", Note: initialize.NoteChanged, Params: domain.Params{"was": "copy"}}
+	unknown := domain.RecapValue{Value: "copy"}
+	outcome := initialize.Outcome{Plan: initialize.Plan{Recapped: domain.Recapped{Recap: []domain.RecapRow{
+		{Path: domain.PathEnvStrategy, Values: []domain.RecapValue{changed, unknown}},
+	}}}}
+
+	values := worded(outcome).Plan.Recap[0].Values
+
+	assert.Equal(t, "main's (was copy)", values[0].Text)
+	assert.Equal(t, "copy", values[1].Text)
+}

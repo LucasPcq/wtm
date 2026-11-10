@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"io"
 	"slices"
@@ -49,11 +50,13 @@ func worded(outcome initialize.Outcome) initialize.Outcome {
 		if row.Path != domain.PathEnvStrategy {
 			continue
 		}
+		// a value no option names (a hand-edited config.toml's) reads as it is
+		short := func(value string) string { return cmp.Or(said.Options[value].Short, value) }
 		values := slices.Clone(row.Values)
 		for j, value := range values {
-			values[j].Text = said.Options[value.Value].Short
+			values[j].Text = short(value.Value)
 			if was := value.Params["was"]; value.Note == initialize.NoteChanged {
-				values[j].Text += " (was " + said.Options[was].Short + ")"
+				values[j].Text += " (was " + short(was) + ")"
 			}
 		}
 		rows[i].Values = values
