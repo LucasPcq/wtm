@@ -29,11 +29,40 @@ func TestSavedWithoutAConfigIsNotFound(t *testing.T) {
 	require.ErrorIs(t, err, project.ErrConfigNotFound)
 }
 
-func TestSavedRefusesAConfigThatDoesNotValidate(t *testing.T) {
-	_, err := Project{StateDir: stateWithConfig(t, "[env]\nstrategy = \"copy\"\n")}.Saved()
+func TestSavedReadsAValueWtmCannotUseAsItIs(t *testing.T) {
+	saved, err := Project{StateDir: stateWithConfig(t, "[env]\nstrategy = \"copy\"\n")}.Saved()
 
-	_, invalid := errors.AsType[*project.InvalidConfigError](err)
-	assert.True(t, invalid, "Saved = %v, want a *project.InvalidConfigError", err)
+	require.NoError(t, err)
+	assert.Equal(t, project.EnvStrategy("copy"), saved.Config.Env.Strategy)
+}
+
+func TestSavedSaysWhereAConfigThatDoesNotParseStopped(t *testing.T) {
+	cases := map[string]struct {
+		content string
+		want    project.InvalidConfigError
+	}{
+		"syntax":      {content: "[worktrees]\nbase_path = \"a\"\nbase_branch =\n", want: project.InvalidConfigError{Line: 3, Column: 14, Key: "worktrees.base_branch"}},
+		"unknown_key": {content: "[worktrees]\nbase_pth = \"a\"\n", want: project.InvalidConfigError{Key: "worktrees.base_pth"}},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, err := Project{StateDir: stateWithConfig(t, c.content)}.Saved()
+
+			invalid, ok := errors.AsType[*project.InvalidConfigError](err)
+			require.True(t, ok, "Saved = %v, want a *project.InvalidConfigError", err)
+			assert.Equal(t, c.want.Line, invalid.Line)
+			assert.Equal(t, c.want.Column, invalid.Column)
+			assert.Equal(t, c.want.Key, invalid.Key)
+		})
+	}
+}
+
+func TestSavedReadsAConfigANewerWtmWrote(t *testing.T) {
+	saved, err := Project{StateDir: stateWithConfig(t, "schema = 2\n[worktrees]\nbase_branch = \"develop\"\n[future]\nkey = 1\n")}.Saved()
+
+	require.NoError(t, err)
+	assert.True(t, saved.Newer())
+	assert.Equal(t, "develop", saved.Config.Worktrees.BaseBranch)
 }
 
 func TestSaveCreatesTheConfigAndItsSchema(t *testing.T) {

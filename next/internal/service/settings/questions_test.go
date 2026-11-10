@@ -107,3 +107,42 @@ func TestABlankEntryOfAListIsNone(t *testing.T) {
 	assert.Equal(t, []project.Hook{}, given.OnCreate)
 	assert.Equal(t, []string{}, given.Values(PathOnCreate))
 }
+
+func TestOnlyTheSettingsGivenAnotherValueChange(t *testing.T) {
+	was := questions(facts(saved()), Given{}).Document()
+
+	now := questions(facts(saved()), Given{BaseBranch: "main", OnClean: []project.Hook{{Cmd: "make down"}}, EnvStrategy: EnvNone}).Document()
+
+	assert.Equal(t, []string{PathEnvStrategy, PathEnvFiles, PathOnClean}, Changed(was, now))
+	assert.Empty(t, now.EnvFiles)
+}
+
+func TestAConfigNamingNoBaseBranchReadsTheDefaultEveryCommandReads(t *testing.T) {
+	s := saved()
+	s.Config.Worktrees.BaseBranch = ""
+
+	q := questions(Facts{Saved: s}, Given{})
+
+	assert.Equal(t, domain.Answer[string]{Value: project.DefaultBaseBranch, Origin: domain.OriginDefault}, q.BaseBranch.Answer)
+	assert.Empty(t, q.Problems())
+}
+
+func TestAValueOnDiskWtmCannotUseIsAProblemOfItsSetting(t *testing.T) {
+	s := saved()
+	s.Config.Env = project.Env{Strategy: "copy", Files: []project.EnvFile{{Target: ""}, {Target: "apps/api/.env", Template: "apps/web/.env.example"}}}
+	s.Config.Remembered = map[string]string{"isolation": "both", "colour": "blue"}
+
+	problems := questions(Facts{Saved: s}, Given{}).Problems()
+
+	codes := map[string]string{}
+	for _, problem := range problems {
+		codes[problem.Path] = problem.Code
+	}
+	assert.Equal(t, map[string]string{
+		PathEnvStrategy:        domain.CodeOneOf,
+		"env_files[0]":         "init.env_file_no_target",
+		"env_files[1]":         "init.env_file_template",
+		"remembered.colour":    "init.remembered_unknown",
+		"remembered.isolation": "init.remembered_not_allowed",
+	}, codes)
+}

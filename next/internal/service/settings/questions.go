@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"maps"
 	"path"
 	"slices"
 	"strconv"
@@ -193,7 +194,7 @@ func basePath(given Given, saved *project.Saved) domain.Answer[string] {
 	return domain.Answer[string]{Value: project.DefaultBasePath, Origin: domain.OriginDefault}
 }
 
-// baseBranch is the base branch as given, else as config.toml holds it, else the branch the repository suggests; none is a required field.
+// baseBranch is the base branch as given, else as config.toml holds it or, naming none, the default every command reads; without a config.toml, the branch the repository suggests; none is a required field.
 func baseBranch(given Given, facts Facts) BaseBranch {
 	question := BaseBranch{Options: facts.Branches, Pinned: facts.Head}
 	switch {
@@ -201,6 +202,9 @@ func baseBranch(given Given, facts Facts) BaseBranch {
 		question.Answer = domain.Answer[string]{Value: given.BaseBranch, Origin: domain.OriginRequest}
 	case facts.Saved != nil && facts.Saved.Config.Worktrees.BaseBranch != "":
 		question.Answer = domain.Answer[string]{Value: facts.Saved.Config.Worktrees.BaseBranch, Origin: domain.OriginConfig}
+	case facts.Saved != nil:
+		// what every command reads of a config.toml that names none
+		question.Answer = domain.Answer[string]{Value: project.DefaultBaseBranch, Origin: domain.OriginDefault}
 	case facts.Head != "":
 		question.Answer = domain.Answer[string]{Value: facts.Head, Origin: domain.OriginDetected}
 	default:
@@ -354,14 +358,21 @@ func answered[T any](list []T) []T {
 
 // The codes of a setting's problem, each after the asking command's name and a dot.
 const (
-	CodeBasePathAbsolute  = "base_path_absolute"
-	CodeBaseBranchUnknown = "base_branch_unknown"
-	CodeEnvFileOutside    = "env_file_outside"
-	CodeEnvFileTwice      = "env_file_twice"
-	CodeHookDirOutside    = "hook_dir_outside"
+	CodeBasePathAbsolute     = "base_path_absolute"
+	CodeBaseBranchUnknown    = "base_branch_unknown"
+	CodeEnvFileNoTarget      = "env_file_no_target"
+	CodeEnvFileOutside       = "env_file_outside"
+	CodeEnvFileTwice         = "env_file_twice"
+	CodeEnvFileTemplate      = "env_file_template"
+	CodeHookDirOutside       = "hook_dir_outside"
+	CodeRememberedUnknown    = "remembered_unknown"
+	CodeRememberedNotAllowed = "remembered_not_allowed"
 )
 
-// Problems are the settings' problems as field errors, each coded after the asking command: a base path that is absolute; no base branch, or one that is no branch of the repository; an env strategy that is none of those accepted; an .env file outside the repository or listed twice; a hook that runs outside the repository.
+// PathRemembered is the path of config.toml's remembered answers, each named remembered.<question> by a problem.
+const PathRemembered = "remembered"
+
+// Problems are the settings' problems as field errors, each coded after the asking command: a base path that is absolute; no base branch, or one that is no branch of the repository; an env strategy that is none of those accepted; an .env file with no target, outside the repository, listed twice, or whose template is no template of it; a hook that runs outside the repository; a remembered answer config.toml holds to a question that remembers none, or that its question cannot remember.
 func (q Questions) Problems() []domain.FieldError {
 	var problems []domain.FieldError
 	if path.IsAbs(q.BasePath.Value) {
@@ -378,17 +389,60 @@ func (q Questions) Problems() []domain.FieldError {
 	if q.EnvStrategy.Value != EnvNone {
 		for index, target := range q.EnvFiles.Picked {
 			at := PathEnvFiles + "[" + strconv.Itoa(index) + "]"
-			switch {
+			switch template := q.envFile(target).Template; {
+			case strings.TrimSpace(target) == "":
+				problems = append(problems, q.problem(at, CodeEnvFileNoTarget, "{path} names no file", target))
 			case outside(target):
 				problems = append(problems, q.problem(at, CodeEnvFileOutside, "{path} must be a file of the repository, not {value}", target))
 			case slices.Index(q.EnvFiles.Picked, target) < index:
 				problems = append(problems, q.problem(at, CodeEnvFileTwice, "{path} {value} is listed twice", target))
+			case template != "" && !slices.Contains(templatesOf(target), template):
+				problem := q.problem(at, CodeEnvFileTemplate, "{path} {value} is no template of {target}", template)
+				problem.Params["target"] = target
+				problems = append(problems, problem)
 			}
 		}
 	}
 
 	problems = append(problems, q.hookProblems(PathOnCreate, q.OnCreate.Entries)...)
-	return append(problems, q.hookProblems(PathOnClean, q.OnClean.Entries)...)
+	problems = append(problems, q.hookProblems(PathOnClean, q.OnClean.Entries)...)
+	return append(problems, q.rememberedProblems()...)
+}
+
+// templatesOf are the templates target may have: itself with each template suffix.
+func templatesOf(target string) []string {
+	templates := make([]string, 0, len(project.TemplateSuffixes()))
+	for _, suffix := range project.TemplateSuffixes() {
+		templates = append(templates, target+suffix)
+	}
+
+	return templates
+}
+
+// rememberedProblems are those of the answers config.toml remembers, by question in sorted order.
+func (q Questions) rememberedProblems() []domain.FieldError {
+	if q.saved == nil {
+		return nil
+	}
+
+	var problems []domain.FieldError
+	remembered := q.saved.Config.Remembered
+	for _, id := range slices.Sorted(maps.Keys(remembered)) {
+		at := PathRemembered + "." + id
+		allowed, known := project.RememberableValues(id)
+		switch {
+		case !known:
+			problem := q.problem(at, CodeRememberedUnknown, "{path} remembers no answer: it is none of {accepted}", remembered[id])
+			problem.Accepted = project.RememberIDs()
+			problems = append(problems, problem)
+		case !slices.Contains(allowed, remembered[id]):
+			problem := q.problem(at, CodeRememberedNotAllowed, "{path} cannot remember {value}: it is none of {accepted}", remembered[id])
+			problem.Accepted = allowed
+			problems = append(problems, problem)
+		}
+	}
+
+	return problems
 }
 
 func (q Questions) hookProblems(at string, hooks []project.Hook) []domain.FieldError {
@@ -443,4 +497,49 @@ func (q Questions) envFile(target string) project.EnvFile {
 	}
 
 	return project.EnvFile{Target: target}
+}
+
+// Document is the settings as every surface reads them, one key per setting: the env strategy one of EnvStrategies, none copying no .env file, whose files are then none.
+type Document struct {
+	BasePath    string            `json:"base_path"`
+	BaseBranch  string            `json:"base_branch"`
+	EnvStrategy string            `json:"env_strategy"`
+	EnvFiles    []project.EnvFile `json:"env_files"`
+	OnCreate    []project.Hook    `json:"on_create"`
+	OnClean     []project.Hook    `json:"on_clean"`
+}
+
+// Document is the settings as the questions settle them.
+func (q Questions) Document() Document {
+	config := q.Rewrite().Config
+	document := Document{
+		BasePath:    config.Worktrees.BasePath,
+		BaseBranch:  config.Worktrees.BaseBranch,
+		EnvStrategy: string(q.EnvStrategy.Value),
+		EnvFiles:    answered(config.Env.Files),
+		OnCreate:    answered(config.OnCreate),
+		OnClean:     answered(config.OnClean),
+	}
+
+	return document
+}
+
+// Changed are the paths of the settings whose value differs from was to now, in the order of the form.
+func Changed(was, now Document) []string {
+	differs := map[string]bool{
+		PathBasePath:    was.BasePath != now.BasePath,
+		PathBaseBranch:  was.BaseBranch != now.BaseBranch,
+		PathEnvStrategy: was.EnvStrategy != now.EnvStrategy,
+		PathEnvFiles:    !slices.Equal(was.EnvFiles, now.EnvFiles),
+		PathOnCreate:    !slices.Equal(was.OnCreate, now.OnCreate),
+		PathOnClean:     !slices.Equal(was.OnClean, now.OnClean),
+	}
+	var changed []string
+	for _, path := range []string{PathBasePath, PathBaseBranch, PathEnvStrategy, PathEnvFiles, PathOnCreate, PathOnClean} {
+		if differs[path] {
+			changed = append(changed, path)
+		}
+	}
+
+	return changed
 }

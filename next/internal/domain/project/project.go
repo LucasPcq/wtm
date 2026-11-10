@@ -13,10 +13,19 @@ var ErrConfigNotFound = errors.New("config file not found")
 // ErrConfigChanged refuses a write of config.toml whose file changed on disk since it was read.
 var ErrConfigChanged = errors.New("config.toml changed on disk since it was read")
 
-// Saved is config.toml as written on disk, before any default applies, and the digest of its bytes, which a write of it compares with the file as it then stands.
+// ConfigSchema is the newest schema of config.toml this wtm writes; a file without one is at schema 1.
+const ConfigSchema = 1
+
+// Saved is config.toml as written on disk, before any default applies and before its values are checked, the digest of its bytes, which a write of it compares with the file as it then stands, and the schema it carries (0 when it names none).
 type Saved struct {
 	Config Config
 	Digest string
+	Schema int
+}
+
+// Newer reports whether a newer wtm wrote the file: it reads, but this wtm does not rewrite it.
+func (s Saved) Newer() bool {
+	return s.Schema > ConfigSchema
 }
 
 // Rewrite is config.toml written whole: its settings, and the digest of the file it replaces, as Saved read it ("" when there was none).
@@ -25,9 +34,12 @@ type Rewrite struct {
 	Replaces string
 }
 
-// An InvalidConfigError is a config.toml that does not parse or does not validate; Reason says why.
+// An InvalidConfigError is a config.toml that does not parse or does not validate; Reason says why, and Line, Column and Key where the parse stopped (0 and "" when it does not say).
 type InvalidConfigError struct {
 	Reason error
+	Line   int
+	Column int
+	Key    string
 }
 
 // Error is the reason.
@@ -69,9 +81,9 @@ type Env struct {
 
 // EnvFile is one .env file a worktree gets: its path in the worktree, the template it starts from (empty to look for the target with a conventional suffix, `.example` first), and config.toml's `local` key.
 type EnvFile struct {
-	Target   string
-	Template string
-	Local    bool
+	Target   string `json:"target"`
+	Template string `json:"template,omitempty"`
+	Local    bool   `json:"local,omitempty"`
 }
 
 // Hook is one command run in a new worktree: its command line, its directory relative to the worktree, and whether a failure lets the next hooks run.
