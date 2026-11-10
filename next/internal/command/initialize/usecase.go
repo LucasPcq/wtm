@@ -142,14 +142,11 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 	return Result{Items: []Item{item}, FollowUps: plan.next()}
 }
 
-// writeFailure is why config.toml could not be written: changed on disk since it was read, written by a newer wtm, or the error the write failed on.
+// writeFailure is why config.toml could not be written: changed on disk since it was read, or the error the write failed on (a newer wtm's file among them, its cause the *domain.SchemaNewer that exits 22).
 func writeFailure(path string, err error) *domain.Error {
 	params := domain.Params{"path": path, "cause": err.Error()}
-	switch {
-	case errors.Is(err, project.ErrConfigChanged):
+	if errors.Is(err, project.ErrConfigChanged) {
 		return &domain.Error{Kind: domain.KindConflict, Code: CodeChangedOnDisk, Message: path + " changed since it was read: run init again", Params: params, FollowUp: &domain.FollowUp{Command: Name, Code: Name + ".again", Message: "set it up from the file as it is now"}, Cause: err}
-	case errors.As(err, new(*domain.SchemaNewer)):
-		return &domain.Error{Kind: domain.KindPrecondition, Code: CodeWriteFailed, Message: "couldn't write " + path, Params: params, Cause: err}
 	}
 
 	return domain.AsError(domain.AsErrorParams{Err: err, Code: CodeWriteFailed, Message: "couldn't write " + path, Params: params})

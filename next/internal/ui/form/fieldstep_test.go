@@ -93,3 +93,11 @@ func TestGoingBackForgetsTheAnswerOfEachStepLeftAndKeepsTheOneReturnedTo(t *test
 	assert.Equal(t, atFrom, d.Wizard.Current())
 	assert.Equal(t, request{"branches": {"feat/a"}, "from": {"main"}}, s.Request())
 }
+
+func TestATextStepOpensOnTheValueItsFieldSettledOn(t *testing.T) {
+	d, s := asking(t, &app{named: "settled"}, request{"branches": {"feat/a"}, "from": {"main"}, "mode": {"fast"}, "ff": {"true"}, "keep": {"true"}, "files": {"a.txt"}})
+
+	assert.Contains(t, d.Screen(), "› settled")
+	d.Keys("enter")
+	assert.Equal(t, []string{"settled"}, s.Request()["name"])
+}

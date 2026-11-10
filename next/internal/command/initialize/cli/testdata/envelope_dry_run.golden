@@ -31,7 +31,7 @@
         }
       ]
     },
-    "changed": null,
+    "changed": [],
     "recap": [
       {
         "key": "base_path",
@@ -115,7 +115,7 @@
       }
     ]
   },
-  "fingerprint": "dd50e3377ed3eec10329ed08",
+  "fingerprint": "eaa60d68f9b6a342e1937cc6",
   "follow_ups": [],
   "warnings": []
 }

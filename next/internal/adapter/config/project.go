@@ -3,16 +3,15 @@ package config
 
 import (
 	"cmp"
-
 	"errors"
 	"fmt"
-	"github.com/BurntSushi/toml"
 	"maps"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 
+	"github.com/BurntSushi/toml"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 )
 

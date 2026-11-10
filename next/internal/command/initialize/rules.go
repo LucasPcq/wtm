@@ -60,14 +60,16 @@ const CodeBasePathMoved = Name + ".base_path_moved"
 // Decide turns the facts and the resolved request into the plan: the settings to write, the file created or rewritten, and on a re-init the settings changed; a new folder for worktrees that leaves some in the old one is warned.
 func Decide(f Facts, req Request) (Plan, []domain.Warning) {
 	now := NewQuestions(f, req)
-	plan := Plan{Path: f.ConfigPath, Created: f.Settings.Saved == nil, Settings: now.Document(), shownPath: f.shown(f.ConfigPath), rewrite: now.Rewrite(), runDeclared: f.RunDeclared}
+	plan := Plan{Path: f.ConfigPath, Created: f.Settings.Saved == nil, Settings: now.Document(), Changed: []string{}, shownPath: f.shown(f.ConfigPath), rewrite: now.Rewrite(), runDeclared: f.RunDeclared}
 	plan.elsewhere = f.outside(plan.Settings.BasePath)
 	if plan.Created {
 		return plan, nil
 	}
 
 	plan.was = NewQuestions(f, Request{}).Document()
-	plan.Changed = settings.Changed(plan.was, plan.Settings)
+	if changed := settings.Changed(plan.was, plan.Settings); changed != nil {
+		plan.Changed = changed
+	}
 	stay := f.linked() - len(f.outside(plan.was.BasePath))
 	if plan.Settings.BasePath == plan.was.BasePath || stay == 0 {
 		return plan, nil
