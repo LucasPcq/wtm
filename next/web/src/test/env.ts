@@ -1,5 +1,5 @@
 import { HttpResponse, http } from 'msw'
-import type { EnvReconcile, WebCall } from '@/api/types.gen'
+import type { DomainRecapValue, EnvPlan, EnvReconcile, WebCall } from '@/api/types.gen'
 import { billingFiles } from '@/test/env-files'
 import { envelope } from '@/test/fixtures'
 import { line, streamed } from '@/test/stream'
@@ -75,17 +75,61 @@ const reconcileOf = (worktree: string): EnvReconcile => {
   return base
 }
 
-const planOf = (call: WebCall) => {
-  const named = asked(call, 'worktree') ?? ['feat/billing', 'fix/login']
-  return { overwrite: false, prune: false, show_values: false, worktrees: named.map(reconcileOf) }
+// the core's recap of each worktree: a line per change, then the keys it leaves; those it does not touch, in step
+const linesOf: Record<string, DomainRecapValue[]> = {
+  'feat/billing': [
+    { value: 'PORT', note: 'rewrite', text: 'apps/web/.env  PORT → 3020' },
+    { value: 'OLD', note: 'left', text: 'apps/api/.env  OLD left: in no source' },
+  ],
+  'fix/login': [{ value: 'API_PORT', note: 'rewrite', text: 'apps/api/.env  API_PORT → 4010' }],
 }
+
+const planOf = (call: WebCall): EnvPlan => {
+  const named = asked(call, 'worktree') ?? ['feat/billing', 'fix/login']
+  const inStep = named.filter((worktree) => !linesOf[worktree])
+  return {
+    overwrite: false,
+    prune: false,
+    show_values: false,
+    worktrees: named.map(reconcileOf),
+    recap: [
+      ...named.flatMap((worktree) =>
+        (linesOf[worktree] ?? []).map((value, at) => ({
+          key: 'worktree',
+          label: at === 0 ? worktree : '',
+          values: [value],
+        })),
+      ),
+      ...(inStep.length > 0
+        ? [{ key: 'in_step', label: 'In step', values: inStep.map((value) => ({ value, text: value })) }]
+        : []),
+    ],
+  }
+}
+
+// a job up in feat/billing reads its web .env: the dry run says it, the apply too once written
+const restartWarning = (worktree: string) => ({
+  code: 'env.restart',
+  message: 'web runs on the old values until restarted',
+  params: { worktree, jobs: 'web' },
+  follow_up: {
+    command: 'run-start',
+    code: 'env.restart_job',
+    message: 'restart it',
+    answers: [
+      { path: 'worktree', values: [worktree] },
+      { path: 'job', values: ['web'] },
+      { path: 'restart', values: ['true'] },
+    ],
+  },
+})
 
 const fingerprintOf = (call: WebCall) => `env:${JSON.stringify(call.answers ?? [])}`
 
 // feat/onboarding has yet to choose its isolation: env leaves its ports, and says how to give it its own
 const pendingWarning = {
   code: 'env.isolation_pending',
-  message: 'feat/onboarding has yet to choose its isolation: its ports and the values wtm owns are left as they are',
+  message: 'feat/onboarding has yet to choose its isolation: its ports and owned values are left as they are',
   params: { worktree: 'feat/onboarding' },
   follow_up: {
     command: 'env',
@@ -151,11 +195,15 @@ export function answeringEnv({
     http.post('/api/repos/r1/commands/env', async ({ request }) => {
       const call = (await request.json()) as WebCall
       const plan = planOf(call)
-      const left = pending && plan.worktrees.some((r) => r.worktree === 'feat/onboarding') ? [pendingWarning] : []
+      const planned = plan.worktrees ?? []
+      const left = [
+        ...(pending && planned.some((r) => r.worktree === 'feat/onboarding') ? [pendingWarning] : []),
+        ...planned.filter((r) => r.restart?.length).map((r) => restartWarning(r.worktree)),
+      ]
       if (call.dry_run)
         return HttpResponse.json({ ...envelope('env', []), warnings: left, plan, fingerprint: fingerprintOf(call) })
 
-      const going = plan.worktrees.filter((r) => (r.phases ?? []).length > 0)
+      const going = planned.filter((r) => (r.phases ?? []).length > 0)
       const failed = (subject: string) => failing.includes(subject)
       return streamed(
         [
@@ -196,25 +244,7 @@ export function answeringEnv({
                     subject: r.worktree,
                     status: 'done',
                     detail: { path: r.path, written: ['apps/web/.env'], ports: r.ports },
-                    warnings: r.restart?.length
-                      ? [
-                          {
-                            code: 'env.restart',
-                            message: 'web runs on the old values until restarted',
-                            params: { worktree: r.worktree, jobs: 'web' },
-                            follow_up: {
-                              command: 'run-start',
-                              code: 'env.restart_job',
-                              message: 'restart it',
-                              answers: [
-                                { path: 'worktree', values: [r.worktree] },
-                                { path: 'job', values: ['web'] },
-                                { path: 'restart', values: ['true'] },
-                              ],
-                            },
-                          },
-                        ]
-                      : [],
+                    warnings: r.restart?.length ? [restartWarning(r.worktree)] : [],
                   },
             ),
           })}\n\n`,

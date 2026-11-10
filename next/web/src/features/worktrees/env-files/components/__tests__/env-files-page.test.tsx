@@ -1,15 +1,19 @@
 import { screen, waitFor, within } from '@testing-library/react'
-import { expect, test } from 'vitest'
+import { beforeEach, expect, test } from 'vitest'
+import { daemonStatus } from '@/test/daemon'
 import { answeringEnv } from '@/test/env'
 import { renderApp } from '@/test/render'
 import { server } from '@/test/server'
+
+// the shell reads the daemon on every page
+beforeEach(() => server.use(daemonStatus()))
 
 test('the page reads the worktree in its toolbar: the keys to check first, then each key by app and file', async () => {
   await renderApp('/r/r1/env')
 
   const toCheck = await screen.findByRole('list', { name: 'To check' })
   expect(within(toCheck).getByText("follows nothing: looks like stack's MAILPIT_UI")).toBeTruthy()
-  expect(within(toCheck).getByText('out of step: 3010 here, wtm writes 3020')).toBeTruthy()
+  expect(within(toCheck).getByText('out of step: 3010 here, 3020 expected')).toBeTruthy()
   const port = screen.getByRole('row', { name: 'PORT' })
   expect(within(port).getByText("web's port")).toBeTruthy()
   expect(within(port).getByText('→ 3020')).toBeTruthy()
@@ -25,14 +29,22 @@ test('a value wtm does not write is withheld until Show values asks for it', asy
 
   await user.click(screen.getByRole('switch', { name: 'Show values' }))
 
-  await waitFor(() => expect(router.state.location.search).toEqual({ values: 'shown' }))
   expect(await within(await screen.findByRole('row', { name: 'JWT_SECRET' })).findAllByText('s3cret')).toHaveLength(2)
+  expect(router.state.location.search).toEqual({})
+})
+
+test('nothing withheld reaches the page, its text nor its attributes, until Show values', async () => {
+  await renderApp('/r/r1/env')
+
+  await screen.findByRole('row', { name: 'JWT_SECRET' })
+
+  for (const secret of ['s3cret', 'http://localhost:8025']) expect(document.body.innerHTML).not.toContain(secret)
 })
 
 test('another worktree is picked from the toolbar, and the address keeps it', async () => {
   const { user, router } = await renderApp('/r/r1/env')
 
-  await user.click(await screen.findByRole('button', { name: 'Worktree' }))
+  await user.click(await screen.findByRole('button', { name: /^Worktree: / }))
   await user.click(await screen.findByRole('menuitem', { name: 'fix/login' }))
 
   await waitFor(() => expect(router.state.location.search).toEqual({ worktree: 'fix/login' }))

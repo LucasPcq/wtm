@@ -57,7 +57,7 @@ export function EnvProgress({
     <>
       <DialogHeader>
         <DialogTitle>Reconcile .env files</DialogTitle>
-        <DialogDescription>{description()}</DialogDescription>
+        <DialogDescription role="status">{description()}</DialogDescription>
       </DialogHeader>
       <DialogBand>{running && <Bar value={total ? (done / total) * 100 : 0} aria-label="Progress" />}</DialogBand>
 

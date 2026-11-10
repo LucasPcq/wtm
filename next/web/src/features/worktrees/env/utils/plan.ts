@@ -1,50 +1,32 @@
-import type { EnvPlan, EnvReconcile } from '@/api/types.gen'
-import { settledWords } from '@/features/worktrees/env/utils/words'
+import type { DomainRecapValue, EnvPlan, EnvReconcile } from '@/api/types.gen'
 import { todo, type Unit } from '@/features/worktrees/utils/progress'
-
-// one change of a worktree's files, as Confirm and Done list it
-export type Change = { key: string; name: string; file?: string; does: string }
 
 export const writes = (r: EnvReconcile) => (r.phases ?? []).length > 0
 
-// what the core says the apply does to one worktree, a line each: the isolation recorded, its numbering, each file
-// rebuilt, each key settled, each value wtm writes
-export function changesOf(r: EnvReconcile): Change[] {
-  const changes: Change[] = []
-  if (r.records) changes.push({ key: 'records', name: `now ${r.records}`, does: 'its isolation recorded' })
-  if (!r.numbered) changes.push({ key: 'numbered', name: 'its ports', does: 'numbered, then settled' })
-  for (const file of r.files ?? []) {
-    if (file.created)
-      changes.push({ key: `created:${file.target}`, name: file.target, does: `rebuilt from ${r.strategy}` })
-    for (const key of (file.keys ?? []).filter((one) => one.settled))
-      changes.push({
-        key: `${file.target}:${key.key}`,
-        name: key.key,
-        file: file.target,
-        does: key.restored ? "back to its source's" : settledWords[key.status],
-      })
+// the core's recap by worktree: a line per change its apply makes, then each key it leaves with why (note "left")
+export function recapLines(plan: EnvPlan): Map<string, DomainRecapValue[]> {
+  const lines = new Map<string, DomainRecapValue[]>()
+  let worktree = ''
+  for (const row of plan.recap ?? []) {
+    if (row.key !== 'worktree') continue
+    // a worktree is named on its first line alone
+    if (row.label) worktree = row.label
+    lines.set(worktree, [...(lines.get(worktree) ?? []), ...(row.values ?? [])])
   }
-  for (const entry of r.ports.entries ?? []) {
-    if (entry.status !== 'rewrite') continue
-    const origin = entry.moves?.[0]?.origin
-    const to = entry.new_value ?? origin ?? String(entry.resolved)
-    const from = entry.current_value ? `${entry.current_value} → ` : ''
-    changes.push({ key: `${entry.file}:${entry.key}`, name: entry.key, file: entry.file, does: `${from}${to}` })
-  }
-  for (const owned of r.ports.owned ?? []) {
-    if (owned.changed)
-      changes.push({ key: `${owned.file}:${owned.key}`, name: owned.key, file: owned.file, does: 'set by wtm' })
-  }
-  return changes
+  return lines
 }
 
-// the keys a worktree keeps as they are, with why
-export const keptOf = (r: EnvReconcile) =>
-  (r.files ?? []).flatMap((file) =>
-    (file.keys ?? [])
-      .filter((key) => !key.settled)
-      .map((key) => ({ file: file.target, key: key.key, status: key.status })),
-  )
+// a line of the recap as the core spells it, its file apart: "apps/web/.env  PORT → 3020"
+export function lineOf(value: DomainRecapValue) {
+  const at = value.text.indexOf('  ')
+  return at < 0 ? { file: '', change: value.text } : { file: value.text.slice(0, at), change: value.text.slice(at + 2) }
+}
+
+// the worktrees the core's recap says are in step
+export const inStepOf = (plan: EnvPlan) =>
+  (plan.recap ?? [])
+    .filter((row) => row.key === 'in_step')
+    .flatMap((row) => (row.values ?? []).map(({ value }) => value))
 
 export const unitsOf = (plan: EnvPlan): Unit[] =>
   (plan.worktrees ?? []).filter(writes).map(({ worktree, phases }) => todo(worktree, phases ?? []))

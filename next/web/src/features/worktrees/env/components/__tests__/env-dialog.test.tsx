@@ -1,8 +1,13 @@
 import { screen, within } from '@testing-library/react'
-import { expect, test } from 'vitest'
+import { HttpResponse, http } from 'msw'
+import { beforeEach, expect, test } from 'vitest'
+import { daemonStatus } from '@/test/daemon'
 import { answeringEnv } from '@/test/env'
 import { renderApp } from '@/test/render'
 import { server } from '@/test/server'
+
+// the shell reads the daemon on every page
+beforeEach(() => server.use(daemonStatus()))
 
 async function openReconcile() {
   const app = await renderApp('/r/r1/env')
@@ -27,9 +32,9 @@ test('Confirm lists what each worktree rewrites, the job to restart and what is 
   await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
 
   const rewrite = await within(dialog).findByRole('region', { name: 'To rewrite' })
-  expect(within(rewrite).getByText('apps/web/.env · 3020')).toBeTruthy()
+  expect(within(rewrite).getByText('PORT → 3020')).toBeTruthy()
   expect(within(rewrite).getByText('web runs on the old values until restarted')).toBeTruthy()
-  expect(within(dialog).getByText('apps/api/.env: in no source: kept as it is')).toBeTruthy()
+  expect(within(dialog).getByText('apps/api/.env: OLD left: in no source')).toBeTruthy()
 
   await user.click(within(dialog).getByRole('button', { name: 'Reconcile 2 worktrees' }))
 
@@ -76,7 +81,7 @@ test('Confirm says what the core leaves in a worktree, with its fix, never that 
   const onboarding = await within(dialog).findByRole('listitem', { name: 'feat/onboarding' })
   expect(
     within(onboarding).getByText(
-      'feat/onboarding has yet to choose its isolation: its ports and the values wtm owns are left as they are',
+      'feat/onboarding has yet to choose its isolation: its ports and owned values are left as they are',
     ),
   ).toBeTruthy()
   expect(within(dialog).queryByText('verbatim: its env is copied as it is')).toBeNull()
@@ -91,4 +96,35 @@ test('Confirm folds the folder and steps of each worktree under Details', async 
 
   expect(within(dialog).getByText('/acme.trees/fix/login')).toBeTruthy()
   expect(within(dialog).getAllByText('Write its .env files')).toHaveLength(2)
+})
+
+test('Confirm plans the worktrees Next took, whatever the questions read since', async () => {
+  const { user, dialog, queryClient } = await openReconcile()
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  await within(dialog).findByRole('region', { name: 'To rewrite' })
+
+  server.use(
+    http.post('/api/repos/r1/commands/env/questions', () =>
+      HttpResponse.json({
+        fields: [
+          { kind: 'multi_select', path: 'worktree', picked: [], prechecked: ['main'], options: [{ value: 'main' }] },
+        ],
+        problems: [],
+      }),
+    ),
+  )
+  await queryClient.invalidateQueries()
+
+  const rewrite = await within(dialog).findByRole('region', { name: 'To rewrite' })
+  expect(within(rewrite).getByText('feat/billing')).toBeTruthy()
+  expect(within(rewrite).getByText('fix/login')).toBeTruthy()
+  expect(within(dialog).getByRole('button', { name: 'Reconcile 2 worktrees' })).toBeTruthy()
+})
+
+test('the progress and its outcome are announced', async () => {
+  const { user, dialog } = await openReconcile()
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Reconcile 2 worktrees' }))
+
+  expect(await within(dialog).findByRole('status')).toHaveProperty('textContent', '2 worktrees reconciled.')
 })

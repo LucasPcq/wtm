@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Link, useNavigate } from '@tanstack/react-router'
+import { Link } from '@tanstack/react-router'
 import {
   ChevronDown,
   CircleMinus,
@@ -10,6 +10,7 @@ import {
   RefreshCw,
   TriangleAlert,
 } from 'lucide-react'
+import { useState } from 'react'
 import { questionsQuery, readQuery } from '@/api/queries/commands'
 import { Centered } from '@/components/centered'
 import { PageHeader } from '@/components/page-header'
@@ -34,7 +35,9 @@ export function EnvFilesPage({ repo, search }: { repo: string; search: EnvFilesS
   const field = form.data?.fields.find((one) => one.path === 'worktree')
   const options = field?.kind === 'select' ? field.options : []
   const worktree = search.worktree ?? (field?.kind === 'select' ? field.value : undefined)
-  const shown = search.values === 'shown'
+  // values are shown for the worktree they were asked for, never kept in the address nor carried to another
+  const [shownFor, setShownFor] = useState<string>()
+  const shown = worktree !== undefined && shownFor === worktree
   const read = useQuery({
     ...readQuery(repo, 'env-show', [
       { path: 'worktree', values: [worktree ?? ''] },
@@ -46,10 +49,7 @@ export function EnvFilesPage({ repo, search }: { repo: string; search: EnvFilesS
   const apps = detail?.apps ?? []
   const checks = detail?.checks ?? []
 
-  const navigate = useNavigate()
   const reconcile = () => openEnv(repo, { worktree: worktree ?? '' })
-  const showValues = (on: boolean) =>
-    navigate({ to: '/r/$repo/env', params: { repo }, search: { ...search, values: on ? 'shown' : undefined } })
 
   const body = () => {
     if (form.isError) return <ReadFailed message={form.error.message} />
@@ -60,8 +60,8 @@ export function EnvFilesPage({ repo, search }: { repo: string; search: EnvFilesS
       return (
         <Centered>
           <StatePage icon={<FileKey />} title="No .env file">
-            config.toml declares no .env file: list each under [[env.file]], with its template, and wtm copies and
-            reconciles it for every worktree.
+            The project declares no .env file. Declare each one with its template, and every worktree gets its own copy,
+            kept in step.
           </StatePage>
         </Centered>
       )
@@ -101,7 +101,7 @@ export function EnvFilesPage({ repo, search }: { repo: string; search: EnvFilesS
         <span className="text-muted-foreground">Worktree</span>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" aria-label="Worktree">
+            <Button variant="outline" aria-label={`Worktree: ${worktree ?? ''}`}>
               <GitBranch aria-hidden="true" />
               {worktree ?? '…'}
               <ChevronDown className="text-muted-foreground" aria-hidden="true" />
@@ -141,7 +141,11 @@ export function EnvFilesPage({ repo, search }: { repo: string; search: EnvFilesS
             to check
           </Glyph>
           <Label className="flex items-center gap-2 font-normal">
-            <Switch checked={shown} onCheckedChange={(on) => void showValues(on)} aria-label="Show values" />
+            <Switch
+              checked={shown}
+              onCheckedChange={(on) => setShownFor(on ? worktree : undefined)}
+              aria-label="Show values"
+            />
             Show values
           </Label>
         </div>

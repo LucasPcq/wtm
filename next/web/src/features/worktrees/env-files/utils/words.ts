@@ -5,8 +5,8 @@ import type { EnvKeyStatus, EnvStatus, EnvshowCheck, EnvshowFollows, EnvshowKey,
 export const followsWords: Record<EnvshowFollows, (key: EnvshowKey) => string> = {
   port: ({ job }) => `${job}'s port`,
   address: ({ job }) => `${job}'s address`,
-  value: ({ job }) => (job ? `${job}'s value` : 'a value of run.toml'),
-  owned: () => "wtm's own",
+  value: ({ job }) => (job ? `${job}'s value` : 'a run value'),
+  owned: () => 'set for each worktree',
   nothing: () => 'follows nothing',
   copied: () => 'copied as it is',
 }
@@ -30,11 +30,11 @@ export const statusWords: Record<EnvKeyStatus, string | undefined> = {
 
 const leftAloneWords: Record<EnvStatus, string> = {
   missing_key: 'the key is in no file',
-  base_not_found: 'wtm finds no port of its job in it',
+  base_not_found: 'no port of its job is in it',
   ambiguous: "its job's port appears more than once",
   foreign_host: 'it points at another host, which no job here serves',
   secure_scheme: 'https: the run proxy serves plain HTTP',
-  rewrite: 'wtm rewrites it',
+  rewrite: 'Reconcile rewrites it',
   unchanged: 'in step',
 }
 
@@ -44,12 +44,11 @@ export const checkWords: Record<EnvshowCheck['kind'], (check: EnvshowCheck) => {
     why: `In ${file}. Until it is linked, every worktree reaches the same one.`,
   }),
   left_alone: ({ status, file }) => ({
-    fact: `left alone: ${status ? leftAloneWords[status] : 'wtm writes nothing in it'}`,
+    fact: `left alone: ${status ? leftAloneWords[status] : 'nothing is written in it'}`,
     why: `In ${file}. Set it by hand to its job's port, or link it again.`,
   }),
   out_of_step: ({ here, writes, file }) => ({
-    fact:
-      here !== undefined && writes !== undefined ? `out of step: ${here} here, wtm writes ${writes}` : 'out of step',
-    why: `In ${file}. Reconcile writes what wtm writes.`,
+    fact: here !== undefined && writes !== undefined ? `out of step: ${here} here, ${writes} expected` : 'out of step',
+    why: `In ${file}. Reconcile puts it back.`,
   }),
 }
