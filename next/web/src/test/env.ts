@@ -78,10 +78,12 @@ const reconcileOf = (worktree: string): EnvReconcile => {
 // the core's recap of each worktree: a line per change, then the keys it leaves; those it does not touch, in step
 const linesOf: Record<string, DomainRecapValue[]> = {
   'feat/billing': [
-    { value: 'PORT', note: 'rewrite', text: 'apps/web/.env  PORT → 3020' },
-    { value: 'OLD', note: 'left', text: 'apps/api/.env  OLD left: in no source' },
+    { value: 'PORT', note: 'rewrite', params: { file: 'apps/web/.env' }, text: 'apps/web/.env  PORT → 3020' },
+    { value: 'OLD', note: 'left', params: { file: 'apps/api/.env' }, text: 'apps/api/.env  OLD left: in no source' },
   ],
-  'fix/login': [{ value: 'API_PORT', note: 'rewrite', text: 'apps/api/.env  API_PORT → 4010' }],
+  'fix/login': [
+    { value: 'API_PORT', note: 'rewrite', params: { file: 'apps/api/.env' }, text: 'apps/api/.env  API_PORT → 4010' },
+  ],
 }
 
 const planOf = (call: WebCall): EnvPlan => {
@@ -107,7 +109,8 @@ const planOf = (call: WebCall): EnvPlan => {
   }
 }
 
-// a job up in feat/billing reads its web .env: the dry run says it, the apply too once written
+// a job up in feat/billing reads its web .env: the dry run says it would run on the old values, the apply that it does,
+// with its restart
 const restartWarning = (worktree: string) => ({
   code: 'env.restart',
   message: 'web runs on the old values until restarted',
@@ -198,7 +201,13 @@ export function answeringEnv({
       const planned = plan.worktrees ?? []
       const left = [
         ...(pending && planned.some((r) => r.worktree === 'feat/onboarding') ? [pendingWarning] : []),
-        ...planned.filter((r) => r.restart?.length).map((r) => restartWarning(r.worktree)),
+        ...planned
+          .filter((r) => r.restart?.length)
+          .map((r) => ({
+            code: 'env.restart',
+            message: `${r.worktree}: web would run on the old values until restarted`,
+            params: { worktree: r.worktree, jobs: 'web' },
+          })),
       ]
       if (call.dry_run)
         return HttpResponse.json({ ...envelope('env', []), warnings: left, plan, fingerprint: fingerprintOf(call) })

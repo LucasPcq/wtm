@@ -54,7 +54,8 @@ export function EnvWizard({
   const field = form.data?.fields.find((one) => one.path === 'worktree')
   const options = field?.kind === 'multi_select' ? field.options : []
   // the core offers those out of step; the worktree on screen goes with them
-  const prechecked = [
+  // a retry offers the worktrees it runs again, Back included; else the core's pick and the worktree on screen
+  const prechecked = again ?? [
     ...(field?.kind === 'multi_select' ? (field.prechecked ?? field.picked) : []),
     ...(worktree ? [worktree] : []),
   ]

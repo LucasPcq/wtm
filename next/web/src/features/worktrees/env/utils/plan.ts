@@ -16,10 +16,11 @@ export function recapLines(plan: EnvPlan): Map<string, DomainRecapValue[]> {
   return lines
 }
 
-// a line of the recap as the core spells it, its file apart: "apps/web/.env  PORT → 3020"
+// a line of the recap with the file the core names in its params apart, the change as the core spells it after it
 export function lineOf(value: DomainRecapValue) {
-  const at = value.text.indexOf('  ')
-  return at < 0 ? { file: '', change: value.text } : { file: value.text.slice(0, at), change: value.text.slice(at + 2) }
+  const file = value.params?.file ?? ''
+  const change = file && value.text.startsWith(file) ? value.text.slice(file.length).trimStart() : value.text
+  return { file, change }
 }
 
 // the worktrees the core's recap says are in step

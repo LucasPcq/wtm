@@ -33,7 +33,7 @@ test('Confirm lists what each worktree rewrites, the job to restart and what is 
 
   const rewrite = await within(dialog).findByRole('region', { name: 'To rewrite' })
   expect(within(rewrite).getByText('PORT → 3020')).toBeTruthy()
-  expect(within(rewrite).getByText('web runs on the old values until restarted')).toBeTruthy()
+  expect(within(rewrite).getByText('feat/billing: web would run on the old values until restarted')).toBeTruthy()
   expect(within(dialog).getByText('apps/api/.env: OLD left: in no source')).toBeTruthy()
 
   await user.click(within(dialog).getByRole('button', { name: 'Reconcile 2 worktrees' }))
@@ -69,6 +69,21 @@ test('Run again plans the worktrees that failed alone, straight on Confirm', asy
   expect(within(rewrite).getByText('fix/login')).toBeTruthy()
   expect(within(rewrite).queryByText('feat/billing')).toBeNull()
   expect(within(again).getByRole('button', { name: 'Reconcile' })).toBeTruthy()
+})
+
+test('Back from Run again keeps the worktrees it runs again checked', async () => {
+  server.use(...answeringEnv({ failing: ['fix/login'] }))
+  const { user, dialog } = await openReconcile()
+  await user.click(await within(dialog).findByRole('button', { name: 'Next' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Reconcile 2 worktrees' }))
+  await user.click(await within(dialog).findByRole('button', { name: 'Run again' }))
+
+  const again = await screen.findByRole('dialog')
+  await user.click(await within(again).findByRole('button', { name: 'Back' }))
+
+  const box = (name: string) => within(again).findByRole('checkbox', { name: `Reconcile ${name}` })
+  expect((await box('fix/login')).getAttribute('data-state')).toBe('checked')
+  expect((await box('feat/billing')).getAttribute('data-state')).toBe('unchecked')
 })
 
 test('Confirm says what the core leaves in a worktree, with its fix, never that it is in step', async () => {

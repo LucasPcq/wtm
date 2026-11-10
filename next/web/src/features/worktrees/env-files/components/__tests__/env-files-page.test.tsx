@@ -33,7 +33,7 @@ test('a value wtm does not write is withheld until Show values asks for it', asy
   expect(router.state.location.search).toEqual({})
 })
 
-test('nothing withheld reaches the page, its text nor its attributes, until Show values', async () => {
+test('with Show values off, no value the core withheld is in the page, its text nor its attributes', async () => {
   await renderApp('/r/r1/env')
 
   await screen.findByRole('row', { name: 'JWT_SECRET' })
