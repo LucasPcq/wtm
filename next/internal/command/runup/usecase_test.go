@@ -271,7 +271,7 @@ func TestARepositoryWithNoRunTomlIsRefusedFollowedByRunInit(t *testing.T) {
 
 	assert.Equal(t, runup.CodeNotInitialized, refused.Code)
 	assert.Equal(t, domain.KindPrecondition, refused.Kind)
-	assert.Equal(t, "run init", refused.FollowUp.Command)
+	assert.Equal(t, domain.CommandRunInit, refused.FollowUp.Command)
 }
 
 func TestADaemonThatCannotBeMadeSureOfFailsEveryWorktree(t *testing.T) {

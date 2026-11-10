@@ -351,9 +351,6 @@ const (
 	CodeRunInvalid     = Name + ".run_invalid"
 )
 
-// commandRunInit sets the run module up in a repository: not migrated yet.
-const commandRunInit = "run init"
-
 // Observe reads what run logs reads from: the project's config and its run.toml, the repository's snapshot, which worktrees' directory is gone, where the caller stands, and the jobs wtm's daemon knows, never starting it. A repository with no wtm config is refused with CodeConfigNotFound, one with no run.toml with CodeNotInitialized.
 func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	repo, err := u.Repository.Observe(ctx, Name)
@@ -364,7 +361,7 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 		return Facts{}, &domain.Error{Kind: domain.KindPrecondition, Code: CodeRunInvalid, Message: "invalid run.toml: " + repo.RunErr.Error()}
 	}
 	if !repo.Run.Declared {
-		return Facts{}, &domain.Error{Kind: domain.KindPrecondition, Code: CodeNotInitialized, Message: "no run.toml: no job has run", FollowUp: &domain.FollowUp{Command: commandRunInit, Code: CodeInit, Message: "declare the jobs"}}
+		return Facts{}, &domain.Error{Kind: domain.KindPrecondition, Code: CodeNotInitialized, Message: "no run.toml: no job has run", FollowUp: &domain.FollowUp{Command: domain.CommandRunInit, Code: CodeInit, Message: "declare the jobs"}}
 	}
 
 	facts := Facts{Repository: repo, Gone: map[string]bool{}, StateDir: u.StateDir}
