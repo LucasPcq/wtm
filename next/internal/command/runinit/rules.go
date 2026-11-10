@@ -1469,12 +1469,13 @@ type LinkRow struct {
 	Spelled string `json:"spelled"`
 }
 
-// A ProfileRow is a profile: its jobs, whether it is the default, whether run init proposes it rather than run.toml or the request holding it, and its answer.
+// A ProfileRow is a profile: its jobs, whether it is the default, whether run init proposes it rather than run.toml or the request holding it, whether the plan writes it (a profile proposed on a re-init is offered, not written, until answered), and its answer.
 type ProfileRow struct {
 	Name     string   `json:"name"`
 	Jobs     []string `json:"jobs"`
 	Default  bool     `json:"default"`
 	Proposed bool     `json:"proposed"`
+	Written  bool     `json:"written"`
 	Spelled  string   `json:"spelled"`
 }
 
@@ -1511,7 +1512,7 @@ func (d Decision) parts() Parts {
 	}
 	for i, profile := range profiles {
 		proposed := i >= len(d.Profiles) || d.Origins[PathProfiles] == domain.OriginDetected
-		parts.Profiles = append(parts.Profiles, ProfileRow{Name: profile.Name, Jobs: profile.Jobs, Default: profile.Name == d.DefaultProfile && i < len(d.Profiles), Proposed: proposed, Spelled: profile.Name + "=" + strings.Join(profile.Jobs, ",")})
+		parts.Profiles = append(parts.Profiles, ProfileRow{Name: profile.Name, Jobs: profile.Jobs, Default: profile.Name == d.DefaultProfile && i < len(d.Profiles), Proposed: proposed, Written: i < len(d.Profiles), Spelled: profile.Name + "=" + strings.Join(profile.Jobs, ",")})
 	}
 	return parts
 }

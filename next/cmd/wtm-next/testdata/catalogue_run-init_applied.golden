@@ -84,6 +84,7 @@
           ],
           "default": true,
           "proposed": false,
+          "written": true,
           "spelled": "all=web"
         },
         {
@@ -93,6 +94,7 @@
           ],
           "default": false,
           "proposed": false,
+          "written": true,
           "spelled": "web=web"
         }
       ]

@@ -316,6 +316,24 @@ func TestAProfileNamingTheRunnerIsRefusedWhenNothingRunsThroughIt(t *testing.T) 
 	assert.Equal(t, []string{runinit.CodeUnknownJob}, fieldCodes(err))
 }
 
+func TestEachProfileRowSaysWhetherThePlanWritesIt(t *testing.T) {
+	w := newWorld(t)
+	first, _, err := w.usecase.Plan(t.Context(), runinit.Request{})
+	require.NoError(t, err)
+	w.apply(t, runinit.Request{Jobs: []string{"postgres", "redis", "mailpit", "admin", "api", "web", "migrate", "seed"}})
+
+	again, _, err := w.usecase.Plan(t.Context(), runinit.Request{Jobs: []string{"postgres", "redis", "mailpit", "admin", "api", "web", "worker", "migrate", "seed"}})
+
+	require.NoError(t, err)
+	for _, row := range first.Parts.Profiles {
+		assert.True(t, row.Written, row.Name)
+	}
+	worker := again.Parts.Profiles[len(again.Parts.Profiles)-1]
+	assert.Equal(t, "worker", worker.Name)
+	assert.True(t, worker.Proposed)
+	assert.False(t, worker.Written, "a profile proposed on a re-init is offered, not written")
+}
+
 func TestDockerComposeIsLeftAloneWhenAsked(t *testing.T) {
 	w := newWorld(t)
 	before := readFile(t, filepath.Join(w.main, "docker-compose.yml"))
