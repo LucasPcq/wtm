@@ -5,6 +5,8 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"io/fs"
+	"path/filepath"
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -133,7 +135,7 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 
 	report(domain.UnitStarted{Subject: plan.Path})
 	if _, err := u.Settings.Write(ctx, plan.rewrite); err != nil {
-		item = Item{Subject: plan.Path, Status: domain.StatusFailed, Err: writeFailure(plan.Path, err)}
+		item = Item{Subject: plan.Path, Status: domain.StatusFailed, Err: writeFailure(plan, err)}
 		report(domain.UnitFinished{Subject: plan.Path, Status: item.Status})
 		return Result{Items: []Item{item}}
 	}
@@ -143,9 +145,14 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 	return Result{Items: []Item{item}, FollowUps: plan.next()}
 }
 
-// writeFailure is why config.toml could not be written: changed on disk since it was read, or the error the write failed on (a newer wtm's file among them, its cause the *domain.SchemaNewer that exits 22).
-func writeFailure(path string, err error) *domain.Error {
+// writeFailure is why config.toml could not be written: changed on disk since it was read, a folder the user may not write (named as they find it, from the main worktree), or the error the write failed on (a newer wtm's file among them, its cause the *domain.SchemaNewer that exits 22).
+func writeFailure(plan Plan, err error) *domain.Error {
+	path := plan.Path
 	params := domain.Params{"path": path, "cause": err.Error()}
+	if errors.Is(err, fs.ErrPermission) {
+		message := "permission denied on " + plan.shownPath + ": check who owns " + filepath.Dir(plan.shownPath) + ", then set it up again"
+		return &domain.Error{Kind: domain.KindPrecondition, Code: CodeWriteFailed, Message: message, Params: params, Cause: err}
+	}
 	if errors.Is(err, project.ErrConfigChanged) {
 		return &domain.Error{Kind: domain.KindConflict, Code: CodeChangedOnDisk, Message: path + " changed since it was read: run init again", Params: params, FollowUp: &domain.FollowUp{Command: Name, Code: Name + ".again", Message: "set it up from the file as it is now"}, Cause: err}
 	}
