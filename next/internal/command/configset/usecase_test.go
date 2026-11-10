@@ -292,3 +292,17 @@ func TestAnAnswerRememberedAnewThatWtmCannotKeepIsRefused(t *testing.T) {
 	_, ok := errors.AsType[*domain.Error](err)
 	assert.True(t, ok, "%v", err)
 }
+
+func TestTheRecapListsCommandsAndPathsOnePerLine(t *testing.T) {
+	dir := stateDir(t, acme)
+	req := answered(t, map[string][]string{settings.PathBasePath: {"../wt"}, settings.PathEnvFiles: {"apps/api/.env"}, settings.PathOnClean: {}})
+
+	outcome, err := usecase(dir, operations()).Run(t.Context(), req, domain.RunOptions{DryRun: true})
+
+	require.NoError(t, err)
+	stacked := map[string]bool{}
+	for _, row := range outcome.Plan.Recap {
+		stacked[row.Key] = row.Stacked
+	}
+	assert.Equal(t, map[string]bool{settings.PathBasePath: false, settings.PathEnvFiles: true, settings.PathOnClean: true}, stacked)
+}

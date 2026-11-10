@@ -162,7 +162,8 @@ func (p Plan) recap() []domain.RecapRow {
 		if len(values) == 0 {
 			values = []domain.RecapValue{{Text: "none"}}
 		}
-		rows = append(rows, domain.RecapRow{Key: change.Path, Label: labels[change.Path], Path: change.Path, Values: values})
+		stacked := slices.Contains([]string{settings.PathEnvFiles, settings.PathOnCreate, settings.PathOnClean}, change.Path)
+		rows = append(rows, domain.RecapRow{Key: change.Path, Label: labels[change.Path], Path: change.Path, Stacked: stacked, Values: values})
 	}
 
 	return rows
