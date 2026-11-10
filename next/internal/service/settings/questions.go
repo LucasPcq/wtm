@@ -241,7 +241,7 @@ func envStrategy(given Given, saved *project.Saved) domain.Answer[string] {
 	return domain.Answer[string]{Value: string(project.DefaultEnvStrategy), Origin: domain.OriginDefault}
 }
 
-// envFiles are the .env files picked as given, else those config.toml holds, else every one the repository holds; its options are the files config.toml holds, those the repository holds besides, then those given besides. None is asked when no .env file is copied, or there is none to pick.
+// envFiles are the .env files picked as given, else those config.toml holds, else (none held, or a strategy given where config.toml copies none) every one the repository holds; its options are the files config.toml holds, those the repository holds besides, then those given besides. None is asked when no .env file is copied, or there is none to pick.
 func envFiles(given Given, facts Facts, strategy string) EnvFiles {
 	question := EnvFiles{Options: envOptions(facts)}
 	for _, target := range given.EnvFiles {
@@ -258,7 +258,7 @@ func envFiles(given Given, facts Facts, strategy string) EnvFiles {
 	switch {
 	case given.EnvFiles != nil:
 		question.Picked, question.Origin = given.EnvFiles, domain.OriginRequest
-	case facts.Saved != nil:
+	case facts.Saved != nil && !(copiesNone(facts.Saved.Config.Env) && strategy != EnvNone):
 		question.Picked, question.Origin = targets(facts.Saved.Config.Env.Files), domain.OriginConfig
 	case len(facts.Detected.EnvFiles) > 0:
 		question.Picked, question.Origin = targets(facts.Detected.EnvFiles), domain.OriginDetected
@@ -267,6 +267,11 @@ func envFiles(given Given, facts Facts, strategy string) EnvFiles {
 	}
 
 	return question
+}
+
+// copiesNone reports whether config.toml copies no .env file: a strategy turned on then picks what a first init would.
+func copiesNone(env project.Env) bool {
+	return env.Strategy == "" && len(env.Files) == 0
 }
 
 func envOptions(facts Facts) []project.EnvFile {
@@ -433,7 +438,7 @@ func (q Questions) strategyProblems() []domain.FieldError {
 	asked := strategy.Origin == domain.OriginRequest || q.EnvFiles.Origin == domain.OriginRequest
 	switch {
 	case strategy.Value == EnvNone && strategy.Origin == domain.OriginRequest && len(q.EnvFiles.Picked) > 0 && q.EnvFiles.Origin == domain.OriginRequest:
-		problems = append(problems, q.problem(PathEnvFiles, CodeEnvFilesWithNone, "{path} lists files while no .env file is copied ({value}): name a strategy, or give no file", strategy.Value))
+		problems = append(problems, q.problem(PathEnvStrategy, CodeEnvFilesWithNone, "{path} {value} copies no .env file, while files are given: name a strategy, or give no file", strategy.Value))
 	case strategy.Value != EnvNone && asked && len(q.EnvFiles.Picked) == 0 && len(q.EnvFiles.Options) > 0:
 		problems = append(problems, q.problem(PathEnvFiles, CodeEnvFilesNone, "{path} lists no file while they come from {value}: pick one, or copy none", strategy.Value))
 	}

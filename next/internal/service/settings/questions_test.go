@@ -165,7 +165,7 @@ func TestTheStrategyAndItsFilesMustAgree(t *testing.T) {
 		path  string
 		code  string
 	}{
-		"files_with_none":   {Given{EnvStrategy: EnvNone, EnvFiles: []string{"apps/api/.env"}}, PathEnvFiles, "init.env_files_with_none"},
+		"files_with_none":   {Given{EnvStrategy: EnvNone, EnvFiles: []string{"apps/api/.env"}}, PathEnvStrategy, "init.env_files_with_none"},
 		"strategy_no_files": {Given{EnvStrategy: "main", EnvFiles: []string{}}, PathEnvFiles, "init.env_files_none"},
 	}
 	for name, c := range cases {
@@ -191,4 +191,27 @@ func TestNoneWrittenInTheConfigIsAProblemOfTheStrategy(t *testing.T) {
 	assert.Equal(t, PathEnvStrategy, problems[0].Path)
 	assert.Equal(t, domain.CodeOneOf, problems[0].Code)
 	assert.Empty(t, fixed)
+}
+
+// Review of #282: files given with none were a problem of the files, a field none skips, so no form showed it.
+func TestFilesGivenWithNoneLeaveTheirSectionToCheck(t *testing.T) {
+	q := questions(facts(nil), Given{EnvStrategy: EnvNone, EnvFiles: []string{"apps/api/.env"}})
+
+	sections := domain.SectionsOf(Sections(), q.Fields(), q.Problems())
+
+	require.Len(t, sections, 3)
+	assert.Equal(t, SectionEnvFiles, sections[1].ID)
+	assert.Equal(t, domain.SectionToCheck, sections[1].State)
+}
+
+// Review of #282: a strategy given where config.toml copies none was refused for want of files, while a first init takes those found.
+func TestAStrategyGivenWhereConfigCopiesNoneTakesTheFilesFound(t *testing.T) {
+	s := saved()
+	s.Config.Env = project.Env{}
+
+	q := questions(facts(s), Given{EnvStrategy: string(project.EnvMain)})
+
+	assert.Equal(t, []string{"apps/api/.env", "apps/web/.env"}, q.EnvFiles.Picked)
+	assert.Equal(t, domain.OriginDetected, q.EnvFiles.Origin)
+	assert.Empty(t, q.Problems())
 }
