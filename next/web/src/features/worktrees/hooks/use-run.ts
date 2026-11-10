@@ -140,6 +140,7 @@ const doing: Record<MutationCommand, string> = {
   'run-stop': 'Stopping',
   'daemon-restart': 'Restarting',
   'daemon-stop-jobs': 'Stopping',
+  init: 'Setting up',
 }
 
 export const isMutation = (command: string): command is MutationCommand => Object.hasOwn(doing, command)

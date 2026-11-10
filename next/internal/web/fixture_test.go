@@ -3,7 +3,10 @@ package web
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"io/fs"
 	"reflect"
+	"strings"
 	"sync"
 
 	"github.com/LucasPcq/wtm/next/internal/api"
@@ -136,4 +139,41 @@ func (s *stream) bind() api.Stream {
 		<-ctx.Done()
 		return api.Response{Envelope: domain.Envelope{Command: "events"}}
 	}}
+}
+
+// fresh is a repository wtm is not set up in, and other one set up that the web does not list.
+var (
+	fresh = domain.Repo{Root: "/code/fresh", CommonDir: "/code/fresh/.git"}
+	other = domain.Repo{Root: "/code/other", CommonDir: "/code/other/.git"}
+)
+
+// places locates repo, fresh and other by any path under their root, a path of /missing as nothing, any other outside a repository; it records each repository registered, which the server's Repos never lists.
+type places struct {
+	mu         sync.Mutex
+	registered []domain.Repo
+	written    bool // fresh set up since: init wrote its settings
+}
+
+func (p *places) locate(_ context.Context, path string) (Located, error) {
+	switch {
+	case strings.HasSuffix(path, ".txt"):
+		return Located{}, fmt.Errorf("%s: %w", path, ErrNotAFolder)
+	case strings.HasPrefix(path, "/missing"):
+		return Located{}, fmt.Errorf("%s: %w", path, fs.ErrNotExist)
+	case strings.HasPrefix(path, repo.Root):
+		return Located{Repo: repo, SetUp: true}, nil
+	case strings.HasPrefix(path, fresh.Root):
+		p.mu.Lock()
+		defer p.mu.Unlock()
+		return Located{Repo: fresh, SetUp: p.written}, nil
+	case strings.HasPrefix(path, other.Root):
+		return Located{Repo: other, SetUp: true}, nil
+	}
+	return Located{}, &domain.Error{Kind: domain.KindPrecondition, Code: domain.CodeNotARepository}
+}
+
+func (p *places) register(_ context.Context, repo domain.Repo) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.registered = append(p.registered, repo)
 }

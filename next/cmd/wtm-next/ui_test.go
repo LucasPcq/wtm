@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/webserver"
 	"github.com/LucasPcq/wtm/next/internal/api"
+	"github.com/LucasPcq/wtm/next/internal/web"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -171,4 +173,34 @@ func TestUISaysWhatToDoWithAServerThatCannotBeAskedToStop(t *testing.T) {
 func TestTheDaemonsLogIsNoneWithNoSocket(t *testing.T) {
 	assert.Empty(t, daemonLogOf(""), "a path of no directory would serve a daemon.log beside the server")
 	assert.Equal(t, filepath.Join("/state", "daemon.log"), daemonLogOf(filepath.Join("/state", "wtm.sock")))
+}
+
+// Review of the web's Add a repository: a path to a file read "doesn't exist" while the file is there.
+func TestAFileIsNoFolderAndAPathToNothingIsMissing(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "README.md")
+	require.NoError(t, os.WriteFile(file, []byte("hi\n"), 0o600))
+
+	_, inFile := locateRepo(t.Context(), file)
+	_, missing := locateRepo(t.Context(), filepath.Join(dir, "gone"))
+
+	assert.ErrorIs(t, inFile, web.ErrNotAFolder)
+	assert.ErrorIs(t, missing, fs.ErrNotExist)
+}
+
+// Review of #286: every error of os.Stat read as nothing there; a folder it may not read is not missing.
+func TestAPathItMayNotReadIsNotMissing(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root reads every folder")
+	}
+	locked := filepath.Join(t.TempDir(), "locked")
+	require.NoError(t, os.Mkdir(locked, 0o700))
+	require.NoError(t, os.Chmod(locked, 0o000))
+	t.Cleanup(func() { _ = os.Chmod(locked, 0o700) })
+
+	_, err := locateRepo(t.Context(), filepath.Join(locked, "app"))
+
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, fs.ErrNotExist)
+	assert.ErrorIs(t, err, fs.ErrPermission)
 }

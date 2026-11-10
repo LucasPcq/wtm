@@ -1,10 +1,10 @@
-import type { ListDetail } from '@/api/types.gen'
+import type { ListDetail, WebRepo } from '@/api/types.gen'
 import { listDetail } from '@/test/fixtures'
 
 // acme, the one repository the component tests' server answers for, with two stacks (feat/billing-ui behind
 // feat/billing, feat/search-docs on feat/search) and a worktree with a change (fix/login). A test changes what it
 // answers with server.use.
-export const repo = { id: 'r1', root: '/acme', common_dir: '/acme/.git' }
+export const repo: WebRepo = { id: 'r1', root: '/acme', common_dir: '/acme/.git', set_up: true }
 
 export const worktrees: ListDetail[] = [
   listDetail('main', { main: true, parent: '', ahead: null, behind: null, path: '/acme' }),

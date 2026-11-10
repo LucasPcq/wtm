@@ -35,9 +35,17 @@ type Params struct {
 	// DaemonLog returns the path of the log of wtm's daemon, where a daemon that did not start says why; nil serves none.
 	DaemonLog func() string
 	// Repos lists the repositories wtm knows, dropping those no longer initialized.
-	Repos   func(ctx context.Context) ([]domain.Repo, error)
-	Version string
-	Token   string
+	Repos func(ctx context.Context) ([]domain.Repo, error)
+	// Locate finds the repository of a path, set up or not: an error wrapping fs.ErrNotExist when nothing is there, ErrNotAFolder for a file, a *domain.Error coded domain.CodeNotARepository outside any.
+	Locate func(ctx context.Context, path string) (Located, error)
+	// Register lists a repository set up among those wtm knows; it never fails.
+	Register func(ctx context.Context, repo domain.Repo)
+	// Home is the user's home, where a path typed ~/… starts; empty reads ~ as it is.
+	Home string
+	// NotSetUp are the commands a repository added but not set up yet takes: its set-up, and those on the machine rather than on it.
+	NotSetUp []string
+	Version  string
+	Token    string
 	// Kill stops at once the children of every operation of the process already cancelled, as a second Ctrl+C does: it is process-wide, never one operation's.
 	Kill func()
 	// CommandLine spells a follow-up as the command line runs it, for one the catalogue cannot run.
@@ -61,7 +69,8 @@ type Server struct {
 	askedOnce sync.Once
 
 	mu        sync.Mutex
-	running   map[string]running // by correlation id
+	running   map[string]running     // by correlation id
+	pending   map[string]domain.Repo // the repositories not set up a client added, by id, served until set up or until the server stops
 	active    int
 	idleSince time.Time
 }
@@ -75,12 +84,14 @@ type running struct {
 // New returns the server of params.
 func New(params Params) *Server {
 	stopping, stop := context.WithCancel(context.Background())
-	s := &Server{params: params, stopping: stopping, stop: stop, running: map[string]running{}, idleSince: time.Now(), asked: make(chan struct{})}
+	s := &Server{params: params, stopping: stopping, stop: stop, running: map[string]running{}, pending: map[string]domain.Repo{}, idleSince: time.Now(), asked: make(chan struct{})}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.page)
 	mux.HandleFunc("GET /api/version", s.version)
 	mux.HandleFunc("GET /api/repos", s.repos)
+	mux.HandleFunc("POST /api/repos", s.add)
+	mux.HandleFunc("POST /api/repos/check", s.check)
 	mux.HandleFunc("GET /api/repos/{repo}/commands", s.commands)
 	mux.HandleFunc("POST /api/repos/{repo}/commands/{name}/questions", s.questions)
 	mux.HandleFunc("POST /api/repos/{repo}/commands/{name}", s.execute)
@@ -175,11 +186,12 @@ func (s *Server) idle() bool {
 // ----------------------------------------------------------------------------
 // Repositories
 
-// A Repo is a repository as the routes name it: its ID, the {repo} of a route, and where it is.
+// A Repo is a repository as the routes name it: its ID, the {repo} of a route, where it is, and whether wtm is set up in it (one not set up is one a client added, which init sets up).
 type Repo struct {
 	ID        string `json:"id"`
 	Root      string `json:"root"`
 	CommonDir string `json:"common_dir"`
+	SetUp     bool   `json:"set_up"`
 }
 
 // repoIDBytes is how many bytes of the SHA-256 of a repository's common directory its ID keeps.
@@ -208,6 +220,12 @@ func (s *Server) repoOf(w http.ResponseWriter, r *http.Request, id string) (doma
 		if RepoID(repo) == id {
 			return repo, true
 		}
+	}
+	s.mu.Lock()
+	pending, added := s.pending[id]
+	s.mu.Unlock()
+	if added {
+		return pending, true
 	}
 	writeError(w, http.StatusNotFound, &domain.Error{Kind: domain.KindInvalid, Code: CodeRepoUnknown, Message: "no repository wtm knows has the id " + id})
 	return domain.Repo{}, false
@@ -244,6 +262,7 @@ func (s *Server) version(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"version": s.params.Version})
 }
 
+// repos lists the repositories wtm knows, set up, then those not set up a client added, by id.
 func (s *Server) repos(w http.ResponseWriter, r *http.Request) {
 	repos, err := s.params.Repos(r.Context())
 	if err != nil {
@@ -253,9 +272,46 @@ func (s *Server) repos(w http.ResponseWriter, r *http.Request) {
 
 	listed := make([]Repo, 0, len(repos))
 	for _, repo := range repos {
-		listed = append(listed, Repo{ID: RepoID(repo), Root: repo.Root, CommonDir: repo.CommonDir})
+		listed = append(listed, Repo{ID: RepoID(repo), Root: repo.Root, CommonDir: repo.CommonDir, SetUp: true})
+	}
+	s.mu.Lock()
+	pending := maps.Clone(s.pending)
+	s.mu.Unlock()
+	for _, id := range slices.Sorted(maps.Keys(pending)) {
+		repo := pending[id]
+		if slices.ContainsFunc(listed, func(known Repo) bool { return known.ID == id }) {
+			s.mu.Lock()
+			delete(s.pending, id) // listed since it was added
+			s.mu.Unlock()
+			continue
+		}
+		listed = append(listed, Repo{ID: id, Root: repo.Root, CommonDir: repo.CommonDir, SetUp: s.setUp(r.Context(), repo)})
 	}
 	writeJSON(w, http.StatusOK, listed)
+}
+
+// setUp reports whether wtm is set up in repo as its files stand now: a repository added is set up once init wrote its settings, whether or not the registry lists it yet.
+func (s *Server) setUp(ctx context.Context, repo domain.Repo) bool {
+	located, err := s.params.Locate(ctx, repo.Root)
+	return err == nil && located.SetUp
+}
+
+// CodeNotSetUp refuses a command on a repository added but not set up yet, other than those it takes (Params.NotSetUp).
+const CodeNotSetUp = "web.not_set_up"
+
+// awaitsSetUp reports whether id names a repository added but not listed, whose settings are not written yet.
+func (s *Server) awaitsSetUp(ctx context.Context, id string) bool {
+	s.mu.Lock()
+	repo, added := s.pending[id]
+	s.mu.Unlock()
+	if !added {
+		return false
+	}
+	repos, err := s.params.Repos(ctx)
+	if err == nil && slices.ContainsFunc(repos, func(known domain.Repo) bool { return RepoID(known) == id }) {
+		return false
+	}
+	return !s.setUp(ctx, repo)
 }
 
 // A listedCommand is a command of the catalogue as GET …/commands lists it: its name and its form outside any repository.
@@ -306,6 +362,10 @@ func (s *Server) call(w http.ResponseWriter, r *http.Request) (domain.Repo, api.
 	command, found := s.params.Catalogue.Find(r.PathValue("name"))
 	if !found {
 		writeError(w, http.StatusNotFound, &domain.Error{Kind: domain.KindInvalid, Code: CodeCommandUnknown, Message: "the catalogue has no command " + r.PathValue("name")})
+		return domain.Repo{}, api.Command{}, body{}, false
+	}
+	if !slices.Contains(s.params.NotSetUp, command.Name) && s.awaitsSetUp(r.Context(), RepoID(repo)) {
+		writeError(w, http.StatusPreconditionFailed, &domain.Error{Kind: domain.KindPrecondition, Code: CodeNotSetUp, Message: repo.Root + " is not set up yet: set it up first", Params: domain.Params{"command": command.Name}})
 		return domain.Repo{}, api.Command{}, body{}, false
 	}
 

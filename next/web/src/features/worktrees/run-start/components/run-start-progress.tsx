@@ -1,6 +1,6 @@
+import { DialogBand } from '@/components/dialog-band'
 import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { DialogBand } from '@/features/worktrees/components/dialog-band'
 import { DialogScroll } from '@/features/worktrees/components/dialog-scroll'
 import { JobSection } from '@/features/worktrees/components/job-section'
 import { PhaseRow } from '@/features/worktrees/components/phase-row'

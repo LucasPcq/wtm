@@ -27,7 +27,7 @@ function serve(status: number, body = '') {
   )
 }
 
-const repo = { id: 'r1', root: '/acme', common_dir: '/acme/.git' }
+const repo = { id: 'r1', root: '/acme', common_dir: '/acme/.git', set_up: true }
 
 test('a line of a repository invalidates what it answers, and a warning shows until the next line', async () => {
   const client = new QueryClient()

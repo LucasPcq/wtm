@@ -1,7 +1,7 @@
 import { toast } from 'sonner'
 import type { Applied } from '@/api/queries/commands'
+import { RunDialogContent } from '@/components/run-dialog-content'
 import { Dialog } from '@/components/ui/dialog'
-import { RunDialogContent } from '@/features/worktrees/components/run-dialog-content'
 import { ExecProgress } from '@/features/worktrees/exec/components/exec-progress'
 import { ExecWizard } from '@/features/worktrees/exec/components/exec-wizard'
 import { lockHeld, passedWords } from '@/features/worktrees/exec/utils/words'

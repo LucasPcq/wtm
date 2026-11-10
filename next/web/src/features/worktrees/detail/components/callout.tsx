@@ -62,6 +62,7 @@ const runsHere: Record<
   },
   create: null,
   checkout: null,
+  init: null,
   prune: { verb: pruneAction.label, open: (repo, fix) => openPrune(repo, subjectsOf(fix)) },
   exec: null,
   // its fixes name its isolation, which only the command line answers: copied, never run here

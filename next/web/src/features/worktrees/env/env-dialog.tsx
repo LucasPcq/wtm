@@ -1,7 +1,7 @@
 import { toast } from 'sonner'
 import type { Applied } from '@/api/queries/commands'
+import { RunDialogContent } from '@/components/run-dialog-content'
 import { Dialog } from '@/components/ui/dialog'
-import { RunDialogContent } from '@/features/worktrees/components/run-dialog-content'
 import { EnvProgress } from '@/features/worktrees/env/components/env-progress'
 import { EnvWizard } from '@/features/worktrees/env/components/env-wizard'
 import { openEnv, useEnvDialog } from '@/features/worktrees/hooks/use-env-dialog'

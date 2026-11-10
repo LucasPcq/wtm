@@ -1,8 +1,8 @@
 import { type QueryClient, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { type Applied, readQuery } from '@/api/queries/commands'
+import { RunDialogContent } from '@/components/run-dialog-content'
 import { Dialog } from '@/components/ui/dialog'
-import { RunDialogContent } from '@/features/worktrees/components/run-dialog-content'
 import { succeeded, useRun } from '@/features/worktrees/hooks/use-run'
 import {
   type RunUpRan,

@@ -1,17 +1,27 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { ChevronsUpDown } from 'lucide-react'
+import { ChevronsUpDown, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { reposQuery } from '@/api/queries/repos'
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar'
+import { AddRepository } from '@/features/shell/components/add-repository'
 import { repoName } from '@/lib/repo'
 
 export function RepoPicker({ current: id }: { current: string | undefined }) {
   const repos = useQuery(reposQuery)
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
+  const [adding, setAdding] = useState(false)
   const current = repos.data?.find((repo) => repo.id === id)
 
   return (
@@ -50,15 +60,32 @@ export function RepoPicker({ current: id }: { current: string | undefined }) {
                     >
                       <span className="flex min-w-0 flex-1 flex-col">
                         <span className="truncate">{repoName(repo.root)}</span>
-                        <span className="truncate text-xs text-muted-foreground">{repo.root}</span>
+                        <span className="truncate text-xs text-muted-foreground" title={repo.root}>
+                          {repo.root}
+                        </span>
                       </span>
                     </CommandItem>
                   ))}
+                </CommandGroup>
+                <CommandSeparator />
+                <CommandGroup forceMount>
+                  <CommandItem
+                    forceMount
+                    value="add a repository"
+                    onSelect={() => {
+                      setOpen(false)
+                      setAdding(true)
+                    }}
+                  >
+                    <Plus />
+                    Add a repository
+                  </CommandItem>
                 </CommandGroup>
               </CommandList>
             </Command>
           </PopoverContent>
         </Popover>
+        <AddRepository open={adding} onOpenChange={setAdding} />
       </SidebarMenuItem>
     </SidebarMenu>
   )

@@ -124,3 +124,8 @@ func jobLogFile(ctx context.Context, job web.JobLog) (string, error) {
 	}
 	return "", nil
 }
+
+// beforeSetUp are the commands the web runs on a repository added but not set up yet: init, and those on wtm's daemon, which is the machine's.
+func beforeSetUp() []string {
+	return []string{initialize.Name, daemonstatus.Name, daemonstop.Name, daemonrestart.Name, daemonstopjobs.Name}
+}

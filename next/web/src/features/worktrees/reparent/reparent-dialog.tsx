@@ -1,5 +1,5 @@
+import { RunDialogContent } from '@/components/run-dialog-content'
 import { Dialog } from '@/components/ui/dialog'
-import { RunDialogContent } from '@/features/worktrees/components/run-dialog-content'
 import { useReparentDialog } from '@/features/worktrees/hooks/use-reparent-dialog'
 import { useRun } from '@/features/worktrees/hooks/use-run'
 import { openSync } from '@/features/worktrees/hooks/use-sync-dialog'

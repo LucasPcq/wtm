@@ -3,7 +3,15 @@ import { DialogContent } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 
 // a run keeps one size while its phases come and go; once it ended, the dialog eases to its content
-export function RunDialogContent({ running, children }: { running: boolean; children: ReactNode }) {
+export function RunDialogContent({
+  running,
+  className,
+  children,
+}: {
+  running: boolean
+  className?: string
+  children: ReactNode
+}) {
   return (
     <DialogContent
       className={cn(
@@ -11,6 +19,7 @@ export function RunDialogContent({ running, children }: { running: boolean; chil
         // the frame pads 24 where shadcn pads 16: its footer and close button follow; its title is 4 above its line
         '[&_[data-slot=dialog-header]]:gap-1 [&_[data-slot=dialog-footer]]:-mx-6 [&_[data-slot=dialog-footer]]:-mb-6 [&_[data-slot=dialog-footer]]:px-6 [&_[data-slot=dialog-footer]]:py-4 [&>button.absolute]:top-4 [&>button.absolute]:right-4',
         running && 'h-[min(36rem,85vh)]',
+        className,
       )}
       showCloseButton={!running}
       // a toast's button (Undo) is clicked over the dialog: it keeps the dialog open

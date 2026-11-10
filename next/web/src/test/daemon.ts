@@ -111,7 +111,10 @@ export const hangingRestart = http.post('/api/repos/:repo/commands/daemon-restar
 
 // acme and a second repository, wtm, each with its own page
 export const twoRepos = http.get('/api/repos', () =>
-  HttpResponse.json([repo, { id: 'r2', root: '/Users/me/dev/wtm', common_dir: '/Users/me/dev/wtm/.git' }]),
+  HttpResponse.json([
+    repo,
+    { id: 'r2', root: '/Users/me/dev/wtm', common_dir: '/Users/me/dev/wtm/.git', set_up: true },
+  ]),
 )
 
 export const answeringRestart = (failing?: 'start_failed' | 'not_back') =>

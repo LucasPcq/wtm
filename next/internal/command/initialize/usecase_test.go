@@ -120,6 +120,45 @@ func TestAConfigANewerWtmWroteIsNotSetUpAgain(t *testing.T) {
 	assert.True(t, newer)
 }
 
+// The web's Couldn't save showed git's raw error, absolute paths and all: a folder it may not write names the folder to fix.
+func TestAConfigItMayNotWriteNamesTheFolderToFix(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root writes every folder")
+	}
+	w := newWorld(t)
+	require.NoError(t, os.MkdirAll(w.stateDir, 0o755))
+	require.NoError(t, os.Chmod(w.stateDir, 0o555))
+	t.Cleanup(func() { _ = os.Chmod(w.stateDir, 0o755) })
+
+	outcome, err := w.usecase.Run(t.Context(), initialize.Request{}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	require.NotNil(t, outcome.Result)
+	failure := outcome.Result.Items[0].Err
+	require.NotNil(t, failure)
+	assert.Equal(t, initialize.CodeWriteFailed, failure.Code)
+	assert.Equal(t, "permission denied on .git/wtm/config.toml: check who owns .git/wtm, then set it up again", failure.Text())
+}
+
+// Review of #286: in a repository never set up, .git/wtm does not exist yet; the folder to fix is the one wtm could not create it in.
+func TestAFirstInitItMayNotWriteNamesTheFolderThatExists(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root writes every folder")
+	}
+	w := newWorld(t)
+	git := filepath.Dir(w.stateDir)
+	require.NoError(t, os.Chmod(git, 0o555))
+	t.Cleanup(func() { _ = os.Chmod(git, 0o755) })
+
+	outcome, err := w.usecase.Run(t.Context(), initialize.Request{}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	require.NotNil(t, outcome.Result)
+	failure := outcome.Result.Items[0].Err
+	require.NotNil(t, failure)
+	assert.Equal(t, "permission denied on .git/wtm/config.toml: check who owns .git, then set it up again", failure.Text())
+}
+
 func TestAConfigChangedOnDiskSinceThePlanIsNotOverwritten(t *testing.T) {
 	w := newWorld(t)
 	w.configure(t, reInit)

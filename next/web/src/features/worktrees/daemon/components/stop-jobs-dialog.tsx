@@ -1,7 +1,7 @@
 import { toast } from 'sonner'
 import type { Applied, Planned } from '@/api/queries/commands'
+import { RunDialogContent } from '@/components/run-dialog-content'
 import { Dialog } from '@/components/ui/dialog'
-import { RunDialogContent } from '@/features/worktrees/components/run-dialog-content'
 import { StopProgress } from '@/features/worktrees/components/stop-progress'
 import { StopJobsConfirm } from '@/features/worktrees/daemon/components/stop-jobs-confirm'
 import { useDaemonRuns } from '@/features/worktrees/daemon/hooks/use-daemon-runs'
