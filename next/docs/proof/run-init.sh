@@ -22,11 +22,12 @@ here=$(cd "$(dirname "$0")" && pwd)
 export TMUX_TMPDIR
 TMUX_TMPDIR=$(mktemp -d /tmp/tmx.XXXX)
 
-roots=()
+# fresh runs in subshells: each sandbox is listed in a file, for the trap to find
+roots=$TMUX_TMPDIR/roots
 # fresh: a new sandbox, entered, with config.toml as the legacy wtm init writes it.
 fresh() {
   root=$(mktemp -d /tmp/wtmXXXXX)
-  roots+=("$root")
+  echo "$root" >>"$roots"
   "$here/run-init-repo.sh" "$root" "$legacy" >/dev/null
   export HOME=$root/home
   cd "$root/acme"
@@ -130,7 +131,16 @@ tty_side() {
   normalise "$tty"/*
 }
 
-trap 'rm -rf ${roots[@]+"${roots[@]}"} "$TMUX_TMPDIR"' EXIT
+# a sandbox's daemon listens under its own HOME: stop it there, never another, before deleting the sandbox
+cleanup() {
+  local root
+  while read -r root; do
+    HOME=$root/home "$next" daemon stop --yes </dev/null >/dev/null 2>&1 || true
+    rm -rf "$root"
+  done < <(cat "$roots" 2>/dev/null)
+  rm -rf "$TMUX_TMPDIR"
+}
+trap cleanup EXIT
 run_side legacy "$legacy"
 run_side next "$next"
 tty_side legacy "$legacy"

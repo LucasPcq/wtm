@@ -842,7 +842,7 @@
 === 05-compose-flags: exit legacy 0, next 0
 --- legacy/05-compose-flags
 +++ next/05-compose-flags
-@@ -1,27 +1,49 @@
+@@ -1,27 +1,46 @@
  ## run.toml
  #:schema ./schemas/run.schema.json
  
@@ -861,7 +861,6 @@
 -    REDIS_PORT = 6379
 +  cmd = "docker compose up -d postgres"
 +  stop = "docker compose stop postgres"
-+  binds_no_port = true
 +  scope = "shared"
 +  [job.namespace]
 +    name = "acme_{worktree}"
@@ -875,14 +874,12 @@
 -  cmd = "pnpm run dev"
 +  cmd = "docker compose up -d redis"
 +  stop = "docker compose stop redis"
-+  binds_no_port = true
 +
 +[[job]]
 +  name = "mailpit"
 +  kind = "service"
 +  cmd = "docker compose up -d mailpit"
 +  stop = "docker compose stop mailpit"
-+  binds_no_port = true
 +  scope = "shared"
 +
 +[[job]]
@@ -904,7 +901,7 @@
    cwd = "apps/api"
    [job.ports]
      PORT = 4000
-@@ -29,9 +51,9 @@
+@@ -29,9 +48,9 @@
      port = "PORT"
  
  [[job]]
@@ -916,7 +913,7 @@
    cwd = "apps/web"
    [job.ports]
      PORT = 3000
-@@ -39,83 +61,74 @@
+@@ -39,83 +58,74 @@
      port = "PORT"
  
  [[job]]
@@ -1030,7 +1027,7 @@
  ## docker-compose.yml
  services:
    postgres:
-@@ -123,15 +136,15 @@
+@@ -123,15 +133,15 @@
      environment:
        POSTGRES_PASSWORD: postgres
      ports:
@@ -1049,7 +1046,7 @@
        - "1025:1025"
  ## config.toml, its .env files
  strategy = "example"
-@@ -146,4 +159,3 @@
+@@ -146,4 +156,3 @@
  target = "packages/db/.env"
  template = "packages/db/.env.example"
  ## git status

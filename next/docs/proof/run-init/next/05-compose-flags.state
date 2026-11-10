@@ -8,7 +8,6 @@ addressing = "names"
   kind = "service"
   cmd = "docker compose up -d postgres"
   stop = "docker compose stop postgres"
-  binds_no_port = true
   scope = "shared"
   [job.namespace]
     name = "acme_{worktree}"
@@ -20,14 +19,12 @@ addressing = "names"
   kind = "service"
   cmd = "docker compose up -d redis"
   stop = "docker compose stop redis"
-  binds_no_port = true
 
 [[job]]
   name = "mailpit"
   kind = "service"
   cmd = "docker compose up -d mailpit"
   stop = "docker compose stop mailpit"
-  binds_no_port = true
   scope = "shared"
 
 [[job]]
