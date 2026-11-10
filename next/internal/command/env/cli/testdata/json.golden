@@ -68,6 +68,9 @@
         "isolation": "isolated",
         "pending": false,
         "numbered": true,
+        "phases": [
+          "env"
+        ],
         "files": [
           {
             "target": "apps/api/.env",

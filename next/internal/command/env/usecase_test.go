@@ -64,7 +64,7 @@ func TestAReconciledWorktreeHasNothingLeftToReconcile(t *testing.T) {
 func TestTheDefaultPickIsTheCallersAndAPersonIsOfferedTheWorktreesOutOfStepToo(t *testing.T) {
 	w := newWorld(acmeSeed())
 
-	q := w.questions(t, env.Request{Caller: domain.Caller{Cwd: "/repo/.trees/" + login + "/apps"}})
+	q := w.questions(t, env.Request{Caller: domain.Caller{Cwd: "/repo/.trees/" + login + "/apps", Surface: domain.SurfaceCLI}})
 
 	assert.Equal(t, domain.OriginDefault, q.Worktrees.Picked.Origin)
 	assert.Equal(t, []string{login}, q.Worktrees.Picked.Value)
@@ -72,6 +72,27 @@ func TestTheDefaultPickIsTheCallersAndAPersonIsOfferedTheWorktreesOutOfStepToo(t
 	assert.Equal(t, 2, optionOf(q.Worktrees.Options, billing).OutOfStep)
 	assert.Equal(t, 0, optionOf(q.Worktrees.Options, login).OutOfStep)
 	assert.Equal(t, project.Verbatim, optionOf(q.Worktrees.Options, verbatim).Isolation)
+}
+
+func TestACallOfTheWebIsOfferedTheWorktreesOutOfStepAlone(t *testing.T) {
+	at := "/repo/.trees/" + login
+	cases := map[string]struct {
+		caller domain.Caller
+		want   []string
+	}{
+		"web":          {caller: domain.Caller{Dir: at, Named: true, Cwd: at, Surface: domain.SurfaceWeb}, want: []string{billing, fresh}},
+		"project_dir":  {caller: domain.Caller{Dir: "/repo/main", Named: true, Cwd: at, Surface: domain.SurfaceCLI}, want: []string{billing, fresh, login}},
+		"command_line": {caller: domain.Caller{Dir: at, Cwd: at, Surface: domain.SurfaceCLI}, want: []string{billing, fresh, login}},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			w := newWorld(acmeSeed())
+
+			q := w.questions(t, env.Request{Caller: c.caller})
+
+			assert.Equal(t, c.want, q.Worktrees.Prechecked)
+		})
+	}
 }
 
 func TestOverwriteAndPruneAreAskedOnlyWhenTheWorktreesAskedHaveSome(t *testing.T) {
@@ -109,6 +130,7 @@ func TestAnUnnumberedWorktreeIsNumberedThenItsPortsSettled(t *testing.T) {
 	outcome := w.run(t, naming(fresh), domain.RunOptions{})
 
 	assert.False(t, reconcileOf(t, planned.Plan, fresh).Numbered)
+	assert.Equal(t, []domain.Phase{domain.PhaseOrdinal, domain.PhaseEnv}, reconcileOf(t, planned.Plan, fresh).Phases)
 	assert.Equal(t, domain.StatusDone, outcome.Result.Items[0].Status)
 	meta, _ := w.store.Meta(fresh)
 	assert.Equal(t, 4, meta.Ordinal)
@@ -147,6 +169,20 @@ func TestAJobUpThatReadsAFileWrittenIsToRestart(t *testing.T) {
 	assert.Empty(t, outcome.Result.Items[1].Warnings)
 	require.NotNil(t, outcome.Result.Items[0].Warnings[0].FollowUp)
 	assert.Equal(t, domain.CommandRunStart, outcome.Result.Items[0].Warnings[0].FollowUp.Command)
+}
+
+func TestADryRunSaysTheJobsItsApplyWouldLeaveOnTheOldValues(t *testing.T) {
+	s := acmeSeed()
+	s.Jobs = []run.Job{{Name: "web", WorkDir: "/repo/.trees/" + billing, Up: true}}
+	w := newWorld(s)
+
+	planned := w.run(t, naming(billing), domain.RunOptions{DryRun: true})
+	applied := w.run(t, naming(billing), domain.RunOptions{})
+
+	assert.Equal(t, []string{env.CodeRestart}, codes(planned.Warnings))
+	assert.Equal(t, billing+": web would run on the old values until restarted", planned.Warnings[0].Message)
+	assert.Nil(t, planned.Warnings[0].FollowUp)
+	assert.Empty(t, codes(applied.Warnings))
 }
 
 func TestTheMainCheckoutSpelledWithPortsKeepsItsPorts(t *testing.T) {
@@ -266,7 +302,7 @@ func TestAnUnattendedRunWithNoneNamedWritesTheCallersWorktreeAlone(t *testing.T)
 	// the review: run from main, it wrote into every worktree out of step, which nobody named
 	w := newWorld(acmeSeed())
 
-	outcome := w.run(t, env.Request{Caller: domain.Caller{Cwd: mainPath}}, domain.RunOptions{})
+	outcome := w.run(t, env.Request{Caller: domain.Caller{Cwd: mainPath, Surface: domain.SurfaceCLI}}, domain.RunOptions{})
 
 	require.Len(t, outcome.Result.Items, 1)
 	assert.Equal(t, "main", outcome.Result.Items[0].Subject)
@@ -322,6 +358,62 @@ func TestOneWorktreeFailingStopsNoneOfTheOthers(t *testing.T) {
 	assert.Equal(t, env.CodeFailed, outcome.Result.Items[0].Err.Code)
 	assert.Equal(t, domain.StatusDone, outcome.Result.Items[1].Status)
 	assert.Equal(t, "PORT=3020\nAPI_URL=http://localhost:4020\n", w.file(t, billing, webEnv))
+}
+
+func TestAWorktreeThatFailedIsOfferedToRunAgainWithTheSameSwitches(t *testing.T) {
+	s := acmeSeed()
+	s.Files["/repo/.trees/"+login+"/"+webEnv] = "PORT=3000\nAPI_URL=http://localhost:4010\n"
+	w := newWorld(s)
+	w.usecase.EnvFiles = failingIn{Files: w.store, dir: "/repo/.trees/" + login + "/", edit: errors.New("disk full")}
+	req := naming(login, billing)
+	req.Overwrite = true
+
+	outcome := w.run(t, req, domain.RunOptions{})
+
+	require.Len(t, outcome.Result.FollowUps, 1)
+	retry := outcome.Result.FollowUps[0]
+	assert.Equal(t, env.CodeRetry, retry.Code)
+	assert.Equal(t, []domain.Answered{{Path: domain.PathWorktree, Values: []string{login}}, {Path: env.PathOverwrite, Values: domain.SaidYes(true)}}, retry.Answers)
+	assert.Equal(t, &retry, outcome.Result.Items[0].Err.FollowUp)
+}
+
+func TestARetrySwitchesTheIsolationOfTheWorktreesTheRunSwitchedAlone(t *testing.T) {
+	// the review: B failing beside a pending A was retried with A's --isolation, which then recorded B's
+	cases := map[string]struct {
+		failing   string
+		isolation []string
+	}{
+		"not_switched": {failing: login},
+		"switched":     {failing: billing, isolation: []string{string(project.Isolated)}},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			s := acmeSeed()
+			s.Meta[billing] = worktree.Meta{SourceBranch: "main", EnvStrategy: project.EnvMain, Ordinal: 2}
+			s.Files["/repo/.trees/"+login+"/"+webEnv] = "PORT=3000\nAPI_URL=http://localhost:4010\n"
+			w := newWorld(s)
+			w.usecase.EnvFiles = failingIn{Files: w.store, dir: "/repo/.trees/" + c.failing + "/", edit: errors.New("disk full")}
+
+			outcome := w.run(t, env.Request{Worktrees: []string{billing, login}, Isolation: project.Isolated}, domain.RunOptions{})
+
+			require.Len(t, outcome.Result.FollowUps, 1)
+			isolation := slices.IndexFunc(outcome.Result.FollowUps[0].Answers, func(a domain.Answered) bool { return a.Path == domain.PathIsolation })
+			if c.isolation == nil {
+				assert.Negative(t, isolation)
+				return
+			}
+			require.GreaterOrEqual(t, isolation, 0)
+			assert.Equal(t, c.isolation, outcome.Result.FollowUps[0].Answers[isolation].Values)
+		})
+	}
+}
+
+func TestARunWhereEveryWorktreePassedOffersNoRetry(t *testing.T) {
+	w := newWorld(acmeSeed())
+
+	outcome := w.run(t, naming(billing), domain.RunOptions{})
+
+	assert.Empty(t, outcome.Result.FollowUps)
 }
 
 func TestACancelledApplySkipsTheWorktreesNotStarted(t *testing.T) {

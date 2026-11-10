@@ -126,7 +126,7 @@ func TestACallIsAskedAndRunFromItsDirectory(t *testing.T) {
 	command.Execute(t.Context(), Call{Dir: "/code/app/.trees/feat-a"})
 
 	require.NoError(t, err)
-	want := domain.Caller{Dir: "/code/app/.trees/feat-a", Named: true, Cwd: "/code/app/.trees/feat-a"}
+	want := domain.Caller{Dir: "/code/app/.trees/feat-a", Named: true, Cwd: "/code/app/.trees/feat-a", Surface: domain.SurfaceAPI}
 	assert.Equal(t, want, asked)
 	assert.Equal(t, want, ran)
 }

@@ -2,6 +2,7 @@ package envshow_test
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/envshow"
@@ -96,6 +97,17 @@ func TestTheCredentialsOfALinkedUrlAreWithheld(t *testing.T) {
 
 	assert.Equal(t, ptr("http://•••@localhost:4020/v1"), keyOf(t, hidden, webEnv, "API_URL").Here)
 	assert.Equal(t, ptr("http://admin:hunter2@localhost:4020/v1"), keyOf(t, shown, webEnv, "API_URL").Here)
+}
+
+func TestTheSecretParametersOfALinkedValueAreWithheld(t *testing.T) {
+	// the review of the web: a linked value showed its access_token while Show values was off
+	s := acmeSeed()
+	s.Files[linkedPath(billing)+"/"+webEnv] = "PORT=3010\nAPI_URL=http://localhost:4010/v1?access_token=abc\n"
+
+	d, _ := read(t, s, envshow.Request{Worktree: billing})
+
+	assert.Equal(t, ptr("http://localhost:4010/v1?access_token=•••"), keyOf(t, d, webEnv, "API_URL").Here)
+	assert.NotContains(t, fmt.Sprint(d.Checks), "abc")
 }
 
 func TestAPortWtmLeavesAloneIsToCheck(t *testing.T) {

@@ -78,9 +78,12 @@ func (f Facts) subject(name string) (worktree.Worktree, bool) {
 	return f.Worktrees[at], true
 }
 
-// prechecked is the pick a person is offered, the main one first: the worktrees out of step under req's switches, as options counts them, and the one the caller stands in.
+// prechecked is the pick a person is offered, the main one first: the worktrees out of step under req's switches, as options counts them, and the one the caller stands in on the command line: a call of the web or the API stands in none.
 func (f Facts) prechecked(req Request, options []domain.Option) []string {
-	current := names(f.targets(Request{Caller: req.Caller}))
+	var current []string
+	if req.Caller.Surface == domain.SurfaceCLI {
+		current = names(f.targets(Request{Caller: req.Caller}))
+	}
 	found := []string{}
 	for _, option := range options {
 		if option.OutOfStep > 0 || slices.Contains(current, option.Value) {
@@ -122,7 +125,7 @@ func (f Facts) pending(w worktree.Worktree) bool {
 // ----------------------------------------------------------------------------
 // The decision of each worktree
 
-// A Reconcile is one worktree asked: its name and path, whether it is the main checkout, whether its directory is gone (left as it is), the strategy its values come from, its isolation, whether it has yet to choose one (Pending: its ports and the values wtm owns are left as they are), the isolation the apply records when it changes (Records), whether it holds an ordinal (Numbered: one that needs it and has none is numbered by the apply, which settles its ports then), each .env file, what wtm writes into them (its values withheld unless shown), why its ports cannot be settled when they cannot, why its files could not be read (left as it is), and the jobs up in it that read a file that changes, which run on the old values until restarted.
+// A Reconcile is one worktree asked: its name and path, whether it is the main checkout, whether its directory is gone (left as it is), the strategy its values come from, its isolation, whether it has yet to choose one (Pending: its ports and owned values are left as they are), the isolation the apply records when it changes (Records), the phases of its apply (none when it is left as it is), whether it holds an ordinal (Numbered: one that needs it and has none is numbered by the apply, which settles its ports then), each .env file, what wtm writes into them (its values withheld unless shown), why its ports cannot be settled when they cannot, why its files could not be read (left as it is), and the jobs up in it that read a file that changes, which run on the old values until restarted.
 type Reconcile struct {
 	Worktree   string              `json:"worktree"`
 	Path       string              `json:"path"`
@@ -133,6 +136,7 @@ type Reconcile struct {
 	Pending    bool                `json:"pending"`
 	Records    project.Isolation   `json:"records,omitempty"`
 	Numbered   bool                `json:"numbered"`
+	Phases     []domain.Phase      `json:"phases"`
 	Files      []File              `json:"files"`
 	Ports      envs.Redacted       `json:"ports"`
 	Unsettled  string              `json:"unsettled,omitempty"`
@@ -236,7 +240,7 @@ func keysOf(reconciles []Reconcile, status envs.KeyStatus) []KeyAt {
 // reconcile decides what reconciling the worktree name does under req: its keys settled on their source, then what wtm writes over them, the main checkout keeping its addresses spelled with ports when its .env spells them so.
 func (f Facts) reconcile(name string, req Request) Reconcile {
 	w, _ := f.subject(name)
-	r := Reconcile{Worktree: name, Path: w.Path, Main: w.Main, Missing: f.Missing[name] || w.Prunable, Strategy: f.strategy(w, req), Isolation: f.isolation(w, req), Pending: !f.switches(w, req) && f.pending(w), Numbered: true, Files: []File{}, Restart: []string{}}
+	r := Reconcile{Worktree: name, Path: w.Path, Main: w.Main, Missing: f.Missing[name] || w.Prunable, Strategy: f.strategy(w, req), Isolation: f.isolation(w, req), Pending: !f.switches(w, req) && f.pending(w), Numbered: true, Files: []File{}, Restart: []string{}, Phases: []domain.Phase{}}
 	if err := f.ReadErrs[name]; err != nil {
 		r.Unreadable = err.Error()
 	}
@@ -273,7 +277,19 @@ func (f Facts) reconcile(name string, req Request) Reconcile {
 	reconciled.Ports.Applied = false
 	r.Ports = shown(reconciled.Ports, req.ShowValues)
 	r.Restart = f.restart(w, r.Files)
+	r.Phases = phasesOf(r)
 	return r
+}
+
+// phasesOf are the phases of r's apply: its numbering when it has no ordinal, then the writing of its files and its isolation, none when the apply leaves it as it is.
+func phasesOf(r Reconcile) []domain.Phase {
+	switch {
+	case !r.writes():
+		return []domain.Phase{}
+	case !r.Numbered:
+		return []domain.Phase{domain.PhaseOrdinal, domain.PhaseEnv}
+	}
+	return []domain.Phase{domain.PhaseEnv}
 }
 
 // shown is plan with its values when they are shown, else without them.
@@ -341,7 +357,7 @@ func Decide(f Facts, req Request) (Plan, []domain.Warning, error) {
 		reconciles = []Reconcile{}
 	}
 
-	planned := Plan{Worktrees: reconciles, Overwrite: req.Overwrite, Prune: req.Prune, ShowValues: req.ShowValues}
+	planned := Plan{Worktrees: reconciles, Overwrite: req.Overwrite, Prune: req.Prune, ShowValues: req.ShowValues, asked: req}
 	return planned, f.warnings(planned), nil
 }
 
@@ -390,7 +406,7 @@ func (f Facts) warnings(planned Plan) []domain.Warning {
 			warnings = append(warnings, domain.Warning{Code: CodeUnreadable, Message: "couldn't read " + r.Worktree + "'s .env files: " + r.Unreadable + " — left as it is", Params: params})
 		case r.Pending:
 			isolate := domain.FollowUp{Command: Name, Answers: append(on(r.Worktree), domain.Answered{Path: domain.PathIsolation, Values: []string{string(project.Isolated)}}), Code: CodeIsolate, Message: "give it ports of its own"}
-			warnings = append(warnings, domain.Warning{Code: CodePending, Message: r.Worktree + " has yet to choose its isolation: its ports and the values wtm owns are left as they are", Params: params, FollowUp: &isolate})
+			warnings = append(warnings, domain.Warning{Code: CodePending, Message: r.Worktree + " has yet to choose its isolation: its ports and owned values are left as they are", Params: params, FollowUp: &isolate})
 		case r.Unsettled != "":
 			params["cause"] = r.Unsettled
 			warnings = append(warnings, domain.Warning{Code: CodeUnsettled, Message: r.Unsettled + " — " + r.Worktree + "'s ports not settled", Params: params})
@@ -417,6 +433,7 @@ type Plan struct {
 	Prune      bool        `json:"prune"`
 	ShowValues bool        `json:"show_values"`
 	domain.Recapped
+	asked Request
 }
 
 // Locks are the locks the plan needs: the repository shared, and each worktree it writes exclusive.
@@ -581,6 +598,46 @@ func (r Reconcile) recap() []domain.RecapValue {
 
 // CodeFailed is a worktree whose files could not be written, or that could not be numbered.
 const CodeFailed = Name + ".failed"
+
+// CodeRetry is the follow-up of a run where some worktree failed or was not reached: env again, on those, with the same switches.
+const CodeRetry = Name + ".retry"
+
+// retry reconciles again each worktree of items, one per worktree of p in its order, that failed or was not reached, with the switches asked, the isolation only when one of them switched it; none when every one passed.
+func (p Plan) retry(items []Item) *domain.FollowUp {
+	var again []string
+	var isolation project.Isolation
+	for i, item := range items {
+		if item.Status != domain.StatusFailed && item.Reason != domain.ReasonInterrupted {
+			continue
+		}
+		again = append(again, item.Subject)
+		// a worktree the run did not switch keeps its isolation: the switch goes with those it switched alone
+		if p.Worktrees[i].Records != "" {
+			isolation = p.asked.Isolation
+		}
+	}
+	if len(again) == 0 {
+		return nil
+	}
+
+	req := Request{Worktrees: again, Strategy: p.asked.Strategy, Overwrite: p.Overwrite, Prune: p.Prune, Isolation: isolation, ShowValues: p.ShowValues}
+	return &domain.FollowUp{Command: Name, Answers: domain.AnswersOf(Questions{}.Form(), req), Code: CodeRetry, Message: "reconcile them again"}
+}
+
+// restarts are the warnings of the jobs up in each worktree p writes that would run on the old values until restarted, said on its dry run.
+func (p Plan) restarts() []domain.Warning {
+	var warnings []domain.Warning
+	for _, r := range p.Worktrees {
+		if !r.writes() || len(r.Restart) == 0 {
+			continue
+		}
+		// before the apply, the restart has nothing to do: the warning names the worktree and follows up with nothing
+		warning := restartWarning(r)
+		warning.Message, warning.FollowUp = r.Worktree+": "+strings.Join(r.Restart, ", ")+" would run on the old values until restarted", nil
+		warnings = append(warnings, warning)
+	}
+	return warnings
+}
 
 // restartWarning is the warning that the jobs of r up run on the old values until restarted, followed by the restart of the first one.
 func restartWarning(r Reconcile) domain.Warning {

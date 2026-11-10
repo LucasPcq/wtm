@@ -76,3 +76,19 @@ func TestStatusOfASurfaceReadsTheWorktreeOfTheCallsDirectory(t *testing.T) {
 		})
 	}
 }
+
+// The web offered main checked in env's picker: a surface's call names its directory, it stands in no worktree.
+func TestEnvOffersASurfaceTheWorktreesOutOfStepAlone(t *testing.T) {
+	main := configured(t)
+	ownConfigDir(t)
+
+	form, err := command(t, "env").Questions(t.Context(), api.Call{Dir: main})
+
+	require.NoError(t, err)
+	i := slices.IndexFunc(form.Fields, func(field domain.Field) bool { return field.Spec().Path == domain.PathWorktree })
+	require.GreaterOrEqual(t, i, 0)
+	field, ok := form.Fields[i].(domain.MultiSelectField)
+	require.True(t, ok)
+	require.NotEmpty(t, field.Options)
+	assert.Empty(t, field.Prechecked)
+}

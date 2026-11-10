@@ -133,6 +133,7 @@ const doing: Record<MutationCommand, string> = {
   exec: 'Running a command',
   reparent: 'Reparenting',
   sync: 'Syncing',
+  env: 'Reconciling',
   'run-up': 'Starting',
   'run-down': 'Stopping',
   'run-start': 'Starting',

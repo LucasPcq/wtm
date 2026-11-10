@@ -2908,6 +2908,19 @@
         "pending": {
           "type": "boolean"
         },
+        "phases": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/domain.Phase"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "ports": {
           "$ref": "#/$defs/env.Redacted"
         },
@@ -2949,6 +2962,7 @@
         "isolation",
         "pending",
         "numbered",
+        "phases",
         "files",
         "ports",
         "restart"

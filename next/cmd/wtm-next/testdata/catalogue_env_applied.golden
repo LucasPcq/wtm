@@ -32,6 +32,9 @@
         "isolation": "isolated",
         "pending": false,
         "numbered": true,
+        "phases": [
+          "env"
+        ],
         "files": [
           {
             "target": ".env",

@@ -2,6 +2,7 @@ import { cleanup } from '@testing-library/react'
 import { toast } from 'sonner'
 import { afterAll, afterEach, beforeAll } from 'vitest'
 import { useDaemonRuns } from '@/features/worktrees/daemon/hooks/use-daemon-runs'
+import { useEnvDialog } from '@/features/worktrees/hooks/use-env-dialog'
 import { useExecDialog } from '@/features/worktrees/hooks/use-exec-dialog'
 import { useFastForwardDialog } from '@/features/worktrees/hooks/use-fast-forward-dialog'
 import { usePruneDialog } from '@/features/worktrees/hooks/use-prune-dialog'
@@ -29,6 +30,7 @@ afterEach(() => {
   useRemoveDialog.setState(useRemoveDialog.getInitialState(), true)
   usePruneDialog.setState(usePruneDialog.getInitialState(), true)
   useFastForwardDialog.setState(useFastForwardDialog.getInitialState(), true)
+  useEnvDialog.setState(useEnvDialog.getInitialState(), true)
   useExecDialog.setState(useExecDialog.getInitialState(), true)
   useReparentDialog.setState(useReparentDialog.getInitialState(), true)
   useRunUpDialogs.setState(useRunUpDialogs.getInitialState(), true)

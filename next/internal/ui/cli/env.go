@@ -34,7 +34,7 @@ func ReadEnv() Env {
 
 // Caller is where the run's caller stands: on ProjectDir, named by $WTM_PROJECT_DIR or not, in Cwd.
 func (e Env) Caller() domain.Caller {
-	return domain.Caller{Dir: e.ProjectDir, Named: e.Named, Cwd: e.Cwd}
+	return domain.Caller{Dir: e.ProjectDir, Named: e.Named, Cwd: e.Cwd, Surface: domain.SurfaceCLI}
 }
 
 // resolved returns path with its symbolic links resolved, or as it is when they cannot be; "" stays "".

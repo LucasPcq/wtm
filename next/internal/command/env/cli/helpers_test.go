@@ -43,7 +43,7 @@ func (d *driver) looksLike(name string) {
 // callerIn is a caller standing in the worktree of branch.
 func callerIn(branch string) domain.Caller {
 	if branch == "main" {
-		return domain.Caller{Cwd: mainPath}
+		return domain.Caller{Cwd: mainPath, Surface: domain.SurfaceCLI}
 	}
-	return domain.Caller{Cwd: pathOf(branch)}
+	return domain.Caller{Cwd: pathOf(branch), Surface: domain.SurfaceCLI}
 }

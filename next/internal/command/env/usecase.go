@@ -78,9 +78,12 @@ func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (
 		return Outcome{Op: op.ID}, err
 	}
 
-	// 3. Fingerprint what would be applied, the files as they stand among it; a dry run ends here with the plan and its fingerprint.
+	// 3. Fingerprint what would be applied, the files as they stand among it; a dry run ends here with the plan, its fingerprint and the jobs its apply would leave on the old values (the apply warns of those it did on their worktree).
 	outcome := Outcome{Op: op.ID, Plan: plan, Warnings: warnings}
 	outcome.Fingerprint, err = operation.Fingerprint(plan.Fingerprinted())
+	if opts.DryRun {
+		outcome.Warnings = append(outcome.Warnings, plan.restarts()...)
+	}
 	if err != nil || opts.DryRun {
 		return outcome, err
 	}
@@ -123,14 +126,23 @@ func (u UseCase) Plan(ctx context.Context, req Request) (Plan, []domain.Warning,
 // ----------------------------------------------------------------------------
 // Apply
 
-// Apply carries out the plan, reporting each step: it reconciles each worktree that changes in turn, a failure stopping none of the others, and reports the others as they stand. Once ctx is cancelled, the worktrees not yet started are skipped.
+// Apply carries out the plan, reporting each step: it reconciles each worktree that changes in turn, a failure stopping none of the others, and reports the others as they stand. Once ctx is cancelled, the worktrees not yet started are skipped. Those that failed or were skipped are offered again (CodeRetry).
 func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Result {
 	items := make([]Item, 0, len(plan.Worktrees))
 	for _, r := range plan.Worktrees {
 		items = append(items, u.reconcile(ctx, r, plan.ShowValues, report))
 	}
 
-	return Result{Items: items}
+	result := Result{Items: items}
+	if retry := plan.retry(items); retry != nil {
+		for _, item := range items {
+			if item.Err != nil {
+				item.Err.FollowUp = retry
+			}
+		}
+		result.FollowUps = []domain.FollowUp{*retry}
+	}
+	return result
 }
 
 // ----------------------------------------------------------------------------

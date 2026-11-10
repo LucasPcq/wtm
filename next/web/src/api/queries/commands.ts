@@ -16,6 +16,9 @@ import type {
   DomainEnvelope,
   DomainForm,
   DomainItem,
+  EnvDetail,
+  EnvPlan,
+  EnvshowDetail,
   ExecDetail,
   ExecPlan,
   FastforwardDetail,
@@ -54,6 +57,7 @@ type ReadDetail = {
   'run-logs': RunlogsDetail
   'run-ps': RunpsDetail
   'daemon-status': DaemonstatusDetail
+  'env-show': EnvshowDetail
 }
 export type ReadCommand = keyof ReadDetail
 
@@ -66,6 +70,7 @@ type Mutation = {
   exec: { plan: ExecPlan; detail: ExecDetail }
   reparent: { plan: ReparentPlan; detail: ReparentDetail }
   sync: { plan: SyncPlan; detail: SyncDetail }
+  env: { plan: EnvPlan; detail: EnvDetail }
   'run-up': { plan: RunupPlan; detail: RunupDetail }
   'run-down': { plan: RundownPlan; detail: RunjobsStopDetail }
   'run-start': { plan: RunstartPlan; detail: RunstartDetail }
