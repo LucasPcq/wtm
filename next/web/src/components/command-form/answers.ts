@@ -17,7 +17,8 @@ export function defaultOf(field: DomainField): string[] {
     case 'text':
       return field.value ? [field.value] : []
     case 'multi_select':
-      return field.picked
+      // the pick a person is offered, when the command offers one beside its unattended default
+      return field.prechecked ?? field.picked
     case 'text_list':
       return [field.entries.join('\n')]
     case 'confirm':

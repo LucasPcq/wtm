@@ -122,7 +122,7 @@ func (f Facts) pending(w worktree.Worktree) bool {
 // ----------------------------------------------------------------------------
 // The decision of each worktree
 
-// A Reconcile is one worktree asked: its name and path, whether it is the main checkout, whether its directory is gone (left as it is), the strategy its values come from, its isolation, whether it has yet to choose one (Pending: its ports and the values wtm owns are left as they are), the isolation the apply records when it changes (Records), whether it holds an ordinal (Numbered: one that needs it and has none is numbered by the apply, which settles its ports then), each .env file, what wtm writes into them (its values withheld unless shown), why its ports cannot be settled when they cannot, why its files could not be read (left as it is), and the jobs up in it that read a file that changes, which run on the old values until restarted.
+// A Reconcile is one worktree asked: its name and path, whether it is the main checkout, whether its directory is gone (left as it is), the strategy its values come from, its isolation, whether it has yet to choose one (Pending: its ports and the values wtm owns are left as they are), the isolation the apply records when it changes (Records), the phases of its apply (none when it is left as it is), whether it holds an ordinal (Numbered: one that needs it and has none is numbered by the apply, which settles its ports then), each .env file, what wtm writes into them (its values withheld unless shown), why its ports cannot be settled when they cannot, why its files could not be read (left as it is), and the jobs up in it that read a file that changes, which run on the old values until restarted.
 type Reconcile struct {
 	Worktree   string              `json:"worktree"`
 	Path       string              `json:"path"`
@@ -133,6 +133,7 @@ type Reconcile struct {
 	Pending    bool                `json:"pending"`
 	Records    project.Isolation   `json:"records,omitempty"`
 	Numbered   bool                `json:"numbered"`
+	Phases     []domain.Phase      `json:"phases"`
 	Files      []File              `json:"files"`
 	Ports      envs.Redacted       `json:"ports"`
 	Unsettled  string              `json:"unsettled,omitempty"`
@@ -236,7 +237,7 @@ func keysOf(reconciles []Reconcile, status envs.KeyStatus) []KeyAt {
 // reconcile decides what reconciling the worktree name does under req: its keys settled on their source, then what wtm writes over them, the main checkout keeping its addresses spelled with ports when its .env spells them so.
 func (f Facts) reconcile(name string, req Request) Reconcile {
 	w, _ := f.subject(name)
-	r := Reconcile{Worktree: name, Path: w.Path, Main: w.Main, Missing: f.Missing[name] || w.Prunable, Strategy: f.strategy(w, req), Isolation: f.isolation(w, req), Pending: !f.switches(w, req) && f.pending(w), Numbered: true, Files: []File{}, Restart: []string{}}
+	r := Reconcile{Worktree: name, Path: w.Path, Main: w.Main, Missing: f.Missing[name] || w.Prunable, Strategy: f.strategy(w, req), Isolation: f.isolation(w, req), Pending: !f.switches(w, req) && f.pending(w), Numbered: true, Files: []File{}, Restart: []string{}, Phases: []domain.Phase{}}
 	if err := f.ReadErrs[name]; err != nil {
 		r.Unreadable = err.Error()
 	}
@@ -273,7 +274,19 @@ func (f Facts) reconcile(name string, req Request) Reconcile {
 	reconciled.Ports.Applied = false
 	r.Ports = shown(reconciled.Ports, req.ShowValues)
 	r.Restart = f.restart(w, r.Files)
+	r.Phases = phasesOf(r)
 	return r
+}
+
+// phasesOf are the phases of r's apply: its numbering when it has no ordinal, then the writing of its files and its isolation, none when the apply leaves it as it is.
+func phasesOf(r Reconcile) []domain.Phase {
+	switch {
+	case !r.writes():
+		return []domain.Phase{}
+	case !r.Numbered:
+		return []domain.Phase{domain.PhaseOrdinal, domain.PhaseEnv}
+	}
+	return []domain.Phase{domain.PhaseEnv}
 }
 
 // shown is plan with its values when they are shown, else without them.

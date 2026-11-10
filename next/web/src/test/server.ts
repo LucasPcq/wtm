@@ -4,6 +4,7 @@ import type { DomainAnswered, DomainField, DomainFollowUp, ListDetail, WebCall }
 import { repo, worktrees } from '@/test/acme'
 import { answeringCheckout } from '@/test/checkout'
 import { cleanPlan, cleanQuestionsOf, cleanRun } from '@/test/clean'
+import { answeringEnv } from '@/test/env'
 import { answeringExec } from '@/test/exec'
 import { ffPlan, ffQuestions, ffRun } from '@/test/fast-forward'
 import { envelope, followUp, offers, psOf, statusDetail, treeDetail } from '@/test/fixtures'
@@ -181,6 +182,7 @@ const handlers = [
   ...answeringRunLogs(),
   ...runJobsHandlers(),
   ...answeringCheckout(),
+  ...answeringEnv(),
   http.post('/api/repos/r1/commands/create/questions', async ({ request }) =>
     HttpResponse.json(questionsOf(((await request.json()) as WebCall).answers)),
   ),
