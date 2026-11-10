@@ -441,3 +441,15 @@ func TestWhatLandsLaterRebuildsTheStepAsked(t *testing.T) {
 	assert.Equal(t, 1, refreshing.refreshed)
 	assert.Equal(t, 0, d.Wizard.Current())
 }
+
+func TestAPlanThatNeedsNoConfirmationFinishesAtItsPreview(t *testing.T) {
+	f := newFake()
+	script := f.script()
+	script.Unasked = func() bool { return true }
+	d := open(t, script)
+
+	d.Keys("enter", "enter")
+
+	assert.Equal(t, form.Finished, d.Wizard.Ending())
+	assert.Empty(t, d.Wizard.View())
+}

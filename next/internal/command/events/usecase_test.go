@@ -434,7 +434,7 @@ func TestAJobThatStartsOrStopsIsSentAsTheWorktreeChanged(t *testing.T) {
 	r.quiet(t)
 }
 
-// A run daemon that stops answering for a while says nothing about the jobs: nothing changed until it answers again.
+// A daemon that stops answering for a while says nothing about the jobs: nothing changed until it answers again.
 func TestJobsTheDaemonCannotTellChangeNothing(t *testing.T) {
 	jobs := &machine{jobs: []run.Job{{Name: "web", WorkDir: "/repo/.trees/feat/a", Up: true, State: run.Running}}}
 	u := useCase(newBus(), &known{}, opening(newRepo("/repo", "feat/a")))

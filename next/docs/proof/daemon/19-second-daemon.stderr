@@ -1,4 +1,3 @@
 
-  ✗ the request is invalid: a daemon already serves this socket
-  → wtm-next daemon --help
+  ✗ wtm's daemon already runs on <SB>/home/Library/Application Support/wtm/wtm.sock: this one stops
 

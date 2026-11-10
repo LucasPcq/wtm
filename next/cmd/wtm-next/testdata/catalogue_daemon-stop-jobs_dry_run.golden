@@ -1,0 +1,55 @@
+{
+  "v": 2,
+  "command": "daemon-stop-jobs",
+  "ok": true,
+  "op": "<id>",
+  "plan": {
+    "repo": "<root>/main",
+    "repos": [
+      {
+        "root": "<root>/main",
+        "worktrees": [
+          {
+            "worktree": "main (main)",
+            "branch": "main",
+            "path": "<root>/main",
+            "jobs": [
+              {
+                "name": "idle",
+                "kind": "service",
+                "hold": "own",
+                "fate": "stop"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "recap": [
+      {
+        "key": "repo",
+        "label": "Repository",
+        "path": "repo",
+        "values": [
+          {
+            "value": "<root>/main",
+            "text": "<root>/main"
+          }
+        ]
+      },
+      {
+        "key": "jobs:main (main)",
+        "label": "Stops in main (main)",
+        "values": [
+          {
+            "value": "idle",
+            "text": "idle"
+          }
+        ]
+      }
+    ]
+  },
+  "fingerprint": "<id>",
+  "follow_ups": [],
+  "warnings": []
+}

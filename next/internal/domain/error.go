@@ -35,13 +35,14 @@ const (
 	ConfigInvalid  = ".config_invalid"
 )
 
-// The suffixes of the codes every read says what it could not read with, after its name: <command>.unreadable fails a subject it could not read, <command>.meta_unreadable warns of a meta record that exists but does not read, <command>.jobs_unknown of a run daemon that could not tell which jobs are up, <command>.prs_unavailable of a forge that could not be asked.
+// The suffixes of the codes every read says what it could not read with, after its name: <command>.unreadable fails a subject it could not read, <command>.meta_unreadable warns of a meta record that exists but does not read, <command>.jobs_unknown of a daemon that could not tell which jobs are up, <command>.prs_unavailable of a forge that could not be asked, <command>.index_frozen of an index of jobs a newer wtm wrote, which records nothing started.
 const (
 	Unreadable     = ".unreadable"
 	MetaUnreadable = ".meta_unreadable"
 	JobsUnknown    = ".jobs_unknown"
 	DaemonSkew     = ".daemon_skew"
 	PRsUnavailable = ".prs_unavailable"
+	IndexFrozen    = ".index_frozen"
 )
 
 // MetaNewer is the suffix, after a command's name, of the code that refuses to write a meta record a newer wtm wrote (exit 22): clean, prune and reparent refuse a request that would delete or rewrite one.

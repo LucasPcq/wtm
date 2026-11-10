@@ -16,11 +16,11 @@ next/
     command/<name>/    one command: usecase.go, port.go, rules.go, questions.go, cli/
     service/<name>/    what use cases share with I/O: operation, provision, repository, registry, teardown; <name>test kits
     domain/            the pure model and vocabulary; worktree/, project/, env/, dotenv/, run/ by subject
-    adapter/<name>/    git, store, config, shell, oplock, events (the bus), registry, webserver, statefile, proxyport, daemon (the run daemon's protocol and jobs.json), process, joblog, proxy (the run proxy), github; <name>test fakes
-    ui/                cli (root, exit codes, env), output (streams, frames, envelope), form (flags, wizard, conclusion), widget (a step's inputs), formtest (the cli tests' kit), runview (the live view of jobs over the run daemon)
+    adapter/<name>/    git, store, config, shell, oplock, events (the bus), registry, webserver, statefile, proxyport, daemon (wtm's daemon's socket, protocol and jobs.json), process, joblog, proxy (the daemon's proxy), github; <name>test fakes
+    ui/                cli (root, exit codes, env), output (streams, frames, envelope), form (flags, wizard, conclusion), widget (a step's inputs), formtest (the cli tests' kit), runview (the live view of jobs over wtm's daemon)
     api/               the catalogue of commands, and its streams, for a surface other than the CLI
     web/               the local HTTP server over api (wtm-next ui): routes, guard, SSE, HTTP statuses, the embedded front
-    daemon/            the run daemon: the jobs of the machine, blind to git, over the ports of its port.go
+    daemon/            wtm's daemon: the jobs of the machine, blind to git, over the ports of its port.go
   web/                 the web front (React + Vite), no Go file; `make ui` builds it into internal/web/dist
   docs/proof/          scripts that run wtm and wtm-next side by side, and their captures
 ```
@@ -39,18 +39,19 @@ next/
 | orchestrates I/O two commands need | `service/<name>/` (concrete, with its own `port.go`) |
 | is a question two commands ask | the fragment of the service that consumes its answers (`service/provision/questions.go`) |
 | is presentation two commands need, or any field kind of the wizard | `ui/output`, `ui/form`, an input in `ui/widget` |
-| shows jobs live: their list and a job's terminal, attached through the run daemon | `ui/runview`, over the port it declares (`runview.Daemon`), which a command's `cli` is handed by `cmd/wtm-next` |
+| shows jobs live: their list and a job's terminal, attached through wtm's daemon | `ui/runview`, over the port it declares (`runview.Daemon`), which a command's `cli` is handed by `cmd/wtm-next` |
 | talks to git, a file, a process, a socket | `adapter/<name>/`, behind a port |
 | is an in-memory stand-in for an adapter, for tests | `adapter/<name>test/` |
 | checks a promise every use case keeps, for tests | `service/<name>test/` (`operationtest.Contract`) |
 | serves the catalogue over HTTP: a route, the guard, server-sent events, the status of an error's kind | `web/`, given what it cannot reach as functions in `web.Params` |
-| runs, watches, stops or recovers a job's process in the run daemon | `daemon/` (its ports in `daemon/port.go`); its protocol and its client in `adapter/daemon`, the processes in `adapter/process`, the logs in `adapter/joblog`, the proxy in `adapter/proxy` |
+| runs, watches, stops or recovers a job's process in wtm's daemon | `daemon/` (its ports in `daemon/port.go`); its socket (`Serve`: the lock, the listener, the idle), its protocol and its client in `adapter/daemon`, the event bus it carries in `adapter/events`, the processes in `adapter/process`, the logs in `adapter/joblog`, the proxy in `adapter/proxy` |
+| is a command on the machine, not a repository (wtm's daemon's: `daemon status`, `stop`, `restart`, `stop-jobs`) | a command slice like any other, its opener ignoring the directory, its operations `machineOperations` (no lock, no event), listed in `cmd/wtm-next`'s `machine` |
 | chooses which adapter backs which port | `cmd/wtm-next/wire.go` |
 | names another command (a follow-up) | a `domain.FollowUp` of that command's name and answers; its command line is spelled by a function `cmd/wtm-next` injects, the only package that knows every command |
 
 Share on the second user, not before: until a second command needs it, code stays in its slice.
 
-One exception to a pure domain: `run.Session` (`domain/run/stream.go`: a channel, an `io.Writer` and a `Release` func) is a client attached to a job's terminal, which the run daemon's core hands its server across the adapter boundary; neither may import the other, so the domain is the one place they share. Add no other such value.
+One exception to a pure domain: `run.Session` (`domain/run/stream.go`: a channel, an `io.Writer` and a `Release` func) is a client attached to a job's terminal, which wtm's daemon's core hands its server across the adapter boundary; neither may import the other, so the domain is the one place they share. Add no other such value.
 
 ## The rules
 

@@ -1,0 +1,9 @@
+
+  ✗ daemon stop: 1 failed
+
+  Stops    db (main · acme), web (main · acme), the daemon
+  Runs on  mail (feat/a · acme)
+  Lets go  db (feat/a · acme)
+
+  ✗ daemon  couldn't stop wtm's daemon: wtm's daemon did not stop within 30s: wtm's daemon did not stop within 30s
+

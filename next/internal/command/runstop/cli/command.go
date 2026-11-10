@@ -17,7 +17,7 @@ const Use = "run stop"
 
 const (
 	stopShort = "Stop one job in worktrees"
-	stopLong  = "Stop one job the run daemon runs in each worktree named, or in the one you stand in;\n" +
+	stopLong  = "Stop one job wtm's daemon runs in each worktree named, or in the one you stand in;\n" +
 		"a worktree it is not up in is left as it is. Several worktrees stop at once.\n" +
 		"\n" +
 		"A shared service a worktree holds is released: it runs on for the worktrees still holding it, and\n" +

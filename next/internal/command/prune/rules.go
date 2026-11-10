@@ -14,7 +14,7 @@ import (
 // ----------------------------------------------------------------------------
 // Facts
 
-// Facts are what prune decides from, as Observe read them: what a removal decides from (the project's config, its run.toml, the repository's snapshot, the records, what each worktree done with holds that makes it unsafe to remove, where the caller stands, why the run daemon or the forge could not be asked), the pull request of each worktree's branch, the branches behind their finished pull request's head (repository.Behind), the branches whose upstream origin deleted, and why fetching origin failed.
+// Facts are what prune decides from, as Observe read them: what a removal decides from (the project's config, its run.toml, the repository's snapshot, the records, what each worktree done with holds that makes it unsafe to remove, where the caller stands, why wtm's daemon or the forge could not be asked), the pull request of each worktree's branch, the branches behind their finished pull request's head (repository.Behind), the branches whose upstream origin deleted, and why fetching origin failed.
 type Facts struct {
 	teardown.Facts
 	PullRequests []worktree.PullRequest
@@ -309,7 +309,7 @@ type Plan struct {
 	domain.Recapped
 	facts         Facts
 	standing      string // the worktree removed the caller stands in, empty when none
-	correlationID string // the operation's, which the run daemon's events carry
+	correlationID string // the operation's, which wtm's daemon's events carry
 }
 
 // removed are the worktrees the plan removes, kept those it leaves as they are for being unsafe.

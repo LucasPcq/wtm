@@ -1,0 +1,8 @@
+
+  ✓ daemon restart: 1 done
+
+  Daemon      0.30.9 → 0.31.0
+  Come back   db (main · acme), web (main · acme), db (feat/a · acme)
+  Taken over  mail (feat/a · acme)
+  Not back    seed (main · acme) — a task, not run again
+

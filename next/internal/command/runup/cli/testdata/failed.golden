@@ -11,7 +11,7 @@
       api  http://api.feat-a.main.localhost:11080
       web  http://web.feat-a.main.localhost:11080
 
-  ✗ feat/b  migrate failed: run daemon: task migrate exited with code 3
+  ✗ feat/b  migrate failed: daemon: task migrate exited with code 3
       error: relation users does not exist
   full output:  /repo/main/.git/wtm/logs/feat%2Fb/migrate.log
 

@@ -81,6 +81,11 @@ func WorktreeLocks(worktrees []string) []Lock {
 	return locks
 }
 
+// MachineLocks are the locks of an operation on wtm's daemon, which is the machine's and no repository's: the one lock of the daemon's own directory, exclusive, so two such operations take turns.
+func MachineLocks() []Lock {
+	return []Lock{{Scope: ScopeRepo, Mode: LockExclusive}}
+}
+
 const correlationIDMaxBytes = 256
 
 // CorrelationProblem returns what makes id unfit as a correlation ID (too long, or holding a control character), or nil when it is fit.

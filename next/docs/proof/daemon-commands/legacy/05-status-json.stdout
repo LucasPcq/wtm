@@ -1,0 +1,11 @@
+{
+  "running": true,
+  "version": "dev",
+  "daemon_version": "dev",
+  "pid": <pid>,
+  "socket_path": "<root>/home/Library/Application Support/wtm/wtm.sock",
+  "state_path": "<root>/home/Library/Application Support/wtm/jobs.json",
+  "proxy_port": 27402,
+  "foreground_jobs": 5,
+  "detached_jobs": 2
+}

@@ -28,6 +28,10 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/clean"
 	cleancli "github.com/LucasPcq/wtm/next/internal/command/clean/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
+	"github.com/LucasPcq/wtm/next/internal/command/daemonrestart"
+	daemonrestartcli "github.com/LucasPcq/wtm/next/internal/command/daemonrestart/cli"
+	"github.com/LucasPcq/wtm/next/internal/command/daemonstopjobs"
+	daemonstopjobscli "github.com/LucasPcq/wtm/next/internal/command/daemonstopjobs/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/events"
 	"github.com/LucasPcq/wtm/next/internal/command/exec"
 	execcli "github.com/LucasPcq/wtm/next/internal/command/exec/cli"
@@ -63,7 +67,6 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
 	"github.com/LucasPcq/wtm/next/internal/service/runjobs"
 	"github.com/LucasPcq/wtm/next/internal/service/teardown"
-	"github.com/LucasPcq/wtm/next/internal/ui/cli"
 )
 
 const opIDBytes = 8
@@ -114,7 +117,7 @@ func wire(params wireParams) app {
 	}
 
 	meta := store.Meta{StateDir: params.StateDir}
-	runs := runDaemon()
+	runs := wtmDaemon()
 	jobs := runs.Jobs
 	gh := github.GitHub{Dir: params.MainPath}
 
@@ -364,7 +367,7 @@ func (r refFetchedOnce) FetchRef(ctx context.Context, name string) error {
 
 // facts reads the repository params locates, as every use case decides from it.
 func (p wireParams) facts() repository.Service {
-	return repository.Service{Config: config.Project{StateDir: p.StateDir, GlobalPath: config.GlobalPath()}, Git: git.Repo{Dir: p.MainPath}, MainPath: p.MainPath, Init: initialize(), Restart: daemonRestart()}
+	return repository.Service{Config: config.Project{StateDir: p.StateDir, GlobalPath: config.GlobalPath()}, Git: git.Repo{Dir: p.MainPath}, MainPath: p.MainPath, Init: initialize(), Restart: daemonRestart(), FrozenIndex: frozenIndex}
 }
 
 // repo is how the event bus and the registry name the repository params locates.
@@ -390,12 +393,12 @@ func initialize() *domain.FollowUp {
 
 // runPs is run ps over the daemon of the machine, opening each repository its jobs run for.
 func runPs() runps.UseCase {
-	return runps.UseCase{Jobs: runDaemon().Jobs, Open: openProject, ReadLog: joblog.Tail, Restart: daemonRestart()}
+	return runps.UseCase{Jobs: wtmDaemon().Jobs, Open: openProject, ReadLog: joblog.Tail, Restart: daemonRestart()}
 }
 
-// daemonRestart is the follow-up that replaces a run daemon of another build by one of this build: run daemon restart.
+// daemonRestart is the follow-up that replaces a daemon of another build by one of this build: daemon restart.
 func daemonRestart() *domain.FollowUp {
-	return &domain.FollowUp{Command: commandRestartDaemon}
+	return &domain.FollowUp{Command: daemonrestart.Name}
 }
 
 // settle settles a worktree's env ports, in the legacy wtm until env migrates.
@@ -433,8 +436,10 @@ func commandLine(followUp domain.FollowUp) []string {
 		return runstartcli.Line(followUp)
 	case runstop.Name:
 		return runstopcli.Line(followUp)
-	case commandRestartDaemon:
-		return []string{cli.Program, "run", "daemon", "restart"}
+	case daemonrestart.Name:
+		return daemonrestartcli.Line(followUp)
+	case daemonstopjobs.Name:
+		return daemonstopjobscli.Line(followUp)
 	}
 
 	argv, _ := spelled(followUp)
@@ -505,7 +510,7 @@ func (p wireParams) publisherParams(op domain.Operation) bus.PublisherParams {
 	return bus.PublisherParams{
 		Root:          p.MainPath,
 		CommonDir:     p.CommonDir,
-		SocketPath:    bus.SocketPath(),
+		SocketPath:    daemon.SocketPath(),
 		OpID:          op.ID,
 		CorrelationID: op.CorrelationID,
 		Now:           time.Now,
@@ -529,7 +534,7 @@ type streamParams struct {
 	Registry string
 }
 
-// eventStream is the events use case over the bus and the registry params name, opening each repository with openEvents and asking the run daemon at the bus's socket for the jobs it polls.
+// eventStream is the events use case over the bus and the registry params name, opening each repository with openEvents and asking wtm's daemon at the bus's socket for the jobs it polls.
 func eventStream(params streamParams) events.UseCase {
 	return events.UseCase{
 		Bus:      bus.Bus{SocketPath: params.Socket, Start: params.Start},
@@ -542,7 +547,7 @@ func eventStream(params streamParams) events.UseCase {
 
 // The process's own event stream: its bus at the socket every wtm-next talks to, started from this binary.
 func systemStream() events.UseCase {
-	return eventStream(streamParams{Socket: bus.SocketPath(), Start: startDaemon, Registry: reposjson.Path()})
+	return eventStream(streamParams{Socket: daemon.SocketPath(), Start: startDaemon, Registry: reposjson.Path()})
 }
 
 // knownRepos is the registry of the repositories wtm knows, in the file at path, announcing on the bus at socket each one that joins or leaves it.

@@ -10,6 +10,10 @@ import (
 	checkoutcli "github.com/LucasPcq/wtm/next/internal/command/checkout/cli"
 	cleancli "github.com/LucasPcq/wtm/next/internal/command/clean/cli"
 	createcli "github.com/LucasPcq/wtm/next/internal/command/create/cli"
+	daemonrestartcli "github.com/LucasPcq/wtm/next/internal/command/daemonrestart/cli"
+	daemonstatuscli "github.com/LucasPcq/wtm/next/internal/command/daemonstatus/cli"
+	daemonstopcli "github.com/LucasPcq/wtm/next/internal/command/daemonstop/cli"
+	daemonstopjobscli "github.com/LucasPcq/wtm/next/internal/command/daemonstopjobs/cli"
 	eventscli "github.com/LucasPcq/wtm/next/internal/command/events/cli"
 	execcli "github.com/LucasPcq/wtm/next/internal/command/exec/cli"
 	extractcli "github.com/LucasPcq/wtm/next/internal/command/extract/cli"
@@ -31,6 +35,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/ui/cli"
 	"github.com/LucasPcq/wtm/next/internal/ui/output"
 	"github.com/LucasPcq/wtm/next/internal/ui/runview"
+
 	"github.com/spf13/cobra"
 )
 
@@ -67,15 +72,15 @@ func commands(streams *output.Streams, env cli.Env) []*cobra.Command {
 		statuscli.New(streams, env, openStatus, commandLine),
 		treecli.New(streams, env, openTree, commandLine),
 		eventscli.New(streams, env, systemStream(), commandLine),
-		runCmd(runupcli.New(streams, env, openRunUp, commandLine, liveView()), runlogscli.New(streams, env, openRunLogs, commandLine, runlogscli.View{Daemon: runDaemon(), Open: openURL}), rundowncli.New(streams, env, openRunDown, commandLine), runstartcli.New(streams, env, openRunStart, commandLine, liveView()), runstopcli.New(streams, env, openRunStop, commandLine), runpscli.New(streams, env, openRunPs, commandLine), runlistcli.New(streams, env, openRunList, commandLine), runDaemonCmd(streams)),
+		runCmd(runupcli.New(streams, env, openRunUp, commandLine, liveView()), runlogscli.New(streams, env, openRunLogs, commandLine, runlogscli.View{Daemon: wtmDaemon(), Open: openURL}), rundowncli.New(streams, env, openRunDown, commandLine), runstartcli.New(streams, env, openRunStart, commandLine, liveView()), runstopcli.New(streams, env, openRunStop, commandLine), runpscli.New(streams, env, openRunPs, commandLine), runlistcli.New(streams, env, openRunList, commandLine)),
+		daemonCmd(streams, daemonstatuscli.New(streams, env, openDaemonStatus, commandLine), daemonstopcli.New(streams, env, openDaemonStop, commandLine), daemonrestartcli.New(streams, env, openDaemonRestart, commandLine), daemonstopjobscli.New(streams, env, openDaemonStopJobs, commandLine)),
 		uiCmd(env),
-		daemonCmd(),
 	}
 }
 
-// liveView is where run up and run start show the jobs they started: the run daemon of this machine, never started for it, and the browser.
+// liveView is where run up and run start show the jobs they started: wtm's daemon of this machine, never started for it, and the browser.
 func liveView() runview.View {
-	return runview.View{Daemon: runDaemon(), Open: openURL, Stop: stopJob, Restart: restartJob, Again: startAgain, Show: showJob}
+	return runview.View{Daemon: wtmDaemon(), Open: openURL, Stop: stopJob, Restart: restartJob, Again: startAgain, Show: showJob}
 }
 
 // runCmd is run, the parent of the commands that start, watch and stop the jobs of run.toml.

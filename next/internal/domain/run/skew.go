@@ -2,7 +2,7 @@ package run
 
 import "cmp"
 
-// ProtocolVersion is the version of the protocol this wtm's run daemon speaks:
+// ProtocolVersion is the version of the protocol this wtm's daemon speaks:
 // a daemon stamps it on every answer, and a client reads nothing of another.
 // The legacy wtm's daemon stamps none.
 const ProtocolVersion = 2
@@ -64,5 +64,5 @@ func (s *Skewed) Error() string {
 	if s.Skew == SkewLegacy {
 		daemon = "the legacy wtm's"
 	}
-	return "the run daemon is " + daemon + ": restart it to start jobs beside its own"
+	return "the daemon is " + daemon + ": restart it to start jobs beside its own"
 }

@@ -1,0 +1,86 @@
+{
+  "v": 2,
+  "command": "daemon-status",
+  "ok": true,
+  "items": [
+    {
+      "subject": "daemon",
+      "status": "done",
+      "detail": {
+        "running": true,
+        "pid": <pid>,
+        "build": "<build>",
+        "daemon": "<build>",
+        "protocol": 2,
+        "repos": [
+          {
+            "root": "<root>/acme",
+            "worktrees": [
+              {
+                "branch": "main",
+                "path": "<root>/acme",
+                "jobs": [
+                  {
+                    "name": "api",
+                    "kind": "service",
+                    "hold": "own"
+                  },
+                  {
+                    "name": "db",
+                    "kind": "service",
+                    "hold": "own",
+                    "shared": true
+                  },
+                  {
+                    "name": "stack",
+                    "kind": "service",
+                    "hold": "detached"
+                  },
+                  {
+                    "name": "web",
+                    "kind": "service",
+                    "hold": "own"
+                  }
+                ]
+              },
+              {
+                "branch": "feat/a",
+                "path": "<root>/acme.trees/feat-a",
+                "jobs": [
+                  {
+                    "name": "api",
+                    "kind": "service",
+                    "hold": "own"
+                  },
+                  {
+                    "name": "db",
+                    "kind": "service",
+                    "hold": "claim"
+                  },
+                  {
+                    "name": "stack",
+                    "kind": "service",
+                    "hold": "detached"
+                  },
+                  {
+                    "name": "web",
+                    "kind": "service",
+                    "hold": "own"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "proxy": {
+          "port": 27412,
+          "public_port": 27412
+        },
+        "socket": "<root>/home/Library/Application Support/wtm/wtm.sock",
+        "index": "<root>/home/Library/Application Support/wtm/jobs.json"
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}

@@ -1,0 +1,14 @@
+
+  = No daemon running.
+
+  Run daemon
+  Version  dev
+  Socket   <root>/home/Library/Application Support/wtm/wtm.sock
+  Index    <root>/home/Library/Application Support/wtm/jobs.json
+  ╭────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+  │ Index read-only                                                                                                        │
+  │ the index on disk was written by a newer wtm, so this build will not write over it                                     │
+  │ nothing started from here is recorded: a detached stack is not picked back up, and an orphaned service is never reaped │
+  │ run the newer wtm, or remove <root>/home/Library/Application Support/wtm/jobs.json once nothing is running      │
+  ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+

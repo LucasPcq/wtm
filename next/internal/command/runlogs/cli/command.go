@@ -35,7 +35,7 @@ const (
 		"\n" +
 		"--output json is the read's v2 envelope, each job with its state and its lines; with\n" +
 		"--follow, one typed JSON object per line instead: line, absent, warning, error.\n" +
-		"It never starts the run daemon: with none running, the lines come from the logs."
+		"It never starts wtm's daemon: with none running, the lines come from the logs."
 	logsExample = `  # Pick worktrees, then watch their jobs live
   wtm run logs
 

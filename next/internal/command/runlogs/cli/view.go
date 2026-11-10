@@ -12,7 +12,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/ui/runview"
 )
 
-// View is where run logs shows the jobs it read: the run daemon its live view asks, and how it opens an address in the browser (nil opens none). A zero View shows none.
+// View is where run logs shows the jobs it read: wtm's daemon its live view asks, and how it opens an address in the browser (nil opens none). A zero View shows none.
 type View struct {
 	Daemon runview.Daemon
 	Open   func(url string) error

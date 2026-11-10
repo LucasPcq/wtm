@@ -53,7 +53,7 @@ func (d *Daemon) startShared(spec run.Spec, out func(run.Line)) (run.Job, error)
 		d.mu.Lock()
 		if d.stopping {
 			d.mu.Unlock()
-			return run.Job{}, &run.Error{Code: run.CodeStopping, Message: "the run daemon is stopping"}
+			return run.Job{}, &run.Error{Code: run.CodeStopping, Message: "wtm's daemon is stopping"}
 		}
 		if held := d.jobs[own]; held != nil && held.up() && (!mainAsks || held.record.MainHolds) {
 			d.mu.Unlock()
@@ -233,7 +233,7 @@ func (d *Daemon) createNamespace(spec run.Spec, service *job) error {
 	why := ""
 	for {
 		if d.isStopping() {
-			return &run.Error{Code: run.CodeStopping, Message: "the run daemon is stopping"}
+			return &run.Error{Code: run.CodeStopping, Message: "wtm's daemon is stopping"}
 		}
 		said := newOutput(d.params.Now)
 		command.Output = said.write

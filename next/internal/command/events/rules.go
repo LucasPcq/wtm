@@ -81,7 +81,7 @@ func (f Facts) claim(w worktree.Worktree) int {
 // A Polled is what a poll reads of a repository: each worktree on a branch, by its branch.
 type Polled map[string]Poll
 
-// A Poll is what a poll reads of one worktree: its branch's tip, what it has checked out, each of its jobs with its state, sorted, and whether it holds uncommitted changes; Jobs is nil when the run daemon could not tell, Dirty when git could not.
+// A Poll is what a poll reads of one worktree: its branch's tip, what it has checked out, each of its jobs with its state, sorted, and whether it holds uncommitted changes; Jobs is nil when wtm's daemon could not tell, Dirty when git could not.
 type Poll struct {
 	Head     string
 	Checkout string
@@ -172,7 +172,7 @@ func polledFields(was, now Poll) []worktree.PolledField {
 	return fields
 }
 
-// Carried is now with the jobs and the dirtiness of each worktree unknown now taken as before knew them, so that a poll the run daemon or git could not answer changes nothing.
+// Carried is now with the jobs and the dirtiness of each worktree unknown now taken as before knew them, so that a poll wtm's daemon or git could not answer changes nothing.
 func Carried(before, now Polled) Polled {
 	for branch, poll := range now {
 		if poll.Jobs == nil {

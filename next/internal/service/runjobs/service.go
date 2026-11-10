@@ -1,4 +1,4 @@
-// Package runjobs starts jobs of run.toml in a worktree for the commands that do, through the run daemon: the facts a start decides from, how each job starts in its worktree, what refuses a start before anything starts, then the start itself (the worktree numbered, each job started in order between its phase's events, its ports checked, a crash caught) and what became of each job. Every code it gives is the asking command's: <command>.<code>.
+// Package runjobs starts jobs of run.toml in a worktree for the commands that do, through wtm's daemon: the facts a start decides from, how each job starts in its worktree, what refuses a start before anything starts, then the start itself (the worktree numbered, each job started in order between its phase's events, its ports checked, a crash caught) and what became of each job. Every code it gives is the asking command's: <command>.<code>.
 package runjobs
 
 import (
@@ -60,7 +60,7 @@ type ObserveParams struct {
 	Cwd        string
 }
 
-// Observe reads, on the repository of params, what a start decides from: the meta record of each worktree, which worktrees' directory is gone, where the caller stands, the jobs the run daemon runs, never starting it, and the drops owed. A repository with no run.toml is refused with <command>.not_initialized, one whose run.toml does not load with <command>.run_invalid.
+// Observe reads, on the repository of params, what a start decides from: the meta record of each worktree, which worktrees' directory is gone, where the caller stands, the jobs wtm's daemon runs, never starting it, and the drops owed. A repository with no run.toml is refused with <command>.not_initialized, one whose run.toml does not load with <command>.run_invalid.
 func (s Service) Observe(ctx context.Context, params ObserveParams) (Facts, error) {
 	repo := params.Repository
 	if repo.RunErr != nil {
@@ -113,10 +113,10 @@ func interrupted(ctx context.Context, err error) error {
 // ----------------------------------------------------------------------------
 // Before the start
 
-// DaemonUnavailable is the code, after the command's name, of a start that could not begin (the run daemon of this build could not be made sure of), or of a stop whose jobs cannot be read.
+// DaemonUnavailable is the code, after the command's name, of a start that could not begin (wtm's daemon of this build could not be made sure of), or of a stop whose jobs cannot be read.
 const DaemonUnavailable = ".daemon_unavailable"
 
-// Ensure makes sure of a run daemon of this build, and is why no job could start when it could not, worded under command: a daemon of another build holding jobs, followed by restart, or the daemon not starting.
+// Ensure makes sure of a daemon of this build, and is why no job could start when it could not, worded under command: a daemon of another build holding jobs, followed by restart, or the daemon not starting.
 func (s Service) Ensure(ctx context.Context, command string, restart *domain.FollowUp) *domain.Error {
 	err := s.Daemon.Ensure(ctx)
 	if err == nil {
@@ -125,13 +125,13 @@ func (s Service) Ensure(ctx context.Context, command string, restart *domain.Fol
 	if refusal := domain.SkewRefusal(domain.SkewRefusalParams{Command: command, Undone: "nothing started", Err: err, Restart: restart}); refusal != nil {
 		return refusal
 	}
-	return domain.AsError(domain.AsErrorParams{Err: err, Code: command + DaemonUnavailable, Message: "couldn't reach the run daemon"})
+	return domain.AsError(domain.AsErrorParams{Err: err, Code: command + DaemonUnavailable, Message: "couldn't reach wtm's daemon"})
 }
 
 // StopFailed is the code, after the command's name, of the warning of a worktree whose jobs an exclusive start could not stop, and of a worktree a job of which a stop could not stop.
 const StopFailed = ".stop_failed"
 
-// StopOthersParams are the command stopping, the other worktrees whose jobs stop, and the operation's correlation id, which the run daemon's events carry.
+// StopOthersParams are the command stopping, the other worktrees whose jobs stop, and the operation's correlation id, which wtm's daemon's events carry.
 type StopOthersParams struct {
 	Command       string
 	Others        []Other

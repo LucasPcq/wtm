@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/clean"
+	"github.com/LucasPcq/wtm/next/internal/command/daemonrestart"
 	"github.com/LucasPcq/wtm/next/internal/command/exec"
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
 	"github.com/LucasPcq/wtm/next/internal/command/rundown"
@@ -56,7 +57,7 @@ func TestEachRegisteredCommandIsInTheCatalogueOrItsStreamsAndWired(t *testing.T)
 	assert.ElementsMatch(t, registered, append(listed, streamed...), "main.go registers a command catalogue.go does not list, or the reverse")
 	for _, name := range registered {
 		// a stream follows every repository: wire.go builds it once, not per repository in app
-		if !slices.Contains(streamsListed, name) {
+		if !slices.Contains(streamsListed, name) && !slices.ContainsFunc(machine, func(m string) bool { return strings.ReplaceAll(m, "-", "") == name }) {
 			assert.True(t, wired[name], "%s is registered in main.go but wire.go builds no %s.UseCase", name, name)
 		}
 	}
@@ -110,7 +111,7 @@ func TestEachFollowUpOfAMigratedCommandIsSpelledFromItsSchema(t *testing.T) {
 			continue
 		}
 
-		require.Contains(t, []string{clean.Name, prune.Name, exec.Name, domain.CommandSync, runup.Name, runlogs.Name, rundown.Name, runstart.Name, runstop.Name, commandRestartDaemon}, followUp.Command, "%s has migrated: spell its follow-ups from its schema in commandLine", followUp.Command)
+		require.Contains(t, []string{clean.Name, prune.Name, exec.Name, domain.CommandSync, runup.Name, runlogs.Name, rundown.Name, runstart.Name, runstop.Name, daemonrestart.Name}, followUp.Command, "%s has migrated: spell its follow-ups from its schema in commandLine", followUp.Command)
 		argv := commandLine(followUp)
 		assert.Equal(t, append([]string{cli.Program}, strings.Fields(spelling(followUp.Command))...), argv[:min(1+len(strings.Fields(spelling(followUp.Command))), len(argv))], "%s's follow-up %v does not fold into its request", followUp.Command, followUp.Answers)
 	}

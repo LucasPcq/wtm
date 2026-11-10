@@ -124,11 +124,11 @@ func TestTheDaemonIsAHiddenCommand(t *testing.T) {
 	streams, _, _, _ := output.Test()
 	root := cli.NewRoot(version, streams, commands(streams, cli.Env{}))
 
-	daemon, _, err := root.Find([]string{daemonCommand})
+	serve, _, err := root.Find(serveArgs)
 
 	require.NoError(t, err)
-	assert.Equal(t, daemonCommand, daemon.Name())
-	assert.True(t, daemon.Hidden)
+	assert.Equal(t, "daemon serve", serve.CommandPath()[len(cli.Program)+1:])
+	assert.True(t, serve.Hidden)
 }
 
 // Opening a repository with no wtm config once registered it, which a global stream's prune dropped at once, announcing it anew.

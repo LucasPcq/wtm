@@ -1,0 +1,11 @@
+
+  ✗ daemon stop-jobs: 1 done · 1 failed
+
+  Repository              /src/acme
+  Stops in main (acme)    web, api (crashed: nothing to stop)
+  Stops in feat/a (acme)  db (held), mail (a stack, by its stop command)
+
+  ✗ feat/a (acme)  couldn't stop mail: docker compose down exited 1
+
+  → wtm-next daemon stop-jobs --repo /src/acme   stop the ones left
+

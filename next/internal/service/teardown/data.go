@@ -608,7 +608,7 @@ func (s Service) settle(ctx context.Context, owed env.OwedDrop, out bool) (bool,
 	return there, err
 }
 
-// jobs are the jobs the run daemon lists, a daemon of another build's among them.
+// jobs are the jobs wtm's daemon lists, a daemon of another build's among them.
 func (s Service) jobs(ctx context.Context) ([]run.Job, error) {
 	jobs, err := s.Daemon.Jobs(ctx)
 	if _, skewed := errors.AsType[*run.Skewed](err); skewed {

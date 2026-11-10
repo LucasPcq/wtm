@@ -1,0 +1,193 @@
+{
+  "v": 2,
+  "command": "daemon-restart",
+  "ok": true,
+  "op": "<id>",
+  "items": [
+    {
+      "subject": "daemon",
+      "status": "done",
+      "detail": {
+        "back": [
+          {
+            "name": "api",
+            "path": "<root>/acme",
+            "back": true
+          },
+          {
+            "name": "db",
+            "path": "<root>/acme",
+            "back": true
+          },
+          {
+            "name": "web",
+            "path": "<root>/acme",
+            "back": true
+          },
+          {
+            "name": "api",
+            "path": "<root>/acme.trees/feat-a",
+            "back": true
+          },
+          {
+            "name": "web",
+            "path": "<root>/acme.trees/feat-a",
+            "back": true
+          },
+          {
+            "name": "db",
+            "path": "<root>/acme.trees/feat-a",
+            "back": true
+          }
+        ]
+      }
+    }
+  ],
+  "plan": {
+    "running": true,
+    "from": "<build>",
+    "to": "<build>",
+    "back": [
+      {
+        "root": "<root>/acme",
+        "worktrees": [
+          {
+            "branch": "main",
+            "path": "<root>/acme",
+            "jobs": [
+              {
+                "name": "api",
+                "kind": "service",
+                "hold": "own"
+              },
+              {
+                "name": "db",
+                "kind": "service",
+                "hold": "own",
+                "shared": true
+              },
+              {
+                "name": "web",
+                "kind": "service",
+                "hold": "own"
+              }
+            ]
+          },
+          {
+            "branch": "feat/a",
+            "path": "<root>/acme.trees/feat-a",
+            "jobs": [
+              {
+                "name": "api",
+                "kind": "service",
+                "hold": "own"
+              },
+              {
+                "name": "db",
+                "kind": "service",
+                "hold": "claim"
+              },
+              {
+                "name": "web",
+                "kind": "service",
+                "hold": "own"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "taken_over": [
+      {
+        "root": "<root>/acme",
+        "worktrees": [
+          {
+            "branch": "main",
+            "path": "<root>/acme",
+            "jobs": [
+              {
+                "name": "stack",
+                "kind": "service",
+                "hold": "detached"
+              }
+            ]
+          },
+          {
+            "branch": "feat/a",
+            "path": "<root>/acme.trees/feat-a",
+            "jobs": [
+              {
+                "name": "stack",
+                "kind": "service",
+                "hold": "detached"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "tasks": [],
+    "unrecorded": [],
+    "gone": [],
+    "unheld": [],
+    "confirm": true,
+    "recap": [
+      {
+        "key": "daemon",
+        "label": "Daemon",
+        "values": [
+          {
+            "value": "<build> → <build>",
+            "text": "<build> → <build>"
+          }
+        ]
+      },
+      {
+        "key": "back",
+        "label": "Come back",
+        "values": [
+          {
+            "value": "api (main · acme)",
+            "text": "api (main · acme)"
+          },
+          {
+            "value": "db (main · acme)",
+            "text": "db (main · acme)"
+          },
+          {
+            "value": "web (main · acme)",
+            "text": "web (main · acme)"
+          },
+          {
+            "value": "api (feat/a · acme)",
+            "text": "api (feat/a · acme)"
+          },
+          {
+            "value": "db (feat/a · acme)",
+            "text": "db (feat/a · acme)"
+          },
+          {
+            "value": "web (feat/a · acme)",
+            "text": "web (feat/a · acme)"
+          }
+        ]
+      },
+      {
+        "key": "taken_over",
+        "label": "Taken over",
+        "values": [
+          {
+            "value": "stack (main · acme)",
+            "text": "stack (main · acme)"
+          },
+          {
+            "value": "stack (feat/a · acme)",
+            "text": "stack (feat/a · acme)"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": []
+}

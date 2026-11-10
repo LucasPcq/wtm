@@ -4,7 +4,7 @@
 # project widened with a task, a shared service with a namespace, a compose stack,
 # a service that crashes at once, a failing task and a verbatim worktree), one per
 # binary, one after the other: legacy `wtm run up` against `wtm-next run up`. Each
-# sandbox has its own HOME, so its own run daemon, socket and index; its jobs are
+# sandbox has its own HOME, so its own daemon, socket and index; its jobs are
 # stopped, its daemon and its compose containers gone before the next side starts.
 # After each scenario it records the exit code, the output and the state (the
 # daemon's index of the jobs up, every meta.json, the jobs' logs, the namespaces
@@ -109,7 +109,7 @@ TOML
 # teardown: every job of the sandbox stopped (its stacks' stop commands run), then its daemon.
 teardown() {
   "$legacy" run down --all --yes </dev/null >/dev/null 2>&1 || true
-  "$legacy" run daemon stop --yes </dev/null >/dev/null 2>&1 || true
+  "$next" daemon stop --yes </dev/null >/dev/null 2>&1 || true
 }
 
 scenario() {

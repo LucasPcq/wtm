@@ -1,4 +1,4 @@
-// Package joblog keeps each job's log as the run daemon writes it and the legacy wtm reads it: a line per line the job printed, its time first, one file per run, rotated past 5 MiB with two backups.
+// Package joblog keeps each job's log as wtm's daemon writes it and the legacy wtm reads it: a line per line the job printed, its time first, one file per run, rotated past 5 MiB with two backups.
 package joblog
 
 import (

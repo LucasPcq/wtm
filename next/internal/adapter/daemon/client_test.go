@@ -2,14 +2,18 @@ package daemon_test
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/daemon"
+	"github.com/LucasPcq/wtm/next/internal/adapter/statefile"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 
@@ -95,7 +99,7 @@ func TestADaemonRefusingTheListingFails(t *testing.T) {
 
 	_, err := daemon.Daemon{SocketPath: socket}.Jobs(t.Context())
 
-	require.EqualError(t, err, "run daemon: busy")
+	require.EqualError(t, err, "busy")
 }
 
 func TestWithNoDaemonTheStacksAndClaimsOfTheIndexAreUp(t *testing.T) {
@@ -157,7 +161,7 @@ func TestARestartsStartReachesTheDaemonAsOne(t *testing.T) {
 }
 
 func TestAStartThatMeetsADaemonStoppingIsMadeAgainOnce(t *testing.T) {
-	fake := &jobs{once: &run.Error{Code: run.CodeStopping, Message: "the run daemon is stopping"}}
+	fake := &jobs{once: &run.Error{Code: run.CodeStopping, Message: "wtm's daemon is stopping"}}
 	socket, _ := served(t, fake, "1.0")
 	spec := run.Spec{Job: project.Job{Name: "web"}, Profile: "dev", WorkDir: "/wt/a"}
 
@@ -198,7 +202,7 @@ func TestAStartTheDaemonRefusesFailsWithItsCodeAndExitCode(t *testing.T) {
 	require.ErrorAs(t, err, &failure)
 	assert.Equal(t, run.CodeTaskFailed, failure.Code)
 	assert.Equal(t, 3, *failure.ExitCode)
-	assert.Equal(t, "run daemon: task migrate exited with code 3", failure.Message)
+	assert.Equal(t, "task migrate exited with code 3", failure.Message)
 }
 
 func TestEnsureStartsADaemonWhenNoneAnswers(t *testing.T) {
@@ -244,8 +248,8 @@ func TestEnsureRefusesASkewedDaemonHoldingJobs(t *testing.T) {
 		code   string
 		says   string
 	}{
-		"build":  {answer: `{"status":"ok","protocol":2,"version":"0.9","jobs":[{"name":"web","work_dir":"/wt/a","state":"running","hold":"own"}]}`, code: run.CodeSkew, says: "the run daemon is wtm 0.9, this is wtm 1.0, and it runs 1 job(s)"},
-		"legacy": {answer: `{"status":"ok","version":"0.30.1","daemon_pid":12,"jobs":[{"name":"web","status":"running"},{"name":"db","status":"detached"},{"name":"api","status":"crashed"}]}`, code: run.CodeLegacy, says: "the run daemon is the legacy wtm 0.30.1, this is wtm 1.0, and it runs 2 job(s)"},
+		"build":  {answer: `{"status":"ok","protocol":2,"version":"0.9","jobs":[{"name":"web","work_dir":"/wt/a","state":"running","hold":"own"}]}`, code: run.CodeSkew, says: "the daemon is wtm 0.9, this is wtm 1.0, and it runs 1 job(s)"},
+		"legacy": {answer: `{"status":"ok","version":"0.30.1","daemon_pid":12,"jobs":[{"name":"web","status":"running"},{"name":"db","status":"detached"},{"name":"api","status":"crashed"}]}`, code: run.CodeLegacy, says: "the daemon is the legacy wtm 0.30.1, this is wtm 1.0, and it runs 2 job(s)"},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -300,7 +304,7 @@ func TestADaemonThatDoesNotStartSaysWhyFromItsLog(t *testing.T) {
 	var failure *run.Error
 	require.ErrorAs(t, err, &failure)
 	assert.Equal(t, run.CodeStartFailed, failure.Code)
-	assert.Equal(t, "the run daemon did not start within 100ms: Error: listen unix: bind: invalid argument", failure.Message)
+	assert.Equal(t, "wtm's daemon did not start within 100ms: Error: listen unix: bind: invalid argument", failure.Message)
 }
 
 func TestAStopWithNoDaemonStartsOneOnlyForAJobTheIndexHolds(t *testing.T) {
@@ -483,4 +487,79 @@ func TestAnAttachOrAResizeOfADaemonOfAnotherBuildIsRefused(t *testing.T) {
 		require.ErrorAs(t, err, &refusal)
 		assert.Equal(t, run.CodeSkew, refusal.Code)
 	}
+}
+
+func TestTheStatusOfALegacyDaemonIsReadAsItSpellsIt(t *testing.T) {
+	socket, _ := serve(t, `{"status":"ok","version":"0.30.1","daemon_pid":77,"proxy_port":27102,"proxy_public_port":80,"jobs":[{"name":"web","kind":"service","status":"running","work_dir":"/w"}]}`)
+
+	got, err := daemon.Daemon{SocketPath: socket, Version: "1.0"}.Status(t.Context())
+
+	require.NoError(t, err)
+	assert.True(t, got.Answering)
+	assert.Equal(t, run.SkewLegacy, got.Skew)
+	assert.Equal(t, 77, got.Stamp.PID)
+	assert.Equal(t, run.Proxy{Port: 27102, PublicPort: 80}, got.Proxy)
+	require.Len(t, got.Jobs, 1)
+	assert.True(t, got.Jobs[0].Up)
+}
+
+func TestASocketAnsweringNoListingHasItsJobsUnread(t *testing.T) {
+	socket, _ := serve(t, `{"status":"error","message":"unknown action: list"}`)
+
+	got, err := daemon.Daemon{SocketPath: socket, Version: "1.0"}.Status(t.Context())
+
+	require.NoError(t, err)
+	assert.True(t, got.Answering)
+	assert.Equal(t, run.SkewProtocol, got.Skew)
+	assert.Nil(t, got.Jobs)
+}
+
+func TestWithNoDaemonTheStatusIsTheStacksItsIndexHolds(t *testing.T) {
+	socket := unanswered(t, `{"version":2,"jobs":[{"name":"db","work_dir":"/w","config":{"name":"db","kind":"service","stop":"down"},"started_at":"2026-11-01T10:00:00Z"},{"name":"web","work_dir":"/w","config":{"name":"web","kind":"service"},"pid":42,"pgid":42}]}`)
+
+	got, err := daemon.Daemon{SocketPath: socket, Version: "1.0"}.Status(t.Context())
+
+	require.NoError(t, err)
+	assert.False(t, got.Answering)
+	require.Len(t, got.Jobs, 1)
+	assert.Equal(t, run.HoldDetached, got.Jobs[0].Hold)
+	require.Len(t, got.Left, 1, "a foreground service left in the index is a dead daemon's")
+	assert.Equal(t, "web", got.Left[0].Name)
+	assert.False(t, got.IndexFrozen)
+}
+
+// A daemon slow to stop closed its listener but held its lock: the next one, started at once, lost the lock to it and exited.
+func TestEnsureWaitsForADaemonStillStoppingBeforeItStartsTheNext(t *testing.T) {
+	socket := filepath.Join(socketDir(t), "wtm.sock")
+	stopping := holdLock(t, filepath.Join(filepath.Dir(socket), "wtm.lock"))
+	time.AfterFunc(300*time.Millisecond, func() { _ = stopping.Close() })
+	var startedLocked atomic.Bool
+	d := daemon.Daemon{SocketPath: socket, Version: "1.0", StartDaemon: func() error {
+		lock, err := statefile.TryLock(filepath.Join(filepath.Dir(socket), "wtm.lock"), domain.LockExclusive)
+		startedLocked.Store(err != nil)
+		if err == nil {
+			_ = lock.Close()
+		}
+		servedAt(t, socket, &jobs{}, "1.0")
+		return nil
+	}}
+
+	require.NoError(t, d.Ensure(t.Context()))
+
+	assert.False(t, startedLocked.Load(), "the next daemon was started while the one stopping held the lock")
+}
+
+func TestEnsureRefusesWhileADaemonStoppingNeverLetsItsLockGo(t *testing.T) {
+	defer daemon.ShortenStoppingWait(200 * time.Millisecond)()
+	socket := filepath.Join(socketDir(t), "wtm.sock")
+	holdLock(t, filepath.Join(filepath.Dir(socket), "wtm.lock"))
+	started := false
+	d := daemon.Daemon{SocketPath: socket, Version: "1.0", StartDaemon: func() error { started = true; return nil }}
+
+	err := d.Ensure(t.Context())
+
+	refused, ok := errors.AsType[*run.Error](err)
+	require.True(t, ok, err)
+	assert.Equal(t, run.CodeBusy, refused.Code)
+	assert.False(t, started)
 }

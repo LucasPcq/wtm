@@ -2,6 +2,7 @@ package daemon_test
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"net"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/daemon"
 	"github.com/LucasPcq/wtm/next/internal/adapter/statefile"
@@ -63,7 +65,7 @@ func unanswered(t *testing.T, content string) string {
 	return filepath.Join(dir, "wtm.sock")
 }
 
-// served is a run daemon serving the protocol on a new socket for jobs, of build version, and the number of shutdowns it was asked; a shutdown closes it.
+// served is a daemon serving the protocol on a new socket for jobs, of build version, and the number of shutdowns it was asked; a shutdown closes it.
 func served(t *testing.T, jobs daemon.Jobs, version string) (string, *atomic.Int32) {
 	t.Helper()
 	socket := filepath.Join(socketDir(t), "wtm.sock")
@@ -166,4 +168,61 @@ func starts(fake *jobs) []any {
 		}
 	}
 	return specs
+}
+
+// serving runs a daemon as params says on a new socket, ending with the test, and returns its socket and the channel Serve's error arrives on.
+func serving(t *testing.T, params daemon.ServeParams) (string, <-chan error) {
+	t.Helper()
+	params.SocketPath = filepath.Join(socketDir(t), "wtm.sock")
+	ctx, cancel := context.WithCancel(context.Background())
+	served := startServe(ctx, params)
+	// The test may read Serve's error itself: the cleanup waits for the lock instead.
+	t.Cleanup(func() {
+		cancel()
+		require.Eventually(t, func() bool { return unlocked(params.SocketPath) }, 5*time.Second, 10*time.Millisecond)
+	})
+	require.Eventually(t, func() bool { return dials(params.SocketPath) }, 2*time.Second, 10*time.Millisecond)
+	return params.SocketPath, served
+}
+
+// startServe runs Serve with params in the background and returns the channel its error arrives on.
+func startServe(ctx context.Context, params daemon.ServeParams) <-chan error {
+	served := make(chan error, 1)
+	go func() { served <- daemon.Serve(ctx, params) }()
+	return served
+}
+
+// unlocked reports whether no daemon holds the lock beside socket.
+func unlocked(socket string) bool {
+	lock, err := statefile.TryLock(filepath.Join(filepath.Dir(socket), "wtm.lock"), domain.LockExclusive)
+	if err != nil {
+		return false
+	}
+	_ = lock.Close()
+	return true
+}
+
+// dials reports whether something accepts a connection on socket.
+func dials(socket string) bool {
+	conn, err := net.DialTimeout("unix", socket, 50*time.Millisecond)
+	if err != nil {
+		return false
+	}
+	_ = conn.Close()
+	return true
+}
+
+// drain returns the first n values of values, failing the test after two seconds without them.
+func drain(t *testing.T, values <-chan string, n int) []string {
+	t.Helper()
+	var got []string
+	for range n {
+		select {
+		case value := <-values:
+			got = append(got, value)
+		case <-time.After(2 * time.Second):
+			require.FailNow(t, "too few values", "got %v", got)
+		}
+	}
+	return got
 }

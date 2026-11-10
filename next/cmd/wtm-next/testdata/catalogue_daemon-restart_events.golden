@@ -1,0 +1,48 @@
+[
+  {
+    "type": "operation.started",
+    "command": "daemon-restart",
+    "surface": "api"
+  },
+  {
+    "type": "unit.started",
+    "subject": "daemon"
+  },
+  {
+    "type": "phase.started",
+    "subject": "daemon",
+    "phase": "job",
+    "job": "idle"
+  },
+  {
+    "type": "phase.finished",
+    "subject": "daemon",
+    "phase": "job",
+    "job": "idle",
+    "failed": false
+  },
+  {
+    "type": "phase.started",
+    "subject": "daemon",
+    "phase": "job",
+    "job": "other"
+  },
+  {
+    "type": "phase.finished",
+    "subject": "daemon",
+    "phase": "job",
+    "job": "other",
+    "failed": false
+  },
+  {
+    "type": "unit.finished",
+    "subject": "daemon",
+    "status": "done"
+  },
+  {
+    "type": "operation.finished",
+    "command": "daemon-restart",
+    "surface": "api",
+    "ok": true
+  }
+]

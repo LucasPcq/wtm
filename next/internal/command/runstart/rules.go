@@ -22,7 +22,7 @@ type Facts struct {
 // ----------------------------------------------------------------------------
 // Decide
 
-// The codes of the refusals of a request: a job that changes foreign data (CodeUnsafe, followed by CodeForce, the request forced), a port another worktree holds (CodePortClash, followed by CodeExclusive, the request stopping the others first), a run daemon of another build holding jobs (CodeDaemonSkew, followed by the restart).
+// The codes of the refusals of a request: a job that changes foreign data (CodeUnsafe, followed by CodeForce, the request forced), a port another worktree holds (CodePortClash, followed by CodeExclusive, the request stopping the others first), a daemon of another build holding jobs (CodeDaemonSkew, followed by the restart).
 const (
 	CodeUnsafe      = Name + runjobs.Unsafe
 	CodeForeignData = Name + runjobs.ForeignData
@@ -32,7 +32,7 @@ const (
 	CodeDaemonSkew  = Name + domain.DaemonSkew
 )
 
-// CodeJobsUnknown warns of a plan the run daemon could not tell the jobs up of.
+// CodeJobsUnknown warns of a plan wtm's daemon could not tell the jobs up of.
 const CodeJobsUnknown = Name + domain.JobsUnknown
 
 // DecideParams are what Decide decides from besides the facts and the request: the follow-up that restarts a daemon of another build.
@@ -40,7 +40,7 @@ type DecideParams struct {
 	Restart *domain.FollowUp
 }
 
-// Decide turns the facts and the resolved request into the plan and its warnings, or the refusal that stops it (runjobs.Facts.Refusal): a run daemon of another build holding jobs, a port another worktree holds unless its jobs are stopped first, a job that changes data the worktree does not own unless forced. The job's action is run up's (start, up, join), restart for one up there that --restart starts again.
+// Decide turns the facts and the resolved request into the plan and its warnings, or the refusal that stops it (runjobs.Facts.Refusal): a daemon of another build holding jobs, a port another worktree holds unless its jobs are stopped first, a job that changes data the worktree does not own unless forced. The job's action is run up's (start, up, join), restart for one up there that --restart starts again.
 func Decide(f Facts, req Request, params DecideParams) (Plan, []domain.Warning, error) {
 	targets, _ := f.Entries(Name, []string{req.Worktree})
 	job, _ := f.Declared(req.Job)

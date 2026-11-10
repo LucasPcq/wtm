@@ -1,0 +1,4 @@
+
+  ✗ nothing started: the daemon is the legacy wtm's: restart it to start jobs beside its own
+  → wtm-next daemon restart   restart it: its jobs come back on a daemon of this build
+

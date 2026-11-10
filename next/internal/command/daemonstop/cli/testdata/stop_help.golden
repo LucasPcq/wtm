@@ -1,0 +1,30 @@
+
+  Stop wtm's daemon, the one process of this machine that runs the jobs of every
+  repository. Every service it runs itself stops with it, in every repository, a shared
+  one included, and the worktrees holding that one let it go. Its stacks (a service with
+  a stop command, docker compose up -d) run on, and the next daemon takes them over.
+
+  It asks first when a service it runs would stop; --yes stops without asking. The
+  next command that needs the daemon starts it again; `wtm daemon restart` stops it
+  and starts it again with its jobs.
+
+  Usage:
+    wtm-next daemon stop [flags]
+
+  Examples:
+    wtm daemon stop
+
+    # For a script or an agent
+    wtm daemon stop --yes --output json
+
+  Flags:
+        --ask                         Ask again the questions this repository remembers an answer to, to change or forget it
+    -n, --dry-run                     Show the plan and its fingerprint, apply nothing
+        --expect-fingerprint string   Apply only if the facts still have this fingerprint, the one --dry-run printed
+    -h, --help                        help for stop
+        --output string               Output format: text or json (default "text")
+    -y, --yes                         Stop without asking
+
+  Global Flags:
+    -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+

@@ -19,7 +19,7 @@ import (
 // ----------------------------------------------------------------------------
 // Facts
 
-// Facts are what status reads: the repository, the worktrees the request reads (Targets), the meta record of each live branch (and the error of a record that exists but does not read), what each worktree read holds, what the run daemon and GitHub said, and the branches behind their merged pull request (repository.Behind).
+// Facts are what status reads: the repository, the worktrees the request reads (Targets), the meta record of each live branch (and the error of a record that exists but does not read), what each worktree read holds, what wtm's daemon and GitHub said, and the branches behind their merged pull request (repository.Behind).
 type Facts struct {
 	worktree.Repository
 	repository.Asked
@@ -75,7 +75,7 @@ type Detail struct {
 	Isolation *project.Isolation `json:"isolation"`  // null while the worktree has not chosen, or when its record does not read
 	RunToml   RunToml            `json:"run_toml"`
 	Run       *Run               `json:"run"`  // null without a run.toml that reads
-	Jobs      []Job              `json:"jobs"` // null when the run daemon cannot tell
+	Jobs      []Job              `json:"jobs"` // null when wtm's daemon cannot tell
 	Env       Env                `json:"env"`
 	Problems  []Problem          `json:"problems"`
 	Condition worktree.Condition `json:"condition"` // the one fact of it that most changes what to do first, as this read knows it

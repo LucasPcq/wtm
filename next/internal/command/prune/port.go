@@ -23,7 +23,7 @@ type Meta interface {
 	Update(ctx context.Context, update worktree.MetaUpdate) (domain.Written, error)
 }
 
-// Jobs lists the jobs the run daemon runs; it fails with run.ErrUnknown when it cannot tell which are up.
+// Jobs lists the jobs wtm's daemon runs; it fails with run.ErrUnknown when it cannot tell which are up.
 type Jobs func(ctx context.Context) ([]run.Job, error)
 
 // PullRequests returns the pull request of each of branches, its open one else its newest whatever its state; it fails with worktree.ErrPullRequestsUnavailable, wrapped with what to do about it, or the context's error.

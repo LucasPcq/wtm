@@ -1,4 +1,4 @@
-// Package repository reads the facts of a repository a command decides from: its config, its run.toml, its snapshot, the meta records of its branches, where each worktree stands on disk, whether a branch is behind its merged pull request, and what a read asks besides git (the run daemon, the forge).
+// Package repository reads the facts of a repository a command decides from: its config, its run.toml, its snapshot, the meta records of its branches, where each worktree stands on disk, whether a branch is behind its merged pull request, and what a read asks besides git (wtm's daemon, the forge).
 package repository
 
 import (
@@ -16,7 +16,9 @@ type Service struct {
 	Git      Snapshotter
 	MainPath string
 	Init     *domain.FollowUp // the command that sets wtm up in a repository, offered by the refusal of one with no config; none when nil
-	Restart  *domain.FollowUp // the command that restarts a run daemon of another build, handing its jobs over; none when nil
+	Restart  *domain.FollowUp // the command that restarts a daemon of another build, handing its jobs over; none when nil
+	// FrozenIndex is the daemon's index of jobs when a newer wtm wrote it, which the daemon then leaves unwritten; "" otherwise, or when nil.
+	FrozenIndex func() string
 }
 
 // Observe reads the repository the command named command decides from: the

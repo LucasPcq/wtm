@@ -1,0 +1,9 @@
+
+  = wtm's daemon is not running
+
+  build   <build>
+  jobs    none
+  socket  <root>/home/Library/Application Support/wtm/wtm.sock
+  index   <root>/home/Library/Application Support/wtm/jobs.json
+  ! the index of jobs <root>/home/Library/Application Support/wtm/jobs.json was written by a newer wtm: nothing started here is recorded, so no restart brings it back — run the newer wtm, or remove the file once nothing runs
+

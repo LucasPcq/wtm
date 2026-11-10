@@ -1,0 +1,14 @@
+
+  ! wtm's daemon runs another build · pid <pid>
+
+  build   the legacy wtm's dev · this wtm is <build>
+  jobs    acme
+            main    api, db (shared), stack (detached), web
+            feat/a  api, db (held), stack (detached), web
+  proxy   port 27422
+  socket  <root>/home/Library/Application Support/wtm/wtm.sock
+  index   <root>/home/Library/Application Support/wtm/jobs.json
+  ! the daemon is the legacy wtm's: restart it to start jobs beside its own
+
+  → wtm-next daemon restart   restart it: its jobs come back on a daemon of this build
+

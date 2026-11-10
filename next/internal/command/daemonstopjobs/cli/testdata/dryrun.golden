@@ -1,0 +1,8 @@
+
+  daemon stop-jobs · dry run, nothing applied
+  Stops in main (acme)    web, api (crashed: nothing to stop)
+  Stops in feat/a (acme)  db (held), mail (a stack, by its stop command)
+  Stops in main (wtm)     docs
+  fingerprint  ce8fe180837b3b4a68965fea
+  → wtm-next daemon stop-jobs --expect-fingerprint ce8fe180837b3b4a68965fea   apply this plan
+

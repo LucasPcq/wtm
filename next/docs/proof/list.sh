@@ -201,7 +201,7 @@ run_side() {
     slow_gh "$root/slow"
     interrupt 17-interrupted "$root/acme" list --with-prs
     interrupt 18-interrupted-json "$root/acme" list --with-prs --output json
-    "$legacy" run daemon stop --yes </dev/null >/dev/null 2>&1 || true
+    "$next" daemon stop --yes </dev/null >/dev/null 2>&1 || true
   )
   sed -i '' -E \
     -e "s#(/private)?$root#<SB>#g" \

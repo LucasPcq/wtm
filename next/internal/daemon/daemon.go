@@ -1,4 +1,4 @@
-// Package daemon is the run daemon: the jobs of every worktree of the machine, started, watched and stopped as its clients ask, recorded for the next daemon and taken over from the one before. It is blind to git: a worktree is the directory and the environment its client sends.
+// Package daemon is wtm's daemon: the jobs of every worktree of the machine, started, watched and stopped as its clients ask, recorded for the next daemon and taken over from the one before. It is blind to git: a worktree is the directory and the environment its client sends.
 package daemon
 
 import (
@@ -206,7 +206,7 @@ func (d *Daemon) start(spec run.Spec, out func(run.Line)) (run.Job, error) {
 	d.mu.Lock()
 	if d.stopping {
 		d.mu.Unlock()
-		return run.Job{}, &run.Error{Code: run.CodeStopping, Message: "the run daemon is stopping"}
+		return run.Job{}, &run.Error{Code: run.CodeStopping, Message: "wtm's daemon is stopping"}
 	}
 	previous := d.jobs[k]
 	if previous != nil && previous.process != nil {
@@ -463,7 +463,7 @@ func (d *Daemon) stopStack(j *job, out func(run.Line)) error {
 		why := fmt.Sprintf("failed (exit %d)", code)
 		switch {
 		case errors.Is(err, errDeadline) && d.isStopping():
-			why = "was stopped as the run daemon stopped"
+			why = "was stopped as wtm's daemon stopped"
 		case errors.Is(err, errDeadline):
 			why = fmt.Sprintf("was still running after %s, and was stopped", stopLimit)
 		}
@@ -802,7 +802,7 @@ func (j *job) viewLocked(public int) run.Job {
 		MainHolds: j.record.MainHolds,
 	}
 	if spec.Origin != nil {
-		view.Repo = spec.Origin.Root
+		view.Repo, view.Branch = spec.Origin.Root, spec.Origin.Branch
 	}
 	if view.Hold == run.HoldDetached {
 		view.StopCommand = spec.Job.Stop

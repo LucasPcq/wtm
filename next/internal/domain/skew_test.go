@@ -11,13 +11,13 @@ import (
 )
 
 func TestASkewedDaemonTheClientCannotGoOnWithIsRefusedFollowedByItsRestart(t *testing.T) {
-	restart := &FollowUp{Command: "run daemon restart"}
+	restart := &FollowUp{Command: "daemon restart"}
 	cases := map[string]struct {
 		err  error
 		skew run.Skew
 	}{
-		"protocol": {err: &run.Error{Code: run.CodeSkew, Message: "the run daemon speaks protocol 1, this wtm 2"}, skew: run.SkewBuild},
-		"legacy":   {err: &run.Error{Code: run.CodeLegacy, Message: "the run daemon is the legacy wtm"}, skew: run.SkewLegacy},
+		"protocol": {err: &run.Error{Code: run.CodeSkew, Message: "wtm's daemon speaks protocol 1, this wtm 2"}, skew: run.SkewBuild},
+		"legacy":   {err: &run.Error{Code: run.CodeLegacy, Message: "wtm's daemon is the legacy wtm"}, skew: run.SkewLegacy},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {

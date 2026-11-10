@@ -1,0 +1,10 @@
+
+  ✓ Daemon restarted.
+
+  Run daemon
+  Version  dev
+  Jobs     0 supervised · 2 detached stack(s)
+  Proxy    port 27402
+  Socket   <root>/home/Library/Application Support/wtm/wtm.sock
+  Index    <root>/home/Library/Application Support/wtm/jobs.json
+

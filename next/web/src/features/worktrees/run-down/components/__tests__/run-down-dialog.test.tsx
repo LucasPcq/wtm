@@ -70,7 +70,7 @@ test('a plan the core refuses is said on Confirm, nothing to press', async () =>
         {
           ...envelope('run-down', []),
           ok: false,
-          error: { kind: 'precondition', code: 'run-down.daemon_unavailable', message: 'no run daemon answers' },
+          error: { kind: 'precondition', code: 'run-down.daemon_unavailable', message: 'no daemon answers' },
         },
         { status: 412 },
       ),
@@ -83,7 +83,7 @@ test('a plan the core refuses is said on Confirm, nothing to press', async () =>
   await user.click(await within(dialog).findByRole('checkbox', { name: 'Stop in fix/login' }))
   await user.click(within(dialog).getByRole('button', { name: 'Next' }))
 
-  expect(await within(dialog).findByText('no run daemon answers')).toBeDefined()
+  expect(await within(dialog).findByText('no daemon answers')).toBeDefined()
   await disabled(dialog, 'Stop jobs')
 })
 

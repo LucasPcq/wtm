@@ -16,7 +16,7 @@ import (
 // ----------------------------------------------------------------------------
 // Facts
 
-// Facts are what a removal, or a run paying the drops owed, decides from: the repository, the meta record of each worktree on a branch, the records a newer wtm wrote, what each worktree checked holds that makes it unsafe to remove, the job environment of each, where the caller stands, the jobs the run daemon lists, the drops owed, and why the run daemon or the forge could not be asked.
+// Facts are what a removal, or a run paying the drops owed, decides from: the repository, the meta record of each worktree on a branch, the records a newer wtm wrote, what each worktree checked holds that makes it unsafe to remove, the job environment of each, where the caller stands, the jobs wtm's daemon lists, the drops owed, and why wtm's daemon or the forge could not be asked.
 type Facts struct {
 	worktree.Repository
 	Records map[string]worktree.Meta       // by branch
@@ -24,10 +24,10 @@ type Facts struct {
 	Checks  map[string]Check               // by the name a worktree is checked by
 	Envs    map[string]map[string]string   // by the name a worktree is checked by, its job environment (Service.Envs)
 	Cwd     string                         // where the caller stands, through its symbolic links
-	Jobs    []run.Job                      // the jobs the run daemon lists
+	Jobs    []run.Job                      // the jobs wtm's daemon lists
 	Owed    []env.OwedDrop                 // the drops removed worktrees owe the shared services (Service.Owing)
-	JobsErr error                          // why the run daemon could not tell which jobs are up
-	Skew    *domain.Warning                // the warning of a run daemon of another build, worded by the command
+	JobsErr error                          // why wtm's daemon could not tell which jobs are up
+	Skew    *domain.Warning                // the warning of a daemon of another build, worded by the command
 	PRsErr  error                          // why the forge could not be asked for open pull requests
 }
 
@@ -40,7 +40,7 @@ type Check struct {
 	Jobs        []string // the jobs up it runs for itself, sorted: its claims on shared services are no job of its own
 }
 
-// Settle completes the facts with what the run daemon and the forge said: the jobs it lists, those each worktree runs for itself, its open pull request, and no commit unpushed when its merged pull request holds them all (landed), which a forge that could not be asked cannot tell.
+// Settle completes the facts with what wtm's daemon and the forge said: the jobs it lists, those each worktree runs for itself, its open pull request, and no commit unpushed when its merged pull request holds them all (landed), which a forge that could not be asked cannot tell.
 func (f *Facts) Settle(worktrees []worktree.Worktree, jobs []run.Job, prs []worktree.PullRequest) {
 	f.Jobs = jobs
 	for _, w := range worktrees {
@@ -101,7 +101,7 @@ type Removal struct {
 	PullRequest string             `json:"pull_request,omitempty"`
 	Jobs        []string           `json:"jobs,omitempty"`
 	entry       int                // its index among the worktrees asked, which its problems are on
-	stop        bool               // whether its jobs are stopped first: it runs some, or the run daemon could not tell
+	stop        bool               // whether its jobs are stopped first: it runs some, or wtm's daemon could not tell
 }
 
 // Removal is the removal of w, asked at index entry of the request's worktrees.
@@ -263,7 +263,7 @@ type WarningsParams struct {
 	Unasked string
 }
 
-// Warnings are what a plan cannot see to: the jobs or the pull requests that could not be asked, a run daemon of another build.
+// Warnings are what a plan cannot see to: the jobs or the pull requests that could not be asked, a daemon of another build.
 func (f Facts) Warnings(params WarningsParams) []domain.Warning {
 	var warnings []domain.Warning
 	if f.JobsErr != nil {

@@ -22,7 +22,7 @@ type Target = runjobs.StopTarget
 // ----------------------------------------------------------------------------
 // Decide
 
-// The codes of what a plan cannot see to: a run daemon of another build answered, whose listing may not say whether the main checkout holds a shared service (its fate is then approximate); run.toml does not load (the job is taken by its name).
+// The codes of what a plan cannot see to: a daemon of another build answered, whose listing may not say whether the main checkout holds a shared service (its fate is then approximate); run.toml does not load (the job is taken by its name).
 const (
 	CodeDaemonSkew       = Name + domain.DaemonSkew
 	CodeFatesApproximate = Name + runjobs.FatesApproximate

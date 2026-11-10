@@ -27,6 +27,8 @@ import (
 	"testing"
 	"time"
 
+	daemonrestartcli "github.com/LucasPcq/wtm/next/internal/command/daemonrestart/cli"
+
 	"github.com/LucasPcq/wtm/next/internal/adapter/daemon"
 	bus "github.com/LucasPcq/wtm/next/internal/adapter/events"
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
@@ -35,6 +37,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/api"
 	"github.com/LucasPcq/wtm/next/internal/command/checkout"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
+	"github.com/LucasPcq/wtm/next/internal/command/daemonrestart"
 	"github.com/LucasPcq/wtm/next/internal/command/fastforward"
 	"github.com/LucasPcq/wtm/next/internal/command/list"
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
@@ -145,9 +148,11 @@ func keepsTheMutationContract(t *testing.T, m mutation) {
 
 	empty, err := c.Questions(t.Context(), api.Call{Dir: main})
 	require.NoError(t, err)
-	// a later answer's problem may wait on the subject's, as extract's files wait on their source
-	subject := m.answers[0].Path
-	assert.Equal(t, m.complete, len(domain.ProblemsOf(empty.Problems, subject)) == 0, "an empty request is not asked its %s, unless it is complete", subject)
+	// a later answer's problem may wait on the subject's, as extract's files wait on their source; a command of no field has no subject
+	if len(m.answers) > 0 {
+		subject := m.answers[0].Path
+		assert.Equal(t, m.complete, len(domain.ProblemsOf(empty.Problems, subject)) == 0, "an empty request is not asked its %s, unless it is complete", subject)
+	}
 
 	asked, err := c.Questions(t.Context(), api.Call{Dir: main, Answers: m.answers})
 	require.NoError(t, err)
@@ -266,6 +271,9 @@ func (s shapes) golden(part string, v any) {
 	data, err := json.MarshalIndent(v, "", "  ")
 	require.NoError(s.t, err)
 	text := strings.ReplaceAll(string(data), s.root, "<root>")
+	if config, err := os.UserConfigDir(); err == nil {
+		text = strings.ReplaceAll(text, config, "<config>")
+	}
 	text = lasted.ReplaceAllString(text, `"duration_ms": 0`)
 	text = runLog.ReplaceAllString(text, `/<id>.log"`)
 	text = varying.ReplaceAllStringFunc(text, func(value string) string {
@@ -277,7 +285,7 @@ func (s shapes) golden(part string, v any) {
 	formtest.Golden(s.t, "catalogue_"+s.command+"_"+part, text+"\n")
 }
 
-// servingBus runs the event bus's daemon on a new socket until the test ends, and returns its socket, in a short directory: a unix socket path is limited to about 100 bytes.
+// servingBus runs a daemon carrying only the event bus on a new socket until the test ends, and returns its socket, in a short directory: a unix socket path is limited to about 100 bytes.
 func servingBus(t *testing.T) string {
 	t.Helper()
 	dir, err := os.MkdirTemp("", "wtm-next")
@@ -287,7 +295,10 @@ func servingBus(t *testing.T) string {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	served := make(chan error, 1)
-	go func() { served <- bus.Serve(ctx, bus.ServeParams{SocketPath: socket, Idle: time.Minute}) }()
+	relay := bus.NewRelay()
+	go func() {
+		served <- daemon.Serve(ctx, daemon.ServeParams{SocketPath: socket, Idle: time.Minute, Bus: relay.Serve, Stopping: relay.Close})
+	}()
 	t.Cleanup(func() {
 		cancel()
 		<-served
@@ -478,6 +489,10 @@ func requestSchema(form domain.Form) map[string]any {
 			answerSchema(domain.PathAsk, oneValue(map[string]any{"enum": []string{"true", "false"}})))
 	}
 
+	// A form with no field takes no answer.
+	if len(answers) == 0 {
+		return map[string]any{"type": "array", "maxItems": 0}
+	}
 	return map[string]any{"type": "array", "items": map[string]any{"oneOf": answers}}
 }
 
@@ -528,7 +543,7 @@ var enums = map[reflect.Type]struct {
 	reflect.TypeFor[checkout.Action]():           {"How a pull request's branch gets its worktree.", checkout.Actions()},
 	reflect.TypeFor[runjobs.Action]():            {"What a start does to one job of its profile.", runjobs.Actions()},
 	reflect.TypeFor[runjobs.JobStatus]():         {"What became of one job of a start.", runjobs.JobStatuses()},
-	reflect.TypeFor[runlogs.JobState]():          {"Where a job whose output is read stands: the run daemon's state, stopped for a job only its log knows, not_started for one that never ran.", runlogs.JobStates()},
+	reflect.TypeFor[runlogs.JobState]():          {"Where a job whose output is read stands: wtm's daemon's state, stopped for a job only its log knows, not_started for one that never ran.", runlogs.JobStates()},
 	reflect.TypeFor[runjobs.StopStatus]():        {"What became of one job of a stop.", runjobs.StopStatuses()},
 	reflect.TypeFor[run.Fate]():                  {"What a stop does to one job: stops it, releases a shared service others keep, or clears a crash.", run.Fates()},
 	reflect.TypeFor[list.Finished]():             {"How a worktree's pull request has done with it: merged, or closed unmerged.", list.Finisheds()},
@@ -547,7 +562,7 @@ var enums = map[reflect.Type]struct {
 	reflect.TypeFor[project.Isolation]():         {"How a worktree stands against its source.", project.Isolations()},
 	reflect.TypeFor[project.JobKind]():           {"Whether a job keeps running or runs to its end.", project.JobKinds()},
 	reflect.TypeFor[run.State]():                 {"A job's state.", run.States()},
-	reflect.TypeFor[run.Hold]():                  {"What of a job the run daemon holds: its own process, a stack its launcher left, a claim on a shared job another worktree runs.", run.Holds()},
+	reflect.TypeFor[run.Hold]():                  {"What of a job wtm's daemon holds: its own process, a stack its launcher left, a claim on a shared job another worktree runs.", run.Holds()},
 	reflect.TypeFor[worktree.PullRequestState](): {"Where a pull request stands.", worktree.PullRequestStates()},
 	reflect.TypeFor[worktree.Action]():           {"An action on a worktree, one entry of the menu every surface shows of it.", worktree.Actions()},
 	reflect.TypeFor[worktree.Unoffered]():        {"Why a worktree does not offer an action, as a code each surface words its own way.", worktree.Unoffereds()},
@@ -862,10 +877,31 @@ func stringsOf(values any) []string {
 	return found
 }
 
-// servingDaemon runs the daemon, the run daemon and the bus, on a new socket in a short directory until the test ends, and returns its socket.
+// servingDaemon runs the daemon, wtm's daemon and the bus, on a new socket in a short directory until the test ends, and returns its socket.
 func servingDaemon(t *testing.T) string {
 	t.Helper()
 	return serving(t, daemonParams{})
+}
+
+// restartable puts in place of the daemon a command starts one of the test's own, on the socket the commands reach, so a restart has a daemon to start; it is stopped with the test.
+func restartable(t *testing.T) {
+	t.Helper()
+	ctx, cancel := context.WithCancel(context.Background())
+	served := make(chan error, 1)
+	started := false
+	was := startDaemon
+	startDaemon = func() error {
+		started = true
+		go func() { served <- serveDaemon(ctx, daemonParams{Socket: daemon.SocketPath(), Stderr: io.Discard}) }()
+		return nil
+	}
+	t.Cleanup(func() {
+		startDaemon = was
+		cancel()
+		if started {
+			<-served
+		}
+	})
 }
 
 // serving runs the daemon of params as servingDaemon does, on params.Socket when it names one, its standard error to its log, as a daemon a client starts.
@@ -933,10 +969,10 @@ func writeRun(t *testing.T, main, content string) {
 	require.NoError(t, os.WriteFile(filepath.Join(main, ".git", "wtm", "run.toml"), []byte(content), 0o644))
 }
 
-// daemonJobs are the jobs the run daemon at the commands' socket lists.
+// daemonJobs are the jobs wtm's daemon at the commands' socket lists.
 func daemonJobs(t *testing.T) []run.Job {
 	t.Helper()
-	jobs, err := daemon.Daemon{SocketPath: bus.SocketPath(), Version: version}.Jobs(t.Context())
+	jobs, err := daemon.Daemon{SocketPath: daemon.SocketPath(), Version: version}.Jobs(t.Context())
 	require.NoError(t, err)
 	return jobs
 }
@@ -963,6 +999,8 @@ func spelling(command string) string {
 		return runstartcli.Use
 	case runstop.Name:
 		return runstopcli.Use
+	case daemonrestart.Name:
+		return daemonrestartcli.Use
 	}
 	return command
 }

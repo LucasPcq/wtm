@@ -1,0 +1,97 @@
+{
+  "v": 2,
+  "command": "daemon-status",
+  "ok": true,
+  "items": [
+    {
+      "subject": "daemon",
+      "status": "done",
+      "detail": {
+        "running": true,
+        "pid": 4242,
+        "build": "0.31.0",
+        "daemon": "0.30.9",
+        "protocol": 2,
+        "skew": "build",
+        "repos": [
+          {
+            "root": "/src/acme",
+            "worktrees": [
+              {
+                "branch": "main",
+                "path": "/src/acme",
+                "jobs": [
+                  {
+                    "name": "db",
+                    "kind": "service",
+                    "hold": "own",
+                    "shared": true
+                  },
+                  {
+                    "name": "web",
+                    "kind": "service",
+                    "hold": "own"
+                  }
+                ]
+              },
+              {
+                "branch": "feat/a",
+                "path": "/src/acme.trees/feat-a",
+                "jobs": [
+                  {
+                    "name": "db",
+                    "kind": "service",
+                    "hold": "claim"
+                  },
+                  {
+                    "name": "mail",
+                    "kind": "service",
+                    "hold": "detached"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "root": "/src/wtm",
+            "worktrees": [
+              {
+                "branch": "main",
+                "path": "/src/wtm",
+                "jobs": [
+                  {
+                    "name": "docs",
+                    "kind": "service",
+                    "hold": "own"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "proxy": {
+          "port": 11080,
+          "public_port": 80
+        },
+        "socket": "/cfg/wtm/wtm.sock",
+        "index": "/cfg/wtm/jobs.json"
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": [
+    {
+      "code": "daemon-status.daemon_skew",
+      "params": {
+        "daemon": "0.30.9",
+        "skew": "build"
+      },
+      "message": "the daemon is of another build (0.30.9): restart it to start jobs beside its own",
+      "follow_up": {
+        "command": "daemon-restart",
+        "code": "daemon-status.restart_daemon",
+        "message": "restart it: its jobs come back on a daemon of this build"
+      }
+    }
+  ]
+}

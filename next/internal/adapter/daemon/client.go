@@ -26,18 +26,23 @@ const (
 	shutdownWait = 30 * time.Second
 	pollEvery    = 50 * time.Millisecond
 
-	indexName = "jobs.json"
-	lockName  = "wtm.lock"
-	logName   = "daemon.log"
+	globalDirName = "wtm"
+	socketName    = "wtm.sock"
+	indexName     = "jobs.json"
+	lockName      = "wtm.lock"
+	logName       = "daemon.log"
 )
 
-// startWait is how long a daemon started has to answer, and a process on the socket that is no run daemon to go.
+// stoppingWait is how long a daemon that stopped answering may hold its lock while its jobs halt before a new one is started.
+var stoppingWait = 2 * time.Minute
+
+// startWait is how long a daemon started has to answer, and a process on the socket that is not wtm's daemon to go.
 var startWait = 5 * time.Second
 
 // errNoDaemon is the error of a request no daemon answered.
-var errNoDaemon = errors.New("no run daemon answers")
+var errNoDaemon = errors.New("no daemon answers")
 
-// Daemon is the run daemon listening on SocketPath, as a client asks it:
+// Daemon is wtm's daemon listening on SocketPath, as a client asks it:
 // Version is this build's, which a daemon of another is told apart by, and
 // StartDaemon starts a daemon of this build when one is needed (nil starts
 // none). Its index of jobs, its lock and its log lie beside the socket.
@@ -45,6 +50,17 @@ type Daemon struct {
 	SocketPath  string
 	Version     string
 	StartDaemon func() error
+}
+
+// SocketPath returns the socket wtm's daemon listens on, under the user's
+// config directory, or "" when that directory is unknown.
+func SocketPath() string {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return ""
+	}
+
+	return filepath.Join(dir, globalDirName, socketName)
 }
 
 // LogPath returns the file a daemon started beside socket writes why it
@@ -87,7 +103,7 @@ func (d Daemon) Jobs(ctx context.Context) ([]run.Job, error) {
 	}
 	skew := run.SkewOf(listing.stamp(), d.Version)
 	if skew == run.SkewProtocol {
-		return nil, &run.Error{Code: run.CodeSkew, Message: fmt.Sprintf("the run daemon speaks protocol %d, this wtm %d", listing.Protocol, run.ProtocolVersion)}
+		return nil, &run.Error{Code: run.CodeSkew, Message: fmt.Sprintf("the daemon speaks protocol %d, this wtm %d", listing.Protocol, run.ProtocolVersion)}
 	}
 
 	jobs := make([]run.Job, 0, len(listing.Jobs))
@@ -106,7 +122,7 @@ func (d Daemon) Jobs(ctx context.Context) ([]run.Job, error) {
 // the stop command of a stack, and whether the main checkout holds a shared
 // job, unknown when the index has no record of it.
 func (d Daemon) recorded(jobs []run.Job) []run.Job {
-	records := (&Index{Path: IndexPath(d.SocketPath)}).Load()
+	records := d.Records()
 	for i, job := range jobs {
 		at := slices.IndexFunc(records, func(record run.Record) bool {
 			return record.Spec.WorkDir == job.WorkDir && record.Spec.Job.Name == job.Name
@@ -123,6 +139,9 @@ func (d Daemon) recorded(jobs []run.Job) []run.Job {
 		if spec.Origin != nil && job.Repo == "" {
 			jobs[i].Repo = spec.Origin.Root
 		}
+		if spec.Origin != nil && job.Branch == "" {
+			jobs[i].Branch = spec.Origin.Branch
+		}
 		if job.Hold == run.HoldDetached && job.StopCommand == "" {
 			jobs[i].StopCommand = spec.Job.Stop
 		}
@@ -130,17 +149,29 @@ func (d Daemon) recorded(jobs []run.Job) []run.Job {
 	return jobs
 }
 
-// indexed returns the jobs the index says are up with no daemon to ask.
+// indexed returns the jobs the index says are up with no daemon to ask; a
+// foreground service left in it fails it with run.ErrUnknown.
 func (d Daemon) indexed() ([]run.Job, error) {
-	var jobs []run.Job
-	for _, record := range (&Index{Path: IndexPath(d.SocketPath)}).Load() {
+	jobs, left := d.held()
+	if len(left) > 0 {
+		return nil, run.ErrUnknown
+	}
+	return jobs, nil
+}
+
+// held returns the stacks and the claims the index holds, which run with no
+// daemon, and the foreground services it holds, which a daemon that died left:
+// whether they still run only a daemon taking them over can tell.
+func (d Daemon) held() (jobs, left []run.Job) {
+	for _, record := range d.Records() {
 		spec, hold := record.Spec, record.Hold()
-		if hold == run.HoldOwn {
-			return nil, run.ErrUnknown
-		}
 		job := run.Job{Name: spec.Job.Name, WorkDir: spec.WorkDir, Up: true, Kind: spec.Job.Kind, Hold: hold, SharedDir: record.SharedDir, MainHolds: record.MainHolds}
 		if spec.Origin != nil {
-			job.Repo = spec.Origin.Root
+			job.Repo, job.Branch = spec.Origin.Root, spec.Origin.Branch
+		}
+		if hold == run.HoldOwn {
+			left = append(left, job)
+			continue
 		}
 		if hold == run.HoldDetached {
 			job.State, job.StartedAt, job.StopCommand = run.Running, record.StartedAt, spec.Job.Stop
@@ -148,7 +179,58 @@ func (d Daemon) indexed() ([]run.Job, error) {
 		jobs = append(jobs, job)
 	}
 
-	return jobs, nil
+	return jobs, left
+}
+
+// Records returns the records of the daemon's index: every job up it
+// recorded, with what started it; none when the index is absent, unreadable
+// or a newer wtm's.
+func (d Daemon) Records() []run.Record {
+	return (&Index{Path: IndexPath(d.SocketPath)}).Load()
+}
+
+// IndexFrozen reports whether a newer wtm wrote the daemon's index, which a
+// daemon of this one leaves unwritten: what it starts is recorded nowhere.
+func (d Daemon) IndexFrozen() bool {
+	return (&Index{Path: IndexPath(d.SocketPath)}).Frozen()
+}
+
+// Status returns the daemon as it stands, never starting it: whether one
+// answers, its stamp, its skew, its jobs and its proxy, or, with none
+// answering, the stacks and claims its index holds. A daemon of another
+// protocol, or a process on the socket that is no daemon of wtm's, answers with
+// jobs that cannot be read.
+func (d Daemon) Status(ctx context.Context) (run.Daemon, error) {
+	status := run.Daemon{Socket: d.SocketPath, Index: IndexPath(d.SocketPath), IndexFrozen: d.IndexFrozen()}
+	listing, err := d.exchange(ctx, exchangeParams{Request: request{Action: actionList}, Timeout: listTimeout})
+	if errors.Is(err, errNoDaemon) {
+		status.Jobs, status.Left = d.held()
+		return status, nil
+	}
+	if err != nil {
+		return run.Daemon{}, err
+	}
+
+	status.Answering, status.Stamp = true, listing.stamp()
+	status.Skew = run.SkewOf(status.Stamp, d.Version)
+	if listing.Status == statusError || status.Skew == run.SkewProtocol {
+		status.Skew = run.SkewProtocol
+		return status, nil
+	}
+	legacy := status.Skew == run.SkewLegacy
+	for _, j := range listing.Jobs {
+		status.Jobs = append(status.Jobs, j.runJob(legacy))
+	}
+	if status.Skew != run.SkewNone {
+		status.Jobs = d.recorded(status.Jobs)
+	}
+	status.Proxy = run.Proxy{Port: listing.ProxyPort, PublicPort: listing.ProxyPublicPort}
+	if listing.Proxy != nil {
+		status.Proxy = run.Proxy{Port: listing.Proxy.Port, PublicPort: listing.Proxy.PublicPort}
+	}
+	status.Stamp.PID = cmp.Or(status.Stamp.PID, listing.DaemonPID)
+
+	return status, nil
 }
 
 // ----------------------------------------------------------------------------
@@ -300,7 +382,7 @@ func (d Daemon) Attach(ctx context.Context, req run.Window) (net.Conn, error) {
 	}
 	if err := json.NewEncoder(conn).Encode(request{Action: actionAttach, Name: req.Name, WorkDir: req.WorkDir, Cols: req.Cols, Rows: req.Rows}); err != nil {
 		_ = conn.Close()
-		return nil, fmt.Errorf("ask the run daemon: %w", err)
+		return nil, fmt.Errorf("ask wtm's daemon: %w", err)
 	}
 	// The answer is one line, the terminal's raw bytes after it: what the reader read past the line is the terminal's.
 	reader := bufio.NewReader(conn)
@@ -348,7 +430,7 @@ func (d Daemon) Resize(ctx context.Context, req run.Window) error {
 func (d Daemon) skewed(a answer) error {
 	switch skew := run.SkewOf(a.stamp(), d.Version); skew {
 	case run.SkewProtocol, run.SkewBuild:
-		return &run.Error{Code: run.CodeSkew, Message: fmt.Sprintf("the run daemon is wtm %s (protocol %d), this is wtm %s", cmp.Or(a.Version, "of an older build"), a.Protocol, d.Version)}
+		return &run.Error{Code: run.CodeSkew, Message: fmt.Sprintf("the daemon is wtm %s (protocol %d), this is wtm %s", cmp.Or(a.Version, "of an older build"), a.Protocol, d.Version)}
 	}
 	return nil
 }
@@ -361,12 +443,16 @@ func (d Daemon) skewed(a answer) error {
 // legacy wtm holding no job up is stopped and replaced; one holding jobs is
 // left alone, refused with [run.CodeSkew] or [run.CodeLegacy], since stopping
 // it would stop the services someone works in. A daemon is never signalled:
-// it is asked to stop, or named. A process on the socket that is no run daemon
+// it is asked to stop, or named. A process on the socket that is not wtm's daemon
 // (an older wtm-next's event bus, which stops once idle) is waited for a
 // moment, then refused with [run.CodeBusy].
 func (d Daemon) Ensure(ctx context.Context) error {
 	listing, err := d.exchange(ctx, exchangeParams{Request: request{Action: actionList}, Timeout: listTimeout})
 	if errors.Is(err, errNoDaemon) {
+		// A daemon stopping closed its listener and still holds its lock while its jobs halt: the next one would lose the lock to it and exit.
+		if err := d.poll(ctx, pollParams{Within: stoppingWait, Done: d.unlocked}); err != nil {
+			return &run.Error{Code: run.CodeBusy, Message: fmt.Sprintf("a daemon still stopping holds the lock beside %s after %v: its jobs take long to halt", d.SocketPath, stoppingWait)}
+		}
 		return d.launch(ctx)
 	}
 	if err != nil {
@@ -400,11 +486,11 @@ func (d Daemon) Ensure(ctx context.Context) error {
 	return d.launch(ctx)
 }
 
-// afterBus waits for a process on the socket that is no run daemon to stop,
+// afterBus waits for a process on the socket that is not wtm's daemon to stop,
 // then starts one.
 func (d Daemon) afterBus(ctx context.Context) error {
 	if err := d.poll(ctx, pollParams{Within: startWait, Done: d.unlocked}); err != nil {
-		return &run.Error{Code: run.CodeBusy, Message: "a process that is no run daemon holds its socket " + d.SocketPath + " (an older wtm-next's event bus): it stops once idle"}
+		return &run.Error{Code: run.CodeBusy, Message: "a process that is not wtm's daemon holds its socket " + d.SocketPath + " (an older wtm-next's event bus): it stops once idle"}
 	}
 
 	return d.launch(ctx)
@@ -425,7 +511,7 @@ func skewed(params skewedParams) error {
 		code, daemon = run.CodeLegacy, "the legacy wtm "+cmp.Or(params.Daemon, "of an older build")
 	}
 
-	return &run.Error{Code: code, Message: fmt.Sprintf("the run daemon is %s, this is wtm %s, and it runs %d job(s)", daemon, params.Client, params.Up)}
+	return &run.Error{Code: code, Message: fmt.Sprintf("the daemon is %s, this is wtm %s, and it runs %d job(s)", daemon, params.Client, params.Up)}
 }
 
 // Shutdown asks the daemon to stop and returns once it is gone: its foreground
@@ -444,7 +530,7 @@ func (d Daemon) Shutdown(ctx context.Context) error {
 	}
 
 	if err := d.poll(ctx, pollParams{Within: shutdownWait, Done: d.unlocked}); err != nil {
-		return &run.Error{Code: run.CodeStopTimeout, Message: fmt.Sprintf("the run daemon did not stop within %v", shutdownWait)}
+		return &run.Error{Code: run.CodeStopTimeout, Message: fmt.Sprintf("wtm's daemon did not stop within %v", shutdownWait)}
 	}
 
 	return nil
@@ -455,17 +541,17 @@ func (d Daemon) Shutdown(ctx context.Context) error {
 // answer in time is reported with the last line it wrote to its log.
 func (d Daemon) launch(ctx context.Context) error {
 	if limit := maxSocketPath(); len(d.SocketPath) > limit {
-		return &run.Error{Code: run.CodeSocketTooLong, Message: fmt.Sprintf("the run daemon's socket %s is %d bytes long, past the %d this system allows: move the user config directory to a shorter path", d.SocketPath, len(d.SocketPath), limit)}
+		return &run.Error{Code: run.CodeSocketTooLong, Message: fmt.Sprintf("wtm's daemon's socket %s is %d bytes long, past the %d this system allows: move the user config directory to a shorter path", d.SocketPath, len(d.SocketPath), limit)}
 	}
 	if d.StartDaemon == nil {
 		return errNoDaemon
 	}
 	if err := d.StartDaemon(); err != nil {
-		return &run.Error{Code: run.CodeStartFailed, Message: "start the run daemon: " + err.Error()}
+		return &run.Error{Code: run.CodeStartFailed, Message: "start wtm's daemon: " + err.Error()}
 	}
 
 	if err := d.poll(ctx, pollParams{Within: startWait, Done: func() bool { return d.answers(ctx) }}); err != nil {
-		message := fmt.Sprintf("the run daemon did not start within %v", startWait)
+		message := fmt.Sprintf("wtm's daemon did not start within %v", startWait)
 		if why := lastLine(LogPath(d.SocketPath)); why != "" {
 			message += ": " + why
 		}
@@ -573,13 +659,13 @@ func (d Daemon) exchange(ctx context.Context, params exchangeParams) (answer, er
 	defer context.AfterFunc(ctx, func() { _ = conn.Close() })()
 
 	if err := json.NewEncoder(conn).Encode(params.Request); err != nil {
-		return answer{}, fmt.Errorf("ask the run daemon: %w", err)
+		return answer{}, fmt.Errorf("ask wtm's daemon: %w", err)
 	}
 	decoder := json.NewDecoder(conn)
 	for {
 		var a answer
 		if err := decoder.Decode(&a); err != nil {
-			return answer{}, fmt.Errorf("read the run daemon's answer: %w", cmp.Or(ctx.Err(), err))
+			return answer{}, fmt.Errorf("read wtm's daemon's answer: %w", cmp.Or(ctx.Err(), err))
 		}
 		if a.Status != statusLine {
 			return a, nil

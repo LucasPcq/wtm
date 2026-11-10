@@ -16,7 +16,7 @@ import (
 // ----------------------------------------------------------------------------
 // Facts
 
-// Facts are what a start decides from, as Observe read them: the project's config, its run.toml, the repository's snapshot, the meta record of each worktree on a branch and why one that exists does not read, the worktrees whose directory is gone, where the caller stands, the jobs the run daemon runs (with why it could not tell, or that one of another build answered), and the drops removed worktrees owe the shared services.
+// Facts are what a start decides from, as Observe read them: the project's config, its run.toml, the repository's snapshot, the meta record of each worktree on a branch and why one that exists does not read, the worktrees whose directory is gone, where the caller stands, the jobs wtm's daemon runs (with why it could not tell, or that one of another build answered), and the drops removed worktrees owe the shared services.
 type Facts struct {
 	worktree.Repository
 	Records    map[string]worktree.Meta // by branch

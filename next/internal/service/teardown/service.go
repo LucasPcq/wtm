@@ -39,7 +39,7 @@ type ReadParams struct {
 	Going     []string
 }
 
-// Read reads, for each worktree of params, whether its directory is gone (a locked one git never calls prunable among them), its uncommitted changes while it is there, and the commits of its branch and of the commit it stands on no branch that stays holds, a commit on no branch or of a rebase under way among them, its directory gone or not. What the run daemon and the forge say is Settle's.
+// Read reads, for each worktree of params, whether its directory is gone (a locked one git never calls prunable among them), its uncommitted changes while it is there, and the commits of its branch and of the commit it stands on no branch that stays holds, a commit on no branch or of a rebase under way among them, its directory gone or not. What wtm's daemon and the forge say is Settle's.
 func (s Service) Read(ctx context.Context, params ReadParams) (map[string]Check, error) {
 	going := params.Going
 	checks := map[string]Check{}
@@ -84,7 +84,7 @@ const (
 	MetaKept           = ".meta_kept"
 )
 
-// BatchParams are the command removing, the facts it planned on, the removals in order, whether a worktree whose jobs would not stop is removed all the same, the operation's correlation id, which the run daemon's events carry, and where the events go.
+// BatchParams are the command removing, the facts it planned on, the removals in order, whether a worktree whose jobs would not stop is removed all the same, the operation's correlation id, which wtm's daemon's events carry, and where the events go.
 type BatchParams struct {
 	Command       string
 	Facts         Facts
@@ -176,7 +176,7 @@ func (s Service) Remove(ctx context.Context, params RemoveParams) (removed Remov
 	return removed
 }
 
-// stopJobs stops the jobs the worktree runs for itself, between the events of its phase, its claims on shared services left for its data's drop; then asks the run daemon again: a job still up, or a daemon that cannot tell, fails the removal unless forced, warned then.
+// stopJobs stops the jobs the worktree runs for itself, between the events of its phase, its claims on shared services left for its data's drop; then asks wtm's daemon again: a job still up, or a daemon that cannot tell, fails the removal unless forced, warned then.
 func (s Service) stopJobs(ctx context.Context, params RemoveParams) ([]domain.Warning, *domain.Error) {
 	removal, report := params.Removal, params.Report
 	if !slices.Contains(removal.Phases, domain.PhaseStopJobs) {

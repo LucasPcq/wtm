@@ -4,7 +4,7 @@
 # docs/demos "acme" project with a shared service, db, whose namespace per
 # worktree is a line of $HOME/namespaces.txt), one per binary, one after the
 # other: legacy `wtm` against `wtm-next`. Each sandbox has its own HOME, so its
-# own run daemon, socket and index; its jobs are stopped and its daemon gone
+# own daemon, socket and index; its jobs are stopped and its daemon gone
 # before the next side starts. No Docker. After each scenario it records the exit
 # code, the output and the state (the daemon's index, every meta.json, the jobs'
 # logs, the namespaces made, pending-removals.toml), then diffs the states. Then,
@@ -71,7 +71,7 @@ TOML
 # teardown: every job of the sandbox stopped, then its daemon.
 teardown() {
   "$legacy" run down --all --yes </dev/null >/dev/null 2>&1 || true
-  "$legacy" run daemon stop --yes </dev/null >/dev/null 2>&1 || true
+  "$next" daemon stop --yes </dev/null >/dev/null 2>&1 || true
 }
 
 # quietly runs a step that sets a scenario up, with the side's binary unless told otherwise.

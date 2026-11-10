@@ -6,7 +6,7 @@
 # starts), driven in tmux at 120×40 with the same keys: the start, the crash,
 # the shared service and focus on it, the filter and focus on a job, the
 # addresses, then q and what is printed under the view. Each sandbox has its
-# own HOME, so its own run daemon; its jobs and its daemon are stopped before it
+# own HOME, so its own daemon; its jobs and its daemon are stopped before it
 # is removed.
 set -euo pipefail
 
@@ -73,7 +73,7 @@ TOML
 # teardown: every job of the sandbox stopped, then its daemon.
 teardown() {
   "$legacy" run down --all --yes </dev/null >/dev/null 2>&1 || true
-  "$legacy" run daemon stop --yes </dev/null >/dev/null 2>&1 || true
+  "$next" daemon stop --yes </dev/null >/dev/null 2>&1 || true
 }
 
 # side <side> <binary>: the view in tmux, in a sandbox of its own.

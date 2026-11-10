@@ -12,10 +12,10 @@ import (
 // started is when the jobs of a test started.
 var started = time.Date(2026, 10, 31, 12, 0, 0, 0, time.UTC)
 
-// web is a foreground service up, as the run daemon lists it.
+// web is a foreground service up, as wtm's daemon lists it.
 var web = run.Job{Name: "web", WorkDir: "/wt/a", Up: true, Kind: project.Service, State: run.Running, Hold: run.HoldOwn, PID: 4242, URL: "http://localhost:3100", Ports: map[string]int{"PORT": 3100}, StartedAt: started}
 
-// jobs is a run daemon a test scripts: what it lists, prints, refuses, and every request it got.
+// jobs is a daemon a test scripts: what it lists, prints, refuses, and every request it got.
 type jobs struct {
 	mu       sync.Mutex
 	listed   []run.Job

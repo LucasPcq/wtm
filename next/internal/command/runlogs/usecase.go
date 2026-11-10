@@ -1,4 +1,4 @@
-// Package runlogs reads what the jobs of some worktrees printed: each job's last lines, from its log or the run daemon, and, followed, each new one as it prints it; a read, it changes nothing and never starts the run daemon.
+// Package runlogs reads what the jobs of some worktrees printed: each job's last lines, from its log or wtm's daemon, and, followed, each new one as it prints it; a read, it changes nothing and never starts wtm's daemon.
 package runlogs
 
 import (
@@ -124,7 +124,7 @@ func JSONOf(v any) ([]byte, error) {
 // ----------------------------------------------------------------------------
 // Run
 
-// Run reads the last lines of the jobs of the worktrees req names, or of the one it stands in: the job req names, else each job the daemon lists there or that left a log; with a search or a time, what of each whole log matches. A read, it takes no lock, runs no operation and never starts the run daemon. An error returned is a refusal of the request or of the repository.
+// Run reads the last lines of the jobs of the worktrees req names, or of the one it stands in: the job req names, else each job the daemon lists there or that left a log; with a search or a time, what of each whole log matches. A read, it takes no lock, runs no operation and never starts wtm's daemon. An error returned is a refusal of the request or of the repository.
 func (u UseCase) Run(ctx context.Context, req Request, _ domain.RunOptions) (Outcome, error) {
 	// 1. Read the repository and the jobs the daemon knows, and settle the worktrees read.
 	facts, req, targets, err := u.resolved(ctx, req)
@@ -354,7 +354,7 @@ const (
 // commandRunInit sets the run module up in a repository: not migrated yet.
 const commandRunInit = "run init"
 
-// Observe reads what run logs reads from: the project's config and its run.toml, the repository's snapshot, which worktrees' directory is gone, where the caller stands, and the jobs the run daemon knows, never starting it. A repository with no wtm config is refused with CodeConfigNotFound, one with no run.toml with CodeNotInitialized.
+// Observe reads what run logs reads from: the project's config and its run.toml, the repository's snapshot, which worktrees' directory is gone, where the caller stands, and the jobs wtm's daemon knows, never starting it. A repository with no wtm config is refused with CodeConfigNotFound, one with no run.toml with CodeNotInitialized.
 func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	repo, err := u.Repository.Observe(ctx, Name)
 	if err != nil {
@@ -378,7 +378,7 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 		return Facts{}, err
 	}
 	facts.Cwd = cmp.Or(cwd, req.Caller.Cwd)
-	facts.Asked = repository.Ask(ctx, repository.AskParams{Jobs: u.Daemon.Jobs, Restart: u.Repository.Restart}, func() {})
+	facts.Asked = repository.Ask(ctx, repository.AskParams{Jobs: u.Daemon.Jobs, Restart: u.Repository.Restart, FrozenIndex: u.Repository.FrozenIndex}, func() {})
 
 	return facts, ctx.Err()
 }

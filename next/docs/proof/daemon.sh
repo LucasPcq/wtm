@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Usage: daemon.sh <wtm binary> <wtm-next binary> <wtm-next binary of another build> <out dir>
-# Drives the run daemon raw over its socket (daemon.py), before any `run`
+# Drives wtm's daemon raw over its socket (daemon.py), before any `run`
 # command exists, in one sandbox (the docs/demos "acme" project): the legacy
 # daemon handing its jobs over to next's, next's daemon starting, stopping and
 # restarting jobs, a hard kill of next's daemon and its recovery, a daemon of
@@ -76,7 +76,7 @@ ask() {
 
 # start_daemon <binary>: runs binary's daemon as a child of this script, and waits for it to answer.
 start_daemon() {
-  "$1" daemon 2>>"$out/daemon.stderr" &
+  "$1" daemon serve 2>>"$out/daemon.stderr" &
   daemon_pid=$!
   local tries=0
   until python3 -I "$here/daemon.py" "$socket" '{"action":"list"}' >/dev/null 2>&1; do
@@ -154,7 +154,7 @@ ask 15-stop-service "{\"action\":\"stop\",\"name\":\"web\",\"work_dir\":\"$acme\
 started 16-restart-service "{\"action\":\"start\",\"spec\":$(spec web service 'echo ready; exec sleep 300')}"
 ask 17-unknown-action '{"action":"bogus"}'
 ask 18-not-json 'notjson'
-"$next" daemon >"$out/19-second-daemon.stdout" 2>"$out/19-second-daemon.stderr" && echo 0 >"$out/19-second-daemon.exit" || echo $? >"$out/19-second-daemon.exit"
+"$next" daemon serve >"$out/19-second-daemon.stdout" 2>"$out/19-second-daemon.stderr" && echo 0 >"$out/19-second-daemon.exit" || echo $? >"$out/19-second-daemon.exit"
 
 # 4b. A job's lines: its log, its last line in the listing, its last lines asked, and its terminal attached to.
 started 19a-start-echo "{\"action\":\"start\",\"spec\":$(spec echo service 'stty -echo; echo ready; exec cat')}"

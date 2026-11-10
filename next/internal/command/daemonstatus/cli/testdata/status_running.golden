@@ -1,0 +1,13 @@
+
+  ✓ wtm's daemon runs · pid 4242
+
+  build   0.31.0
+  jobs    acme
+            main    db (shared), web
+            feat/a  db (held), mail (detached)
+          wtm
+            main    docs
+  proxy   port 11080 · addresses on :80
+  socket  /cfg/wtm/wtm.sock
+  index   /cfg/wtm/jobs.json
+

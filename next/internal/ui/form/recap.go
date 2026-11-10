@@ -42,7 +42,7 @@ func (w *Wizard) previewed(m previewMsg) tea.Cmd {
 		w.failure = failure
 	} else {
 		w.planned = true
-		if w.script.Empty != nil && w.script.Empty() {
+		if w.script.Empty != nil && w.script.Empty() || w.script.Unasked != nil && w.script.Unasked() {
 			w.ending = Finished
 			return tea.Quit
 		}

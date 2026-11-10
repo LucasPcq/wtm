@@ -158,7 +158,7 @@ run_side() {
     scenario 19-no-config-json "$root/bare" resolve main --output json
     scenario 20-not-a-repository "$root/plain" resolve main --output json
     tty
-    "$legacy" run daemon stop --yes </dev/null >/dev/null 2>&1 || true
+    "$next" daemon stop --yes </dev/null >/dev/null 2>&1 || true
   )
   sed -i '' -E \
     -e "s#(/private)?$root#<SB>#g" \

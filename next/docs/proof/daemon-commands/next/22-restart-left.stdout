@@ -1,0 +1,7 @@
+
+  ✓ daemon restart: 1 done
+
+  Daemon      none runs: one starts, as <build>, and stops first what a daemon that died left running
+  Come back   api (main · acme), db (main · acme), web (main · acme), api (feat/a · acme), db (feat/a · acme), web (feat/a · acme)
+  Taken over  stack (main · acme), stack (feat/a · acme)
+

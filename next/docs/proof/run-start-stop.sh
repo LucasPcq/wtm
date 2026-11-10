@@ -3,7 +3,7 @@
 # Runs the same run stop and run start scenarios in two identical sandboxes
 # (run-down.sh's "acme", with a stack whose stop command fails), one per binary,
 # one after the other: legacy `wtm run stop|start` against `wtm-next run
-# stop|start`, each side starting its jobs with its own `run up`. Each sandbox has its own HOME, so its own run daemon,
+# stop|start`, each side starting its jobs with its own `run up`. Each sandbox has its own HOME, so its own daemon,
 # socket and index; its jobs are stopped, its daemon and its compose containers
 # gone before the next side starts. After each scenario it records the exit code,
 # the output and the state, then diffs the states. Then, in a fresh sandbox per
@@ -117,7 +117,7 @@ TOML
 # teardown: every job of the sandbox stopped (its stacks' stop commands run), then its daemon.
 teardown() {
   "$legacy" run down --all --yes </dev/null >/dev/null 2>&1 || true
-  "$legacy" run daemon stop --yes </dev/null >/dev/null 2>&1 || true
+  "$next" daemon stop --yes </dev/null >/dev/null 2>&1 || true
 }
 
 scenario() {

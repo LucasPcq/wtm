@@ -87,7 +87,7 @@ func (w world) open(context.Context, string) (runup.UseCase, error) {
 	teardowns := teardown.Service{Owed: owing{}}
 	return runup.UseCase{
 		Meta:       w.store,
-		Repository: repository.Service{Config: w.config, Git: w.git, MainPath: mainPath, Init: &domain.FollowUp{Command: "init"}, Restart: &domain.FollowUp{Command: "run daemon restart"}},
+		Repository: repository.Service{Config: w.config, Git: w.git, MainPath: mainPath, Init: &domain.FollowUp{Command: "init"}, Restart: &domain.FollowUp{Command: "daemon restart"}},
 		Operations: operation.Service{
 			Locker:    w.locks,
 			Publisher: w.locks,
@@ -132,7 +132,7 @@ func (d *daemon) Start(_ context.Context, spec run.Spec, out func(run.Line)) (ru
 	if spec.Job.Name == "migrate" && spec.WorkDir == pathOf(featB) {
 		out(run.Line{At: startedAt, Text: "error: relation users does not exist"})
 		exit := 3
-		return run.Job{}, &run.Error{Code: run.CodeTaskFailed, Message: "run daemon: task migrate exited with code 3", ExitCode: &exit}
+		return run.Job{}, &run.Error{Code: run.CodeTaskFailed, Message: "daemon: task migrate exited with code 3", ExitCode: &exit}
 	}
 	if spec.Job.Name == "web" && d.interrupt != nil {
 		d.interrupt()

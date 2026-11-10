@@ -1,0 +1,48 @@
+[
+  {
+    "type": "operation.started",
+    "command": "daemon-stop-jobs",
+    "surface": "api"
+  },
+  {
+    "type": "unit.started",
+    "subject": "main (main)"
+  },
+  {
+    "type": "phase.started",
+    "subject": "main (main)",
+    "phase": "job",
+    "job": "idle"
+  },
+  {
+    "type": "phase.finished",
+    "subject": "main (main)",
+    "phase": "job",
+    "job": "idle",
+    "failed": false
+  },
+  {
+    "type": "phase.started",
+    "subject": "main (main)",
+    "phase": "job",
+    "job": "other"
+  },
+  {
+    "type": "phase.finished",
+    "subject": "main (main)",
+    "phase": "job",
+    "job": "other",
+    "failed": false
+  },
+  {
+    "type": "unit.finished",
+    "subject": "main (main)",
+    "status": "done"
+  },
+  {
+    "type": "operation.finished",
+    "command": "daemon-stop-jobs",
+    "surface": "api",
+    "ok": true
+  }
+]

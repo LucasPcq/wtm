@@ -13,7 +13,7 @@ import (
 // ----------------------------------------------------------------------------
 // Facts
 
-// Facts are what clean decides from, as Observe read them: what a removal decides from (the project's config, its run.toml, the repository's snapshot, the records, what each worktree asked holds that makes it unsafe to remove, where the caller stands, why the run daemon or the forge could not be asked), and where each name asked as a path leads.
+// Facts are what clean decides from, as Observe read them: what a removal decides from (the project's config, its run.toml, the repository's snapshot, the records, what each worktree asked holds that makes it unsafe to remove, where the caller stands, why wtm's daemon or the forge could not be asked), and where each name asked as a path leads.
 type Facts struct {
 	teardown.Facts
 	Located map[string]string // the real path each name asked that is no worktree's name leads to, when something is there
@@ -147,7 +147,7 @@ type Plan struct {
 	domain.Recapped
 	facts         Facts
 	standing      string // the worktree removed the caller stands in, empty when none
-	correlationID string // the operation's, which the run daemon's events carry
+	correlationID string // the operation's, which wtm's daemon's events carry
 }
 
 // Locks are the locks the plan needs: the repository shared, and each worktree it removes and each child it reparents exclusive.

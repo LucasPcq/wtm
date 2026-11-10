@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"path/filepath"
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/statefile"
@@ -145,4 +146,8 @@ func poll(ctx context.Context, done func() bool) error {
 		}
 	}
 	return nil
+}
+
+func lockPath(socketPath string) string {
+	return filepath.Join(filepath.Dir(socketPath), lockName)
 }

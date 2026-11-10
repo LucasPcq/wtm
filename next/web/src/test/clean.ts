@@ -192,7 +192,7 @@ export const partlyFailedRun = (call: WebCall) => {
         { subject: first, status: 'failed', detail: {}, error },
         ...rest.map((branch) => ({ subject: branch, status: 'done', detail: { path: `/acme.trees/${branch}` } })),
       ],
-      warnings: [{ code: 'clean.jobs_unknown', message: "couldn't ask the run daemon which jobs are up" }],
+      warnings: [{ code: 'clean.jobs_unknown', message: "couldn't ask wtm's daemon which jobs are up" }],
       error,
     })}\n\n`,
   )

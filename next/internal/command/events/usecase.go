@@ -42,7 +42,7 @@ const recheckEvery = 5 * time.Second
 // dirtyEvery is how many polls apart a poll reads whether each worktree is dirty, one at a time: a git status per worktree cost 2.3 CPU-seconds a poll on 20 worktrees of 4,600 files read 8 at once, 1 one at a time, and the legacy dashboard read git every 20 seconds.
 const dirtyEvery = 4
 
-// A UseCase streams the events of the repositories wtm knows: the bus it subscribes to, the registry of those repositories, how it opens one, the jobs of the run daemon, its clock, and how often it polls what it watches (Recheck, 5 seconds when zero): whether it is still there, and what changed in it with no operation of wtm. Jobs may be nil: the jobs are then never polled.
+// A UseCase streams the events of the repositories wtm knows: the bus it subscribes to, the registry of those repositories, how it opens one, the jobs of wtm's daemon, its clock, and how often it polls what it watches (Recheck, 5 seconds when zero): whether it is still there, and what changed in it with no operation of wtm. Jobs may be nil: the jobs are then never polled.
 type UseCase struct {
 	Bus      Bus
 	Registry registry.Service
@@ -552,7 +552,7 @@ func namedBy(event domain.Event) string {
 	}
 }
 
-// jobs are the jobs of the run daemon, and whether it could tell them.
+// jobs are the jobs of wtm's daemon, and whether it could tell them.
 func (s *stream) jobs(ctx context.Context) ([]run.Job, bool) {
 	if s.Jobs == nil {
 		return nil, false

@@ -11,7 +11,7 @@ import (
 // ----------------------------------------------------------------------------
 // Facts
 
-// Facts are what tree reads: the repository, the meta record of each live branch (and the error of a record that exists but does not read), the stack they make, what each worktree holds, what the run daemon and GitHub said, and the branches behind their merged pull request (repository.Behind).
+// Facts are what tree reads: the repository, the meta record of each live branch (and the error of a record that exists but does not read), the stack they make, what each worktree holds, what wtm's daemon and GitHub said, and the branches behind their merged pull request (repository.Behind).
 type Facts struct {
 	worktree.Repository
 	repository.Asked

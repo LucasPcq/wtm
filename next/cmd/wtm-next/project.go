@@ -11,7 +11,7 @@ import (
 	"slices"
 	"strings"
 
-	bus "github.com/LucasPcq/wtm/next/internal/adapter/events"
+	"github.com/LucasPcq/wtm/next/internal/adapter/daemon"
 	"github.com/LucasPcq/wtm/next/internal/adapter/git"
 	reposjson "github.com/LucasPcq/wtm/next/internal/adapter/registry"
 	"github.com/LucasPcq/wtm/next/internal/adapter/store"
@@ -123,7 +123,7 @@ func openEvents(ctx context.Context, dir string) (events.Source, error) {
 
 // register lists the repository params locates among those wtm knows, for a stream that follows all of them, once initialized; it never fails nor holds a command for long.
 func register(ctx context.Context, params wireParams) {
-	knownRepos(reposjson.Path(), bus.SocketPath()).Register(ctx, params.repo())
+	knownRepos(reposjson.Path(), daemon.SocketPath()).Register(ctx, params.repo())
 }
 
 // locate returns where the repository of dir, any of its worktrees or a folder in one, keeps its main worktree, its common dir and wtm's state.

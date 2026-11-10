@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/gittest"
@@ -17,10 +18,12 @@ func TestTheCatalogueListsEachCommandWithItsSchemaOutsideAnyRepository(t *testin
 	var names []string
 	for _, command := range catalogue() {
 		names = append(names, command.Name)
-		assert.NotEmpty(t, command.Form.Fields, command.Name)
+		if !slices.Contains(machine, command.Name) {
+			assert.NotEmpty(t, command.Form.Fields, command.Name)
+		}
 	}
 
-	assert.Equal(t, []string{"create", "extract", "checkout", "clean", "prune", "fast-forward", "sync", "exec", "reparent", "list", "resolve", "status", "tree", "run-up", "run-logs", "run-down", "run-start", "run-stop", "run-ps", "run-list"}, names)
+	assert.Equal(t, []string{"create", "extract", "checkout", "clean", "prune", "fast-forward", "sync", "exec", "reparent", "list", "resolve", "status", "tree", "run-up", "run-logs", "run-down", "run-start", "run-stop", "run-ps", "run-list", "daemon-status", "daemon-stop", "daemon-restart", "daemon-stop-jobs"}, names)
 }
 
 func TestAnInvalidCallIsRefusedWithItsKind(t *testing.T) {

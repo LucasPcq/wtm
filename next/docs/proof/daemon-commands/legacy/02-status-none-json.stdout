@@ -1,0 +1,8 @@
+{
+  "running": false,
+  "version": "dev",
+  "socket_path": "<root>/home/Library/Application Support/wtm/wtm.sock",
+  "state_path": "<root>/home/Library/Application Support/wtm/jobs.json",
+  "foreground_jobs": 0,
+  "detached_jobs": 0
+}

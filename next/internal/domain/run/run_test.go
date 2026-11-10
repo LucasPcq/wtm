@@ -37,8 +37,8 @@ func TestTheProfileOfAWorktreeIsThatOfTheJobsItRunsForItself(t *testing.T) {
 }
 
 func TestWhyTheJobsAreUnknownNamesTheDaemonsFailure(t *testing.T) {
-	assert.Equal(t, "the run daemon is not running: which jobs are up is unknown", UnknownMessage(ErrUnknown))
-	assert.Equal(t, "couldn't ask the run daemon which jobs are up: refused", UnknownMessage(errors.New("refused")))
+	assert.Equal(t, "wtm's daemon is not running: which jobs are up is unknown", UnknownMessage(ErrUnknown))
+	assert.Equal(t, "couldn't ask wtm's daemon which jobs are up: refused", UnknownMessage(errors.New("refused")))
 }
 
 func TestAJobAListedRunnerStartsStandsAsItsRunnerNestedOrNot(t *testing.T) {

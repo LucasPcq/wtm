@@ -52,7 +52,7 @@ func (f Facts) plan(t runjobs.StopTarget, profile string) Target {
 // ----------------------------------------------------------------------------
 // Decide
 
-// The codes of what a plan cannot see to: a run daemon of another build answered, whose listing may not say whether the main checkout holds a shared service (the fates of the shared services are then approximate); run.toml does not load.
+// The codes of what a plan cannot see to: a daemon of another build answered, whose listing may not say whether the main checkout holds a shared service (the fates of the shared services are then approximate); run.toml does not load.
 const (
 	CodeDaemonSkew       = Name + domain.DaemonSkew
 	CodeFatesApproximate = Name + runjobs.FatesApproximate
@@ -78,7 +78,7 @@ func Decide(f Facts, req Request, params DecideParams) (Plan, []domain.Warning) 
 
 	warnings := f.StopWarnings(runjobs.StopWarningsParams{Command: Name, Targets: targets, Restart: params.Restart})
 	if f.RunErr != nil {
-		warnings = append(warnings, domain.Warning{Code: CodeRunInvalid, Message: "invalid run.toml: " + f.RunErr.Error() + " — the jobs the run daemon runs stop all the same"})
+		warnings = append(warnings, domain.Warning{Code: CodeRunInvalid, Message: "invalid run.toml: " + f.RunErr.Error() + " — the jobs wtm's daemon runs stop all the same"})
 	}
 	return planned, warnings
 }

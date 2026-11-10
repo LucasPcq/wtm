@@ -17,7 +17,7 @@
           "value": "ghost"
         },
         "flag": "--job",
-        "message": "ghost is neither a job of run.toml nor one the run daemon runs in the worktrees picked"
+        "message": "ghost is neither a job of run.toml nor one wtm's daemon runs in the worktrees picked"
       }
     ]
   }

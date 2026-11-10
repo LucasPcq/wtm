@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/clean"
@@ -99,7 +100,7 @@ func TestARepositoryWithNoWtmConfigIsFollowedUpByTheLegacyInit(t *testing.T) {
 	ownConfigDir(t)
 	for _, command := range catalogue() {
 		// run ps reads the jobs of the whole machine: the directory it is called from opens no repository
-		if command.Name == runps.Name {
+		if command.Name == runps.Name || slices.Contains(machine, command.Name) {
 			continue
 		}
 		t.Run(command.Name, func(t *testing.T) {

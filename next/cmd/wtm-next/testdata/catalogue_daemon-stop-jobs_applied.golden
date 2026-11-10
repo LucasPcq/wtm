@@ -1,0 +1,83 @@
+{
+  "v": 2,
+  "command": "daemon-stop-jobs",
+  "ok": true,
+  "op": "<id>",
+  "items": [
+    {
+      "subject": "main (main)",
+      "status": "done",
+      "detail": {
+        "path": "<root>/main",
+        "jobs": [
+          {
+            "name": "idle",
+            "status": "stopped"
+          },
+          {
+            "name": "other",
+            "status": "stopped"
+          }
+        ]
+      }
+    }
+  ],
+  "plan": {
+    "repo": "<root>/main",
+    "repos": [
+      {
+        "root": "<root>/main",
+        "worktrees": [
+          {
+            "worktree": "main (main)",
+            "branch": "main",
+            "path": "<root>/main",
+            "jobs": [
+              {
+                "name": "idle",
+                "kind": "service",
+                "hold": "own",
+                "fate": "stop"
+              },
+              {
+                "name": "other",
+                "kind": "service",
+                "hold": "own",
+                "fate": "stop"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "recap": [
+      {
+        "key": "repo",
+        "label": "Repository",
+        "path": "repo",
+        "values": [
+          {
+            "value": "<root>/main",
+            "text": "<root>/main"
+          }
+        ]
+      },
+      {
+        "key": "jobs:main (main)",
+        "label": "Stops in main (main)",
+        "values": [
+          {
+            "value": "idle",
+            "text": "idle"
+          },
+          {
+            "value": "other",
+            "text": "other"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": []
+}

@@ -1,6 +1,6 @@
 // Package runview is the live view of the jobs of some worktrees: their list,
 // the shared services first, then each worktree's own jobs, and the terminal of
-// the job selected, attached through the run daemon. Leaving it stops nothing.
+// the job selected, attached through wtm's daemon. Leaving it stops nothing.
 package runview
 
 import (
@@ -15,7 +15,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// Daemon is the run daemon as the view asks it: the jobs it runs, a job's
+// Daemon is wtm's daemon as the view asks it: the jobs it runs, a job's
 // terminal attached and sized, and the lines a job left in its log.
 type Daemon interface {
 	Jobs(ctx context.Context) ([]run.Job, error)
@@ -56,7 +56,7 @@ type Params struct {
 	Out       io.Writer
 }
 
-// A View is where a command shows the jobs it started: the run daemon the
+// A View is where a command shows the jobs it started: wtm's daemon the
 // view asks, how it opens an address in the browser (nil opens none), how it
 // stops a job and starts it again (nil: s and r do nothing), and the command
 // lines the view gives when it is left with an action cut short or still under

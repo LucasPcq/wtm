@@ -1,5 +1,5 @@
 
-  Stop one job the run daemon runs in each worktree named, or in the one you stand in;
+  Stop one job wtm's daemon runs in each worktree named, or in the one you stand in;
   a worktree it is not up in is left as it is. Several worktrees stop at once.
 
   A shared service a worktree holds is released: it runs on for the worktrees still holding it, and
@@ -24,7 +24,7 @@
     -n, --dry-run                     Show the plan and its fingerprint, apply nothing
         --expect-fingerprint string   Apply only if the facts still have this fingerprint, the one --dry-run printed
     -h, --help                        help for stop
-        --job string                  The job to stop, a job of run.toml or one the run daemon runs there
+        --job string                  The job to stop, a job of run.toml or one wtm's daemon runs there
         --output string               Output format: text or json (default "text")
     -y, --yes                         Run unattended: no question, no confirmation (the worktree you stand in unless given; --job is required)
 

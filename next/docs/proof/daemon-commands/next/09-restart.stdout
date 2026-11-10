@@ -1,0 +1,7 @@
+
+  ✓ daemon restart: 1 done
+
+  Daemon      <build> → <build>
+  Come back   api (main · acme), db (main · acme), web (main · acme), api (feat/a · acme), db (feat/a · acme), web (feat/a · acme)
+  Taken over  stack (main · acme), stack (feat/a · acme)
+

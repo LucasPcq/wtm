@@ -112,7 +112,7 @@ start() {
 teardown() {
   "$legacy" run down --all --yes </dev/null >/dev/null 2>&1 || true
   "$next" run down --all --yes </dev/null >/dev/null 2>&1 || true
-  "$legacy" run daemon stop --yes </dev/null >/dev/null 2>&1 || true
+  "$next" daemon stop --yes </dev/null >/dev/null 2>&1 || true
 }
 
 # scenario <name> <dir> <args...>: runs the side's binary from dir with no terminal.

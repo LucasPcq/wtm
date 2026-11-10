@@ -10,10 +10,11 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
 
-// AskParams are what a read asks besides git: the run daemon's jobs, and, WithPRs, the forge's pull request of each of Branches; Restart is the command that hands a skewed daemon's jobs over to this wtm's, offered when one answers.
+// AskParams are what a read asks besides git: the daemon's jobs, and, WithPRs, the forge's pull request of each of Branches; Restart is the command that hands a skewed daemon's jobs over to this wtm's, offered when one answers; FrozenIndex the daemon's index when a newer wtm wrote it ("" otherwise, nothing asked when nil).
 type AskParams struct {
 	Jobs         func(ctx context.Context) ([]run.Job, error)
 	Restart      *domain.FollowUp
+	FrozenIndex  func() string
 	PullRequests func(ctx context.Context, branches []string) ([]worktree.PullRequest, error)
 	Branches     []string
 	WithPRs      bool
@@ -30,6 +31,9 @@ func Ask(ctx context.Context, params AskParams, readWorktrees func()) Asked {
 		}
 	})
 	asked.restart = params.Restart
+	if params.FrozenIndex != nil {
+		asked.FrozenIndex = params.FrozenIndex()
+	}
 	if params.WithPRs {
 		wg.Go(func() { asked.PullRequests, asked.PRsErr = params.PullRequests(ctx, params.Branches) })
 	}
@@ -40,11 +44,12 @@ func Ask(ctx context.Context, params AskParams, readWorktrees func()) Asked {
 	return asked
 }
 
-// Asked is what a read asks besides git while it reads the worktrees: the run daemon's jobs and the forge's pull requests, each with the error that kept it from being read, the daemon's skew when one of another build answered, and whether the read was interrupted; PullRequests is nil when the forge was not asked.
+// Asked is what a read asks besides git while it reads the worktrees: wtm's daemon's jobs and the forge's pull requests, each with the error that kept it from being read, the daemon's skew when one of another build answered, and whether the read was interrupted; PullRequests is nil when the forge was not asked.
 type Asked struct {
 	Jobs         []run.Job
 	JobsErr      error
 	Skewed       *run.Skewed
+	FrozenIndex  string
 	restart      *domain.FollowUp
 	PullRequests []worktree.PullRequest
 	PRsErr       error
@@ -69,7 +74,7 @@ func (a Asked) URLs(dir string) []string {
 	return run.URLsIn(a.Jobs, dir)
 }
 
-// Warnings are the warnings of what the read of the command named command could not ask: <command>.jobs_unknown when the daemon could not tell which jobs are up, <command>.daemon_skew when one of another build answered (with the restart that hands its jobs over), <command>.prs_unavailable when the forge could not be asked; none once the read was interrupted, which says so and nothing more.
+// Warnings are the warnings of what the read of the command named command could not ask: <command>.jobs_unknown when the daemon could not tell which jobs are up, <command>.index_frozen when a newer wtm wrote the daemon's index, <command>.daemon_skew when one of another build answered (with the restart that hands its jobs over), <command>.prs_unavailable when the forge could not be asked; none once the read was interrupted, which says so and nothing more.
 func (a Asked) Warnings(command string) []domain.Warning {
 	if a.Interrupted {
 		return nil
@@ -78,6 +83,9 @@ func (a Asked) Warnings(command string) []domain.Warning {
 	var warnings []domain.Warning
 	if a.JobsErr != nil {
 		warnings = append(warnings, domain.Warning{Code: command + domain.JobsUnknown, Message: run.UnknownMessage(a.JobsErr)})
+	}
+	if a.FrozenIndex != "" {
+		warnings = append(warnings, domain.IndexFrozenWarning(command, a.FrozenIndex))
 	}
 	if a.Skewed != nil {
 		warnings = append(warnings, domain.SkewWarning(domain.SkewWarningParams{Command: command, Skewed: a.Skewed, Restart: a.restart}))
