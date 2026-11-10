@@ -43,9 +43,14 @@ func TestAHookTableWithoutACommandIsRefused(t *testing.T) {
 	assert.ErrorContains(t, err, `on_create: hook[0]: hook table requires a string "cmd" field`)
 }
 
-func TestAnUnknownKeyInAHookTableIsTolerated(t *testing.T) {
-	cfg, _, err := loadState(t, stateWithConfig(t, "[hooks]\non_create = [{ cmd = \"make\", shell = \"zsh\" }]\n"))
+func TestAnUnknownKeyInAHookTableIsRefused(t *testing.T) {
+	_, _, err := loadState(t, stateWithConfig(t, "[hooks]\non_create = [{ cmd = \"make\", continue_on_eror = true }]\n"))
 
-	require.NoError(t, err)
-	assert.Equal(t, []project.Hook{{Cmd: "make"}}, cfg.OnCreate)
+	assert.ErrorContains(t, err, `on_create: hook[0]: hook table has an unknown key "continue_on_eror"`)
+}
+
+func TestAHookTableValueOfTheWrongTypeIsRefused(t *testing.T) {
+	_, _, err := loadState(t, stateWithConfig(t, "[hooks]\non_create = [{ cmd = \"make\", continue_on_error = \"yes\" }]\n"))
+
+	assert.ErrorContains(t, err, `on_create: hook[0]: hook table's "continue_on_error" must be a boolean`)
 }

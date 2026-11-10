@@ -57,6 +57,14 @@ func TestSavedSaysWhereAConfigThatDoesNotParseStopped(t *testing.T) {
 	}
 }
 
+func TestSavedRefusesAHookItWouldLoseOnARewrite(t *testing.T) {
+	_, err := Project{StateDir: stateWithConfig(t, "[hooks]\non_create = [{ cmd = \"make\", continue_on_eror = true }]\n")}.Saved()
+
+	invalid, ok := errors.AsType[*project.InvalidConfigError](err)
+	require.True(t, ok, "Saved = %v, want a *project.InvalidConfigError", err)
+	assert.ErrorContains(t, invalid.Reason, `unknown key "continue_on_eror"`)
+}
+
 func TestSavedReadsAConfigANewerWtmWrote(t *testing.T) {
 	saved, err := Project{StateDir: stateWithConfig(t, "schema = 2\n[worktrees]\nbase_branch = \"develop\"\n[future]\nkey = 1\n")}.Saved()
 
