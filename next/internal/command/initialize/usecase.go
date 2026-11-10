@@ -150,7 +150,7 @@ func writeFailure(plan Plan, err error) *domain.Error {
 	path := plan.Path
 	params := domain.Params{"path": path, "cause": err.Error()}
 	if errors.Is(err, fs.ErrPermission) {
-		message := "permission denied on " + plan.shownPath + ": check who owns " + filepath.Dir(plan.shownPath) + ", then set it up again"
+		message := "permission denied on " + plan.shownPath + ": check who owns " + plan.shown(deniedIn(plan.Path, err)) + ", then set it up again"
 		return &domain.Error{Kind: domain.KindPrecondition, Code: CodeWriteFailed, Message: message, Params: params, Cause: err}
 	}
 	if errors.Is(err, project.ErrConfigChanged) {
@@ -158,6 +158,15 @@ func writeFailure(plan Plan, err error) *domain.Error {
 	}
 
 	return domain.AsError(domain.AsErrorParams{Err: err, Code: CodeWriteFailed, Message: "couldn't write " + path, Params: params})
+}
+
+// deniedIn is the folder a write of path was denied in: the one it could not create a folder in (.git, while .git/wtm does not exist yet), else the one it could not create its file in.
+func deniedIn(path string, err error) string {
+	if denied, ok := errors.AsType[*fs.PathError](err); ok {
+		return filepath.Dir(denied.Path)
+	}
+
+	return filepath.Dir(path)
 }
 
 // ----------------------------------------------------------------------------
