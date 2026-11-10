@@ -4,7 +4,7 @@
   ✓ Worktrees: feat/billing
   · All — set by its flag only
   · Values from — set by its flag only
-  · Overwrite — no key differs from its source
+  · Overwrite — every key matches its source
   ✓ Prune: kept
   · Isolation — set by its flag only
   · Show values — set by its flag only

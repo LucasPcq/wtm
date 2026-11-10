@@ -3,6 +3,7 @@ package env_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/env"
@@ -244,4 +245,18 @@ func TestRecordingAnIsolationAloneIsAChange(t *testing.T) {
 
 	assert.Equal(t, domain.StatusDone, outcome.Result.Items[0].Status)
 	assert.Empty(t, outcome.Result.Items[0].Reason)
+}
+
+func TestAPortWtmFindsNothingToMoveInIsLeftAloneAndSaid(t *testing.T) {
+	// the proof: a port set by hand was "in step", where legacy warned it was left alone
+	s := acmeSeed()
+	s.Files["/repo/.trees/"+login+"/"+webEnv] = "PORT=9999\nAPI_URL=http://localhost:4010\n"
+	w := newWorld(s)
+
+	outcome := w.run(t, naming(login), domain.RunOptions{DryRun: true})
+
+	require.Contains(t, codes(outcome.Warnings), env.CodeLeftAlone)
+	warning := outcome.Warnings[slices.IndexFunc(outcome.Warnings, func(w domain.Warning) bool { return w.Code == env.CodeLeftAlone })]
+	require.Len(t, warning.Ports, 1)
+	assert.Equal(t, "PORT", warning.Ports[0].Key)
 }

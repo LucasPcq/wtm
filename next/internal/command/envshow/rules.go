@@ -121,7 +121,7 @@ func AllFollows() []Follows {
 	return []Follows{FollowsPort, FollowsAddress, FollowsValue, FollowsOwned, FollowsNothing, FollowsCopied}
 }
 
-// A Key is one key of a file: what it follows and the job and port it follows (or looks like, when it follows nothing), its value in the main checkout and here, nil when absent there, and what wtm writes here, nil when it writes nothing; whether the values are withheld, wtm writing none of them and none shown; how it stands against its source; and whether it is out of step with what wtm writes.
+// A Key is one key of a file: what it follows and the job and port it follows (or looks like, when it follows nothing), its value in the main checkout and here, nil when absent there, and what wtm writes here, nil when it writes nothing; whether the values are withheld, wtm writing none of them and none shown; how it stands against its source; whether it is out of step with what wtm writes; and why wtm leaves it alone, finding nothing to move in its value.
 type Key struct {
 	Key       string         `json:"key"`
 	Follows   Follows        `json:"follows"`
@@ -133,17 +133,19 @@ type Key struct {
 	Withheld  bool           `json:"withheld"`
 	Status    envs.KeyStatus `json:"status"`
 	OutOfStep bool           `json:"out_of_step"`
+	LeftAlone envs.Status    `json:"left_alone,omitempty"`
 }
 
-// A Check is a key to check: one that follows nothing although it looks like a port or an address, with the job and port it looks like (none for an address on no declared port), or one out of step with what wtm writes, with its value here and what wtm writes.
+// A Check is a key to check: one that follows nothing although it looks like a port or an address, with the job and port it looks like (none for an address on no declared port), or one out of step with what wtm writes, with its value here and what wtm writes, or one wtm leaves alone, with why (Status).
 type Check struct {
-	File   string    `json:"file"`
-	Key    string    `json:"key"`
-	Kind   CheckKind `json:"kind"`
-	Job    string    `json:"job,omitempty"`
-	Port   string    `json:"port,omitempty"`
-	Here   *string   `json:"here,omitempty"`
-	Writes *string   `json:"writes,omitempty"`
+	File   string      `json:"file"`
+	Key    string      `json:"key"`
+	Kind   CheckKind   `json:"kind"`
+	Job    string      `json:"job,omitempty"`
+	Port   string      `json:"port,omitempty"`
+	Here   *string     `json:"here,omitempty"`
+	Writes *string     `json:"writes,omitempty"`
+	Status envs.Status `json:"status,omitempty"`
 }
 
 // CheckKind is why a key is to check.
@@ -153,11 +155,12 @@ type CheckKind string
 const (
 	CheckUnlinked  CheckKind = "unlinked"
 	CheckOutOfStep CheckKind = "out_of_step"
+	CheckLeftAlone CheckKind = "left_alone"
 )
 
 // CheckKinds returns every CheckKind.
 func CheckKinds() []CheckKind {
-	return []CheckKind{CheckUnlinked, CheckOutOfStep}
+	return []CheckKind{CheckUnlinked, CheckOutOfStep, CheckLeftAlone}
 }
 
 // The codes of the warnings: a worktree yet to choose its isolation, followed by env giving it one; ports that cannot be settled.
@@ -207,10 +210,11 @@ func Show(f Facts) (Item, []domain.Warning) {
 	return Item{Subject: w.Name(), Status: domain.StatusDone, Detail: &detail}, warnings
 }
 
-// written is what wtm writes into one key: the value, and whether the key holds another one.
+// written is what wtm writes into one key: the value, and whether the key holds another one; or why it leaves it alone.
 type written struct {
 	value     string
 	outOfStep bool
+	leftAlone envs.Status
 }
 
 // writtenBy is what wtm writes into each key, by file then key: its linked ports and addresses, then its own values.
@@ -228,6 +232,8 @@ func writtenBy(plan envs.Plan) map[string]map[string]written {
 			set(entry.File, entry.Key, written{value: entry.NewValue, outOfStep: true})
 		case envs.StatusUnchanged:
 			set(entry.File, entry.Key, written{value: entry.CurrentValue})
+		default:
+			set(entry.File, entry.Key, written{leftAlone: entry.Status})
 		}
 	}
 	for _, owned := range plan.Owned {
@@ -249,9 +255,10 @@ func (f Facts) file(read envs.FileRead, writes map[string]map[string]written) Fi
 	for _, k := range envs.Keys(envs.DriftParams{Child: read.Child, Template: read.Template, Parent: parent, Main: main}) {
 		key := Key{Key: k.Name, Status: k.Status, Follows: FollowsCopied}
 		key.Follows, key.Job, key.Port = f.follows(read.File.Target, k.Name, valueOf(inMain, here, k.Name))
-		if w, wtm := writes[read.File.Target][k.Name]; wtm {
+		if w, wtm := writes[read.File.Target][k.Name]; wtm && w.leftAlone == "" {
 			key.Writes, key.OutOfStep = &w.value, w.outOfStep
 		}
+		key.LeftAlone = writes[read.File.Target][k.Name].leftAlone
 		key.Main, key.Here = lookup(inMain, k.Name), lookup(here, k.Name)
 		switch {
 		case f.ShowValues:
@@ -317,6 +324,8 @@ func checkOf(file string, key Key) (Check, bool) {
 		return Check{File: file, Key: key.Key, Kind: CheckUnlinked, Job: key.Job, Port: key.Port}, true
 	case key.OutOfStep:
 		return Check{File: file, Key: key.Key, Kind: CheckOutOfStep, Job: key.Job, Port: key.Port, Here: key.Here, Writes: key.Writes}, true
+	case key.LeftAlone != "":
+		return Check{File: file, Key: key.Key, Kind: CheckLeftAlone, Job: key.Job, Port: key.Port, Here: key.Here, Status: key.LeftAlone}, true
 	}
 	return Check{}, false
 }

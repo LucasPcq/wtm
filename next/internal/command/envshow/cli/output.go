@@ -47,7 +47,7 @@ func drawDetail(w io.Writer, d envshow.Detail) {
 			}
 			rows := [][]string{{st.Muted.Render("KEY"), st.Muted.Render("FOLLOWS"), st.Muted.Render("IN MAIN"), st.Muted.Render("HERE")}}
 			for _, key := range file.Keys {
-				rows = append(rows, []string{key.Key, followsWords(key), value(key.Main, key.Withheld), hereValue(key)})
+				rows = append(rows, []string{key.Key, followsWords(key, d.Main), value(key.Main, key.Withheld), hereValue(key)})
 			}
 			output.Columns(w, indented(rows))
 		}
@@ -61,10 +61,23 @@ func checkWords(check envshow.Check) string {
 		}
 		return "follows nothing: looks like " + check.Job + "'s " + check.Port
 	}
+	if check.Kind == envshow.CheckLeftAlone {
+		return "left alone: " + leftAloneWords[check.Status]
+	}
 	if check.Here != nil && check.Writes != nil {
 		return "out of step: " + *check.Here + " here, wtm writes " + *check.Writes
 	}
 	return "out of step with what wtm writes"
+}
+
+var leftAloneWords = map[env.Status]string{
+	env.StatusMissingKey:   "the key is in no file",
+	env.StatusNotFound:     "wtm finds no port of its job in it to move",
+	env.StatusAmbiguous:    "its job's port appears more than once",
+	env.StatusForeignHost:  "it points at another host, which no job here serves",
+	env.StatusSecureScheme: "https: the run proxy serves plain HTTP",
+	env.StatusRewrite:      "",
+	env.StatusUnchanged:    "",
 }
 
 func appWords(app envshow.App) string {
@@ -111,12 +124,14 @@ var follows = map[envshow.Follows]string{
 	envshow.FollowsCopied:  "copied as it is",
 }
 
-func followsWords(key envshow.Key) string {
+func followsWords(key envshow.Key, main bool) string {
 	switch {
 	case key.Follows == envshow.FollowsCopied && key.Status == env.KeyOrphan:
 		return "in no source"
 	case key.Follows == envshow.FollowsCopied && key.Here == nil:
 		return "not here yet"
+	case key.Follows == envshow.FollowsCopied && main:
+		return "set in main"
 	}
 	switch key.Follows {
 	case envshow.FollowsPort, envshow.FollowsAddress, envshow.FollowsValue:

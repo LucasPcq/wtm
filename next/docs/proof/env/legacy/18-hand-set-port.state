@@ -1,0 +1,48 @@
+## <SB>/acme/apps/api/.env
+PORT=24601
+JWT_SECRET=s3cret
+MAILER_URL=http://localhost:8025
+## <SB>/acme/apps/web/.env
+PORT=24600
+API_URL=http://localhost:24601
+## <SB>/acme/apps/docs/.env
+DOCS_TITLE=Acme
+## <SB>/acme.trees/feat-a/apps/api/.env
+PORT=24611
+JWT_SECRET=s3cret
+MAILER_URL=http://localhost:8025
+## <SB>/acme.trees/feat-a/apps/web/.env
+PORT=24610
+API_URL=http://api.feat-a.acme.localhost:24602
+## <SB>/acme.trees/feat-a/apps/docs/.env
+DOCS_TITLE=Acme
+## <SB>/acme.trees/feat-b/apps/api/.env
+PORT=24621
+JWT_SECRET=s3cret
+MAILER_URL=http://localhost:8025
+## <SB>/acme.trees/feat-b/apps/web/.env
+PORT=9999
+API_URL=http://api.feat-b.acme.localhost:24602
+## <SB>/acme.trees/feat-b/apps/docs/.env
+DOCS_TITLE=Acme
+## <SB>/acme.trees/feat-c/apps/api/.env
+PORT=24601
+## <SB>/acme.trees/feat-c/apps/web/.env
+PORT=24600
+API_URL=http://localhost:24601
+## <SB>/acme.trees/feat-c/apps/docs/.env
+DOCS_TITLE=
+## <SB>/acme.trees/feat-p/apps/api/.env
+PORT=24631
+JWT_SECRET=s3cret
+MAILER_URL=http://localhost:8025
+## <SB>/acme.trees/feat-p/apps/web/.env
+PORT=24630
+API_URL=http://api.feat-p.acme.localhost:24602
+## <SB>/acme.trees/feat-p/apps/docs/.env
+DOCS_TITLE=Acme
+## isolation
+.git/wtm/worktrees/feat%2Fa/meta.json: isolated
+.git/wtm/worktrees/feat%2Fb/meta.json: isolated
+.git/wtm/worktrees/feat%2Fc/meta.json: verbatim
+.git/wtm/worktrees/feat%2Fp/meta.json: isolated

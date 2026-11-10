@@ -4,9 +4,9 @@
   ✓ Worktrees: feat/billing
   · All — set by its flag only
   · Values from — set by its flag only
-  · Overwrite — no key differs from its source
+  · Overwrite — every key matches its source
 
-  These keys are in no source:
+  This key is in no source:
     feat/billing  apps/api/.env  OLD
 
 ▌› No, keep it

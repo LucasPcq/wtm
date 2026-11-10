@@ -23,6 +23,11 @@ const (
 	StatusSecureScheme Status = "secure_scheme"
 )
 
+// Statuses returns every Status.
+func Statuses() []Status {
+	return []Status{StatusRewrite, StatusUnchanged, StatusMissingKey, StatusNotFound, StatusAmbiguous, StatusForeignHost, StatusSecureScheme}
+}
+
 // A Move is one port a key links to and where it moves for the worktree: from Base to Resolved, or to Origin when the key is addressed by name.
 type Move struct {
 	Port     string `json:"port"`

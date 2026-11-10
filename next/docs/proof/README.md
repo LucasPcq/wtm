@@ -639,13 +639,14 @@ The reference is the legacy `wtm env` of 0.30.1. Its output differs by design (n
   15. legacy `feat/b --check --output json`, next `env show feat/b --output json`
   16. `-q`
   17. legacy `main --yes`, next `--all --yes`
+  18. `feat/b --yes` with its web `PORT` set by hand to a number that is no port of its job: both leave it, and say so
 - The bugs of the legacy, each fixed with its test:
   - B1, 4: legacy's `--check` exits 18 right after a successful `--yes`, counting the orphans and conflicts an unattended run leaves; next's dry run plans what the same request writes, empty once applied (`TestAReconciledWorktreeHasNothingLeftToReconcile`).
   - B2, 14: legacy's `--show-values` changes nothing in its text report; next's `env show --show-values` prints every value, and `env` shows the values of its changes (`TestShowValuesShowsEveryValueAndTheJSONTheTree`).
   - B3: legacy's "Move onto names" promises `http://<job>.<repo>.localhost` and writes `http://<job>.main.<repo>.localhost`; next has no addressing switch (D5).
   - B4: legacy prints "Addresses carry the proxy's port … then `wtm env` drops it" on every run, even one that wrote nothing; next says nothing it did not do.
   - B5: legacy's wizard prints the secrets its report withholds; next withholds every value wtm does not write, everywhere, unless `--show-values` (`TestValuesAreWithheldUnlessShown`).
-- Found by this proof and fixed: switching a worktree whose values come from its template to verbatim left the ports wtm had written, the template giving none (10, `TestAWorktreeSwitchedToVerbatimFromItsTemplateGetsTheMainValues`); recording an isolation alone was said `unchanged` (9, `TestRecordingAnIsolationAloneIsAChange`).
+- Found by the proofs and fixed: a port wtm finds nothing to move in was said in step, where legacy warns it is left alone (18, `TestAPortWtmFindsNothingToMoveInIsLeftAloneAndSaid`, and in `env show` a key to check, `TestAPortWtmLeavesAloneIsToCheck`); switching a worktree whose values come from its template to verbatim left the ports wtm had written, the template giving none (10, `TestAWorktreeSwitchedToVerbatimFromItsTemplateGetsTheMainValues`); recording an isolation alone was said `unchanged` (9, `TestRecordingAnIsolationAloneIsAChange`).
 - The differences, approved by the owner (2026-11-10):
   - D1: next takes several worktrees (`env [worktree...]`, `--all`); with none named, the worktrees out of step and the one you stand in, picked in the wizard, applied without a terminal (7: legacy refuses, exit 1; next reconciles `feat/c`, in step).
   - D2: `--check` is next's `--dry-run`, exit 0 with its fingerprint (1, 2, 4: legacy exits 18).

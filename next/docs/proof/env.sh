@@ -137,6 +137,9 @@ run_side() {
     both 15-show-json env feat/b --check --output json -- env show feat/b --output json
     both 16-quiet -q env feat/c --yes -- -q env feat/c --yes
     both 17-all env main --yes -- env --all --yes
+    # a port set by hand, which holds no port of its job to move
+    sed -i '' 's/^PORT=.*/PORT=9999/' "$box/acme.trees/feat-b/apps/web/.env"
+    both 18-hand-set-port env feat/b --yes -- env feat/b --yes
   )
   sed -i '' -E \
     -e "s#(/private)?$box#<SB>#g" \

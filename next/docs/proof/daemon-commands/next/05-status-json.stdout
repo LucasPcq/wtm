@@ -29,7 +29,10 @@
                     "name": "db",
                     "kind": "service",
                     "hold": "own",
-                    "shared": true
+                    "shared": true,
+                    "held_by": [
+                      "feat/a"
+                    ]
                   },
                   {
                     "name": "stack",

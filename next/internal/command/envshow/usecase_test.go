@@ -6,6 +6,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/command/envshow"
 	"github.com/LucasPcq/wtm/next/internal/domain"
+	"github.com/LucasPcq/wtm/next/internal/domain/env"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 
@@ -95,4 +96,14 @@ func TestTheCredentialsOfALinkedUrlAreWithheld(t *testing.T) {
 
 	assert.Equal(t, ptr("http://•••@localhost:4020/v1"), keyOf(t, hidden, webEnv, "API_URL").Here)
 	assert.Equal(t, ptr("http://admin:hunter2@localhost:4020/v1"), keyOf(t, shown, webEnv, "API_URL").Here)
+}
+
+func TestAPortWtmLeavesAloneIsToCheck(t *testing.T) {
+	// the proof: a port set by hand read "nothing to check"
+	s := acmeSeed()
+	s.Files[linkedPath(billing)+"/"+webEnv] = "PORT=9999\nAPI_URL=http://localhost:4020\n"
+
+	d, _ := read(t, s, envshow.Request{Worktree: billing})
+
+	assert.Contains(t, d.Checks, envshow.Check{File: webEnv, Key: "PORT", Kind: envshow.CheckLeftAlone, Job: "web", Port: "PORT", Here: ptr("9999"), Status: env.StatusNotFound})
 }

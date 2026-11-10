@@ -2565,7 +2565,7 @@
           "type": "integer"
         },
         "status": {
-          "type": "string"
+          "$ref": "#/$defs/env.Status"
         }
       },
       "required": [
@@ -2870,6 +2870,18 @@
       ],
       "type": "object"
     },
+    "env.Status": {
+      "description": "What settling decided for one linked key of a .env file: rewritten, unchanged, or left alone and why.",
+      "enum": [
+        "rewrite",
+        "unchanged",
+        "missing_key",
+        "base_not_found",
+        "ambiguous",
+        "foreign_host",
+        "secure_scheme"
+      ]
+    },
     "env.envelope": {
       "allOf": [
         {
@@ -3148,6 +3160,9 @@
         "port": {
           "type": "string"
         },
+        "status": {
+          "$ref": "#/$defs/env.Status"
+        },
         "writes": {
           "type": "string"
         }
@@ -3163,7 +3178,8 @@
       "description": "Why a key of a .env file is to check.",
       "enum": [
         "unlinked",
-        "out_of_step"
+        "out_of_step",
+        "left_alone"
       ]
     },
     "envshow.Detail": {
@@ -3302,6 +3318,9 @@
         },
         "key": {
           "type": "string"
+        },
+        "left_alone": {
+          "$ref": "#/$defs/env.Status"
         },
         "main": {
           "anyOf": [

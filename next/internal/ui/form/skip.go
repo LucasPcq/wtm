@@ -22,8 +22,8 @@ var skipped = map[domain.Skip]string{
 	domain.SkipAlone:           "no other worktree runs jobs",
 	domain.SkipConfigured:      "run.toml answers it",
 	domain.SkipTask:            "a task binds no port and is gone once done",
-	domain.SkipNoKeyConflict:   "no key differs from its source",
-	domain.SkipNoKeyOrphan:     "no key is in no source",
+	domain.SkipNoKeyConflict:   "every key matches its source",
+	domain.SkipNoKeyOrphan:     "every key has a source",
 }
 
 // Skipped is how the wizard's trail words why a step is not asked, empty when it has no words for it; a command may

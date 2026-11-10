@@ -312,6 +312,7 @@ const (
 	CodeRestart      = Name + ".restart"
 	CodeRestartJob   = Name + ".restart_job"
 	CodeClean        = Name + ".clean"
+	CodeLeftAlone    = Name + ".env_ports_left_alone"
 	CodePending      = Name + ".isolation_pending"
 	CodeIsolate      = Name + ".isolate"
 )
@@ -322,7 +323,7 @@ const (
 	pathRunStartRestart = "restart"
 )
 
-// warnings are what the plan cannot see to or leaves as it is: each link of run.toml into a file the project does not declare, then for each worktree asked whose directory is gone, whose files could not be read, or whose ports cannot be settled, why.
+// warnings are what the plan cannot see to or leaves as it is: each link of run.toml into a file the project does not declare, then for each worktree asked whose directory is gone, whose files could not be read, or whose ports cannot be settled, why, and the ports it leaves alone, wtm finding nothing to move in their value.
 func (f Facts) warnings(planned Plan) []domain.Warning {
 	var warnings []domain.Warning
 	if f.RunErr == nil {
@@ -350,6 +351,9 @@ func (f Facts) warnings(planned Plan) []domain.Warning {
 		case r.Unsettled != "":
 			params["cause"] = r.Unsettled
 			warnings = append(warnings, domain.Warning{Code: CodeUnsettled, Message: r.Unsettled + " — " + r.Worktree + "'s ports not settled", Params: params})
+		}
+		if left := r.Ports.LeftAlone(); len(left) > 0 {
+			warnings = append(warnings, domain.Warning{Code: CodeLeftAlone, Message: r.Worktree + ": env ports left alone", Params: domain.Params{"worktree": r.Worktree, "count": strconv.Itoa(len(left))}, Ports: left})
 		}
 	}
 
@@ -407,7 +411,7 @@ func (r Request) Locks() []domain.Lock {
 // ----------------------------------------------------------------------------
 // The recap
 
-// The notes of the recap's values: a file created, a key added, overwritten, dropped, or left with its status, a linked value rewritten, a value wtm owns set, a worktree numbered; a worktree in step, one whose directory is gone.
+// The notes of the recap's values: a file created, a key added, overwritten, dropped, or left with its status, a linked value rewritten, a value wtm owns set, a worktree numbered; a worktree in step, one whose directory is gone, one whose ports wtm leaves alone.
 const (
 	NoteCreated     = "created"
 	NoteAdded       = "added"
@@ -420,6 +424,7 @@ const (
 	NoteIsolation   = "isolation"
 	NoteInStep      = "in_step"
 	NoteMissing     = "missing"
+	NoteLeftAlone   = "left_alone"
 )
 
 // empty reports whether applying the plan changes nothing.
@@ -435,6 +440,8 @@ func (p Plan) recap() []domain.RecapRow {
 		switch {
 		case r.Missing:
 			left = append(left, domain.RecapValue{Value: r.Worktree, Note: NoteMissing, Text: r.Worktree + " (its directory is gone)"})
+		case !r.writes() && !r.leaves() && len(r.Ports.LeftAlone()) > 0:
+			left = append(left, domain.RecapValue{Value: r.Worktree, Note: NoteLeftAlone, Text: r.Worktree + " (ports left alone)"})
 		case r.writes() || r.leaves():
 			// a row per change, the worktree named on its first: a line each
 			for i, value := range r.recap() {

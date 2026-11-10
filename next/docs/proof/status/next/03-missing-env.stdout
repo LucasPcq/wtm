@@ -19,5 +19,5 @@
   ! main has 2 commits it lacks
   → wtm-next sync feat/b   sync it onto main
   ! apps/web/.env is missing
-  → wtm env feat/b   rebuild it
+  → wtm-next env feat/b   rebuild it
 

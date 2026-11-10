@@ -27,12 +27,12 @@ func words(q envcmd.Questions, field domain.Field) form.Words {
 			string(project.EnvParent):  {Label: "The parent worktree", Short: "parent"},
 		}}
 	case envcmd.PathOverwrite:
-		return form.Words{Flag: "--overwrite", Label: "Overwrite", Help: keysHelp("Give a key whose value differs from its source the source's value", "These keys differ from their source:", q.Conflicts), Options: map[string]form.OptionWords{
+		return form.Words{Flag: "--overwrite", Label: "Overwrite", Help: keysHelp("Give a key whose value differs from its source the source's value", [2]string{"This key differs from its source:", "These keys differ from their source:"}, q.Conflicts), Options: map[string]form.OptionWords{
 			"true":  {Label: "Yes, take the source's value", Short: "overwritten"},
 			"false": {Label: "No, keep the worktree's value", Short: "kept"},
 		}}
 	case envcmd.PathPrune:
-		return form.Words{Flag: "--prune", Label: "Prune", Help: keysHelp("Drop a key no source has", "These keys are in no source:", q.Orphans), Options: map[string]form.OptionWords{
+		return form.Words{Flag: "--prune", Label: "Prune", Help: keysHelp("Drop a key no source has", [2]string{"This key is in no source:", "These keys are in no source:"}, q.Orphans), Options: map[string]form.OptionWords{
 			"true":  {Label: "Yes, drop it", Short: "dropped"},
 			"false": {Label: "No, keep it", Short: "kept"},
 		}}
@@ -64,12 +64,12 @@ func worktreeWords(options []domain.Option) map[string]form.OptionWords {
 	return labels
 }
 
-// keysHelp is help, or, when keys are asked about, title and each key.
-func keysHelp(help, title string, keys []envcmd.KeyAt) string {
+// keysHelp is help, or, when keys are asked about, title (one key's, then several's) and each key.
+func keysHelp(help string, titles [2]string, keys []envcmd.KeyAt) string {
 	if len(keys) == 0 {
 		return help
 	}
-	lines := []string{title}
+	lines := []string{titles[min(len(keys)-1, 1)]}
 	for _, k := range keys {
 		lines = append(lines, "  "+k.Worktree+"  "+k.File+"  "+k.Key)
 	}

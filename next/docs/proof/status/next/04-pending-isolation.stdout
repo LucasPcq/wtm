@@ -19,5 +19,5 @@
   ! main has 2 commits it lacks
   → wtm-next sync feat/old   sync it onto main
   ! predates the isolation choice: run up and run start refuse it
-  → wtm env feat/old --isolation isolated   isolate it
+  → wtm-next env feat/old --isolation isolated   isolate it
 
