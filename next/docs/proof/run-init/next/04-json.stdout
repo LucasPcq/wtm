@@ -5,19 +5,19 @@
   "op": "<OP>",
   "items": [
     {
-      "subject": "run.toml",
-      "status": "done",
-      "detail": {
-        "path": "run.toml",
-        "tracked": false
-      }
-    },
-    {
       "subject": "docker-compose.yml",
       "status": "done",
       "detail": {
         "path": "docker-compose.yml",
         "tracked": true
+      }
+    },
+    {
+      "subject": "run.toml",
+      "status": "done",
+      "detail": {
+        "path": "run.toml",
+        "tracked": false
       }
     }
   ],
@@ -73,14 +73,14 @@
     },
     "files": [
       {
-        "path": "run.toml",
-        "tracked": false,
-        "new": true
-      },
-      {
         "path": "docker-compose.yml",
         "tracked": true,
         "new": false
+      },
+      {
+        "path": "run.toml",
+        "tracked": false,
+        "new": true
       }
     ],
     "detection": {
@@ -909,12 +909,12 @@
         "label": "Writes",
         "values": [
           {
-            "value": "run.toml",
-            "text": "run.toml"
-          },
-          {
             "value": "docker-compose.yml",
             "text": "docker-compose.yml"
+          },
+          {
+            "value": "run.toml",
+            "text": "run.toml"
           }
         ]
       }

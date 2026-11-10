@@ -13,7 +13,7 @@
 ┃  Addresses  names
 ┃  .env keys  8 linked
 ┃  Profiles   all (default), admin, api, web, worker
-┃  Writes     run.toml, docker-compose.yml
+┃  Writes     docker-compose.yml, run.toml
 ┃
 ┃  ! admin binds 3001 whatever ADMIN_PORT says: run it as pnpm exec next dev -p ${ADMIN_PORT} (--command)
 ┃
