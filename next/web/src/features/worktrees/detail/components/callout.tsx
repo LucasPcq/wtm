@@ -64,6 +64,8 @@ const runsHere: Record<
   checkout: null,
   prune: { verb: pruneAction.label, open: (repo, fix) => openPrune(repo, subjectsOf(fix)) },
   exec: null,
+  // its fixes name its isolation, which only the command line answers: copied, never run here
+  env: null,
   sync: {
     verb: menu.sync.label,
     open: (_repo, fix, runEntry) => runEntry({ action: 'sync', followUp: fix }, []),

@@ -1,6 +1,7 @@
 package env
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -112,12 +113,21 @@ func hasLoopbackOrigin(value string) bool {
 	return false
 }
 
-// passwordParams are the query parameters that carry a password, whose values WithoutCredentials masks.
-var passwordParams = []string{"password", "passwd", "pwd", "secret", "token"}
+// secretSuffixes end the names of the parameters that carry a secret, whose values WithoutCredentials masks; a key is one alone, or of these kinds, never any name that ends in key (a redirect_key holds an address).
+var secretSuffixes = []string{"password", "passwd", "pwd", "secret", "token", "api_key", "apikey", "access_key", "secret_key", "private_key"}
 
-// WithoutCredentials returns value with the user and password of each url in it masked, and the value of each query parameter that carries a password: what wtm writes is the port or the address, never the credentials beside them.
+// paramStarts are what a parameter's name follows, beside the start of a value: a query string, a fragment, a connection string's ; and a libpq DSN's spaces; paramEnds end an unquoted value (a comma may be part of a password, a list's comma goes with its space).
+const (
+	paramStarts = "?&#; \t"
+	paramEnds   = "&#; \t"
+)
+
+// quoteCloses closes a quoted value by the character it opens with.
+var quoteCloses = map[byte]byte{'\'': '\'', '"': '"', '{': '}'}
+
+// WithoutCredentials returns value with the user and password of each url in it masked, and of each user/password@host:port with no scheme (Oracle's EZConnect), and the value of each parameter whose name says it holds a secret (a query string's, a fragment's, a connection string's, a DSN's): what wtm writes is the port or the address, never the credentials beside them.
 func WithoutCredentials(value string) string {
-	masked, rest := "", value
+	masked, rest := "", maskedLogins(value)
 	for {
 		at := strings.Index(rest, schemeSeparator)
 		if at < 0 {
@@ -138,21 +148,97 @@ func WithoutCredentials(value string) string {
 	}
 }
 
-// maskedParams returns value with the value of each password parameter of its query strings masked.
+// maskedParams returns value with the value of each parameter whose name ends as a secret's masked, wherever its name starts a parameter.
 func maskedParams(value string) string {
-	for _, name := range passwordParams {
-		for _, sep := range []string{"?", "&"} {
-			key := sep + name + "="
-			for at := 0; at+len(key) <= len(value); at++ {
-				// matched on the value's own bytes: lowering it could change its length
-				if !strings.EqualFold(value[at:at+len(key)], key) {
-					continue
-				}
-				start := at + len(key)
-				end := start + strings.IndexAny(value[start:]+"&", "&#, ")
-				value = value[:start] + "•••" + value[end:]
-			}
+	var masked strings.Builder
+	last := 0
+	for i := 0; i < len(value); i++ {
+		if value[i] != '=' {
+			continue
 		}
+		start := i
+		for start > 0 && isNameByte(value[start-1]) {
+			start--
+		}
+		if start == i || start > 0 && !strings.ContainsRune(paramStarts, rune(value[start-1])) || !isSecretName(value[start:i]) {
+			continue
+		}
+		masked.WriteString(value[last : i+1])
+		end := maskValue(&masked, value, i+1)
+		last, i = end, end-1
 	}
-	return value
+	return masked.String() + value[last:]
+}
+
+// maskValue writes to masked the mask of the value of value that starts at start, its quotes kept, and returns where that value ends: a quoted one at its closing quote, whatever it holds, or at the end of value; another at the first of paramEnds.
+func maskValue(masked *strings.Builder, value string, start int) int {
+	var closing byte
+	quoted := false
+	if start < len(value) {
+		closing, quoted = quoteCloses[value[start]]
+	}
+	if !quoted {
+		masked.WriteString("•••")
+		return start + strings.IndexAny(value[start:]+"&", paramEnds)
+	}
+
+	at := strings.IndexByte(value[start+1:], closing)
+	if at < 0 {
+		masked.WriteString(value[start:start+1] + "•••")
+		return len(value)
+	}
+	masked.WriteString(value[start:start+1] + "•••" + string(closing))
+	return start + 1 + at + 1
+}
+
+// maskedLogins returns value with each user/password before an @host:port that no scheme opens masked, as Oracle's EZConnect spells a login; a url's userinfo is left to WithoutCredentials.
+func maskedLogins(value string) string {
+	var masked strings.Builder
+	last := 0
+	for at := strings.IndexByte(value, '@'); at >= 0; at = nextAt(value, at) {
+		start := at
+		for start > last && !strings.ContainsRune(loginStarts, rune(value[start-1])) {
+			start--
+		}
+		login := value[start:at]
+		if !strings.Contains(login, "/") || strings.Contains(login, schemeSeparator) || !hasHostPort(value[at+1:]) {
+			continue
+		}
+		masked.WriteString(value[last:start] + "•••")
+		last = at
+	}
+	return masked.String() + value[last:]
+}
+
+// loginStarts are what a login without a scheme follows, beside the start of a value.
+const loginStarts = " \t;,='\""
+
+// nextAt is the index of the @ after the one at at in value, -1 when there is none.
+func nextAt(value string, at int) int {
+	next := strings.IndexByte(value[at+1:], '@')
+	if next < 0 {
+		return -1
+	}
+	return at + 1 + next
+}
+
+// hasHostPort reports whether rest opens on a host and a port: a name, a colon, then digits.
+func hasHostPort(rest string) bool {
+	colon := strings.IndexByte(rest, ':')
+	if colon <= 0 || strings.ContainsAny(rest[:colon], "/@ \t;") {
+		return false
+	}
+	digits := rest[colon+1:]
+	return len(digits) > 0 && '0' <= digits[0] && digits[0] <= '9'
+}
+
+// isNameByte reports whether b may be part of a parameter's name: ASCII alone, so lowering a name keeps its length.
+func isNameByte(b byte) bool {
+	return 'a' <= b && b <= 'z' || 'A' <= b && b <= 'Z' || '0' <= b && b <= '9' || b == '_' || b == '-' || b == '.'
+}
+
+// isSecretName reports whether name is key or ends as the name of a secret, whatever its case.
+func isSecretName(name string) bool {
+	lower := strings.ToLower(name)
+	return lower == "key" || slices.ContainsFunc(secretSuffixes, func(suffix string) bool { return strings.HasSuffix(lower, suffix) })
 }

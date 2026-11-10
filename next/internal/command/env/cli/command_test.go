@@ -45,6 +45,16 @@ func TestAJobUpOnTheOldValuesIsToRestart(t *testing.T) {
 	formtest.Golden(t, "restart", got.Stdout)
 }
 
+func TestADryRunSaysWhichJobsItsApplyWouldLeaveOnTheOldValues(t *testing.T) {
+	w := newWorld()
+	w.jobs = []run.Job{{Name: "web", WorkDir: pathOf(billing), Up: true}}
+
+	got := runEnv(t, w, billing, "--dry-run")
+
+	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
+	formtest.Golden(t, "dryrun_restart", got.Stdout)
+}
+
 func TestTheJSONEnvelopeWithholdsTheValuesUnlessShown(t *testing.T) {
 	hidden := runEnv(t, newWorld(), billing, "--yes", "--output", "json")
 	shown := runEnv(t, newWorld(), billing, "--yes", "--output", "json", "--show-values")

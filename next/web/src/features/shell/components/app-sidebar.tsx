@@ -23,7 +23,6 @@ const soon: { group: string; items: { label: string; icon: LucideIcon }[] }[] = 
     group: 'Run',
     items: [
       { label: 'Profiles & jobs', icon: Layers },
-      { label: '.env files', icon: FileKey },
       { label: 'Run settings', icon: SlidersHorizontal },
     ],
   },
@@ -33,6 +32,7 @@ const soon: { group: string; items: { label: string; icon: LucideIcon }[] }[] = 
 export function AppSidebar({ repo, daemon }: { repo: string | undefined; daemon?: Daemon | undefined }) {
   const matchRoute = useMatchRoute()
   const onRunning = matchRoute({ to: '/r/$repo/running', fuzzy: true }) !== false
+  const onEnv = matchRoute({ to: '/r/$repo/env', fuzzy: true }) !== false
 
   return (
     <Sidebar>
@@ -48,7 +48,7 @@ export function AppSidebar({ repo, daemon }: { repo: string | undefined; daemon?
           <SidebarMenu>
             <SidebarMenuItem>
               {repo ? (
-                <SidebarMenuButton asChild isActive={!onRunning}>
+                <SidebarMenuButton asChild isActive={!onRunning && !onEnv}>
                   <Link to="/r/$repo/worktrees" params={{ repo: repo }}>
                     <GitBranch />
                     All worktrees
@@ -84,6 +84,23 @@ export function AppSidebar({ repo, daemon }: { repo: string | undefined; daemon?
                     </SidebarMenuButton>
                   )}
                   {repo && <JobsUp repo={repo} />}
+                </SidebarMenuItem>
+              )}
+              {group === 'Run' && (
+                <SidebarMenuItem>
+                  {repo ? (
+                    <SidebarMenuButton asChild isActive={onEnv}>
+                      <Link to="/r/$repo/env" params={{ repo }}>
+                        <FileKey />
+                        .env files
+                      </Link>
+                    </SidebarMenuButton>
+                  ) : (
+                    <SidebarMenuButton disabled>
+                      <FileKey />
+                      .env files
+                    </SidebarMenuButton>
+                  )}
                 </SidebarMenuItem>
               )}
               {items.map(({ label, icon: Icon }) => (

@@ -22,6 +22,7 @@
         "isolation": "verbatim",
         "pending": false,
         "numbered": true,
+        "phases": [],
         "files": [
           {
             "target": "apps/api/.env",

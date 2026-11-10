@@ -43,17 +43,18 @@ type Call struct {
 	Options domain.RunOptions
 }
 
-// caller is where the call's caller stands: in the directory it names, named, or nowhere when it names none. Cwd is that directory with its symbolic links resolved, as git spells the worktrees it lists and the command line its working directory.
+// caller is where the call's caller stands: in the directory it names, named, or nowhere when it names none; on the call's surface, the API's when it names none. Cwd is that directory with its symbolic links resolved, as git spells the worktrees it lists and the command line its working directory.
 func (c Call) caller() domain.Caller {
+	surface := cmp.Or(c.Options.Surface, domain.SurfaceAPI)
 	if c.Dir == "" {
-		return domain.Caller{}
+		return domain.Caller{Surface: surface}
 	}
 
 	cwd := c.Dir
 	if resolved, err := filepath.EvalSymlinks(c.Dir); err == nil {
 		cwd = resolved
 	}
-	return domain.Caller{Dir: c.Dir, Named: true, Cwd: cwd}
+	return domain.Caller{Dir: c.Dir, Named: true, Cwd: cwd, Surface: surface}
 }
 
 // A Response is how an execution ended: its envelope, whose error's kind a surface maps onto its own status.
