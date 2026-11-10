@@ -24,6 +24,18 @@ const (
 	PathOnClean     = domain.PathOnClean
 )
 
+// The sections the settings fall in, in the order of the form: where worktrees go, their .env files, their hooks.
+const (
+	SectionWorktrees = "worktrees"
+	SectionEnvFiles  = "env_files"
+	SectionHooks     = "hooks"
+)
+
+// Sections are the IDs of the settings' sections, in the order of the form.
+func Sections() []string {
+	return []string{SectionWorktrees, SectionEnvFiles, SectionHooks}
+}
+
 // EnvNone is the env strategy that copies no .env file into a new worktree: config.toml then names neither a strategy nor a file.
 const EnvNone = project.EnvNone
 
@@ -323,12 +335,12 @@ func (q Questions) Fields() []domain.Field {
 	}
 
 	return []domain.Field{
-		domain.TextField{FieldSpec: domain.FieldSpec{Path: PathBasePath, Origin: q.BasePath.Origin}, Value: q.BasePath.Value},
-		domain.SelectField{FieldSpec: domain.FieldSpec{Path: PathBaseBranch, Origin: q.BaseBranch.Origin}, Value: q.BaseBranch.Value, Options: branches, Pinned: q.BaseBranch.Pinned},
-		domain.SelectField{FieldSpec: domain.FieldSpec{Path: PathEnvStrategy, Origin: q.EnvStrategy.Origin}, Value: string(q.EnvStrategy.Value), Options: domain.OptionsOf(EnvStrategies()), Closed: true},
-		domain.MultiSelectField{FieldSpec: domain.FieldSpec{Path: PathEnvFiles, Origin: q.EnvFiles.Origin, Skip: q.EnvFiles.Skip}, Picked: q.EnvFiles.Picked, Options: files},
-		domain.HooksField{FieldSpec: domain.FieldSpec{Path: PathOnCreate, Origin: q.OnCreate.Origin}, Entries: q.OnCreate.Entries, Found: q.OnCreate.Found, Dirs: q.Dirs},
-		domain.HooksField{FieldSpec: domain.FieldSpec{Path: PathOnClean, Origin: q.OnClean.Origin}, Entries: q.OnClean.Entries, Found: q.OnClean.Found, Dirs: q.Dirs},
+		domain.TextField{FieldSpec: domain.FieldSpec{Path: PathBasePath, Section: SectionWorktrees, Origin: q.BasePath.Origin}, Value: q.BasePath.Value},
+		domain.SelectField{FieldSpec: domain.FieldSpec{Path: PathBaseBranch, Section: SectionWorktrees, Origin: q.BaseBranch.Origin}, Value: q.BaseBranch.Value, Options: branches, Pinned: q.BaseBranch.Pinned},
+		domain.SelectField{FieldSpec: domain.FieldSpec{Path: PathEnvStrategy, Section: SectionEnvFiles, Origin: q.EnvStrategy.Origin}, Value: string(q.EnvStrategy.Value), Options: domain.OptionsOf(EnvStrategies()), Closed: true},
+		domain.MultiSelectField{FieldSpec: domain.FieldSpec{Path: PathEnvFiles, Section: SectionEnvFiles, Origin: q.EnvFiles.Origin, Skip: q.EnvFiles.Skip}, Picked: q.EnvFiles.Picked, Options: files},
+		domain.HooksField{FieldSpec: domain.FieldSpec{Path: PathOnCreate, Section: SectionHooks, Origin: q.OnCreate.Origin}, Entries: q.OnCreate.Entries, Found: q.OnCreate.Found, Dirs: q.Dirs},
+		domain.HooksField{FieldSpec: domain.FieldSpec{Path: PathOnClean, Section: SectionHooks, Origin: q.OnClean.Origin}, Entries: q.OnClean.Entries, Found: q.OnClean.Found, Dirs: q.Dirs},
 	}
 }
 

@@ -8,13 +8,62 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 )
 
-// Form is a command's request as a schema a surface renders without knowing the command: its fields in the order a wizard asks them, as data each surface words its own way, and the request's problems, each naming a field, an entry of one, or a field the form does not list (remember[0]).
+// Form is a command's request as a schema a surface renders without knowing the command: its fields in the order a wizard asks them, as data each surface words its own way, the request's problems, each naming a field, an entry of one, or a field the form does not list (remember[0]), and the sections its fields fall in, in order, none for a form of one part.
 type Form struct {
 	Fields   []Field
 	Problems []FieldError
+	Sections []Section
 }
 
-// MarshalJSON is the form as a surface receives it: each field with its "kind" (select, multi_select, text, text_list, confirm, hooks) first, then what that kind carries, and the request's problems.
+// Section is a part of a form, which its fields name by ID (FieldSpec.Section): where it stands, why when it is skipped or to check (Reason, a code, with its Params; each surface words it), and the sections it waits for before it can be answered.
+type Section struct {
+	ID       string       `json:"id"`
+	State    SectionState `json:"state"`
+	Reason   string       `json:"reason,omitempty"`
+	Params   Params       `json:"params,omitempty"`
+	WaitsFor []string     `json:"waits_for,omitempty"`
+}
+
+// SectionState is where a section of a form stands.
+type SectionState string
+
+// The states of a section.
+const (
+	SectionToDo     SectionState = "to_do"    // a field of it is not answered yet
+	SectionAnswered SectionState = "answered" // every field of it is answered, with no problem
+	SectionToCheck  SectionState = "to_check" // a field of it has a problem
+	SectionSkipped  SectionState = "skipped"  // nothing in it is asked
+)
+
+// SectionsOf are the sections ids of fields, in order, each as its fields and problems stand: skipped when every field of it is, to do when a field of it is required and unanswered, to check when another problem names one of its fields, else answered.
+func SectionsOf(ids []string, fields []Field, problems []FieldError) []Section {
+	sections := make([]Section, 0, len(ids))
+	for _, id := range ids {
+		section := Section{ID: id, State: SectionSkipped}
+		for _, field := range fields {
+			spec := field.Spec()
+			if spec.Section != id || spec.Skip != "" {
+				continue
+			}
+			if section.State == SectionSkipped {
+				section.State = SectionAnswered
+			}
+			for _, problem := range ProblemsOf(problems, spec.Path) {
+				switch {
+				case problem.Code == CodeRequired:
+					section.State = SectionToDo
+				case section.State != SectionToDo:
+					section.State = SectionToCheck
+				}
+			}
+		}
+		sections = append(sections, section)
+	}
+
+	return sections
+}
+
+// MarshalJSON is the form as a surface receives it: each field with its "kind" (select, multi_select, text, text_list, confirm, hooks) first, then what that kind carries, the request's problems and the form's sections.
 func (f Form) MarshalJSON() ([]byte, error) {
 	fields := make([]json.RawMessage, 0, len(f.Fields))
 	for _, field := range f.Fields {
@@ -29,7 +78,8 @@ func (f Form) MarshalJSON() ([]byte, error) {
 	return encoded(struct {
 		Fields   []json.RawMessage `json:"fields"`
 		Problems []FieldError      `json:"problems"`
-	}{fields, orEmpty(f.Problems)})
+		Sections []Section         `json:"sections"`
+	}{fields, orEmpty(f.Problems), orEmpty(f.Sections)})
 }
 
 // fieldKind returns the kind of field and the field with each of its lists an array, never null, so a surface iterates them as they are.
@@ -98,9 +148,10 @@ type Field interface {
 
 // FieldSpec is what a field of every kind has; its words (its name, what its answer decides, its flag on the command line) are each surface's own, by its path.
 type FieldSpec struct {
-	Path   string `json:"path"`             // the request field it answers, as a field error names it
-	Origin Origin `json:"origin,omitempty"` // where its answer came from, empty when the field does not say
-	Skip   Skip   `json:"skip,omitempty"`   // why it is not asked, empty when it is
+	Path    string `json:"path"`              // the request field it answers, as a field error names it
+	Origin  Origin `json:"origin,omitempty"`  // where its answer came from, empty when the field does not say
+	Skip    Skip   `json:"skip,omitempty"`    // why it is not asked, empty when it is
+	Section string `json:"section,omitempty"` // the ID of the form's section it falls in, empty for a form of one part
 }
 
 // Spec is the spec itself, so each kind of field has it by embedding.

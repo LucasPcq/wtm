@@ -1680,6 +1680,9 @@
         "remembered": {
           "type": "boolean"
         },
+        "section": {
+          "type": "string"
+        },
         "skip": {
           "$ref": "#/$defs/domain.Skip"
         },
@@ -1936,7 +1939,7 @@
     },
     "domain.Form": {
       "additionalProperties": false,
-      "description": "A command's request as a schema a surface renders without knowing the command: its fields in the order a wizard asks them, and the request's problems.",
+      "description": "A command's request as a schema a surface renders without knowing the command: its fields in the order a wizard asks them, the request's problems, and the sections its fields fall in.",
       "properties": {
         "fields": {
           "items": {
@@ -1949,11 +1952,18 @@
             "$ref": "#/$defs/domain.FieldError"
           },
           "type": "array"
+        },
+        "sections": {
+          "items": {
+            "$ref": "#/$defs/domain.Section"
+          },
+          "type": "array"
         }
       },
       "required": [
         "fields",
-        "problems"
+        "problems",
+        "sections"
       ],
       "type": "object"
     },
@@ -1985,6 +1995,9 @@
           "$ref": "#/$defs/domain.Origin"
         },
         "path": {
+          "type": "string"
+        },
+        "section": {
           "type": "string"
         },
         "skip": {
@@ -2073,6 +2086,9 @@
             "type": "string"
           },
           "type": "array"
+        },
+        "section": {
+          "type": "string"
         },
         "skip": {
           "$ref": "#/$defs/domain.Skip"
@@ -2259,6 +2275,44 @@
       ],
       "type": "object"
     },
+    "domain.Section": {
+      "additionalProperties": false,
+      "description": "A part of a form, which its fields name by id: where it stands, why when it is skipped or to check (a code and its params, each surface words it), and the sections it waits for.",
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "params": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "to_do",
+            "answered",
+            "to_check",
+            "skipped"
+          ]
+        },
+        "waits_for": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "state"
+      ],
+      "type": "object"
+    },
     "domain.SelectField": {
       "additionalProperties": false,
       "properties": {
@@ -2299,6 +2353,9 @@
           "type": "boolean"
         },
         "remembered": {
+          "type": "string"
+        },
+        "section": {
           "type": "string"
         },
         "skip": {
@@ -2358,6 +2415,9 @@
         "path": {
           "type": "string"
         },
+        "section": {
+          "type": "string"
+        },
         "skip": {
           "$ref": "#/$defs/domain.Skip"
         },
@@ -2394,6 +2454,9 @@
           "$ref": "#/$defs/domain.Origin"
         },
         "path": {
+          "type": "string"
+        },
+        "section": {
           "type": "string"
         },
         "skip": {
@@ -4343,11 +4406,12 @@
       "type": "object"
     },
     "project.EnvStrategy": {
-      "description": "Where a worktree's .env files are copied from.",
+      "description": "Where a worktree's .env files are copied from, none when they are not.",
       "enum": [
         "example",
         "main",
-        "parent"
+        "parent",
+        "none"
       ]
     },
     "project.FoundHook": {

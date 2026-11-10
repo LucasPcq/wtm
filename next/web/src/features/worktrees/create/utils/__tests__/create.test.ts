@@ -15,6 +15,7 @@ test('each question goes in its step, a skipped one is listed apart, a field no 
   const form: DomainForm = {
     fields: [text('branches'), text('env_from', 'exists'), text('if_not_exists', 'flag_only'), text('new_one')],
     problems: [],
+    sections: [],
   }
 
   const [branch, environment] = stepsBy(form, createSteps)

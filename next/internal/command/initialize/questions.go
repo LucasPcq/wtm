@@ -42,9 +42,10 @@ func NewQuestions(f Facts, req Request) Questions {
 	return Questions{settings.NewQuestions(settings.QuestionsParams{Command: Name, Given: req.Given, Facts: f.Settings})}
 }
 
-// Form is the questions as the schema a surface renders: the worktrees' folder and base branch, where .env files come from and which, then the hooks. A zero Questions gives the schema the flags and --help are spelled from.
+// Form is the questions as the schema a surface renders, in its three sections: the worktrees' folder and base branch, where .env files come from and which, then the hooks. A zero Questions gives the schema the flags and --help are spelled from.
 func (q Questions) Form() domain.Form {
-	return domain.Form{Fields: q.Fields(), Problems: q.Problems()}
+	fields, problems := q.Fields(), q.Problems()
+	return domain.Form{Fields: fields, Problems: problems, Sections: domain.SectionsOf(settings.Sections(), fields, problems)}
 }
 
 // ----------------------------------------------------------------------------

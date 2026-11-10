@@ -565,7 +565,7 @@ var enums = map[reflect.Type]struct {
 	reflect.TypeFor[synccommand.Blocker]():       {"What makes a branch unsafe to move in a sync, a safety refusal only force lifts.", synccommand.Blockers()},
 	reflect.TypeFor[worktree.Divergence]():       {"Where a branch stands against origin's branch of the same name.", worktree.Divergences()},
 	reflect.TypeFor[worktree.Operation]():        {"What git stopped in the middle of in a worktree, to continue or abort there.", worktree.Operations()},
-	reflect.TypeFor[project.EnvStrategy]():       {"Where a worktree's .env files are copied from.", project.EnvStrategies()},
+	reflect.TypeFor[project.EnvStrategy]():       {"Where a worktree's .env files are copied from, none when they are not.", append(project.EnvStrategies(), project.EnvNone)},
 	reflect.TypeFor[project.Isolation]():         {"How a worktree stands against its source.", project.Isolations()},
 	reflect.TypeFor[project.JobKind]():           {"Whether a job keeps running or runs to its end.", project.JobKinds()},
 	reflect.TypeFor[run.State]():                 {"A job's state.", run.States()},
