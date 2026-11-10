@@ -15,7 +15,8 @@
             "idle"
           ]
         }
-      ]
+      ],
+      "optional": false
     },
     {
       "kind": "select",

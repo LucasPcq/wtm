@@ -46,7 +46,8 @@
       "path": "env_files",
       "section": "env_files",
       "picked": [],
-      "options": []
+      "options": [],
+      "optional": false
     },
     {
       "kind": "hooks",

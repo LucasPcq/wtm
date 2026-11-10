@@ -29,7 +29,8 @@
             "status": "untracked"
           }
         }
-      ]
+      ],
+      "optional": false
     },
     {
       "kind": "select",

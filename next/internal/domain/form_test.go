@@ -82,7 +82,7 @@ func TestAFormIsEncodedWithTheKindOfEachField(t *testing.T) {
 			{"kind": "text_list", "path": "branches", "entries": ["feat/x"], "options": [{"value": "feat/x", "tag": "local"}]},
 			{"kind": "confirm", "path": "keep", "skip": "not asked", "value": false, "no_first": true, "rememberable": false, "remember": false},
 			{"kind": "select", "path": "isolation", "origin": "remembered", "value": "shared", "options": [{"value": "shared", "base": true, "origin": {"ahead": 0, "behind": 2, "state": "behind"}}], "remembered": "shared", "rememberable": true, "remember": false, "refreshable": true, "closed": false},
-			{"kind": "multi_select", "path": "files", "picked": [], "options": [{"value": "a.txt", "change": {"path": "a.txt", "status": "modified"}}]},
+			{"kind": "multi_select", "path": "files", "picked": [], "options": [{"value": "a.txt", "change": {"path": "a.txt", "status": "modified"}}], "optional": false},
 			{"kind": "text", "path": "to", "value": "feat/y"},
 			{"kind": "hooks", "path": "on_create", "origin": "detected", "entries": [{"cmd": "pnpm install"}], "found": [{"cmd": "pnpm install", "file": "pnpm-lock.yaml"}], "dirs": []}
 		],

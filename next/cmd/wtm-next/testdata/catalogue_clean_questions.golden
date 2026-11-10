@@ -10,7 +10,8 @@
         {
           "value": "feat/old"
         }
-      ]
+      ],
+      "optional": false
     },
     {
       "kind": "confirm",

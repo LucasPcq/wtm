@@ -12,7 +12,8 @@
           "value": "main",
           "tag": "current"
         }
-      ]
+      ],
+      "optional": false
     },
     {
       "kind": "select",

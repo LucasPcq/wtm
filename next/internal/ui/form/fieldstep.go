@@ -386,7 +386,11 @@ func (s *MultiSelectStep) Open() tea.Cmd {
 		options = append(options, pick)
 	}
 
-	s.picks = widget.NewMultiSelect(options, words.Empty)
+	empty := words.Empty
+	if field.Optional {
+		empty = ""
+	}
+	s.picks = widget.NewMultiSelect(options, empty)
 	return nil
 }
 

@@ -56,7 +56,8 @@
       "skip": "no_env",
       "section": "env_files",
       "picked": [],
-      "options": []
+      "options": [],
+      "optional": false
     },
     {
       "kind": "hooks",

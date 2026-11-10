@@ -2070,6 +2070,9 @@
         "kind": {
           "const": "multi_select"
         },
+        "optional": {
+          "type": "boolean"
+        },
         "options": {
           "items": {
             "$ref": "#/$defs/domain.Option"
@@ -2099,7 +2102,8 @@
         "kind",
         "path",
         "picked",
-        "options"
+        "options",
+        "optional"
       ],
       "type": "object"
     },
