@@ -1,0 +1,132 @@
+{
+  "branch": "feat/b",
+  "path": "<SB>/acme.trees/feat-b",
+  "mode": "add",
+  "check": true,
+  "files": [
+    {
+      "target": "apps/api/.env",
+      "strategy": "main",
+      "source": "main",
+      "diff": {
+        "mode": "add",
+        "entries": [
+          {
+            "key": "PORT",
+            "status": "resolved",
+            "redacted": true
+          },
+          {
+            "key": "JWT_SECRET",
+            "status": "resolved",
+            "redacted": true
+          },
+          {
+            "key": "MAILER_URL",
+            "status": "resolved",
+            "redacted": true
+          }
+        ]
+      },
+      "applied": false
+    },
+    {
+      "target": "apps/web/.env",
+      "strategy": "main",
+      "source": "main",
+      "diff": {
+        "mode": "add",
+        "entries": [
+          {
+            "key": "PORT",
+            "status": "resolved",
+            "redacted": true
+          },
+          {
+            "key": "API_URL",
+            "status": "resolved",
+            "redacted": true
+          }
+        ]
+      },
+      "applied": false
+    },
+    {
+      "target": "apps/docs/.env",
+      "strategy": "main",
+      "source": "main",
+      "diff": {
+        "mode": "add",
+        "entries": [
+          {
+            "key": "DOCS_TITLE",
+            "status": "resolved",
+            "redacted": true
+          }
+        ]
+      },
+      "applied": false
+    }
+  ],
+  "ports": {
+    "offset": 20,
+    "entries": [
+      {
+        "file": "apps/web/.env",
+        "key": "PORT",
+        "port": "PORT",
+        "base": 24600,
+        "resolved": 24620,
+        "moves": [
+          {
+            "port": "PORT",
+            "job": "web",
+            "base": 24600,
+            "resolved": 24620
+          }
+        ],
+        "addressing": "ports",
+        "status": "unchanged"
+      },
+      {
+        "file": "apps/web/.env",
+        "key": "API_URL",
+        "port": "PORT",
+        "base": 24601,
+        "resolved": 24621,
+        "moves": [
+          {
+            "port": "PORT",
+            "job": "api",
+            "base": 24601,
+            "resolved": 24621,
+            "origin": "http://api.feat-b.acme.localhost:24602"
+          }
+        ],
+        "addressing": "names",
+        "status": "unchanged"
+      },
+      {
+        "file": "apps/api/.env",
+        "key": "PORT",
+        "port": "PORT",
+        "base": 24601,
+        "resolved": 24621,
+        "moves": [
+          {
+            "port": "PORT",
+            "job": "api",
+            "base": 24601,
+            "resolved": 24621
+          }
+        ],
+        "addressing": "ports",
+        "status": "unchanged"
+      }
+    ],
+    "addressing": "names",
+    "public_port": 24602,
+    "applied": false
+  },
+  "isolation": "isolated"
+}

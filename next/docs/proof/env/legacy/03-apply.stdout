@@ -1,0 +1,18 @@
+
+  ✓ Settled 2 linked .env value(s).
+
+  Worktree  feat/a
+  Mode      add
+
+  apps/api/.env   strategy: main  ·  source: main
+  − OLD  orphan — in no source
+
+  apps/web/.env   strategy: main  ·  source: main
+  ✓ no key to reconcile — its linked values were settled
+
+  apps/docs/.env   strategy: main  ·  source: main
+  = in sync — nothing to reconcile
+
+  Addresses carry the proxy's port
+    Written with :24602 — `wtm run proxy install` serves them on port 80, then `wtm env` drops it
+

@@ -1,0 +1,22 @@
+
+  Step 8/8 • Confirm
+
+  ✓ Worktrees: feat/billing
+  · All — set by its flag only
+  · Values from — set by its flag only
+  · Overwrite — every key matches its source
+  ✓ Prune: kept
+  · Isolation — set by its flag only
+  · Show values — set by its flag only
+
+  ┃  Review & confirm
+  ┃
+  ┃  feat/billing  apps/api/.env + JWT_SECRET
+  ┃                apps/web/.env PORT → 3020
+  ┃                apps/api/.env OLD left: in no source
+
+▌› Yes, reconcile feat/billing
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   No, cancel
+
+  ↑↓ navigate • / filter • enter confirm • esc back

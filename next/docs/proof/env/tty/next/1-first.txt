@@ -1,0 +1,15 @@
+$ wtm env; echo EXIT=$?
+
+  Step 1/8 • Worktrees
+
+  The worktrees to reconcile, by branch or by path; those out of step and the one you stand in are
+  checked
+
+▌› [ ] main — in step                                                                         main
+   [x] feat/a — 2 changes                                                                  current
+   [x] feat/b — 1 change
+   [ ] feat/c — in step
+   [ ] feat/p — in step
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc cancel
+

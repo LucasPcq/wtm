@@ -1,0 +1,20 @@
+=== 00-before: exit legacy , next 
+=== 01-preview: exit legacy 18, next 0
+=== 02-preview-json: exit legacy 18, next 0
+=== 03-apply: exit legacy 0, next 0
+=== 04-preview-after-apply: exit legacy 18, next 0
+=== 05-overwrite: exit legacy 0, next 0
+=== 06-prune: exit legacy 0, next 0
+=== 07-no-worktree-no-terminal: exit legacy 1, next 0
+=== 08-pending: exit legacy 0, next 0
+=== 09-pending-isolated: exit legacy 0, next 0
+=== 10-verbatim: exit legacy 0, next 0
+=== 11-main-isolation: exit legacy 1, next 2
+=== 12-unknown: exit legacy 1, next 2
+=== 13-json: exit legacy 0, next 0
+=== 14-show-values: exit legacy 0, next 0
+=== 15-show-json: exit legacy 0, next 0
+=== 16-quiet: exit legacy 0, next 0
+=== 17-all: exit legacy 0, next 0
+=== 18-hand-set-port: exit legacy 0, next 0
+=== 19-from-main-none-named: exit legacy 0, next 0

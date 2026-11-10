@@ -1,0 +1,26 @@
+$ wtm env; echo EXIT=$?
+
+  Step 5/5 • Review & apply
+
+  ✓ Select worktree: main
+  ⊘ Isolation — the main checkout is always isolated
+  ✓ Addressing: kept as is
+  ✓ Resolve: reviewed
+
+  ┃  Review & confirm
+  ┃
+  ┃  Worktree:  main
+  ┃  Mode:      add
+  ┃  Env:       example
+  ┃  Addresses: ports (unchanged)
+  ┃
+  ┃  apps/api/.env:
+  ┃    JWT_SECRET  keep "s3cret"
+  ┃    MAILER_URL  keep "http://localhost:8025"
+
+▌▸ Yes, apply
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+   No, cancel
+
+  ↑↓ navigate • / filter • enter confirm • esc back
+

@@ -1,0 +1,75 @@
+{
+  "v": 2,
+  "command": "env",
+  "ok": true,
+  "op": "<OP>",
+  "items": [
+    {
+      "subject": "feat/c",
+      "status": "done",
+      "reason": "unchanged",
+      "detail": {}
+    }
+  ],
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "feat/c",
+        "path": "<SB>/acme.trees/feat-c",
+        "main": false,
+        "missing": false,
+        "strategy": "example",
+        "isolation": "verbatim",
+        "pending": false,
+        "numbered": true,
+        "files": [
+          {
+            "target": "apps/api/.env",
+            "created": false,
+            "keys": [],
+            "writes": false
+          },
+          {
+            "target": "apps/web/.env",
+            "created": false,
+            "keys": [],
+            "writes": false
+          },
+          {
+            "target": "apps/docs/.env",
+            "created": false,
+            "keys": [],
+            "writes": false
+          }
+        ],
+        "ports": {
+          "offset": 0,
+          "entries": null,
+          "addressing": "",
+          "applied": false
+        },
+        "restart": []
+      }
+    ],
+    "overwrite": false,
+    "prune": false,
+    "show_values": false,
+    "recap": [
+      {
+        "key": "in_step",
+        "label": "In step",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "feat/c",
+            "note": "in_step",
+            "text": "feat/c"
+          }
+        ]
+      }
+    ],
+    "empty": true
+  },
+  "follow_ups": [],
+  "warnings": []
+}

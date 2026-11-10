@@ -1,0 +1,7 @@
+
+  = env: 5 unchanged
+
+  main     apps/api/.env  JWT_SECRET left: in no source
+           apps/api/.env  MAILER_URL left: in no source
+  In step  feat/a, feat/b, feat/c, feat/p
+

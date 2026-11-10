@@ -111,7 +111,7 @@ func TestEachFollowUpOfAMigratedCommandIsSpelledFromItsSchema(t *testing.T) {
 			continue
 		}
 
-		require.Contains(t, []string{clean.Name, prune.Name, exec.Name, domain.CommandSync, runup.Name, runlogs.Name, rundown.Name, runstart.Name, runstop.Name, daemonrestart.Name}, followUp.Command, "%s has migrated: spell its follow-ups from its schema in commandLine", followUp.Command)
+		require.Contains(t, []string{clean.Name, prune.Name, exec.Name, domain.CommandSync, domain.CommandEnv, runup.Name, runlogs.Name, rundown.Name, runstart.Name, runstop.Name, daemonrestart.Name}, followUp.Command, "%s has migrated: spell its follow-ups from its schema in commandLine", followUp.Command)
 		argv := commandLine(followUp)
 		assert.Equal(t, append([]string{cli.Program}, strings.Fields(spelling(followUp.Command))...), argv[:min(1+len(strings.Fields(spelling(followUp.Command))), len(argv))], "%s's follow-up %v does not fold into its request", followUp.Command, followUp.Answers)
 	}

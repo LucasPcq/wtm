@@ -77,7 +77,10 @@
                 "kind": "service",
                 "hold": "own",
                 "fate": "stop",
-                "shared_in": "<root>/acme"
+                "shared_in": "<root>/acme",
+                "held_by": [
+                  "feat/a"
+                ]
               },
               {
                 "name": "stack",

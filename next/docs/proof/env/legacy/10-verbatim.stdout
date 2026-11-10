@@ -1,0 +1,17 @@
+
+  ✓ Now verbatim — 3 value(s) wtm owns back to the source's.
+
+  Worktree   feat/c
+  Mode       add
+  Isolation  verbatim — .env kept as copied
+
+  apps/api/.env   strategy: example  ·  source: template
+  ~ PORT  back to the source's :24601
+
+  apps/web/.env   strategy: example  ·  source: template
+  ~ PORT     back to the source's :24600
+  ~ API_URL  back to the source's value
+
+  apps/docs/.env   strategy: example  ·  source: template
+  = in sync — nothing to reconcile
+

@@ -1,0 +1,23 @@
+{
+  "v": 2,
+  "command": "env-show",
+  "ok": true,
+  "items": [
+    {
+      "subject": "main",
+      "status": "done",
+      "detail": {
+        "worktree": "main",
+        "path": "<root>/main",
+        "main": true,
+        "strategy": "example",
+        "isolation": "isolated",
+        "pending": false,
+        "apps": [],
+        "checks": []
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": []
+}

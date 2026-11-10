@@ -1,0 +1,15 @@
+
+  Step 5/8 • Prune
+
+  ✓ Worktrees: feat/billing
+  · All — set by its flag only
+  · Values from — set by its flag only
+  · Overwrite — every key matches its source
+
+  This key is in no source:
+    feat/billing  apps/api/.env  OLD
+
+▌› No, keep it
+   Yes, drop it
+
+  ↑↓ navigate • / filter • enter confirm • esc back

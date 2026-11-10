@@ -5,6 +5,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 
+	"github.com/LucasPcq/wtm/next/internal/domain/dotenv"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 )
@@ -55,4 +56,9 @@ type Ancestors interface {
 // MetaWriter rewrites a worktree's meta record by its branch.
 type MetaWriter interface {
 	Update(ctx context.Context, update worktree.MetaUpdate) (domain.Written, error)
+}
+
+// EnvReader reads a .env file, none when it does not exist.
+type EnvReader interface {
+	Read(path string) ([]dotenv.Line, error)
 }

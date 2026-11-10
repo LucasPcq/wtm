@@ -16,6 +16,7 @@ $ api $U/api/repos/$A/commands | jq -c ".[] | {name, questions: [.form.fields[]?
 {"name":"clean","questions":["worktree","reparent_children","force","drop_data","keep_data"]}
 {"name":"prune","questions":["worktree","reparent_children","force","drop_data","keep_data","merged","closed","gone","no_fetch"]}
 {"name":"fast-forward","questions":["worktree","all","force","no_fetch"]}
+{"name":"env","questions":["worktree","all","from","overwrite","prune","isolation","show_values"]}
 {"name":"sync","questions":["worktree","all","descendants","force","keep_conflict","ff_parents","push","no_fetch"]}
 {"name":"exec","questions":["worktree","command","all","jobs","print"]}
 {"name":"reparent","questions":["worktree","to"]}
@@ -30,6 +31,7 @@ $ api $U/api/repos/$A/commands | jq -c ".[] | {name, questions: [.form.fields[]?
 {"name":"run-stop","questions":["worktree","job"]}
 {"name":"run-ps","questions":["repo"]}
 {"name":"run-list","questions":["worktree"]}
+{"name":"env-show","questions":["worktree","show_values"]}
 {"name":"daemon-status","questions":[]}
 {"name":"daemon-stop","questions":[]}
 {"name":"daemon-restart","questions":["force"]}

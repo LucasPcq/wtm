@@ -1,0 +1,22 @@
+
+  ! feat/b — 1 key to check
+    MAILER_URL  apps/api/.env  follows nothing: holds an address of this machine
+
+  apps/api  api runs here · 1 of 3 keys follow a job · 1 to check
+    .env  copied from main's
+      KEY         FOLLOWS          IN MAIN                HERE
+      PORT        api's port       24601                  24621
+      JWT_SECRET  copied as it is  s3cret                 s3cret
+      MAILER_URL  follows nothing  http://localhost:8025  http://localhost:8025
+
+  apps/web  web runs here · 2 of 2 keys follow a job
+    .env  copied from main's
+      KEY      FOLLOWS        IN MAIN                 HERE
+      PORT     web's port     24600                   24620
+      API_URL  api's address  http://localhost:24601  http://api.feat-b.acme.localhost:24602
+
+  apps/docs  0 of 1 key follow a job
+    .env  copied from main's
+      KEY         FOLLOWS          IN MAIN  HERE
+      DOCS_TITLE  copied as it is  Acme     Acme
+

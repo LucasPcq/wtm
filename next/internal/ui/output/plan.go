@@ -214,7 +214,7 @@ type DryRunParams struct {
 // DryRun writes the dry run params describes to w: its title, its plan and warnings, its fingerprint, the line that applies it, then what its warnings offer.
 func DryRun(w io.Writer, params DryRunParams) {
 	SectionTitle(w, params.Command+Dot+"dry run, nothing applied")
-	warnings := Messages(params.Warnings)
+	warnings := WarningMessages(params.Warnings)
 	DrawPlan(w, PlanParams{Rows: params.Rows, Warnings: warnings})
 	if len(warnings) > 0 {
 		Blank(w)

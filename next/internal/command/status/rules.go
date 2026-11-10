@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
-	"github.com/LucasPcq/wtm/next/internal/domain/dotenv"
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
@@ -40,18 +39,9 @@ type State struct {
 	Commits  []worktree.Commit
 	Base     *worktree.AheadBehind
 	Lacks    int
-	Env      []EnvRead
+	Env      []env.FileRead
 	Unread   []string
 	Err      error
-}
-
-// An EnvRead is one .env file the project declares, as read for a worktree: the worktree's own copy and what it is rebuilt and compared from, its template, the parent worktree's copy and the main worktree's, each nil when it does not exist.
-type EnvRead struct {
-	File     project.EnvFile
-	Child    []dotenv.Line
-	Template []dotenv.Line
-	Parent   []dotenv.Line
-	Main     []dotenv.Line
 }
 
 // ----------------------------------------------------------------------------
@@ -510,7 +500,7 @@ func (f Facts) envOf(w worktree.Worktree, state State) Env {
 	for _, read := range state.Env {
 		file := EnvFile{Target: read.File.Target, Missing: read.Child == nil}
 		if !file.Missing {
-			parent, main := sourcesOf(strategy, read)
+			parent, main := read.Sources(strategy)
 			file.Keys = env.KeyDrift(env.DriftParams{Child: read.Child, Template: read.Template, Parent: parent, Main: main, Owned: env.Owned(f.Run, read.File.Target)})
 		}
 		files = append(files, file)
@@ -522,20 +512,6 @@ func (f Facts) envOf(w worktree.Worktree, state State) Env {
 // strategy is where w's .env files come from: its record's strategy, else the project's, else the default.
 func (f Facts) strategy(w worktree.Worktree) project.EnvStrategy {
 	return cmp.Or(f.Records[w.Branch()].EnvStrategy, f.Config.Env.Strategy, project.DefaultEnvStrategy)
-}
-
-// sourcesOf are the copies a file's values come from under strategy: none with the template's, the main worktree's, or the parent's when it has one, else the main's.
-func sourcesOf(strategy project.EnvStrategy, read EnvRead) (parent, main []dotenv.Line) {
-	switch {
-	case strategy == project.EnvMain:
-		return nil, read.Main
-	case strategy == project.EnvParent && read.Parent != nil:
-		return read.Parent, nil
-	case strategy == project.EnvParent:
-		return nil, read.Main
-	}
-
-	return nil, nil
 }
 
 // missing are the declared .env files w lacks, each with what rebuilds it.
@@ -552,8 +528,8 @@ func (f Facts) missing(w worktree.Worktree, state State) []Missing {
 }
 
 // rebuildFrom is what a missing file is rebuilt from: the worktree's own source when it has a copy, else the template, else the main worktree's copy, else nothing.
-func rebuildFrom(strategy project.EnvStrategy, read EnvRead) Rebuild {
-	parent, main := sourcesOf(strategy, read)
+func rebuildFrom(strategy project.EnvStrategy, read env.FileRead) Rebuild {
+	parent, main := read.Sources(strategy)
 	switch {
 	case strategy == project.EnvExample && read.Template != nil, parent != nil, main != nil:
 		return FromSource

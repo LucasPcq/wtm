@@ -93,3 +93,14 @@ func TestGoingBackForgetsTheAnswerOfEachStepLeftAndKeepsTheOneReturnedTo(t *test
 	assert.Equal(t, atFrom, d.Wizard.Current())
 	assert.Equal(t, request{"branches": {"feat/a"}, "from": {"main"}}, s.Request())
 }
+
+func TestAMultiSelectOpensOnThePickItOffersAPersonAndNamesIt(t *testing.T) {
+	given := request{"branches": {"feat/a"}, "from": {"main"}, "mode": {"fast"}, "ff": {"false"}, "keep": {"false"}, "offered": {"b.txt"}}
+	d, s := asking(t, &app{}, given)
+
+	assert.Contains(t, d.Screen(), "[ ] a.txt")
+	assert.Contains(t, d.Screen(), "[x] b.txt")
+	d.Keys("enter")
+
+	assert.Equal(t, []string{"b.txt"}, s.Request()["files"], "the pick offered is named: none would run the default pick")
+}

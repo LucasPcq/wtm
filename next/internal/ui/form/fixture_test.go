@@ -143,9 +143,18 @@ func (q questions) Form() domain.Form {
 		domain.SelectField{FieldSpec: domain.FieldSpec{Path: "mode"}, Value: one("mode"), Options: []domain.Option{{Value: "fast"}, {Value: "slow"}}, Remembered: q.remembered, Rememberable: true, Remember: slices.Contains(q.req[domain.PathRemember], "mode")},
 		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: "ff"}, Value: one("ff") == "true", Rememberable: true},
 		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: "keep"}, Value: one("keep") == "true", NoFirst: true},
-		domain.MultiSelectField{FieldSpec: domain.FieldSpec{Path: "files"}, Picked: q.req["files"], Options: []domain.Option{{Value: "a.txt"}, {Value: "b.txt"}}},
+		filesField(q.req),
 		domain.TextField{FieldSpec: domain.FieldSpec{Path: "name", Skip: domain.Skip(one("unworded"))}, Value: one("name")},
 	}}
+}
+
+// filesField is the files' question: those given, else, when the request offers some (its "offered", no field of the form), none picked by default and those offered to a person.
+func filesField(req request) domain.MultiSelectField {
+	field := domain.MultiSelectField{FieldSpec: domain.FieldSpec{Path: "files"}, Picked: req["files"], Options: []domain.Option{{Value: "a.txt"}, {Value: "b.txt"}}}
+	if req["files"] == nil && req["offered"] != nil {
+		field.Origin, field.Prechecked = domain.OriginDefault, req["offered"]
+	}
+	return field
 }
 
 // fakeWords are how the command line words the fake command's fields.

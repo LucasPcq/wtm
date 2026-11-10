@@ -1,0 +1,6 @@
+
+  env · dry run, nothing applied
+  feat/a  apps/api/.env  OLD left: in no source
+  fingerprint  <FP>
+  → wtm-next env feat/a --expect-fingerprint <FP>   apply this plan
+

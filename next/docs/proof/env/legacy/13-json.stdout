@@ -1,0 +1,61 @@
+{
+  "branch": "feat/c",
+  "path": "<SB>/acme.trees/feat-c",
+  "mode": "add",
+  "check": false,
+  "files": [
+    {
+      "target": "apps/api/.env",
+      "strategy": "example",
+      "source": "template",
+      "diff": {
+        "mode": "add",
+        "entries": [
+          {
+            "key": "PORT",
+            "status": "resolved",
+            "redacted": true
+          }
+        ]
+      },
+      "applied": false
+    },
+    {
+      "target": "apps/web/.env",
+      "strategy": "example",
+      "source": "template",
+      "diff": {
+        "mode": "add",
+        "entries": [
+          {
+            "key": "PORT",
+            "status": "resolved",
+            "redacted": true
+          },
+          {
+            "key": "API_URL",
+            "status": "resolved",
+            "redacted": true
+          }
+        ]
+      },
+      "applied": false
+    },
+    {
+      "target": "apps/docs/.env",
+      "strategy": "example",
+      "source": "template",
+      "diff": {
+        "mode": "add",
+        "entries": [
+          {
+            "key": "DOCS_TITLE",
+            "status": "resolved"
+          }
+        ]
+      },
+      "applied": false
+    }
+  ],
+  "isolation": "verbatim"
+}

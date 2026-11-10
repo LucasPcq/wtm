@@ -99,3 +99,60 @@ func joinList(elements []listElement) string {
 	}
 	return strings.Join(parts, ",")
 }
+
+// hasLoopbackOrigin reports whether value holds an http url to this machine.
+func hasLoopbackOrigin(value string) bool {
+	for _, element := range splitList(value) {
+		if _, authority, ok := splitOrigin(element.value); ok {
+			if host, _ := splitHostPort(authority); isLoopbackHost(host) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// passwordParams are the query parameters that carry a password, whose values WithoutCredentials masks.
+var passwordParams = []string{"password", "passwd", "pwd", "secret", "token"}
+
+// WithoutCredentials returns value with the user and password of each url in it masked, and the value of each query parameter that carries a password: what wtm writes is the port or the address, never the credentials beside them.
+func WithoutCredentials(value string) string {
+	masked, rest := "", value
+	for {
+		at := strings.Index(rest, schemeSeparator)
+		if at < 0 {
+			return maskedParams(masked + rest)
+		}
+		masked, rest = masked+rest[:at+len(schemeSeparator)], rest[at+len(schemeSeparator):]
+		// a password may hold / ? # or a comma: its url's userinfo ends at the last @ before the next url or a space
+		end := len(rest)
+		if next := strings.Index(rest, schemeSeparator); next >= 0 {
+			end = next
+		}
+		if space := strings.IndexAny(rest[:end], " \t"); space >= 0 {
+			end = space
+		}
+		if user := strings.LastIndex(rest[:end], "@"); user >= 0 {
+			masked, rest = masked+"•••", rest[user:]
+		}
+	}
+}
+
+// maskedParams returns value with the value of each password parameter of its query strings masked.
+func maskedParams(value string) string {
+	for _, name := range passwordParams {
+		for _, sep := range []string{"?", "&"} {
+			key := sep + name + "="
+			for at := 0; at+len(key) <= len(value); at++ {
+				// matched on the value's own bytes: lowering it could change its length
+				if !strings.EqualFold(value[at:at+len(key)], key) {
+					continue
+				}
+				start := at + len(key)
+				end := start + strings.IndexAny(value[start:]+"&", "&#, ")
+				value = value[:start] + "•••" + value[end:]
+			}
+		}
+	}
+	return value
+}

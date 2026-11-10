@@ -50,11 +50,13 @@ const (
 	SkipAlone           Skip = "alone"            // no other worktree runs jobs: nothing to keep or stop
 	SkipConfigured      Skip = "configured"       // run.toml answers it
 	SkipTask            Skip = "task"             // the job is a task: it binds no port and is gone once done, nothing to keep or stop
+	SkipNoKeyConflict   Skip = "no_key_conflict"  // no .env key asked holds another value than its source's
+	SkipNoKeyOrphan     Skip = "no_key_orphan"    // no .env key asked is in no source
 )
 
 // Skips returns every Skip.
 func Skips() []Skip {
-	return []Skip{SkipFlagOnly, SkipExists, SkipNotBehind, SkipHeld, SkipRunUnread, SkipNothingIsolated, SkipNoConflict, SkipAll, SkipNoOrphan, SkipSafe, SkipNoDataOwed, SkipNoCandidate, SkipNoDescendant, SkipNoRebase, SkipNothingToPush, SkipOneProfile, SkipAlone, SkipConfigured, SkipTask}
+	return []Skip{SkipFlagOnly, SkipExists, SkipNotBehind, SkipHeld, SkipRunUnread, SkipNothingIsolated, SkipNoConflict, SkipAll, SkipNoOrphan, SkipSafe, SkipNoDataOwed, SkipNoCandidate, SkipNoDescendant, SkipNoRebase, SkipNothingToPush, SkipOneProfile, SkipAlone, SkipConfigured, SkipTask, SkipNoKeyConflict, SkipNoKeyOrphan}
 }
 
 // Answer is the value a question settled on, and where that value came from.
@@ -86,6 +88,8 @@ type Option struct {
 	RunningIn []string              `json:"running_in,omitempty"`   // the worktrees picked whose jobs up a profile started, or that a job is up in
 	Kind      project.JobKind       `json:"kind,omitempty"`         // a job's kind
 	Problem   *FieldError           `json:"problem,omitempty"`      // the problem picking it raises, nil when it raises none
+	OutOfStep int                   `json:"out_of_step,omitempty"`  // the changes reconciling a worktree's .env files makes
+	Isolation project.Isolation     `json:"isolation,omitempty"`    // how a worktree runs beside the others, when it is not isolated
 }
 
 // OptionTag is what sets an option apart, as a code each surface words its own way.
