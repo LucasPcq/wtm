@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +16,7 @@ import (
 
 	"github.com/LucasPcq/wtm/next/internal/adapter/webserver"
 	"github.com/LucasPcq/wtm/next/internal/api"
+	"github.com/LucasPcq/wtm/next/internal/domain"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -171,4 +174,19 @@ func TestUISaysWhatToDoWithAServerThatCannotBeAskedToStop(t *testing.T) {
 func TestTheDaemonsLogIsNoneWithNoSocket(t *testing.T) {
 	assert.Empty(t, daemonLogOf(""), "a path of no directory would serve a daemon.log beside the server")
 	assert.Equal(t, filepath.Join("/state", "daemon.log"), daemonLogOf(filepath.Join("/state", "wtm.sock")))
+}
+
+// Review of the web's Add a repository: a path to a file read "doesn't exist" while the file is there.
+func TestAFileIsInNoRepositoryAndAPathToNothingIsMissing(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "README.md")
+	require.NoError(t, os.WriteFile(file, []byte("hi\n"), 0o600))
+
+	_, inFile := locateRepo(t.Context(), file)
+	_, missing := locateRepo(t.Context(), filepath.Join(dir, "gone"))
+
+	refused, ok := errors.AsType[*domain.Error](inFile)
+	require.True(t, ok, "locateRepo(file) = %v, want a *domain.Error", inFile)
+	assert.Equal(t, domain.CodeNotARepository, refused.Code)
+	assert.ErrorIs(t, missing, fs.ErrNotExist)
 }

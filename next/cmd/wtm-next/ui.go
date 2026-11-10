@@ -233,8 +233,12 @@ func ensureServer(ctx context.Context, idle time.Duration) (webserver.Record, er
 
 // locateRepo is the repository of path for the web server, and whether wtm is set up in it.
 func locateRepo(ctx context.Context, path string) (web.Located, error) {
-	if info, err := os.Stat(path); err != nil || !info.IsDir() {
+	info, err := os.Stat(path)
+	if err != nil {
 		return web.Located{}, fmt.Errorf("%s: %w", path, fs.ErrNotExist)
+	}
+	if !info.IsDir() {
+		return web.Located{}, &domain.Error{Kind: domain.KindPrecondition, Code: domain.CodeNotARepository, Message: path + " is a file, not a folder"}
 	}
 	params, err := locate(ctx, path)
 	if err != nil {
