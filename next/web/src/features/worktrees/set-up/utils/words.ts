@@ -59,3 +59,14 @@ export const foundLine = (files: string[]) => {
 }
 
 export const hooksRun = 'A hook that fails stops the creation, or the removal, unless it is set to go on.'
+
+// what a screen reader hears while a hook is dragged: its command and its place, never the row's inner id
+const named = (cmd: string | undefined) => cmd || 'This command'
+export const dragWords = {
+  instructions:
+    'To move a command, press space or enter, move it with the arrow keys, then press space or enter to drop it.',
+  picked: (cmd: string | undefined, at: number, of: number) => `Picked up ${named(cmd)}, ${at} of ${of}.`,
+  over: (cmd: string | undefined, at: number, of: number) => `${named(cmd)} moved to ${at} of ${of}.`,
+  dropped: (cmd: string | undefined, at: number, of: number) => `${named(cmd)} dropped at ${at} of ${of}.`,
+  back: (cmd: string | undefined, at: number, of: number) => `${named(cmd)} put back at ${at} of ${of}.`,
+}

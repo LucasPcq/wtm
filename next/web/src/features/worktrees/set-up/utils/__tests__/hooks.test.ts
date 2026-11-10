@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { changed, foundIn, hookOf, moved } from '@/features/worktrees/set-up/utils/hooks'
+import { changed, dropped, foundIn, hookOf, moved } from '@/features/worktrees/set-up/utils/hooks'
 
 test('a hook reads back from its answer: a command alone, or the JSON of one that runs in a folder or goes on', () => {
   expect(hookOf('pnpm install')).toEqual({ cmd: 'pnpm install' })
@@ -34,4 +34,13 @@ test('the files hooks were found in are listed once each', () => {
   ]
 
   expect(foundIn(found)).toEqual(['pnpm-lock.yaml', 'docker-compose.yml'])
+})
+
+test('a drop moves the hook where it lands, and a drag cancelled, off the list or back to its place changes nothing', () => {
+  const values = ['a', 'b', 'c']
+
+  expect(dropped(values, { canceled: false, from: 0, to: 2 })).toEqual(['b', 'c', 'a'])
+  expect(dropped(values, { canceled: true, from: 0, to: 2 })).toBeUndefined()
+  expect(dropped(values, { canceled: false, from: 0, to: undefined })).toBeUndefined()
+  expect(dropped(values, { canceled: false, from: 1, to: 1 })).toBeUndefined()
 })

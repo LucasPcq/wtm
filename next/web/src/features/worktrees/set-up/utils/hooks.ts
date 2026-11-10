@@ -27,3 +27,11 @@ export const moved = <T>(values: T[], from: number, to: number) => {
 
 // the files the repository suggests its hooks from, each once, in the order found
 export const foundIn = (found: ProjectFoundHook[]) => [...new Set(found.map((hook) => hook.file))]
+
+export type Drop = { canceled: boolean; from: number | undefined; to: number | undefined }
+
+// the list once a row is dropped: unchanged when the drag was cancelled, left no list's place, or came back to its own
+export function dropped(values: string[], { canceled, from, to }: Drop): string[] | undefined {
+  if (canceled || from === undefined || to === undefined || from === to) return undefined
+  return moved(values, from, to)
+}

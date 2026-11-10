@@ -1,3 +1,4 @@
+import { Accessibility } from '@dnd-kit/dom'
 import { SortableKeyboardPlugin } from '@dnd-kit/dom/sortable'
 import { DragDropProvider, KeyboardSensor, PointerSensor } from '@dnd-kit/react'
 import { isSortable, useSortable } from '@dnd-kit/react/sortable'
@@ -6,7 +7,11 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { changed, hookOf, moved } from '@/features/worktrees/set-up/utils/hooks'
+import { changed, dropped, hookOf } from '@/features/worktrees/set-up/utils/hooks'
+import { dragWords } from '@/features/worktrees/set-up/utils/words'
+
+type AccessibilityOptions = NonNullable<ConstructorParameters<typeof Accessibility>[1]>
+type Operation = Parameters<NonNullable<AccessibilityOptions['announcements']>['dragend']>[0]['operation']
 
 // a Select item cannot be the empty string: the root, where a hook runs with no cwd, is this value
 const root = '.'
@@ -24,13 +29,38 @@ export function HookList({
   dirs: string[]
   onChange: (values: string[]) => void
 }) {
+  const of = values.length
+  const fromOf = ({ source }: Operation) => (isSortable(source) ? source.index : undefined)
+  const toOf = ({ target }: Operation) => (isSortable(target) ? target.index : undefined)
+  const commandOf = (index: number | undefined) => (index === undefined ? undefined : hookOf(values[index] ?? '').cmd)
+  const options: AccessibilityOptions = {
+    screenReaderInstructions: { draggable: dragWords.instructions },
+    announcements: {
+      dragstart: ({ operation }) => {
+        const at = fromOf(operation) ?? 0
+        return dragWords.picked(commandOf(at), at + 1, of)
+      },
+      dragover: ({ operation }) => {
+        const to = toOf(operation)
+        if (to === undefined) return undefined
+        return dragWords.over(commandOf(fromOf(operation)), to + 1, of)
+      },
+      dragend: ({ canceled, operation }) => {
+        const from = fromOf(operation) ?? 0
+        const to = toOf(operation)
+        if (canceled || to === undefined) return dragWords.back(commandOf(from), from + 1, of)
+        return dragWords.dropped(commandOf(from), to + 1, of)
+      },
+    },
+  }
+
   return (
     <DragDropProvider
       sensors={[PointerSensor, KeyboardSensor]}
+      plugins={(defaults) => [...defaults, Accessibility.configure(options)]}
       onDragEnd={({ canceled, operation }) => {
-        const { source, target } = operation
-        if (canceled || !isSortable(source) || !isSortable(target) || source.index === target.index) return
-        onChange(moved(values, source.index, target.index))
+        const next = dropped(values, { canceled, from: fromOf(operation), to: toOf(operation) })
+        if (next) onChange(next)
       }}
     >
       <ul id={id} aria-label={label} className="divide-y rounded-lg border">

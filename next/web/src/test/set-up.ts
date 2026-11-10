@@ -156,6 +156,7 @@ export const places: Record<string, WebPlace> = {
     name: 'billing-api',
   },
   '/tmp/notes': { path: '/tmp/notes', state: 'not_a_repository' },
+  '/acme/README.md': { path: '/acme/README.md', state: 'not_a_folder' },
   '/Users/me/dev/payments': {
     path: '/Users/me/dev/payments',
     state: 'set_up',

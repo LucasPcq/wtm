@@ -23,6 +23,7 @@ test('each path typed is answered under the field, and the primary says what it 
   const path = within(dialog).getByRole('textbox', { name: 'Path' })
   const cases = [
     { typed: '/tmp/notes', line: 'Not a git repository: there is no .git in /tmp/notes.', primary: 'Add', off: true },
+    { typed: '/acme/README.md', line: '/acme/README.md is a file, not a folder.', primary: 'Add', off: true },
     {
       typed: '/Users/me/dev/payments',
       line: "payments is set up already: it's added as it is.",
@@ -66,4 +67,13 @@ test('an add the server refused is forgotten once another path is typed', async 
   await user.type(path, 'x')
 
   await waitFor(() => expect(within(dialog).queryByText('the server is stopping')).toBeNull())
+})
+
+test('an address that points nowhere offers to add its repository again', async () => {
+  const { user } = await renderApp('/r/gone/worktrees')
+
+  expect(await screen.findByText("This repository isn't here")).toBeDefined()
+  await user.click(screen.getByRole('button', { name: 'Add a repository' }))
+
+  expect(await screen.findByRole('dialog', { name: 'Add a repository' })).toBeDefined()
 })

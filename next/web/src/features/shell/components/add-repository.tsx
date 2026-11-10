@@ -3,7 +3,6 @@ import { useNavigate } from '@tanstack/react-router'
 import { CircleCheck, CircleX, Loader2 } from 'lucide-react'
 import { useDeferredValue, useState } from 'react'
 import { addRepo, placeQuery, reposQuery } from '@/api/queries/repos'
-import type { WebPlace } from '@/api/types.gen'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -15,24 +14,7 @@ import {
 } from '@/components/ui/dialog'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-
-type Answer = { ok: boolean; line: string; primary?: string }
-
-// what the server found at the path, and the one thing to do with it
-const answerOf = (place: WebPlace): Answer => {
-  switch (place.state) {
-    case 'missing':
-      return { ok: false, line: `Nothing is there: ${place.path} doesn't exist.` }
-    case 'not_a_repository':
-      return { ok: false, line: `Not a git repository: there is no .git in ${place.path}.` }
-    case 'not_set_up':
-      return { ok: true, line: 'A git repository, not set up yet.', primary: `Set up ${place.name}` }
-    case 'set_up':
-      return { ok: true, line: `${place.name} is set up already: it's added as it is.`, primary: `Add ${place.name}` }
-    case 'known':
-      return { ok: true, line: `${place.name} is already here.`, primary: `Open ${place.name}` }
-  }
-}
+import { placeAnswer } from '@/features/shell/utils/words'
 
 export function AddRepository({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const client = useQueryClient()
@@ -54,7 +36,7 @@ export function AddRepository({ open, onOpenChange }: { open: boolean; onOpenCha
     },
   })
 
-  const answer = place.data && !place.isError && path !== '' ? answerOf(place.data) : undefined
+  const answer = place.data && !place.isError && path !== '' ? placeAnswer[place.data.state](place.data) : undefined
   const failure = add.error?.message ?? place.error?.message
 
   return (
