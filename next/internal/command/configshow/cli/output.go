@@ -20,9 +20,10 @@ func drawShow(w io.Writer, read configshow.Outcome, _ configshow.Request, view o
 	if len(read.Items) == 1 && read.Items[0].Detail != nil {
 		drawDocument(w, *read.Items[0].Detail, read.Warnings)
 	}
+	steps := output.WarningSteps(read.Warnings, view.CommandLine)
 	read.Warnings = slices.DeleteFunc(slices.Clone(read.Warnings), func(warning domain.Warning) bool { return warning.Code == configshow.CodeInvalidValue })
 	output.ReadEnd(w, read)
-	if steps := output.WarningSteps(read.Warnings, view.CommandLine); len(steps) > 0 {
+	if len(steps) > 0 {
 		output.Blank(w)
 		output.NextSteps(w, steps)
 	}
@@ -85,6 +86,11 @@ func drawDocument(w io.Writer, d configshow.Detail, warnings []domain.Warning) {
 	var rows [][]string
 	for _, answer := range d.Remembered {
 		rows = append(rows, []string{pad(cmp.Or(remembered[answer.Question], answer.Question)), answer.Value})
+		for _, warning := range warnings {
+			if answer.Problem != nil && warning.Code == configshow.CodeInvalidValue && warning.Params["path"] == answer.Problem.Path {
+				rows = append(rows, []string{"", st.Warning.Render(output.GlyphAttention) + " " + warning.Message})
+			}
+		}
 	}
 	output.Columns(w, rows)
 }

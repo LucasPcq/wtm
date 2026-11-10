@@ -1,14 +1,17 @@
 import { BookmarkCheck } from 'lucide-react'
-import type { ConfigshowRemembered } from '@/api/types.gen'
+import type { ConfigshowRemembered, DomainFollowUp } from '@/api/types.gen'
 import { Button } from '@/components/ui/button'
-import { rememberedWords } from '@/features/worktrees/settings/utils/words'
+import { CommandLine } from '@/features/worktrees/components/command-line'
+import { rememberedProblem, rememberedWords } from '@/features/worktrees/settings/utils/words'
 
 export function RememberedAnswers({
   remembered,
+  edit,
   disabled,
   onForget,
 }: {
   remembered: ConfigshowRemembered[]
+  edit: DomainFollowUp
   disabled: boolean
   onForget: (answer: ConfigshowRemembered) => void
 }) {
@@ -26,9 +29,17 @@ export function RememberedAnswers({
             <BookmarkCheck className="mt-0.5 size-4 text-muted-foreground" aria-hidden="true" />
             <div className="flex min-w-0 flex-col gap-1">
               <span className="text-sm font-medium">{said}</span>
-              <span className="text-sm text-muted-foreground">
-                Create doesn't ask it. Forget it and Create asks again.
-              </span>
+              {answer.problem ? (
+                <>
+                  <span className="text-sm text-destructive">{rememberedProblem(answer.problem)}</span>
+                  <span className="text-sm text-muted-foreground">Forget it, or fix it in your editor:</span>
+                  <CommandLine followUp={edit} look="inline" />
+                </>
+              ) : (
+                <span className="text-sm text-muted-foreground">
+                  Create doesn't ask it. Forget it and Create asks again.
+                </span>
+              )}
             </div>
             <Button
               variant="outline"

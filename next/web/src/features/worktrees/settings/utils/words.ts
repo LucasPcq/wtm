@@ -102,6 +102,16 @@ export function problemLine(problem: DomainFieldError): { fact: string; conseque
   )
 }
 
+// a remembered answer's problem in the screen's words where it has some, else the core's message
+export function rememberedProblem(problem: DomainFieldError): string {
+  const value = String(problem.params?.value ?? '')
+  const words: Record<string, string> = {
+    remembered_unknown: 'No question remembers an answer under this name.',
+    remembered_not_allowed: `“${value}” is no answer this question can remember.`,
+  }
+  return words[problemSuffix(problem.code)] ?? problem.message
+}
+
 export const refusalWords = {
   notFound: { title: 'No settings yet', line: 'Set wtm up in this repository: init asks each setting once.' },
   noParse: {

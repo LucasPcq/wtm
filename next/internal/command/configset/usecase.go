@@ -63,7 +63,7 @@ func (u UseCase) Run(ctx context.Context, req Request, opts domain.RunOptions) (
 	}
 
 	// 3. Fingerprint what would be written, the file it replaces included; a dry run ends here.
-	outcome := Outcome{Op: op.ID, Plan: plan}
+	outcome := Outcome{Op: op.ID, Plan: plan, Warnings: plan.warnings(offered(u.Edit, Name+".edit", "fix it in your editor"))}
 	outcome.Fingerprint, err = operation.Fingerprint(plan.Fingerprinted())
 	if err != nil || opts.DryRun {
 		return outcome, err

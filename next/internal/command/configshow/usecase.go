@@ -50,7 +50,7 @@ func (u UseCase) Run(ctx context.Context, _ Request, _ domain.RunOptions) (Outco
 	}
 
 	// 2. Report it as a document.
-	return Report(facts), nil
+	return Report(facts, offered(u.Edit, Name+".edit", "fix it in your editor")), nil
 }
 
 // ----------------------------------------------------------------------------

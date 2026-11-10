@@ -20,9 +20,10 @@ func TestTheHelpOfConfigShow(t *testing.T) {
 
 func TestConfigShowDrawsTheDocument(t *testing.T) {
 	cases := map[string]world{
-		"document": {Config: acme},
-		"invalid":  {Config: strings.Replace(acme, `strategy = "example"`, `strategy = "copy"`, 1)},
-		"newer":    {Config: strings.Replace(acme, "schema = 1", "schema = 9", 1)},
+		"document":   {Config: acme},
+		"invalid":    {Config: strings.Replace(acme, `strategy = "example"`, `strategy = "copy"`, 1)},
+		"newer":      {Config: strings.Replace(acme, "schema = 1", "schema = 9", 1)},
+		"remembered": {Config: strings.Replace(acme, `env_strategy = "parent"`, `env_strategy = "copy"`, 1)},
 	}
 	for name, w := range cases {
 		t.Run(name, func(t *testing.T) {

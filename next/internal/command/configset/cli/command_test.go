@@ -71,17 +71,17 @@ func TestNoFlagInATerminalAsksEverySetting(t *testing.T) {
 	assert.NotContains(t, d.Screen(), "kept")
 }
 
-// a strategy given over a config.toml that copies no .env file was written with none of the repository's
+// a strategy given over a config.toml that names no .env file was written with none of the repository's
 func TestAProblemTheFlagCreatesOnAnotherSettingNamesItsFlag(t *testing.T) {
-	got := runSet(t, noEnv, "--env-strategy", "main", "--yes")
+	got := runSet(t, noFiles, "--env-strategy", "main", "--yes")
 
 	assert.Equal(t, uicli.ExitUsage, got.Code)
 	assert.Contains(t, got.Stderr, "--env-file")
-	assert.Equal(t, noEnv.Config, written(t))
+	assert.Equal(t, noFiles.Config, written(t))
 }
 
 func TestAKeptStepTheFlagMakesInvalidIsAsked(t *testing.T) {
-	d := wizard(t, noEnv, configset.Request{Given: settings.Given{EnvStrategy: "main"}})
+	d := wizard(t, noFiles, configset.Request{Given: settings.Given{EnvStrategy: "main"}})
 
 	assert.Contains(t, d.Screen(), "Step 4/9")
 	assert.NotContains(t, d.Screen(), "Yes, write config.toml")

@@ -42,11 +42,12 @@ type Default struct {
 	InUse bool   `json:"in_use"`
 }
 
-// A Remembered is an answer config.toml remembers: its question and its value, and the entry config set's remembered field spells it as.
+// A Remembered is an answer config.toml remembers: its question and its value, the entry config set's remembered field spells it as, and the problem it holds, if wtm cannot keep it.
 type Remembered struct {
-	Question string `json:"question"`
-	Value    string `json:"value"`
-	Entry    string `json:"entry"`
+	Question string             `json:"question"`
+	Value    string             `json:"value"`
+	Entry    string             `json:"entry"`
+	Problem  *domain.FieldError `json:"problem,omitempty"`
 }
 
 // ----------------------------------------------------------------------------
@@ -58,8 +59,8 @@ const (
 	CodeConfigNewer  = Name + ".config_newer"
 )
 
-// Report is the read of config.toml: its one item, the document, and a warning per problem it holds.
-func Report(facts Facts) Outcome {
+// Report is the read of config.toml: its one item, the document, and a warning per problem it holds, a remembered answer's followed by edit, the one fix of an answer no question takes.
+func Report(facts Facts, edit *domain.FollowUp) Outcome {
 	questions := settings.NewQuestions(settings.QuestionsParams{Command: Name, Facts: settings.Facts{Saved: &facts.Saved, Branches: facts.Branches}})
 	fields, problems := questions.Fields(), questions.Problems()
 	detail := &Detail{Digest: facts.Saved.Digest, Newer: facts.Saved.Newer(), Settings: domain.Form{Fields: fields, Problems: problems, Sections: domain.SectionsOf(settings.Sections(), fields, problems)}, Remembered: []Remembered{}}
@@ -71,7 +72,11 @@ func Report(facts Facts) Outcome {
 	remembered := facts.Saved.Config.Remembered
 	for _, question := range slices.Sorted(maps.Keys(remembered)) {
 		value := remembered[question]
-		detail.Remembered = append(detail.Remembered, Remembered{Question: question, Value: value, Entry: question + "=" + value})
+		answer := Remembered{Question: question, Value: value, Entry: question + "=" + value}
+		if at := slices.IndexFunc(problems, func(problem domain.FieldError) bool { return problem.Path == settings.PathRemembered+"."+question }); at >= 0 {
+			answer.Problem = &problems[at]
+		}
+		detail.Remembered = append(detail.Remembered, answer)
 	}
 
 	var warnings []domain.Warning
@@ -84,7 +89,11 @@ func Report(facts Facts) Outcome {
 		for key, value := range problem.Params {
 			params[key] = value
 		}
-		warnings = append(warnings, domain.Warning{Code: CodeInvalidValue, Params: params, Message: problem.Message(keyOf(problem.Path))})
+		warning := domain.Warning{Code: CodeInvalidValue, Params: params, Message: problem.Message(keyOf(problem.Path))}
+		if strings.HasPrefix(problem.Path, settings.PathRemembered+".") {
+			warning.FollowUp = edit
+		}
+		warnings = append(warnings, warning)
 	}
 	return Outcome{Items: []Item{{Subject: subject, Status: domain.StatusDone, Detail: detail}}, Warnings: warnings}
 }

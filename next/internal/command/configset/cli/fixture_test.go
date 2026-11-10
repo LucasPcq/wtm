@@ -76,5 +76,5 @@ func (branches) Branches(context.Context) (worktree.Branches, error) {
 	return worktree.Branches{Local: []worktree.Branch{{Name: "main"}, {Name: "develop"}}}, nil
 }
 
-// noEnv is acme's config.toml with no [env]: no .env file copied, while the repository holds apps/api/.env.
-var noEnv = world{Config: strings.Replace(acme, "[env]\nstrategy = \"example\"\n\n[[env.file]]\ntarget = \"apps/api/.env\"\ntemplate = \"apps/api/.env.example\"\n\n[[env.file]]\ntarget = \"apps/web/.env\"\ntemplate = \"apps/web/.env.example\"\n\n", "", 1), Found: []project.EnvFile{{Target: "apps/api/.env"}}}
+// noFiles is acme's config.toml copying .env files from their template, naming none, while the repository holds apps/api/.env.
+var noFiles = world{Config: strings.Replace(acme, "[[env.file]]\ntarget = \"apps/api/.env\"\ntemplate = \"apps/api/.env.example\"\n\n[[env.file]]\ntarget = \"apps/web/.env\"\ntemplate = \"apps/web/.env.example\"\n\n", "", 1), Found: []project.EnvFile{{Target: "apps/api/.env"}}}

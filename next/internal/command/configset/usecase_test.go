@@ -235,9 +235,9 @@ func TestABlankValueIsRefusedNotIgnored(t *testing.T) {
 	assert.Equal(t, domain.CodeRequired, refusal.Fields[0].Code)
 }
 
-// a strategy given over a config.toml that copies no .env file wrote one that copies none of the repository's
+// a strategy given over a config.toml that names no .env file wrote one that copies none of the repository's
 func TestAProblemTheChangeCreatesOnAnotherSettingIsRefused(t *testing.T) {
-	dir := stateDir(t, noEnv)
+	dir := stateDir(t, noFiles)
 	u := usecase(dir, operations())
 	u.Detect = func() project.Detected {
 		return project.Detected{EnvFiles: []project.EnvFile{{Target: "apps/api/.env"}}, Dirs: detected().Dirs}
@@ -249,5 +249,23 @@ func TestAProblemTheChangeCreatesOnAnotherSettingIsRefused(t *testing.T) {
 	require.True(t, ok, "%v", err)
 	require.Len(t, refusal.Fields, 1)
 	assert.Equal(t, settings.PathEnvFiles, refusal.Fields[0].Path)
-	assert.Equal(t, noEnv, read(t, dir))
+	assert.Equal(t, noFiles, read(t, dir))
+}
+
+// config set wrote back a remembered answer wtm cannot keep and said nothing of it
+func TestARememberedAnswerKeptAsItIsWarnsAndOffersTheEdit(t *testing.T) {
+	dir := stateDir(t, strings.Replace(acme, `env_strategy = "parent"`, `env_strategy = "copy"`, 1))
+	u := usecase(dir, operations())
+	u.Edit = &domain.FollowUp{Command: domain.CommandConfigEdit}
+
+	preview, err := u.Run(t.Context(), answered(t, map[string][]string{settings.PathBasePath: {"../wt"}}), domain.RunOptions{DryRun: true})
+
+	require.NoError(t, err)
+	require.Len(t, preview.Warnings, 1)
+	assert.Equal(t, configset.CodeRememberedKept, preview.Warnings[0].Code)
+	require.NotNil(t, preview.Warnings[0].FollowUp)
+	assert.Equal(t, domain.CommandConfigEdit, preview.Warnings[0].FollowUp.Command)
+	forgot, err := u.Run(t.Context(), answered(t, map[string][]string{configset.PathRemembered: {}}), domain.RunOptions{DryRun: true})
+	require.NoError(t, err)
+	assert.Empty(t, forgot.Warnings, "forgetting them leaves none to keep")
 }

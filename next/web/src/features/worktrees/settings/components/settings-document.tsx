@@ -1,5 +1,5 @@
 import { BookmarkCheck } from 'lucide-react'
-import type { ConfigshowDetail, ConfigshowRemembered, DomainField } from '@/api/types.gen'
+import type { ConfigshowDetail, ConfigshowRemembered, DomainField, DomainFollowUp } from '@/api/types.gen'
 import { HookList } from '@/features/worktrees/settings/components/hook-list'
 import { RememberedAnswers } from '@/features/worktrees/settings/components/remembered-answers'
 import { SectionHead } from '@/features/worktrees/settings/components/section-head'
@@ -18,12 +18,14 @@ import {
 
 export function SettingsDocument({
   detail,
+  edit,
   busy,
   onEdit,
   onChoose,
   onForget,
 }: {
   detail: ConfigshowDetail
+  edit: DomainFollowUp
   busy: boolean
   onEdit: (path: SettingPath) => void
   onChoose: (strategy: Strategy) => void
@@ -91,7 +93,12 @@ export function SettingsDocument({
           title="Remembered answers"
           line="Create's questions answered with “Always use this answer”."
         />
-        <RememberedAnswers remembered={detail.remembered ?? []} disabled={busy || detail.newer} onForget={onForget} />
+        <RememberedAnswers
+          remembered={detail.remembered ?? []}
+          edit={edit}
+          disabled={busy || detail.newer}
+          onForget={onForget}
+        />
       </section>
     </div>
   )

@@ -46,6 +46,12 @@
           "values": [
             "example"
           ]
+        },
+        {
+          "path": "replaces",
+          "values": [
+            "<DIGEST>"
+          ]
         }
       ],
       "code": "config-set.undo",

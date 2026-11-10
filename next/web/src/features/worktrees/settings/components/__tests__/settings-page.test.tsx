@@ -228,3 +228,29 @@ test('a list changed by hand since the dialog last opened is the one it opens on
   expect(sent.find(({ path }) => path === 'replaces')?.values).toEqual(['d2'])
   expect(JSON.stringify(sent.find(({ path }) => path === 'on_create')?.values)).toContain('pnpm build')
 })
+
+// a remembered answer wtm cannot keep was listed as if it were one Create uses
+test('a remembered answer that cannot be kept says so and offers the edit', async () => {
+  shows(
+    settingsDetail({
+      remembered: [
+        {
+          question: 'env_strategy',
+          value: 'copy',
+          entry: 'env_strategy=copy',
+          problem: {
+            path: 'remembered.env_strategy',
+            code: 'config-show.remembered_not_allowed',
+            params: { value: 'copy' },
+            flag: '',
+            message: 'wizard.remembered.env_strategy cannot remember copy',
+          },
+        },
+      ],
+    }),
+  )
+  await renderApp('/r/r1/settings')
+
+  expect(await screen.findByText('“copy” is no answer this question can remember.')).toBeTruthy()
+  expect(await screen.findByRole('button', { name: 'Copy wtm config-edit' })).toBeTruthy()
+})

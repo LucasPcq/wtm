@@ -121,6 +121,7 @@ export function SettingsPage({ repo }: { repo: string }) {
       <div className="overflow-y-auto">
         <SettingsDocument
           detail={detail}
+          edit={edit}
           busy={saving}
           onEdit={(path) => setEditing({ path, digest: detail.digest })}
           onChoose={choose}

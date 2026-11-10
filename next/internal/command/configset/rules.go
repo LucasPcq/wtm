@@ -26,6 +26,9 @@ const (
 	CodeConfigNewer   = Name + ".config_newer"
 )
 
+// CodeRememberedKept warns of a remembered answer wtm cannot keep, which a change of other settings writes back as it is.
+const CodeRememberedKept = Name + ".remembered_kept"
+
 // Decide turns the request into the plan: config.toml rewritten with each setting given, refused when the file changed since the request was made on it, and with every problem of the settings it changes or that the change makes; a problem another setting holds on disk already is left to its own change.
 func Decide(facts Facts, req Request) (Plan, error) {
 	if saved := facts.Settings.Saved; saved.Newer() {
@@ -45,6 +48,9 @@ func Decide(facts Facts, req Request) (Plan, error) {
 	}
 
 	plan := Plan{Changes: []Change{}, rewrite: asked.Questions.Rewrite()}
+	if req.Remembered == nil {
+		plan.kept = settings.RememberedProblems(Name, facts.Settings.Saved)
+	}
 	plan.rewrite.Config.Remembered = asked.remembered()
 	plan.Replaces = plan.rewrite.Replaces
 	changed := settings.Changed(was.Document(), asked.Document())
@@ -97,6 +103,7 @@ type Plan struct {
 	Changes  []Change `json:"changes"`
 	Replaces string   `json:"replaces"`
 	rewrite  project.Rewrite
+	kept     []domain.FieldError // the problems of the remembered answers written back as they are
 	domain.Recapped
 }
 
@@ -164,4 +171,14 @@ func (p Plan) undo() *domain.FollowUp {
 		answers = append(answers, domain.Answered{Path: change.Path, Values: change.Before})
 	}
 	return &domain.FollowUp{Command: Name, Answers: answers, Code: CodeUndo, Message: "put back what it held"}
+}
+
+// warnings are the remembered answers wtm cannot keep that the plan writes back, each followed by edit.
+func (p Plan) warnings(edit *domain.FollowUp) []domain.Warning {
+	warnings := make([]domain.Warning, 0, len(p.kept))
+	for _, problem := range p.kept {
+		warnings = append(warnings, domain.Warning{Code: CodeRememberedKept, Params: domain.Params{"path": problem.Path, "problem": problem.Code}, Message: problem.Message("wizard." + problem.Path), FollowUp: edit})
+	}
+
+	return warnings
 }

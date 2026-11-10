@@ -99,3 +99,20 @@ func TestAConfigANewerWtmWroteIsReadAndSaidSo(t *testing.T) {
 	require.Len(t, read.Warnings, 1)
 	assert.Equal(t, configshow.CodeConfigNewer, read.Warnings[0].Code)
 }
+
+// a remembered answer wtm cannot keep was listed with nothing said of it, in the text and on the web
+func TestARememberedAnswerWtmCannotKeepIsShownWithItsProblemAndTheEdit(t *testing.T) {
+	u := usecase(t, strings.Replace(acme, `env_strategy = "parent"`, `env_strategy = "copy"`, 1))
+	u.Edit = &domain.FollowUp{Command: domain.CommandConfigEdit}
+
+	read, err := u.Run(t.Context(), configshow.Request{}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	remembered := read.Items[0].Detail.Remembered
+	require.Len(t, remembered, 1)
+	require.NotNil(t, remembered[0].Problem)
+	assert.Equal(t, configshow.Name+"."+settings.CodeRememberedNotAllowed, remembered[0].Problem.Code)
+	require.Len(t, read.Warnings, 1)
+	require.NotNil(t, read.Warnings[0].FollowUp)
+	assert.Equal(t, domain.CommandConfigEdit, read.Warnings[0].FollowUp.Command)
+}
