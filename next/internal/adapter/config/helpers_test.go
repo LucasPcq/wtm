@@ -80,3 +80,11 @@ func onDisk(t *testing.T, s seed) Project {
 	}
 	return Project{StateDir: stateDir, GlobalPath: filepath.Join(t.TempDir(), "config.toml")}
 }
+
+// withURL is job publishing its first port under host.
+func withURL(job project.Job, host string) project.Job {
+	for name := range job.Ports {
+		job.URL = &project.URL{Port: name, Host: host}
+	}
+	return job
+}

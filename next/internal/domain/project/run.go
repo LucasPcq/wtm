@@ -1,9 +1,25 @@
 package project
 
 import (
+	"errors"
 	"slices"
 	"strings"
 )
+
+// ErrRunChanged refuses a write of run.toml whose file changed on disk since it was read.
+var ErrRunChanged = errors.New("run.toml changed on disk since it was read")
+
+// SavedRun is run.toml as written on disk, an empty Run when there is none, and the digest of its bytes ("" for no file), which a write of it compares with the file as it then stands.
+type SavedRun struct {
+	Run    Run
+	Digest string
+}
+
+// RunRewrite is run.toml written whole: its run config, and the digest of the file it replaces, as SavedRun read it ("" when there was none).
+type RunRewrite struct {
+	Run      Run
+	Replaces string
+}
 
 // Run is the project's run.toml: whether the file exists, its jobs and profiles, the .env keys it links to them, how jobs are addressed, how worktrees are isolated from one another, what a start does about the jobs other worktrees run, and how long it waits for a declared port to answer.
 type Run struct {

@@ -1,0 +1,71 @@
+#:schema ./schemas/run.schema.json
+
+port_offset_block = 100
+port_probe_timeout = 20
+addressing = "names"
+concurrency = "parallel"
+isolation = "isolated"
+
+[[job]]
+  name = "postgres"
+  kind = "service"
+  cmd = "docker compose up postgres"
+  stop = "docker compose stop postgres"
+  probe = false
+  scope = "shared"
+  [job.ports]
+    POSTGRES_PORT = 5432
+  [job.namespace]
+    name = "acme_{worktree}"
+    create = "createdb $NAME"
+    remove = "dropdb $NAME"
+    [job.namespace.env]
+      PGHOST = "localhost"
+
+[[job]]
+  name = "api"
+  kind = "service"
+  cmd = "pnpm dev"
+  cwd = "apps/api"
+  runs = ["postgres"]
+  [job.ports]
+    API_PORT = 4000
+  [job.url]
+    port = "API_PORT"
+    host = "api"
+
+[[job]]
+  name = "worker"
+  kind = "service"
+  cmd = "pnpm start"
+  cwd = "apps/worker"
+  binds_no_port = true
+
+[[job]]
+  name = "migrate"
+  kind = "task"
+  cmd = "pnpm migrate"
+  cwd = "packages/db"
+  touches = ["postgres"]
+
+[[profile]]
+  name = "all"
+  jobs = ["postgres", "api", "worker"]
+  default = true
+
+[[profile]]
+  name = "api"
+  jobs = ["api"]
+  default = false
+
+[[env_port]]
+  file = "apps/web/.env"
+  key = "API_PORT"
+  job = "api"
+  port = "API_PORT"
+
+[[env]]
+  file = "apps/api/.env"
+  key = "DATABASE_URL"
+  job = "postgres"
+  value = "postgres://localhost:{port.POSTGRES_PORT}/{namespace}"

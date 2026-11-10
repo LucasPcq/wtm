@@ -74,6 +74,8 @@ type port interface {
 	Load() (project.Config, project.Global, error)
 	LoadRun() (project.Run, error)
 	Remember(ctx context.Context, answers map[string]string) (domain.Written, error)
+	SavedRun() (project.SavedRun, error)
+	SaveRun(ctx context.Context, rewrite project.RunRewrite) (domain.Written, error)
 }
 
 type implementation struct {
@@ -106,5 +108,27 @@ func seeded() *project.Config {
 		OnCreate:   []project.Hook{},
 		OnClean:    []project.Hook{{Cmd: "make down"}},
 		Remembered: map[string]string{project.RememberEnvStrategy: "main"},
+	}
+}
+
+// savedRun holds every key run.toml may hold, as testdata/run.saved.toml writes it.
+func savedRun() project.Run {
+	return project.Run{
+		Declared:         true,
+		PortOffsetBlock:  100,
+		PortProbeTimeout: 20,
+		Addressing:       project.AddressNames,
+		Concurrency:      project.Parallel,
+		Isolation:        project.Isolated,
+		Jobs: []project.Job{
+			{Name: "postgres", Kind: project.Service, Cmd: "docker compose up postgres", Stop: "docker compose stop postgres", Ports: map[string]int{"POSTGRES_PORT": 5432}, Scope: project.Shared, NoProbe: true,
+				Namespace: &project.Namespace{Name: "acme_{worktree}", Create: "createdb $NAME", Remove: "dropdb $NAME", Env: map[string]string{"PGHOST": "localhost"}}},
+			{Name: "api", Kind: project.Service, Cmd: "pnpm dev", Cwd: "apps/api", Ports: map[string]int{"API_PORT": 4000}, URL: &project.URL{Port: "API_PORT", Host: "api"}, Runs: []string{"postgres"}},
+			{Name: "worker", Kind: project.Service, Cmd: "pnpm start", Cwd: "apps/worker", BindsNoPort: true},
+			{Name: "migrate", Kind: project.Task, Cmd: "pnpm migrate", Cwd: "packages/db", Touches: []string{"postgres"}},
+		},
+		Profiles:  []project.Profile{{Name: "all", Jobs: []string{"postgres", "api", "worker"}, Default: true}, {Name: "api", Jobs: []string{"api"}}},
+		EnvPorts:  []project.EnvPortLink{{File: "apps/web/.env", Key: "API_PORT", Job: "api", Port: "API_PORT"}},
+		EnvValues: []project.EnvValueLink{{File: "apps/api/.env", Key: "DATABASE_URL", Job: "postgres", Value: "postgres://localhost:{port.POSTGRES_PORT}/{namespace}"}},
 	}
 }

@@ -93,6 +93,11 @@ func (p Project) LoadRun() (project.Run, error) {
 		return project.Run{}, err
 	}
 
+	return parseRun(path, data)
+}
+
+// parseRun decodes the run.toml read from path, strictly, and refuses it with every invalid value it holds; the run config it returns is Declared.
+func parseRun(path string, data []byte) (project.Run, error) {
 	var file runFile
 	if err := decodeStrict(strictParams{Source: path, Data: data, Out: &file}); err != nil {
 		return project.Run{}, err

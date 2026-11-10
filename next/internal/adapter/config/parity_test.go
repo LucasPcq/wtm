@@ -101,3 +101,39 @@ func TestTheProjectAndItsFakeReadNoRunTomlAsAnEmptyRunConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestTheProjectAndItsFakeSaveARunTomlAndReadItBack(t *testing.T) {
+	for _, impl := range implementations(t, seed{Config: seeded()}) {
+		t.Run(impl.name, func(t *testing.T) {
+			none, err := impl.port.SavedRun()
+			require.NoError(t, err)
+
+			written, err := impl.port.SaveRun(t.Context(), project.RunRewrite{Run: savedRun(), Replaces: none.Digest})
+
+			require.NoError(t, err)
+			assert.True(t, written.Changed)
+			saved, err := impl.port.SavedRun()
+			require.NoError(t, err)
+			assert.Equal(t, savedRun(), saved.Run)
+			assert.NotEmpty(t, saved.Digest)
+			loaded, err := impl.port.LoadRun()
+			require.NoError(t, err)
+			assert.Equal(t, savedRun(), loaded)
+		})
+	}
+}
+
+func TestTheProjectAndItsFakeRefuseARunTomlTheyNoLongerHold(t *testing.T) {
+	for _, impl := range implementations(t, seed{Config: seeded()}) {
+		t.Run(impl.name, func(t *testing.T) {
+			none, err := impl.port.SavedRun()
+			require.NoError(t, err)
+			_, err = impl.port.SaveRun(t.Context(), project.RunRewrite{Run: savedRun(), Replaces: none.Digest})
+			require.NoError(t, err)
+
+			_, err = impl.port.SaveRun(t.Context(), project.RunRewrite{Run: savedRun(), Replaces: none.Digest})
+
+			require.ErrorIs(t, err, project.ErrRunChanged)
+		})
+	}
+}
