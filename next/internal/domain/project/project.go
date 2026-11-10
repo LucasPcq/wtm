@@ -142,6 +142,9 @@ const (
 	EnvParent  EnvStrategy = "parent"  // the files of the worktree the new one starts from
 )
 
+// EnvNone is the answer to where a new worktree's .env files come from that copies none: config.toml then names neither a strategy nor a file. It is no strategy of EnvStrategies.
+const EnvNone EnvStrategy = "none"
+
 // DefaultEnvStrategy is the strategy when neither the request nor config.toml names one.
 const DefaultEnvStrategy = EnvExample
 

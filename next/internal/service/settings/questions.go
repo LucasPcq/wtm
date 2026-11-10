@@ -16,16 +16,16 @@ import (
 
 // The paths of the settings, one per value config.toml holds.
 const (
-	PathBasePath    = "base_path"
-	PathBaseBranch  = "base_branch"
-	PathEnvStrategy = "env_strategy"
-	PathEnvFiles    = "env_files"
-	PathOnCreate    = "on_create"
-	PathOnClean     = "on_clean"
+	PathBasePath    = domain.PathBasePath
+	PathBaseBranch  = domain.PathBaseBranch
+	PathEnvStrategy = domain.PathEnvStrategy
+	PathEnvFiles    = domain.PathEnvFiles
+	PathOnCreate    = domain.PathOnCreate
+	PathOnClean     = domain.PathOnClean
 )
 
 // EnvNone is the env strategy that copies no .env file into a new worktree: config.toml then names neither a strategy nor a file.
-const EnvNone project.EnvStrategy = "none"
+const EnvNone = project.EnvNone
 
 // EnvStrategies are the answers to where a new worktree's .env files come from, in the order a choice offers them: each strategy, then none.
 func EnvStrategies() []project.EnvStrategy {

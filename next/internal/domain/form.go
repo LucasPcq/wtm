@@ -68,6 +68,16 @@ const PathRemember = "remember"
 // PathAsk is the path of the request's --ask: true to ask again the questions whose answer is remembered.
 const PathAsk = "ask"
 
+// The paths of config.toml's settings, one per value it holds, which init asks and a change to the settings writes.
+const (
+	PathBasePath    = "base_path"
+	PathBaseBranch  = "base_branch"
+	PathEnvStrategy = "env_strategy"
+	PathEnvFiles    = "env_files"
+	PathOnCreate    = "on_create"
+	PathOnClean     = "on_clean"
+)
+
 // The paths of the questions every command that creates a worktree asks, the fields --remember accepts: where its .env files come from, how it stands against its source, whether its source is fast-forwarded first.
 const (
 	PathEnvFrom     = "env_from"
