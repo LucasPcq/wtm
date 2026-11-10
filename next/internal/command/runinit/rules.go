@@ -377,7 +377,10 @@ func (f Facts) decideShared(d *Decision, req Request) {
 			spacesOnDisk[name] = *job.Namespace
 		}
 	}
-	d.Spaces = settle(d, PathSpaces, parseSpaces(req.Spaces), req.Spaces != nil, func() map[string]project.Namespace { return spacesOnDisk }, d.ProposedSpaces, f.declared())
+	// a space given for a service no longer shared goes with it; one shared that the list leaves out gets none, as its absence says
+	given := parseSpaces(req.Spaces)
+	maps.DeleteFunc(given, func(service string, _ project.Namespace) bool { return !slices.Contains(d.Shared, service) })
+	d.Spaces = settle(d, PathSpaces, given, req.Spaces != nil, func() map[string]project.Namespace { return spacesOnDisk }, d.ProposedSpaces, f.declared())
 	if len(d.Shared) == 0 {
 		d.Skips[PathSpaces] = domain.SkipNothingToAsk
 	}
@@ -604,8 +607,11 @@ func (f Facts) decidePorts(d *Decision, req Request) {
 			onDisk = append(onDisk, Port{Job: name, Variable: variable, Base: job.Ports[variable], From: runFile})
 		}
 	}
-	given := parsePorts(req.Ports)
-	d.Ports = settle(d, PathPorts, given, req.Ports != nil, func() []Port { return onDisk }, d.ProposedPorts, f.declared())
+	unasked := d.ProposedPorts
+	if f.declared() {
+		unasked = onDisk
+	}
+	d.Ports = settle(d, PathPorts, d.followingJobs(parsePorts(req.Ports), unasked), req.Ports != nil, func() []Port { return onDisk }, d.ProposedPorts, f.declared())
 
 	for _, port := range d.Ports {
 		c, ok := d.candidate(port.Job)
@@ -627,6 +633,20 @@ func (f Facts) decidePorts(d *Decision, req Request) {
 	if len(d.Picked) == 0 {
 		d.Skips[PathPorts] = domain.SkipNothingToAsk
 	}
+}
+
+// followingJobs is a list of ports given, spelled before the jobs picked last changed, made to follow them: the entries of a job left out go, and a service the list does not name gets its ports as unasked (run.toml's on a re-init, else the proposal). An entry naming no candidate stays, for its problem.
+func (d Decision) followingJobs(given, unasked []Port) []Port {
+	if given == nil {
+		return nil
+	}
+	ports := slices.DeleteFunc(slices.Clone(given), func(p Port) bool { return d.left(p.Job) })
+	for _, name := range d.services() {
+		if !slices.ContainsFunc(ports, func(p Port) bool { return p.Job == name }) {
+			ports = append(ports, portsOf(unasked, name)...)
+		}
+	}
+	return ports
 }
 
 func portsOf(ports []Port, job string) []Port {
@@ -1444,13 +1464,14 @@ type PortRow struct {
 	Spelled string `json:"spelled"`
 }
 
-// A CommandRow is a job's command: as it runs, the one run init proposes so it reads its port's variable (none when it proposes none), and whether the request changed it; Spelled answers it with the proposal.
+// A CommandRow is a job's command: as it runs, the one run init proposes so it reads its port's variable (none when it proposes none), and whether the request changed it; Spelled answers it with the proposal, Answered with the command it runs once changed.
 type CommandRow struct {
 	Job      string `json:"job"`
 	Cmd      string `json:"cmd"`
 	Proposed string `json:"proposed,omitempty"`
 	Changed  bool   `json:"changed"`
 	Spelled  string `json:"spelled,omitempty"`
+	Answered string `json:"answered,omitempty"`
 }
 
 // A SpaceRow is what each worktree gets of a shared service, and the answers that spell it.
@@ -1493,6 +1514,9 @@ func (d Decision) parts() Parts {
 		row := CommandRow{Job: name, Cmd: cmp.Or(d.Commands[name], c.Cmd), Proposed: d.Rewrites[name], Changed: changed}
 		if row.Proposed != "" {
 			row.Spelled = name + "=" + row.Proposed
+		}
+		if changed {
+			row.Answered = name + "=" + row.Cmd
 		}
 		parts.Commands = append(parts.Commands, row)
 	}

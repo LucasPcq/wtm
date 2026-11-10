@@ -6875,6 +6875,9 @@
     "runinit.CommandRow": {
       "additionalProperties": false,
       "properties": {
+        "answered": {
+          "type": "string"
+        },
         "changed": {
           "type": "boolean"
         },

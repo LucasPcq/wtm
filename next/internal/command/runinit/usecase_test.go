@@ -334,6 +334,45 @@ func TestEachProfileRowSaysWhetherThePlanWritesIt(t *testing.T) {
 	assert.False(t, worker.Written, "a profile proposed on a re-init is offered, not written")
 }
 
+func TestAListGivenFollowsTheJobsPickedSinceItWasSpelled(t *testing.T) {
+	w := newWorld(t)
+	jobs := []string{"postgres", "redis", "mailpit", "admin", "api", "web", "migrate", "seed"}
+
+	plan, _, err := w.usecase.Plan(t.Context(), runinit.Request{
+		Jobs:     jobs,
+		Ports:    []string{"postgres.POSTGRES_PORT=5432", "redis.CACHE_PORT=6379", "mailpit.MAILPIT_PORT=8025", "mailpit.MAILPIT_PORT_1025=1025", "admin.ADMIN_PORT=3001", "web.PORT=3000", "worker="},
+		Commands: []string{"worker=node worker.js"},
+		Spaces:   []string{"redis.name=acme_{worktree}", "redis.create=x"},
+	})
+
+	require.NoError(t, err)
+	var ports []string
+	for _, row := range plan.Parts.Ports {
+		ports = append(ports, row.Spelled)
+	}
+	assert.Contains(t, ports, "redis.CACHE_PORT=6379", "an entry given is kept")
+	assert.Contains(t, ports, "api.PORT=4000", "a job the list leaves out gets what it would unasked")
+	assert.NotContains(t, ports, "worker=", "a job left out takes its entries with it")
+	for _, row := range plan.Parts.Commands {
+		assert.NotEqual(t, "worker", row.Job)
+	}
+	for _, row := range plan.Parts.Spaces {
+		assert.NotEqual(t, "redis", row.Service, "a service not shared keeps no space")
+	}
+}
+
+func TestACommandChangedIsSpelledAsItStands(t *testing.T) {
+	w := newWorld(t)
+
+	plan, _, err := w.usecase.Plan(t.Context(), runinit.Request{Commands: []string{"admin=pnpm exec next dev -p ${ADMIN_PORT}"}})
+
+	require.NoError(t, err)
+	require.Len(t, plan.Parts.Commands, 1)
+	row := plan.Parts.Commands[0]
+	assert.True(t, row.Changed)
+	assert.Equal(t, "admin=pnpm exec next dev -p ${ADMIN_PORT}", row.Answered)
+}
+
 func TestDockerComposeIsLeftAloneWhenAsked(t *testing.T) {
 	w := newWorld(t)
 	before := readFile(t, filepath.Join(w.main, "docker-compose.yml"))
