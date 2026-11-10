@@ -149,6 +149,7 @@ func webParams(token string, idle time.Duration) web.Params {
 		Register: func(ctx context.Context, repo domain.Repo) {
 			knownRepos(reposjson.Path(), daemon.SocketPath()).Register(ctx, repo)
 		},
+		Home:        home(),
 		Version:     version,
 		Token:       token,
 		Kill:        shell.KillCancelled,
@@ -156,6 +157,15 @@ func webParams(token string, idle time.Duration) web.Params {
 		Schema:      api.Schema,
 		Idle:        idle,
 	}
+}
+
+// home is the user's home directory, "" when none is known: a path typed ~/… is then refused as not absolute.
+func home() string {
+	dir, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return dir
 }
 
 // eventsStream is the event stream of streams(), the one the server serves.

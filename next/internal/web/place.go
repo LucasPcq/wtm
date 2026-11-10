@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"net/http"
 	"path/filepath"
+	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 )
@@ -37,7 +38,7 @@ const (
 	PlaceKnown         PlaceState = "known"            // in a repository the web lists already
 )
 
-// A placeCall is the body of POST /api/repos/check and POST /api/repos: the path, absolute.
+// A placeCall is the body of POST /api/repos/check and POST /api/repos: the path, absolute, or from the home as ~/….
 type placeCall struct {
 	Path string `json:"path"`
 }
@@ -79,7 +80,11 @@ func (s *Server) add(w http.ResponseWriter, r *http.Request) {
 // place reads the path of the body and where it stands, or writes its refusal and reports false.
 func (s *Server) place(w http.ResponseWriter, r *http.Request) (Place, Located, bool) {
 	var call placeCall
-	if err := decode(w, r, &call); err != nil || !filepath.IsAbs(call.Path) {
+	err := decode(w, r, &call)
+	if home := s.params.Home; home != "" && (call.Path == "~" || strings.HasPrefix(call.Path, "~/")) {
+		call.Path = filepath.Join(home, strings.TrimPrefix(call.Path, "~"))
+	}
+	if err != nil || !filepath.IsAbs(call.Path) {
 		writeError(w, http.StatusBadRequest, domain.InvalidMessage("the body of the request names no absolute path"))
 		return Place{}, Located{}, false
 	}

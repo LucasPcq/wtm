@@ -72,3 +72,13 @@ func TestAPathInNoRepositoryIsNotAdded(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, response.StatusCode, body)
 	}
 }
+
+func TestAPathTypedFromTheHomeIsReadFromIt(t *testing.T) {
+	located := &places{}
+	server := serving(t, Params{Locate: located.locate, Register: located.register, Home: "/code"})
+
+	response := do(t, server, req{method: http.MethodPost, path: "/api/repos/check", body: `{"path":"~/fresh/src"}`})
+
+	require.Equal(t, http.StatusOK, response.StatusCode)
+	assert.Equal(t, Place{Path: "/code/fresh/src", State: PlaceNotSetUp, ID: RepoID(fresh), Root: fresh.Root, Name: "fresh"}, decoded[Place](t, response))
+}

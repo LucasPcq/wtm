@@ -40,8 +40,10 @@ type Params struct {
 	Locate func(ctx context.Context, path string) (Located, error)
 	// Register lists a repository set up among those wtm knows; it never fails.
 	Register func(ctx context.Context, repo domain.Repo)
-	Version  string
-	Token    string
+	// Home is the user's home, where a path typed ~/… starts; empty reads ~ as it is.
+	Home    string
+	Version string
+	Token   string
 	// Kill stops at once the children of every operation of the process already cancelled, as a second Ctrl+C does: it is process-wide, never one operation's.
 	Kill func()
 	// CommandLine spells a follow-up as the command line runs it, for one the catalogue cannot run.
