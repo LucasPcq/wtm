@@ -1,0 +1,213 @@
+{
+  "v": 2,
+  "command": "run-init",
+  "ok": true,
+  "op": "<id>",
+  "items": [
+    {
+      "subject": "run.toml",
+      "status": "done",
+      "detail": {
+        "path": "run.toml",
+        "tracked": false
+      }
+    }
+  ],
+  "plan": {
+    "files": [
+      {
+        "path": "run.toml",
+        "tracked": false,
+        "new": true
+      }
+    ],
+    "detection": {
+      "manager": "",
+      "manager_from": "",
+      "compose": "",
+      "services": [],
+      "places": [
+        {
+          "dir": ".",
+          "name": "web",
+          "scripts": [
+            {
+              "name": "dev",
+              "cmd": "vite"
+            }
+          ]
+        }
+      ],
+      "candidates": [
+        {
+          "name": "web",
+          "place": ".",
+          "script": "dev",
+          "cmd": "npm run dev",
+          "kind": "service",
+          "compose": false,
+          "proposed": true,
+          "on_disk": false
+        }
+      ],
+      "env_files": [
+        {
+          "file": ".env",
+          "copied": false,
+          "keys": [
+            {
+              "key": "PORT",
+              "value": "5174"
+            }
+          ]
+        }
+      ]
+    },
+    "parts": {
+      "ports": [
+        {
+          "job": "web",
+          "variable": "PORT",
+          "base": 5173,
+          "from": "request",
+          "spelled": "web.PORT=5173"
+        }
+      ],
+      "commands": [],
+      "spaces": [],
+      "links": [],
+      "profiles": [
+        {
+          "name": "all",
+          "jobs": [
+            "web"
+          ],
+          "default": true,
+          "proposed": false,
+          "spelled": "all=web"
+        },
+        {
+          "name": "web",
+          "jobs": [
+            "web"
+          ],
+          "default": false,
+          "proposed": false,
+          "spelled": "web=web"
+        }
+      ]
+    },
+    "preview": {
+      "worktree": "main",
+      "ordinal": 0,
+      "numbered": true,
+      "offset": 0,
+      "spacing": 10,
+      "services": [
+        "web"
+      ],
+      "tasks": [],
+      "joins": [],
+      "data": [],
+      "ports": [
+        {
+          "job": "web",
+          "variable": "PORT",
+          "base": 5173,
+          "port": 5173,
+          "shared": false
+        }
+      ],
+      "addresses": [
+        {
+          "job": "web",
+          "url": "http://web.main.main.localhost:11080"
+        }
+      ],
+      "env": [],
+      "up": {
+        "name": "all",
+        "jobs": [
+          "web"
+        ],
+        "default": true
+      }
+    },
+    "recap": [
+      {
+        "key": "jobs",
+        "label": "Jobs",
+        "path": "jobs",
+        "values": [
+          {
+            "value": "web",
+            "text": "web"
+          }
+        ]
+      },
+      {
+        "key": "ports",
+        "label": "Ports",
+        "path": "ports",
+        "values": [
+          {
+            "value": "web PORT 5173",
+            "text": "web PORT 5173"
+          }
+        ]
+      },
+      {
+        "key": "addressing",
+        "label": "Addresses",
+        "path": "addressing",
+        "values": [
+          {
+            "value": "names",
+            "text": "names"
+          }
+        ]
+      },
+      {
+        "key": "profiles",
+        "label": "Profiles",
+        "path": "profiles",
+        "values": [
+          {
+            "value": "all (default)",
+            "text": "all (default)"
+          },
+          {
+            "value": "web",
+            "text": "web"
+          }
+        ]
+      },
+      {
+        "key": "writes",
+        "label": "Writes",
+        "values": [
+          {
+            "value": "run.toml",
+            "text": "run.toml"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [
+    {
+      "command": "run-up",
+      "code": "run-init.up",
+      "message": "start the jobs"
+    }
+  ],
+  "warnings": [
+    {
+      "code": "run-init.unknown_link",
+      "params": {
+        "value": ".env#PORT"
+      },
+      "message": ".env#PORT holds no port of a job"
+    }
+  ]
+}

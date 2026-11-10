@@ -1,0 +1,22 @@
+[
+  {
+    "type": "operation.started",
+    "command": "run-init",
+    "surface": "api"
+  },
+  {
+    "type": "unit.started",
+    "subject": "run.toml"
+  },
+  {
+    "type": "unit.finished",
+    "subject": "run.toml",
+    "status": "done"
+  },
+  {
+    "type": "operation.finished",
+    "command": "run-init",
+    "surface": "api",
+    "ok": true
+  }
+]

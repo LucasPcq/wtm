@@ -17,6 +17,7 @@
         "resolve",
         "status",
         "tree",
+        "run-init",
         "run-up",
         "run-logs",
         "run-down",
@@ -2069,6 +2070,9 @@
         "kind": {
           "const": "multi_select"
         },
+        "optional": {
+          "type": "boolean"
+        },
         "options": {
           "items": {
             "$ref": "#/$defs/domain.Option"
@@ -2098,7 +2102,8 @@
         "kind",
         "path",
         "picked",
-        "options"
+        "options",
+        "optional"
       ],
       "type": "object"
     },
@@ -2400,7 +2405,11 @@
         "configured",
         "task",
         "no_env",
-        "no_env_file"
+        "no_env_file",
+        "no_runner",
+        "no_compose",
+        "nothing_to_ask",
+        "no_profile"
       ]
     },
     "domain.TextField": {
@@ -4387,6 +4396,26 @@
       },
       "type": "array"
     },
+    "project.ComposeSpan": {
+      "additionalProperties": false,
+      "properties": {
+        "column": {
+          "type": "integer"
+        },
+        "line": {
+          "type": "integer"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "line",
+        "column",
+        "text"
+      ],
+      "type": "object"
+    },
     "project.EnvFile": {
       "additionalProperties": false,
       "properties": {
@@ -4466,6 +4495,82 @@
         "service",
         "task"
       ]
+    },
+    "project.Place": {
+      "additionalProperties": false,
+      "properties": {
+        "dir": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "scripts": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/project.Script"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "dir",
+        "name",
+        "scripts"
+      ],
+      "type": "object"
+    },
+    "project.Profile": {
+      "additionalProperties": false,
+      "properties": {
+        "default": {
+          "type": "boolean"
+        },
+        "jobs": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "jobs",
+        "default"
+      ],
+      "type": "object"
+    },
+    "project.Script": {
+      "additionalProperties": false,
+      "properties": {
+        "cmd": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "cmd"
+      ],
+      "type": "object"
     },
     "prune.Candidate": {
       "additionalProperties": false,
@@ -5303,6 +5408,372 @@
       },
       "type": "array"
     },
+    "run-init.envelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/domain.Envelope"
+        }
+      ],
+      "properties": {
+        "command": {
+          "const": "run-init"
+        },
+        "items": {
+          "items": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/runinit.Detail"
+                  },
+                  {
+                    "maxProperties": 0,
+                    "type": "object"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "plan": {
+          "$ref": "#/$defs/runinit.Plan"
+        }
+      }
+    },
+    "run-init.request": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "jobs"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "tasks"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "runner"
+              },
+              "values": {
+                "items": {
+                  "description": "One of its options, or empty for its default.",
+                  "enum": [
+                    "",
+                    "one_by_one",
+                    "through"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "shared"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "spaces"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "touches"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "ports"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "commands"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "addressing"
+              },
+              "values": {
+                "items": {
+                  "description": "One of its options, or empty for its default.",
+                  "enum": [
+                    "",
+                    "names",
+                    "ports"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "urls"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "env_copy"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "links"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "profiles"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "default_profile"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "patch_compose"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "preview"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "type": "array"
+    },
     "run-list.envelope": {
       "allOf": [
         {
@@ -6108,6 +6579,51 @@
               "values"
             ],
             "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "remember"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "exclusive"
+                  ]
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "ask"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
           }
         ]
       },
@@ -6305,6 +6821,850 @@
         "worktree",
         "path",
         "jobs"
+      ],
+      "type": "object"
+    },
+    "runinit.Candidate": {
+      "additionalProperties": false,
+      "properties": {
+        "build": {
+          "type": "boolean"
+        },
+        "cmd": {
+          "type": "string"
+        },
+        "compose": {
+          "type": "boolean"
+        },
+        "image": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/project.JobKind"
+        },
+        "name": {
+          "type": "string"
+        },
+        "on_disk": {
+          "type": "boolean"
+        },
+        "place": {
+          "type": "string"
+        },
+        "proposed": {
+          "type": "boolean"
+        },
+        "script": {
+          "type": "string"
+        },
+        "stop": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "place",
+        "cmd",
+        "kind",
+        "compose",
+        "proposed",
+        "on_disk"
+      ],
+      "type": "object"
+    },
+    "runinit.CommandRow": {
+      "additionalProperties": false,
+      "properties": {
+        "changed": {
+          "type": "boolean"
+        },
+        "cmd": {
+          "type": "string"
+        },
+        "job": {
+          "type": "string"
+        },
+        "proposed": {
+          "type": "string"
+        },
+        "spelled": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "job",
+        "cmd",
+        "changed"
+      ],
+      "type": "object"
+    },
+    "runinit.ComposeChange": {
+      "additionalProperties": false,
+      "properties": {
+        "edits": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runinit.ComposeEdit"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "file": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "file",
+        "edits"
+      ],
+      "type": "object"
+    },
+    "runinit.ComposeEdit": {
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "type": "string"
+        },
+        "at": {
+          "$ref": "#/$defs/project.ComposeSpan"
+        },
+        "before": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "what": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "subject",
+        "what",
+        "at",
+        "before",
+        "after"
+      ],
+      "type": "object"
+    },
+    "runinit.ConfigChange": {
+      "additionalProperties": false,
+      "properties": {
+        "added": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "added"
+      ],
+      "type": "object"
+    },
+    "runinit.Detail": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "tracked": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "path",
+        "tracked"
+      ],
+      "type": "object"
+    },
+    "runinit.Detection": {
+      "additionalProperties": false,
+      "properties": {
+        "candidates": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runinit.Candidate"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "compose": {
+          "type": "string"
+        },
+        "env_files": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runinit.EnvFile"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "manager": {
+          "type": "string"
+        },
+        "manager_from": {
+          "type": "string"
+        },
+        "places": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/project.Place"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "runner": {
+          "$ref": "#/$defs/runinit.Candidate"
+        },
+        "services": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runinit.Service"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "manager",
+        "manager_from",
+        "compose",
+        "services",
+        "places",
+        "candidates",
+        "env_files"
+      ],
+      "type": "object"
+    },
+    "runinit.EnvFile": {
+      "additionalProperties": false,
+      "properties": {
+        "copied": {
+          "type": "boolean"
+        },
+        "file": {
+          "type": "string"
+        },
+        "keys": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runinit.EnvKey"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "file",
+        "copied",
+        "keys"
+      ],
+      "type": "object"
+    },
+    "runinit.EnvKey": {
+      "additionalProperties": false,
+      "properties": {
+        "job": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "value"
+      ],
+      "type": "object"
+    },
+    "runinit.File": {
+      "additionalProperties": false,
+      "properties": {
+        "new": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string"
+        },
+        "tracked": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "path",
+        "tracked",
+        "new"
+      ],
+      "type": "object"
+    },
+    "runinit.LinkRow": {
+      "additionalProperties": false,
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "job": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "linked": {
+          "type": "boolean"
+        },
+        "port": {
+          "type": "string"
+        },
+        "spelled": {
+          "type": "string"
+        },
+        "template": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "file",
+        "key",
+        "value",
+        "job",
+        "port",
+        "kind",
+        "linked",
+        "spelled"
+      ],
+      "type": "object"
+    },
+    "runinit.Parts": {
+      "additionalProperties": false,
+      "properties": {
+        "commands": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runinit.CommandRow"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "links": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runinit.LinkRow"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ports": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runinit.PortRow"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "profiles": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runinit.ProfileRow"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "spaces": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runinit.SpaceRow"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "ports",
+        "commands",
+        "spaces",
+        "links",
+        "profiles"
+      ],
+      "type": "object"
+    },
+    "runinit.Plan": {
+      "additionalProperties": false,
+      "properties": {
+        "compose": {
+          "$ref": "#/$defs/runinit.ComposeChange"
+        },
+        "config": {
+          "$ref": "#/$defs/runinit.ConfigChange"
+        },
+        "detection": {
+          "$ref": "#/$defs/runinit.Detection"
+        },
+        "empty": {
+          "type": "boolean"
+        },
+        "files": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runinit.File"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "parts": {
+          "$ref": "#/$defs/runinit.Parts"
+        },
+        "preview": {
+          "$ref": "#/$defs/runinit.Preview"
+        },
+        "recalled": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "recap": {
+          "items": {
+            "$ref": "#/$defs/domain.RecapRow"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "files",
+        "detection",
+        "parts",
+        "preview"
+      ],
+      "type": "object"
+    },
+    "runinit.PortRow": {
+      "additionalProperties": false,
+      "properties": {
+        "base": {
+          "type": "integer"
+        },
+        "from": {
+          "type": "string"
+        },
+        "job": {
+          "type": "string"
+        },
+        "spelled": {
+          "type": "string"
+        },
+        "variable": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "job",
+        "spelled"
+      ],
+      "type": "object"
+    },
+    "runinit.Preview": {
+      "additionalProperties": false,
+      "properties": {
+        "addresses": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runinit.PreviewAddress"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "data": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runinit.PreviewData"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "env": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runinit.PreviewEnv"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "joins": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "numbered": {
+          "type": "boolean"
+        },
+        "offset": {
+          "type": "integer"
+        },
+        "ordinal": {
+          "type": "integer"
+        },
+        "ports": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/runinit.PreviewPort"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "services": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "spacing": {
+          "type": "integer"
+        },
+        "tasks": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "up": {
+          "$ref": "#/$defs/project.Profile"
+        },
+        "worktree": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "worktree",
+        "ordinal",
+        "numbered",
+        "offset",
+        "spacing",
+        "services",
+        "tasks",
+        "joins",
+        "data",
+        "ports",
+        "addresses",
+        "env",
+        "up"
+      ],
+      "type": "object"
+    },
+    "runinit.PreviewAddress": {
+      "additionalProperties": false,
+      "properties": {
+        "job": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "job",
+        "url"
+      ],
+      "type": "object"
+    },
+    "runinit.PreviewData": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "service": {
+          "type": "string"
+        },
+        "template": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "service",
+        "name",
+        "template"
+      ],
+      "type": "object"
+    },
+    "runinit.PreviewEnv": {
+      "additionalProperties": false,
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "keys": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "file",
+        "keys"
+      ],
+      "type": "object"
+    },
+    "runinit.PreviewPort": {
+      "additionalProperties": false,
+      "properties": {
+        "base": {
+          "type": "integer"
+        },
+        "job": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "shared": {
+          "type": "boolean"
+        },
+        "variable": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "job",
+        "variable",
+        "base",
+        "port",
+        "shared"
+      ],
+      "type": "object"
+    },
+    "runinit.ProfileRow": {
+      "additionalProperties": false,
+      "properties": {
+        "default": {
+          "type": "boolean"
+        },
+        "jobs": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "proposed": {
+          "type": "boolean"
+        },
+        "spelled": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "jobs",
+        "default",
+        "proposed",
+        "spelled"
+      ],
+      "type": "object"
+    },
+    "runinit.Service": {
+      "additionalProperties": false,
+      "properties": {
+        "image": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "ports": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "image",
+        "ports"
+      ],
+      "type": "object"
+    },
+    "runinit.SpaceRow": {
+      "additionalProperties": false,
+      "properties": {
+        "create": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "remove": {
+          "type": "string"
+        },
+        "service": {
+          "type": "string"
+        },
+        "spelled": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "service",
+        "name",
+        "create",
+        "remove",
+        "spelled"
       ],
       "type": "object"
     },
@@ -7364,6 +8724,9 @@
           },
           "type": "array"
         },
+        "remember_parallel": {
+          "type": "boolean"
+        },
         "worktrees": {
           "anyOf": [
             {
@@ -7383,7 +8746,8 @@
         "worktrees",
         "exclusive",
         "others",
-        "no_probe"
+        "no_probe",
+        "remember_parallel"
       ],
       "type": "object"
     },

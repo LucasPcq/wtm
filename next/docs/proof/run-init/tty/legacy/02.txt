@@ -1,0 +1,25 @@
+
+  Step 2/17 • Package.json scripts
+
+  ✓ Docker services: 1 files selected
+
+  ┃  Only what you check becomes a job. Dev scripts are checked for you; check
+  ┃  anything else you want `wtm run` to start or run.
+  ┃
+  ┃  In a monorepo, a root script often starts the app scripts below it — check those too, and the next
+  ┃  step asks which ones it starts.
+  ┃  Ports and urls are declared per job: a root script alone leaves them with none.
+
+▌ [ ] root / build            none run build
+  [ ] root / dev              none run dev
+  [ ] apps/admin / build      none run build
+  [✓] apps/admin / dev        none run dev
+  [ ] apps/api / build        none run build
+  [✓] apps/api / dev          none run dev
+  [ ] apps/web / build        none run build
+  [✓] apps/web / dev          none run dev
+  [✓] apps/worker / dev       none run dev
+  [ ] packages/db / migrate   none run migrate
+  [ ] packages/db / seed      none run seed
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc back

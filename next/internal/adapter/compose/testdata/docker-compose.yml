@@ -1,0 +1,29 @@
+x-ports: &shared
+  - "9000:9000"
+services:
+  postgres:
+    image: postgres:16
+    container_name: acme-postgres
+    ports:
+      - "5432:5432"
+  redis:
+    image: redis:7
+    ports:
+      - 127.0.0.1:6379:6379
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - "${MAILPIT_PORT:-8025}:8025"
+      - target: 1025
+        published: 1025
+  api:
+    build: .
+    ports: *shared
+    environment:
+      DATABASE_URL: postgres://localhost:${PG_PORT}/acme
+volumes:
+  data:
+    name: acme-data
+  cache:
+    name: shared-cache
+    external: true

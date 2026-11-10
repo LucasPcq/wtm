@@ -13,7 +13,7 @@ import (
 // ----------------------------------------------------------------------------
 // The request
 
-// A Request is what the caller asks of run up: the worktrees to start a profile in, each by its branch or, on no branch, by its path (none: the one the caller stands in); the Profile of run.toml to start (none: its default); whether the other worktrees' jobs are stopped first (Exclusive, nil leaving it to run.toml, else to the question), or kept (Parallel, which says no to Exclusive); whether a job that changes data the worktree does not own starts all the same (Force); whether the ports the jobs declare go unchecked (NoProbe); and whether the command line returns once they are started rather than show them (Detach). Caller is where the caller stands; it is no field of the form: every surface sets it.
+// A Request is what the caller asks of run up: the worktrees to start a profile in, each by its branch or, on no branch, by its path (none: the one the caller stands in); the Profile of run.toml to start (none: its default); whether the other worktrees' jobs are stopped first (Exclusive, nil leaving it to run.toml, else to the question), or kept (Parallel, which says no to Exclusive); whether a job that changes data the worktree does not own starts all the same (Force); whether the ports the jobs declare go unchecked (NoProbe); whether the command line returns once they are started rather than show them (Detach); and the answers to remember (Remember: PathExclusive answered no is run.toml's concurrency = "parallel" from then on). Caller is where the caller stands; it is no field of the form: every surface sets it.
 type Request struct {
 	Worktrees []string      `json:"worktree"`
 	Profile   string        `json:"profile"`
@@ -22,6 +22,7 @@ type Request struct {
 	Force     bool          `json:"force"`
 	NoProbe   bool          `json:"no_probe"`
 	Detach    bool          `json:"detach"`
+	Remember  []string      `json:"remember"`
 	Caller    domain.Caller `json:"-"`
 }
 
@@ -62,6 +63,8 @@ func (r Request) Answer(path string, values []string) (Request, error) {
 		next.NoProbe, err = domain.Yes(path, values)
 	case PathDetach:
 		next.Detach, err = domain.Yes(path, values)
+	case domain.PathRemember:
+		next.Remember = values
 	default:
 		return r, domain.Unknown(path)
 	}
@@ -92,6 +95,8 @@ func (r Request) Values(path string) []string {
 		return domain.SaidYes(r.NoProbe)
 	case PathDetach:
 		return domain.SaidYes(r.Detach)
+	case domain.PathRemember:
+		return r.Remember
 	}
 
 	return nil
@@ -137,6 +142,7 @@ func NewQuestions(f Facts, req Request) Questions {
 	exclusive := f.exclusive(req, targets)
 	questions.Exclusive = exclusive.Confirm
 	questions.Errors = append(questions.Errors, exclusive.Problems...)
+	questions.Errors = append(questions.Errors, rememberProblems(req, exclusive.Value)...)
 
 	risky := f.Risky(targets, f.jobsOf(questions.Profile.Value))
 	questions.Force = domain.Confirm{Answer: domain.Answer[bool]{Value: req.Force, Origin: originOf(req.Force)}}
@@ -153,7 +159,7 @@ func (q Questions) Form() domain.Form {
 	return domain.Form{Problems: q.Errors, Fields: []domain.Field{
 		domain.MultiSelectField{FieldSpec: domain.FieldSpec{Path: domain.PathWorktree, Origin: q.Worktrees.Origin}, Picked: q.Worktrees.Picked, Options: q.Worktrees.Options},
 		domain.SelectField{FieldSpec: domain.FieldSpec{Path: PathProfile, Origin: q.Profile.Origin, Skip: q.Profile.Skip}, Value: q.Profile.Value, Options: q.Profiles},
-		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: PathExclusive, Origin: q.Exclusive.Origin, Skip: q.Exclusive.Skip}, Value: q.Exclusive.Value, NoFirst: true},
+		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: PathExclusive, Origin: q.Exclusive.Origin, Skip: q.Exclusive.Skip}, Value: q.Exclusive.Value, NoFirst: true, Rememberable: true, Remember: slices.Contains(q.Request.Remember, PathExclusive)},
 		domain.ConfirmField{FieldSpec: domain.FieldSpec{Path: PathForce, Origin: q.Force.Origin, Skip: q.Force.Skip}, Value: q.Force.Value, NoFirst: true},
 		domain.ConfirmField{FieldSpec: spec(flagOnly, PathParallel), Value: q.Request.Parallel, NoFirst: true},
 		domain.ConfirmField{FieldSpec: spec(flagOnly, PathNoProbe), Value: q.Request.NoProbe, NoFirst: true},
@@ -227,6 +233,23 @@ const (
 	CodeExclusiveMany  = Name + runjobs.ExclusiveSeveral
 	CodeBothWays       = Name + runjobs.ExclusiveAndParallel
 )
+
+// CodeRememberExclusive refuses to remember stopping the other worktrees' jobs: only keeping them is remembered, in run.toml.
+const CodeRememberExclusive = Name + ".remember_exclusive"
+
+// rememberProblems are the problems of the answers to remember: one that is no rememberable field, and the others' jobs stopped first, which is never remembered.
+func rememberProblems(req Request, exclusive bool) []domain.FieldError {
+	var problems []domain.FieldError
+	for _, path := range req.Remember {
+		switch {
+		case path != PathExclusive:
+			problems = append(problems, domain.OneOf(domain.OneOfParams{Path: domain.PathRemember, Value: path, Accepted: []string{PathExclusive}})...)
+		case exclusive:
+			problems = append(problems, domain.FieldError{Path: PathExclusive, Code: CodeRememberExclusive, Template: "{path} is never remembered: only keeping the other worktrees' jobs is", With: []string{domain.PathRemember}})
+		}
+	}
+	return problems
+}
 
 // profileProblems are the problems of the profile asked: one run.toml does not declare, or none when it declares several and none is the default.
 func (f Facts) profileProblems(req Request) []domain.FieldError {

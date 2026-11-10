@@ -200,11 +200,8 @@ const (
 	CodeRunInit  = Name + ".run_init"
 )
 
-// The commands not yet migrated a set-up follows up with, spelled as the legacy wtm runs them.
-const (
-	commandRelocate = "relocate"
-	commandRunInit  = "run init"
-)
+// commandRelocate is a command not yet migrated a set-up follows up with, spelled as the legacy wtm runs it.
+const commandRelocate = "relocate"
 
 func relocate() *domain.FollowUp {
 	return &domain.FollowUp{Command: commandRelocate, Code: CodeRelocate, Message: "move the worktrees made elsewhere into the folder"}
@@ -219,7 +216,7 @@ func (p Plan) next() []domain.FollowUp {
 		steps = append(steps, *follow)
 	}
 	if !p.runDeclared {
-		steps = append(steps, domain.FollowUp{Command: commandRunInit, Code: CodeRunInit, Message: "set up what runs in each worktree"})
+		steps = append(steps, domain.FollowUp{Command: domain.CommandRunInit, Code: CodeRunInit, Message: "set up what runs in each worktree"})
 	}
 
 	return steps

@@ -1,0 +1,18 @@
+
+  Step 2/17 • Run once
+
+  ✓ What runs: postgres, redis, mailpit, admin, api, web, worker, migrate, seed
+
+  The jobs that run to their end, the others keep running (repeatable)
+
+▌› [ ] postgres
+   [ ] redis
+   [ ] mailpit
+   [ ] admin
+   [ ] api
+   [ ] web
+   [ ] worker
+   [x] migrate
+   [x] seed
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc back

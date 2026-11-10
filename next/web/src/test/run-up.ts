@@ -91,6 +91,7 @@ export const runUpPlanOf = (picked: string[], profile = 'dev'): RunupPlan => ({
   profile,
   exclusive: false,
   no_probe: false,
+  remember_parallel: false,
   others: null,
   worktrees: picked.map((worktree, index) => targetOf(worktree, index, profile)),
 })

@@ -50,9 +50,6 @@ const (
 	RunInvalid     = ".run_invalid"
 )
 
-// commandRunInit sets the run module up in a repository: not migrated yet.
-const commandRunInit = "run init"
-
 // ObserveParams are the command observing, whose codes the refusals give, the repository as it observed it (repository.Service.Observe), and where its caller stands.
 type ObserveParams struct {
 	Command    string
@@ -67,7 +64,7 @@ func (s Service) Observe(ctx context.Context, params ObserveParams) (Facts, erro
 		return Facts{}, &domain.Error{Kind: domain.KindPrecondition, Code: params.Command + RunInvalid, Message: "invalid run.toml: " + repo.RunErr.Error()}
 	}
 	if !repo.Run.Declared {
-		return Facts{}, &domain.Error{Kind: domain.KindPrecondition, Code: params.Command + NotInitialized, Message: "no run.toml: nothing to start", FollowUp: &domain.FollowUp{Command: commandRunInit, Code: params.Command + RunInit, Message: "declare the jobs"}}
+		return Facts{}, &domain.Error{Kind: domain.KindPrecondition, Code: params.Command + NotInitialized, Message: "no run.toml: nothing to start", FollowUp: &domain.FollowUp{Command: domain.CommandRunInit, Code: params.Command + RunInit, Message: "declare the jobs"}}
 	}
 
 	facts := Facts{Repository: repo, Records: map[string]worktree.Meta{}, RecordErrs: map[string]error{}, Gone: map[string]bool{}}

@@ -1,0 +1,158 @@
+#:schema ./schemas/run.schema.json
+
+addressing = "names"
+
+[[job]]
+  name = "postgres"
+  kind = "service"
+  cmd = "docker compose up -d postgres"
+  stop = "docker compose stop postgres"
+  scope = "shared"
+  [job.ports]
+    POSTGRES_PORT = 5432
+  [job.namespace]
+    name = "acme_{worktree}"
+    create = "docker compose exec -T postgres createdb -U postgres \"$WTM_NAMESPACE\""
+    remove = "docker compose exec -T postgres dropdb -U postgres --if-exists \"$WTM_NAMESPACE\""
+
+[[job]]
+  name = "redis"
+  kind = "service"
+  cmd = "docker compose up -d redis"
+  stop = "docker compose stop redis"
+  [job.ports]
+    REDIS_PORT = 6379
+
+[[job]]
+  name = "mailpit"
+  kind = "service"
+  cmd = "docker compose up -d mailpit"
+  stop = "docker compose stop mailpit"
+  scope = "shared"
+  [job.ports]
+    MAILPIT_PORT = 8025
+    MAILPIT_PORT_1025 = 1025
+
+[[job]]
+  name = "admin"
+  kind = "service"
+  cmd = "pnpm dev"
+  cwd = "apps/admin"
+  [job.ports]
+    ADMIN_PORT = 3001
+  [job.url]
+    port = "ADMIN_PORT"
+
+[[job]]
+  name = "api"
+  kind = "service"
+  cmd = "pnpm dev"
+  cwd = "apps/api"
+  [job.ports]
+    PORT = 4000
+  [job.url]
+    port = "PORT"
+
+[[job]]
+  name = "web"
+  kind = "service"
+  cmd = "pnpm dev"
+  cwd = "apps/web"
+  [job.ports]
+    PORT = 3000
+  [job.url]
+    port = "PORT"
+
+[[job]]
+  name = "worker"
+  kind = "service"
+  cmd = "pnpm start"
+  cwd = "apps/worker"
+  binds_no_port = true
+
+[[job]]
+  name = "migrate"
+  kind = "task"
+  cmd = "pnpm migrate"
+  cwd = "packages/db"
+  touches = ["postgres"]
+
+[[job]]
+  name = "seed"
+  kind = "task"
+  cmd = "pnpm seed"
+  cwd = "packages/db"
+  touches = ["postgres"]
+
+[[profile]]
+  name = "all"
+  jobs = ["postgres", "redis", "mailpit", "admin", "api", "web", "worker", "migrate", "seed"]
+  default = true
+
+[[profile]]
+  name = "admin"
+  jobs = ["postgres", "redis", "api", "admin"]
+  default = false
+
+[[profile]]
+  name = "api"
+  jobs = ["postgres", "redis", "api"]
+  default = false
+
+[[profile]]
+  name = "web"
+  jobs = ["postgres", "redis", "api", "web"]
+  default = false
+
+[[profile]]
+  name = "worker"
+  jobs = ["redis", "worker"]
+  default = false
+
+[[env_port]]
+  file = "apps/admin/.env"
+  key = "NEXT_PUBLIC_API_URL"
+  job = "api"
+  port = "PORT"
+
+[[env_port]]
+  file = "apps/api/.env"
+  key = "PORT"
+  job = "api"
+  port = "PORT"
+
+[[env_port]]
+  file = "apps/api/.env"
+  key = "REDIS_URL"
+  job = "redis"
+  port = "REDIS_PORT"
+
+[[env_port]]
+  file = "apps/worker/.env"
+  key = "REDIS_URL"
+  job = "redis"
+  port = "REDIS_PORT"
+
+[[env_port]]
+  file = "apps/web/.env.local"
+  key = "PORT"
+  job = "web"
+  port = "PORT"
+
+[[env_port]]
+  file = "apps/web/.env.local"
+  key = "NEXT_PUBLIC_API_URL"
+  job = "api"
+  port = "PORT"
+
+[[env]]
+  file = "apps/api/.env"
+  key = "DATABASE_URL"
+  job = "postgres"
+  value = "postgres://postgres:postgres@localhost:{port.POSTGRES_PORT}/{namespace}"
+
+[[env]]
+  file = "packages/db/.env"
+  key = "DATABASE_URL"
+  job = "postgres"
+  value = "postgres://postgres:postgres@localhost:{port.POSTGRES_PORT}/{namespace}"

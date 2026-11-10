@@ -1,0 +1,111 @@
+{
+  "v": 2,
+  "command": "run-init",
+  "ok": false,
+  "op": "<id>",
+  "follow_ups": [
+    {
+      "command": "run-init",
+      "answers": [
+        {
+          "path": "jobs",
+          "values": [
+            "web"
+          ]
+        },
+        {
+          "path": "tasks",
+          "values": []
+        },
+        {
+          "path": "runner",
+          "values": [
+            "one_by_one"
+          ]
+        },
+        {
+          "path": "shared",
+          "values": []
+        },
+        {
+          "path": "spaces",
+          "values": []
+        },
+        {
+          "path": "touches",
+          "values": []
+        },
+        {
+          "path": "ports",
+          "values": [
+            "web.PORT=5173"
+          ]
+        },
+        {
+          "path": "commands",
+          "values": []
+        },
+        {
+          "path": "addressing",
+          "values": [
+            "names"
+          ]
+        },
+        {
+          "path": "urls",
+          "values": [
+            "web"
+          ]
+        },
+        {
+          "path": "env_copy",
+          "values": []
+        },
+        {
+          "path": "links",
+          "values": [
+            ".env#PORT"
+          ]
+        },
+        {
+          "path": "profiles",
+          "values": [
+            "all=web",
+            "web=web"
+          ]
+        },
+        {
+          "path": "default_profile",
+          "values": [
+            "all"
+          ]
+        },
+        {
+          "path": "patch_compose",
+          "values": [
+            "true"
+          ]
+        },
+        {
+          "path": "preview",
+          "values": [
+            "main"
+          ]
+        }
+      ],
+      "dry_run": true,
+      "code": "plan.replan",
+      "message": "the plan the facts give now"
+    }
+  ],
+  "warnings": [],
+  "error": {
+    "kind": "precondition",
+    "code": "plan.stale",
+    "message": "the facts changed since the preview",
+    "params": {
+      "expected": "<id>",
+      "found": "<id>"
+    }
+  }
+}

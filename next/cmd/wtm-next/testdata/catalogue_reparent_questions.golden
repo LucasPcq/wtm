@@ -16,7 +16,8 @@
           "value": "feat/b",
           "parent": "main"
         }
-      ]
+      ],
+      "optional": false
     },
     {
       "kind": "select",

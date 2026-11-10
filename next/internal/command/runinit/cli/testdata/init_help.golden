@@ -1,0 +1,67 @@
+
+  Set up the run module of the repository you stand in, from what it holds: the services of its
+  docker-compose.yml, the dev and start scripts of its apps and the other scripts of its packages, and
+  its .env files. Six parts, in order: what runs; shared or per worktree, and what each worktree gets
+  of a shared service; each job's port; the jobs answering under their own name; the .env keys that
+  follow a job; the profiles run up starts. Then run.toml, docker-compose.yml's rewrite and
+  config.toml's .env files are written at once, or none.
+
+  A compose service's literal host port is rewritten to read the variable its port is declared under,
+  the literal kept as its default ("${POSTGRES_PORT:-5432}:5432"), so docker compose up keeps working
+  on its own; a container's name is fronted with the compose project. --patch-compose=false leaves
+  the file as it is.
+
+  Run again, it sets the module up again from run.toml: every part filled from it, a job, a link or a
+  profile left out staying out, nothing found since added unattended; a job run.toml declares that
+  run init does not propose (run job add's) is kept as it is.
+
+  Usage:
+    wtm-next init [flags]
+
+  Examples:
+    # The wizard
+    wtm run init
+
+    # Unattended, from what wtm finds
+    wtm run init --yes
+
+    # Leave docker-compose.yml alone, start the apps through turbo
+    wtm run init --yes --patch-compose=false --runner through
+
+    # Fix admin's port and copy web's .env.local into new worktrees
+    wtm run init --yes --command 'admin=pnpm exec next dev -p ${ADMIN_PORT}' --env-copy apps/web/.env.local
+
+    # See the plan first, then apply exactly that plan
+    wtm run init --yes --dry-run
+    wtm run init --expect-fingerprint <hash>
+
+    # For a script or an agent, with the v2 JSON envelope
+    wtm run init --yes --output json
+
+  Flags:
+        --addressing string           How .env values spell an address: names, each worktree its own host through the proxy, or ports
+        --ask                         Ask again the questions this repository remembers an answer to, to change or forget it
+        --command strings             A job's command changed, job=command, so it reads its port's variable (repeatable)
+        --default-profile string      The profile run up starts when none is named
+    -n, --dry-run                     Show the plan and its fingerprint, apply nothing
+        --env-copy strings            The .env files config.toml copies into a new worktree besides its own (repeatable)
+        --expect-fingerprint string   Apply only if the facts still have this fingerprint, the one --dry-run printed
+    -h, --help                        help for init
+        --job strings                 The jobs to write, each a compose service, an app or a package script (repeatable; default: as run.toml holds them, else every one found)
+        --link strings                The .env keys that follow a job, file#KEY (repeatable; default: every key holding a job's port)
+        --output string               Output format: text or json (default "text")
+        --patch-compose               Rewrite docker-compose.yml's literal host ports and pinned names so each worktree gets its own (default: true)
+        --port strings                Each job's port, job.VARIABLE=base, or job= for a job that binds none (repeatable)
+        --preview string              The worktree the plan previews (default: the first that is not the main one)
+        --profile strings             The profiles run up starts, name=job,job (repeatable)
+        --runner string               How the root script that starts the apps runs: one_by_one, each app its own job, or through, the script one job that starts them
+        --shared strings              The compose services one copy serves for every worktree, the others one each (repeatable)
+        --space strings               What each worktree gets of a shared service: service.name=its space ({worktree} filled in), service.create= and service.remove=the commands that make and drop it, its name in $WTM_NAMESPACE (repeatable; a service with no name gets nothing of its own)
+        --task strings                The jobs that run to their end, the others keep running (repeatable)
+        --touches strings             The tasks that change a shared service's data: they run on each worktree's own space (repeatable)
+        --url strings                 The jobs answering under their own name through the proxy (repeatable)
+    -y, --yes                         Run unattended: no question, no confirmation (each part as given, else as run.toml holds it, else as found)
+
+  Global Flags:
+    -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+

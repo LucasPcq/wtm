@@ -11,7 +11,8 @@
         {
           "value": "feat/done"
         }
-      ]
+      ],
+      "optional": false
     },
     {
       "kind": "confirm",

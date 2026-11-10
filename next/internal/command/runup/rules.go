@@ -79,6 +79,7 @@ func Decide(f Facts, req Request, params DecideParams) (Plan, []domain.Warning, 
 	jobs := f.jobsOf(req.Profile)
 	exclusive := f.exclusive(req, targets).Value
 	planned := Plan{Profile: req.Profile, Exclusive: exclusive, Worktrees: []runjobs.Target{}, Others: []runjobs.Other{}, NoProbe: req.NoProbe, facts: f, asked: req}
+	planned.RememberParallel = !exclusive && slices.Contains(req.Remember, PathExclusive) && f.Run.Concurrency != project.Parallel
 	for _, t := range targets {
 		planned.Worktrees = append(planned.Worktrees, f.Planned(t, jobs, f.OrdinalOf(t)))
 	}
@@ -144,7 +145,7 @@ func (f Facts) warnings(p Plan, req Request) []domain.Warning {
 // ----------------------------------------------------------------------------
 // The plan
 
-// A Plan is what Apply will do, as the dry run and the JSON envelope show it and the fingerprint covers it: the profile started (none when run.toml declares none: every job), in each worktree, in order; whether the other worktrees' jobs are stopped first, and those worktrees; whether the ports go unchecked; then the recap, which the fingerprint leaves out.
+// A Plan is what Apply will do, as the dry run and the JSON envelope show it and the fingerprint covers it: the profile started (none when run.toml declares none: every job), in each worktree, in order; whether the other worktrees' jobs are stopped first, and those worktrees; whether keeping them is written into run.toml as concurrency = "parallel"; whether the ports go unchecked; then the recap, which the fingerprint leaves out.
 type Plan struct {
 	Profile   string           `json:"profile"`
 	Worktrees []runjobs.Target `json:"worktrees"`
@@ -152,7 +153,10 @@ type Plan struct {
 	Others    []runjobs.Other  `json:"others"`
 	NoProbe   bool             `json:"no_probe"`
 	Owed      []teardown.Debt  `json:"owed,omitempty"`
+
+	RememberParallel bool `json:"remember_parallel"`
 	domain.Recapped
+	remembered    bool
 	correlationID string
 	facts         Facts
 	asked         Request
@@ -224,6 +228,13 @@ func (p Plan) recap() []domain.RecapRow {
 			stopped = append(stopped, other.Worktree)
 		}
 		rows = append(rows, domain.RecapRow{Key: "stops", Label: "Stops first", Path: PathExclusive, Values: domain.RecapValues(stopped)})
+	}
+	if p.RememberParallel {
+		mark := domain.MarkRemember
+		if p.remembered {
+			mark = domain.MarkSaved
+		}
+		rows = append(rows, domain.RecapRow{Key: "others", Label: "Others' jobs", Path: PathExclusive, Mark: mark, Values: domain.RecapValues([]string{"kept"})})
 	}
 	if len(p.Owed) > 0 {
 		rows = append(rows, domain.RecapRow{Key: RecapOwed, Label: "Owed", Values: teardown.RecappedDebts(p.Owed)})

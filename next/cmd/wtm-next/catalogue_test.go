@@ -23,7 +23,7 @@ func TestTheCatalogueListsEachCommandWithItsSchemaOutsideAnyRepository(t *testin
 		}
 	}
 
-	assert.Equal(t, []string{"init", "create", "extract", "checkout", "clean", "prune", "fast-forward", "sync", "exec", "reparent", "list", "resolve", "status", "tree", "run-up", "run-logs", "run-down", "run-start", "run-stop", "run-ps", "run-list", "daemon-status", "daemon-stop", "daemon-restart", "daemon-stop-jobs"}, names)
+	assert.Equal(t, []string{"init", "create", "extract", "checkout", "clean", "prune", "fast-forward", "sync", "exec", "reparent", "list", "resolve", "status", "tree", "run-init", "run-up", "run-logs", "run-down", "run-start", "run-stop", "run-ps", "run-list", "daemon-status", "daemon-stop", "daemon-restart", "daemon-stop-jobs"}, names)
 }
 
 func TestAnInvalidCallIsRefusedWithItsKind(t *testing.T) {

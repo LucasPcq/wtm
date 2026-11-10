@@ -20,7 +20,8 @@
             "state": "up-to-date"
           }
         }
-      ]
+      ],
+      "optional": false
     },
     {
       "kind": "confirm",

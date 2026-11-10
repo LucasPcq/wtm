@@ -1,0 +1,18 @@
+
+  Step 5/17 • Each worktree's space
+
+  ✓ What runs: postgres, redis, mailpit, admin, api, web, worker, migrate, seed
+  ✓ Run once: migrate, seed
+  ✓ Root dev script: one by one
+  ✓ Shared: postgres, mailpit
+
+  What each worktree gets of a shared service: service.name=its space ({worktree} filled in), service.create=
+  and service.remove=the commands that make and drop it, its name in $WTM_NAMESPACE (repeatable; a service
+  with no name gets nothing of its own)
+
+›
+  postgres.name=acme_{worktree}
+  postgres.create=docker compose exec -T postgres createdb -U postgres "$WTM_NAMESPACE"
+  postgres.remove=docker compose exec -T postgres dropdb -U postgres --if-exists "$WTM_NAMESPACE"
+
+  tab add another • backspace remove last • enter confirm • esc back

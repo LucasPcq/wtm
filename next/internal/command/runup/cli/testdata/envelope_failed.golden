@@ -171,6 +171,7 @@
     "exclusive": false,
     "others": [],
     "no_probe": false,
+    "remember_parallel": false,
     "recap": [
       {
         "key": "worktrees",

@@ -20,7 +20,7 @@ func Worded[Q form.Questions](t *testing.T, words form.Worder[Q]) {
 
 		switch field := field.(type) {
 		case domain.MultiSelectField:
-			assert.NotEmpty(t, said.Empty, "the problem of %s answered with none", path)
+			assert.True(t, field.Optional || said.Empty != "", "the problem of %s answered with none", path)
 		case domain.SelectField:
 			for _, option := range field.Options {
 				worded := field.Closed || option.Value == ""

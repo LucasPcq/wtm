@@ -47,7 +47,7 @@ type MultiSelect struct {
 	err       error
 }
 
-// NewMultiSelect returns a multi-select over a copy of options; empty is the error shown when enter confirms with nothing picked.
+// NewMultiSelect returns a multi-select over a copy of options; empty is the error shown when enter confirms with nothing picked, none ("") when none picked is an answer.
 func NewMultiSelect(options []Pick, empty string) *MultiSelect {
 	m := &MultiSelect{options: append([]Pick(nil), options...), empty: empty}
 	m.refilter()
@@ -162,7 +162,7 @@ func (m *MultiSelect) pickAll() {
 
 // confirm answers the field, or stays with its Empty error when nothing is picked.
 func (m *MultiSelect) confirm() Verdict {
-	if len(m.Values()) == 0 {
+	if len(m.Values()) == 0 && m.empty != "" {
 		m.err = errors.New(m.empty)
 		return Stay
 	}

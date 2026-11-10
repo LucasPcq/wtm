@@ -140,7 +140,7 @@
       }
     },
     {
-      "command": "run init",
+      "command": "run-init",
       "code": "init.run_init",
       "message": "set up what runs in each worktree"
     }

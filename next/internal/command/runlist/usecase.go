@@ -76,9 +76,6 @@ const (
 	CodeRunInvalid     = Name + ".run_invalid"
 )
 
-// commandRunInit sets the run module up in a repository: not migrated yet.
-const commandRunInit = "run init"
-
 // Observe reads what run list reports: the repository and its run.toml, the worktree req names, the meta records, the jobs the daemon knows, never starting it, and the last line of the log of each job of run.toml it does not list there. A repository with no run.toml is refused with CodeNotInitialized, one whose run.toml does not load with CodeRunInvalid.
 func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 	repo, located, err := u.observeRequest(ctx, req)
@@ -89,7 +86,7 @@ func (u UseCase) Observe(ctx context.Context, req Request) (Facts, error) {
 		return Facts{}, &domain.Error{Kind: domain.KindPrecondition, Code: CodeRunInvalid, Message: "invalid run.toml: " + repo.RunErr.Error()}
 	}
 	if !repo.Run.Declared {
-		return Facts{}, &domain.Error{Kind: domain.KindPrecondition, Code: CodeNotInitialized, Message: "no run.toml: no job is declared", FollowUp: &domain.FollowUp{Command: commandRunInit, Code: CodeInit, Message: "declare the jobs"}}
+		return Facts{}, &domain.Error{Kind: domain.KindPrecondition, Code: CodeNotInitialized, Message: "no run.toml: no job is declared", FollowUp: &domain.FollowUp{Command: domain.CommandRunInit, Code: CodeInit, Message: "declare the jobs"}}
 	}
 	target, err := domain.TargetWorktree(repo.Snapshot.MainFirst(), req.query(located))
 	if err != nil {

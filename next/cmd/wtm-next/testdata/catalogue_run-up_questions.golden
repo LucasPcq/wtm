@@ -12,7 +12,8 @@
           "value": "main",
           "tag": "current"
         }
-      ]
+      ],
+      "optional": false
     },
     {
       "kind": "select",
@@ -33,7 +34,7 @@
       "skip": "alone",
       "value": false,
       "no_first": true,
-      "rememberable": false,
+      "rememberable": true,
       "remember": false
     },
     {

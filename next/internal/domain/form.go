@@ -193,8 +193,9 @@ type SelectField struct {
 // MultiSelectField asks any of its options.
 type MultiSelectField struct {
 	FieldSpec
-	Picked  []string `json:"picked"`
-	Options []Option `json:"options"`
+	Picked   []string `json:"picked"`
+	Options  []Option `json:"options"`
+	Optional bool     `json:"optional"` // none picked is an answer
 }
 
 // TextField asks one line of text.

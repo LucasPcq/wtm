@@ -14,7 +14,8 @@
       "kind": "multi_select",
       "path": "files",
       "picked": [],
-      "options": []
+      "options": [],
+      "optional": false
     },
     {
       "kind": "select",

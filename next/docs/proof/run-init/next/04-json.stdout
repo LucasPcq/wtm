@@ -1,0 +1,943 @@
+{
+  "v": 2,
+  "command": "run-init",
+  "ok": true,
+  "op": "<OP>",
+  "items": [
+    {
+      "subject": "docker-compose.yml",
+      "status": "done",
+      "detail": {
+        "path": "docker-compose.yml",
+        "tracked": true
+      }
+    },
+    {
+      "subject": "run.toml",
+      "status": "done",
+      "detail": {
+        "path": "run.toml",
+        "tracked": false
+      }
+    }
+  ],
+  "plan": {
+    "compose": {
+      "file": "docker-compose.yml",
+      "edits": [
+        {
+          "subject": "postgres",
+          "what": "port",
+          "at": {
+            "line": 7,
+            "column": 9,
+            "text": "\"5432:5432\""
+          },
+          "before": "\"5432:5432\"",
+          "after": "\"${POSTGRES_PORT:-5432}:5432\""
+        },
+        {
+          "subject": "redis",
+          "what": "port",
+          "at": {
+            "line": 11,
+            "column": 9,
+            "text": "\"6379:6379\""
+          },
+          "before": "\"6379:6379\"",
+          "after": "\"${REDIS_PORT:-6379}:6379\""
+        },
+        {
+          "subject": "mailpit",
+          "what": "port",
+          "at": {
+            "line": 15,
+            "column": 9,
+            "text": "\"8025:8025\""
+          },
+          "before": "\"8025:8025\"",
+          "after": "\"${MAILPIT_PORT:-8025}:8025\""
+        },
+        {
+          "subject": "mailpit",
+          "what": "port",
+          "at": {
+            "line": 16,
+            "column": 9,
+            "text": "\"1025:1025\""
+          },
+          "before": "\"1025:1025\"",
+          "after": "\"${MAILPIT_PORT_1025:-1025}:1025\""
+        }
+      ]
+    },
+    "files": [
+      {
+        "path": "docker-compose.yml",
+        "tracked": true,
+        "new": false
+      },
+      {
+        "path": "run.toml",
+        "tracked": false,
+        "new": true
+      }
+    ],
+    "detection": {
+      "manager": "pnpm",
+      "manager_from": "package.json",
+      "compose": "docker-compose.yml",
+      "services": [
+        {
+          "name": "postgres",
+          "image": "postgres:16",
+          "ports": [
+            "5432:5432"
+          ]
+        },
+        {
+          "name": "redis",
+          "image": "redis:7",
+          "ports": [
+            "6379:6379"
+          ]
+        },
+        {
+          "name": "mailpit",
+          "image": "axllent/mailpit",
+          "ports": [
+            "8025:8025",
+            "1025:1025"
+          ]
+        }
+      ],
+      "places": [
+        {
+          "dir": ".",
+          "name": "acme",
+          "scripts": [
+            {
+              "name": "build",
+              "cmd": "turbo run build"
+            },
+            {
+              "name": "dev",
+              "cmd": "turbo run dev"
+            }
+          ]
+        },
+        {
+          "dir": "apps/admin",
+          "name": "admin",
+          "scripts": [
+            {
+              "name": "build",
+              "cmd": "next build"
+            },
+            {
+              "name": "dev",
+              "cmd": "next dev -p 3001"
+            }
+          ]
+        },
+        {
+          "dir": "apps/api",
+          "name": "api",
+          "scripts": [
+            {
+              "name": "build",
+              "cmd": "tsc"
+            },
+            {
+              "name": "dev",
+              "cmd": "tsx watch src/server.ts"
+            }
+          ]
+        },
+        {
+          "dir": "apps/web",
+          "name": "web",
+          "scripts": [
+            {
+              "name": "build",
+              "cmd": "next build"
+            },
+            {
+              "name": "dev",
+              "cmd": "next dev"
+            }
+          ]
+        },
+        {
+          "dir": "apps/worker",
+          "name": "worker",
+          "scripts": [
+            {
+              "name": "dev",
+              "cmd": "tsx watch src/worker.ts"
+            }
+          ]
+        },
+        {
+          "dir": "packages/db",
+          "name": "db",
+          "scripts": [
+            {
+              "name": "migrate",
+              "cmd": "prisma migrate deploy"
+            },
+            {
+              "name": "seed",
+              "cmd": "tsx seed.ts"
+            }
+          ]
+        }
+      ],
+      "candidates": [
+        {
+          "name": "postgres",
+          "place": "",
+          "cmd": "docker compose up -d postgres",
+          "stop": "docker compose stop postgres",
+          "kind": "service",
+          "image": "postgres:16",
+          "compose": true,
+          "proposed": true,
+          "on_disk": false
+        },
+        {
+          "name": "redis",
+          "place": "",
+          "cmd": "docker compose up -d redis",
+          "stop": "docker compose stop redis",
+          "kind": "service",
+          "image": "redis:7",
+          "compose": true,
+          "proposed": true,
+          "on_disk": false
+        },
+        {
+          "name": "mailpit",
+          "place": "",
+          "cmd": "docker compose up -d mailpit",
+          "stop": "docker compose stop mailpit",
+          "kind": "service",
+          "image": "axllent/mailpit",
+          "compose": true,
+          "proposed": true,
+          "on_disk": false
+        },
+        {
+          "name": "admin",
+          "place": "apps/admin",
+          "script": "dev",
+          "cmd": "pnpm dev",
+          "kind": "service",
+          "compose": false,
+          "proposed": true,
+          "on_disk": false
+        },
+        {
+          "name": "api",
+          "place": "apps/api",
+          "script": "dev",
+          "cmd": "pnpm dev",
+          "kind": "service",
+          "compose": false,
+          "proposed": true,
+          "on_disk": false
+        },
+        {
+          "name": "web",
+          "place": "apps/web",
+          "script": "dev",
+          "cmd": "pnpm dev",
+          "kind": "service",
+          "compose": false,
+          "proposed": true,
+          "on_disk": false
+        },
+        {
+          "name": "worker",
+          "place": "apps/worker",
+          "script": "dev",
+          "cmd": "pnpm dev",
+          "kind": "service",
+          "compose": false,
+          "proposed": true,
+          "on_disk": false
+        },
+        {
+          "name": "migrate",
+          "place": "packages/db",
+          "script": "migrate",
+          "cmd": "pnpm migrate",
+          "kind": "task",
+          "compose": false,
+          "proposed": true,
+          "on_disk": false
+        },
+        {
+          "name": "seed",
+          "place": "packages/db",
+          "script": "seed",
+          "cmd": "pnpm seed",
+          "kind": "task",
+          "compose": false,
+          "proposed": true,
+          "on_disk": false
+        }
+      ],
+      "runner": {
+        "name": "dev",
+        "place": ".",
+        "script": "dev",
+        "cmd": "pnpm dev",
+        "kind": "service",
+        "compose": false,
+        "proposed": true,
+        "on_disk": false
+      },
+      "env_files": [
+        {
+          "file": "apps/admin/.env",
+          "copied": true,
+          "keys": [
+            {
+              "key": "NEXT_PUBLIC_API_URL",
+              "value": "http://localhost:4000",
+              "job": "api",
+              "kind": "address"
+            }
+          ]
+        },
+        {
+          "file": "apps/api/.env",
+          "copied": true,
+          "keys": [
+            {
+              "key": "PORT",
+              "value": "4000",
+              "job": "api",
+              "kind": "port"
+            },
+            {
+              "key": "DATABASE_URL",
+              "value": "postgres://postgres:postgres@localhost:5432/acme",
+              "job": "postgres",
+              "kind": "data"
+            },
+            {
+              "key": "REDIS_URL",
+              "value": "redis://localhost:6379",
+              "job": "redis",
+              "kind": "port"
+            }
+          ]
+        },
+        {
+          "file": "apps/web/.env.local",
+          "copied": true,
+          "keys": [
+            {
+              "key": "PORT",
+              "value": "3000",
+              "job": "web",
+              "kind": "port"
+            },
+            {
+              "key": "NEXT_PUBLIC_API_URL",
+              "value": "http://localhost:4000",
+              "job": "api",
+              "kind": "address"
+            }
+          ]
+        },
+        {
+          "file": "apps/worker/.env",
+          "copied": true,
+          "keys": [
+            {
+              "key": "REDIS_URL",
+              "value": "redis://localhost:6379",
+              "job": "redis",
+              "kind": "port"
+            },
+            {
+              "key": "SMTP_PORT",
+              "value": "1025"
+            }
+          ]
+        },
+        {
+          "file": "packages/db/.env",
+          "copied": true,
+          "keys": [
+            {
+              "key": "DATABASE_URL",
+              "value": "postgres://postgres:postgres@localhost:5432/acme",
+              "job": "postgres",
+              "kind": "data"
+            }
+          ]
+        }
+      ]
+    },
+    "parts": {
+      "ports": [
+        {
+          "job": "postgres",
+          "variable": "POSTGRES_PORT",
+          "base": 5432,
+          "from": "docker-compose.yml",
+          "spelled": "postgres.POSTGRES_PORT=5432"
+        },
+        {
+          "job": "redis",
+          "variable": "REDIS_PORT",
+          "base": 6379,
+          "from": "docker-compose.yml",
+          "spelled": "redis.REDIS_PORT=6379"
+        },
+        {
+          "job": "mailpit",
+          "variable": "MAILPIT_PORT",
+          "base": 8025,
+          "from": "docker-compose.yml",
+          "spelled": "mailpit.MAILPIT_PORT=8025"
+        },
+        {
+          "job": "mailpit",
+          "variable": "MAILPIT_PORT_1025",
+          "base": 1025,
+          "from": "docker-compose.yml",
+          "spelled": "mailpit.MAILPIT_PORT_1025=1025"
+        },
+        {
+          "job": "admin",
+          "variable": "ADMIN_PORT",
+          "base": 3001,
+          "from": "apps/admin/package.json",
+          "spelled": "admin.ADMIN_PORT=3001"
+        },
+        {
+          "job": "api",
+          "variable": "PORT",
+          "base": 4000,
+          "from": "apps/api/.env",
+          "spelled": "api.PORT=4000"
+        },
+        {
+          "job": "web",
+          "variable": "PORT",
+          "base": 3000,
+          "from": "apps/web/.env.local",
+          "spelled": "web.PORT=3000"
+        },
+        {
+          "job": "worker",
+          "spelled": "worker="
+        }
+      ],
+      "commands": [
+        {
+          "job": "admin",
+          "cmd": "pnpm dev",
+          "proposed": "pnpm exec next dev -p ${ADMIN_PORT}",
+          "changed": false,
+          "spelled": "admin=pnpm exec next dev -p ${ADMIN_PORT}"
+        }
+      ],
+      "spaces": [
+        {
+          "service": "postgres",
+          "name": "acme_{worktree}",
+          "create": "docker compose exec -T postgres createdb -U postgres \"$WTM_NAMESPACE\"",
+          "remove": "docker compose exec -T postgres dropdb -U postgres --if-exists \"$WTM_NAMESPACE\"",
+          "spelled": [
+            "postgres.name=acme_{worktree}",
+            "postgres.create=docker compose exec -T postgres createdb -U postgres \"$WTM_NAMESPACE\"",
+            "postgres.remove=docker compose exec -T postgres dropdb -U postgres --if-exists \"$WTM_NAMESPACE\""
+          ]
+        },
+        {
+          "service": "mailpit",
+          "name": "",
+          "create": "",
+          "remove": "",
+          "spelled": []
+        }
+      ],
+      "links": [
+        {
+          "file": "apps/admin/.env",
+          "key": "NEXT_PUBLIC_API_URL",
+          "value": "http://localhost:4000",
+          "job": "api",
+          "port": "PORT",
+          "kind": "address",
+          "linked": true,
+          "spelled": "apps/admin/.env#NEXT_PUBLIC_API_URL"
+        },
+        {
+          "file": "apps/api/.env",
+          "key": "PORT",
+          "value": "4000",
+          "job": "api",
+          "port": "PORT",
+          "kind": "port",
+          "linked": true,
+          "spelled": "apps/api/.env#PORT"
+        },
+        {
+          "file": "apps/api/.env",
+          "key": "DATABASE_URL",
+          "value": "postgres://postgres:postgres@localhost:5432/acme",
+          "job": "postgres",
+          "port": "POSTGRES_PORT",
+          "kind": "data",
+          "template": "postgres://postgres:postgres@localhost:{port.POSTGRES_PORT}/{namespace}",
+          "linked": true,
+          "spelled": "apps/api/.env#DATABASE_URL"
+        },
+        {
+          "file": "apps/api/.env",
+          "key": "REDIS_URL",
+          "value": "redis://localhost:6379",
+          "job": "redis",
+          "port": "REDIS_PORT",
+          "kind": "port",
+          "linked": true,
+          "spelled": "apps/api/.env#REDIS_URL"
+        },
+        {
+          "file": "apps/web/.env.local",
+          "key": "PORT",
+          "value": "3000",
+          "job": "web",
+          "port": "PORT",
+          "kind": "port",
+          "linked": true,
+          "spelled": "apps/web/.env.local#PORT"
+        },
+        {
+          "file": "apps/web/.env.local",
+          "key": "NEXT_PUBLIC_API_URL",
+          "value": "http://localhost:4000",
+          "job": "api",
+          "port": "PORT",
+          "kind": "address",
+          "linked": true,
+          "spelled": "apps/web/.env.local#NEXT_PUBLIC_API_URL"
+        },
+        {
+          "file": "apps/worker/.env",
+          "key": "REDIS_URL",
+          "value": "redis://localhost:6379",
+          "job": "redis",
+          "port": "REDIS_PORT",
+          "kind": "port",
+          "linked": true,
+          "spelled": "apps/worker/.env#REDIS_URL"
+        },
+        {
+          "file": "packages/db/.env",
+          "key": "DATABASE_URL",
+          "value": "postgres://postgres:postgres@localhost:5432/acme",
+          "job": "postgres",
+          "port": "POSTGRES_PORT",
+          "kind": "data",
+          "template": "postgres://postgres:postgres@localhost:{port.POSTGRES_PORT}/{namespace}",
+          "linked": true,
+          "spelled": "packages/db/.env#DATABASE_URL"
+        }
+      ],
+      "profiles": [
+        {
+          "name": "all",
+          "jobs": [
+            "postgres",
+            "redis",
+            "mailpit",
+            "admin",
+            "api",
+            "web",
+            "worker",
+            "migrate",
+            "seed"
+          ],
+          "default": true,
+          "proposed": true,
+          "spelled": "all=postgres,redis,mailpit,admin,api,web,worker,migrate,seed"
+        },
+        {
+          "name": "admin",
+          "jobs": [
+            "postgres",
+            "redis",
+            "api",
+            "admin"
+          ],
+          "default": false,
+          "proposed": true,
+          "spelled": "admin=postgres,redis,api,admin"
+        },
+        {
+          "name": "api",
+          "jobs": [
+            "postgres",
+            "redis",
+            "api"
+          ],
+          "default": false,
+          "proposed": true,
+          "spelled": "api=postgres,redis,api"
+        },
+        {
+          "name": "web",
+          "jobs": [
+            "postgres",
+            "redis",
+            "api",
+            "web"
+          ],
+          "default": false,
+          "proposed": true,
+          "spelled": "web=postgres,redis,api,web"
+        },
+        {
+          "name": "worker",
+          "jobs": [
+            "redis",
+            "worker"
+          ],
+          "default": false,
+          "proposed": true,
+          "spelled": "worker=redis,worker"
+        }
+      ]
+    },
+    "preview": {
+      "worktree": "main",
+      "ordinal": 0,
+      "numbered": true,
+      "offset": 0,
+      "spacing": 10,
+      "services": [
+        "redis",
+        "admin",
+        "api",
+        "web",
+        "worker"
+      ],
+      "tasks": [
+        "migrate",
+        "seed"
+      ],
+      "joins": [
+        "postgres",
+        "mailpit"
+      ],
+      "data": [
+        {
+          "service": "postgres",
+          "name": "acme_main",
+          "template": "acme_{worktree}"
+        }
+      ],
+      "ports": [
+        {
+          "job": "admin",
+          "variable": "ADMIN_PORT",
+          "base": 3001,
+          "port": 3001,
+          "shared": false
+        },
+        {
+          "job": "api",
+          "variable": "PORT",
+          "base": 4000,
+          "port": 4000,
+          "shared": false
+        },
+        {
+          "job": "mailpit",
+          "variable": "MAILPIT_PORT",
+          "base": 8025,
+          "port": 8025,
+          "shared": true
+        },
+        {
+          "job": "mailpit",
+          "variable": "MAILPIT_PORT_1025",
+          "base": 1025,
+          "port": 1025,
+          "shared": true
+        },
+        {
+          "job": "postgres",
+          "variable": "POSTGRES_PORT",
+          "base": 5432,
+          "port": 5432,
+          "shared": true
+        },
+        {
+          "job": "redis",
+          "variable": "REDIS_PORT",
+          "base": 6379,
+          "port": 6379,
+          "shared": false
+        },
+        {
+          "job": "web",
+          "variable": "PORT",
+          "base": 3000,
+          "port": 3000,
+          "shared": false
+        }
+      ],
+      "addresses": [
+        {
+          "job": "admin",
+          "url": "http://admin.main.acme.localhost:11080"
+        },
+        {
+          "job": "api",
+          "url": "http://api.main.acme.localhost:11080"
+        },
+        {
+          "job": "web",
+          "url": "http://web.main.acme.localhost:11080"
+        }
+      ],
+      "env": [
+        {
+          "file": "apps/admin/.env",
+          "keys": [
+            "NEXT_PUBLIC_API_URL"
+          ]
+        },
+        {
+          "file": "apps/api/.env",
+          "keys": [
+            "PORT",
+            "REDIS_URL",
+            "DATABASE_URL"
+          ]
+        },
+        {
+          "file": "apps/web/.env.local",
+          "keys": [
+            "PORT",
+            "NEXT_PUBLIC_API_URL"
+          ]
+        },
+        {
+          "file": "apps/worker/.env",
+          "keys": [
+            "REDIS_URL"
+          ]
+        },
+        {
+          "file": "packages/db/.env",
+          "keys": [
+            "DATABASE_URL"
+          ]
+        }
+      ],
+      "up": {
+        "name": "all",
+        "jobs": [
+          "postgres",
+          "redis",
+          "mailpit",
+          "admin",
+          "api",
+          "web",
+          "worker",
+          "migrate",
+          "seed"
+        ],
+        "default": true
+      }
+    },
+    "recap": [
+      {
+        "key": "jobs",
+        "label": "Jobs",
+        "path": "jobs",
+        "values": [
+          {
+            "value": "postgres",
+            "text": "postgres"
+          },
+          {
+            "value": "redis",
+            "text": "redis"
+          },
+          {
+            "value": "mailpit",
+            "text": "mailpit"
+          },
+          {
+            "value": "admin",
+            "text": "admin"
+          },
+          {
+            "value": "api",
+            "text": "api"
+          },
+          {
+            "value": "web",
+            "text": "web"
+          },
+          {
+            "value": "worker",
+            "text": "worker"
+          },
+          {
+            "value": "migrate",
+            "text": "migrate"
+          },
+          {
+            "value": "seed",
+            "text": "seed"
+          }
+        ]
+      },
+      {
+        "key": "shared",
+        "label": "Shared",
+        "path": "shared",
+        "values": [
+          {
+            "value": "postgres",
+            "text": "postgres"
+          },
+          {
+            "value": "mailpit",
+            "text": "mailpit"
+          }
+        ]
+      },
+      {
+        "key": "ports",
+        "label": "Ports",
+        "path": "ports",
+        "values": [
+          {
+            "value": "postgres POSTGRES_PORT 5432",
+            "text": "postgres POSTGRES_PORT 5432"
+          },
+          {
+            "value": "redis REDIS_PORT 6379",
+            "text": "redis REDIS_PORT 6379"
+          },
+          {
+            "value": "mailpit MAILPIT_PORT 8025",
+            "text": "mailpit MAILPIT_PORT 8025"
+          },
+          {
+            "value": "mailpit MAILPIT_PORT_1025 1025",
+            "text": "mailpit MAILPIT_PORT_1025 1025"
+          },
+          {
+            "value": "admin ADMIN_PORT 3001",
+            "text": "admin ADMIN_PORT 3001"
+          },
+          {
+            "value": "api PORT 4000",
+            "text": "api PORT 4000"
+          },
+          {
+            "value": "web PORT 3000",
+            "text": "web PORT 3000"
+          }
+        ]
+      },
+      {
+        "key": "addressing",
+        "label": "Addresses",
+        "path": "addressing",
+        "values": [
+          {
+            "value": "names",
+            "text": "names"
+          }
+        ]
+      },
+      {
+        "key": "links",
+        "label": ".env keys",
+        "path": "links",
+        "values": [
+          {
+            "value": "8 linked",
+            "text": "8 linked"
+          }
+        ]
+      },
+      {
+        "key": "profiles",
+        "label": "Profiles",
+        "path": "profiles",
+        "values": [
+          {
+            "value": "all (default)",
+            "text": "all (default)"
+          },
+          {
+            "value": "admin",
+            "text": "admin"
+          },
+          {
+            "value": "api",
+            "text": "api"
+          },
+          {
+            "value": "web",
+            "text": "web"
+          },
+          {
+            "value": "worker",
+            "text": "worker"
+          }
+        ]
+      },
+      {
+        "key": "writes",
+        "label": "Writes",
+        "values": [
+          {
+            "value": "docker-compose.yml",
+            "text": "docker-compose.yml"
+          },
+          {
+            "value": "run.toml",
+            "text": "run.toml"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [
+    {
+      "command": "run-up",
+      "code": "run-init.up",
+      "message": "start the jobs"
+    }
+  ],
+  "warnings": [
+    {
+      "code": "run-init.port_variable_ignored",
+      "params": {
+        "after": "pnpm exec next dev -p ${ADMIN_PORT}",
+        "before": "pnpm dev",
+        "job": "admin",
+        "port": "3001",
+        "variable": "ADMIN_PORT"
+      },
+      "message": "admin binds 3001 whatever ADMIN_PORT says: run it as pnpm exec next dev -p ${ADMIN_PORT} (--command)"
+    }
+  ]
+}

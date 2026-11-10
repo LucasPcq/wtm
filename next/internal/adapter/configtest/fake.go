@@ -27,6 +27,7 @@ type Fake struct {
 	mu         sync.Mutex
 	config     *project.Config
 	run        project.Run
+	runVersion int
 	schema     int
 	unreadable bool
 	fail       map[string]error

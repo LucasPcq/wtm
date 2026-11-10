@@ -28,6 +28,7 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/reparent"
 	"github.com/LucasPcq/wtm/next/internal/command/resolve"
 	"github.com/LucasPcq/wtm/next/internal/command/rundown"
+	"github.com/LucasPcq/wtm/next/internal/command/runinit"
 	"github.com/LucasPcq/wtm/next/internal/command/runlist"
 	"github.com/LucasPcq/wtm/next/internal/command/runlogs"
 	"github.com/LucasPcq/wtm/next/internal/command/runps"
@@ -66,6 +67,7 @@ var (
 	openStatus      = opener(func(a app) status.UseCase { return a.Status })
 	openTree        = opener(func(a app) tree.UseCase { return a.Tree })
 	openRunUp       = opener(func(a app) runup.UseCase { return a.RunUp })
+	openRunInit     = opener(func(a app) runinit.UseCase { return a.RunInit })
 	openRunLogs     = opener(func(a app) runlogs.UseCase { return a.RunLogs })
 	openRunDown     = opener(func(a app) rundown.UseCase { return a.RunDown })
 	openRunStart    = opener(func(a app) runstart.UseCase { return a.RunStart })

@@ -1,0 +1,13 @@
+
+  Step 3/17 • Root dev script
+
+  ✓ What runs: postgres, redis, mailpit, admin, api, web, worker, migrate, seed
+  ✓ Run once: migrate, seed
+
+  How the root script that starts the apps runs: one_by_one, each app its own job, or through, the script one
+  job that starts them
+
+▌› One by one: each app its own port, logs and restart
+   Through the root script, as one job
+
+  ↑↓ navigate • / filter • enter confirm • esc back

@@ -1,0 +1,17 @@
+
+  PROFILES
+  all    default    postgres, redis, mailpit, admin, api, web, migrate, seed
+  admin             postgres, redis, api, admin
+  api               postgres, redis, api
+  web               postgres, redis, api, web
+
+  JOBS
+  postgres  service  docker compose up -d postgres        POSTGRES_PORT=5432  shared
+  redis     service  docker compose up -d redis           REDIS_PORT=6379
+  mailpit   service  docker compose up -d mailpit         MAILPIT_PORT=8025 MAILPIT_PORT_1025=1025  shared
+  admin     service  pnpm exec next dev -p ${ADMIN_PORT}  ADMIN_PORT=3001 ↗
+  api       service  pnpm dev                             PORT=4000 ↗
+  web       service  pnpm dev                             PORT=3000 ↗
+  migrate   task     pnpm migrate
+  seed      task     pnpm seed
+

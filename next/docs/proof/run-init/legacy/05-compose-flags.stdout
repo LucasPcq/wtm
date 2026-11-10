@@ -1,0 +1,33 @@
+
+  ✓ Configured run module → <SB>/acme/.git/wtm/run.toml   5 added
+
+  ✓ 5 port(s) declared in run.toml, 1 compose file(s) templatized
+
+  ╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+  │ Ports withdrawn — they could not coexist                                                                                            │
+  │ MAILPIT_PORT_1025 (job "docker-compose", base 1025) is dropped — it meets SMTP_PORT (job "worker-dev", base 1025) in every worktree │
+  │ SMTP_PORT (job "worker-dev", base 1025) is dropped — it meets MAILPIT_PORT_1025 (job "docker-compose", base 1025) in every worktree │
+  ╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+  ✓ 8 .env value(s) now follow a port
+
+  ╭──────────────────────────────────────────────────────────────────────────╮
+  │ These jobs will bind the same port in every worktree                     │
+  │ admin-dev    no port declared                                            │
+  │ worker-dev   no port declared                                            │
+  │                                                                          │
+  │ Declare a port, or reference it in the command: `wtm run job edit <job>` │
+  ╰──────────────────────────────────────────────────────────────────────────╯
+  ╭──────────────────────────────────────────────────────────────────────────────────────╮
+  │ Named URLs carry a port                                                              │
+  │ Jobs publishing a named URL answer on http://<job>.<worktree>.<repo>.localhost:11080 │
+  │ `wtm run proxy install` serves them on port 80 so the port disappears from the URL   │
+  ╰──────────────────────────────────────────────────────────────────────────────────────╯
+  ╭──────────────────────────────────────────────────────────────────────────────╮
+  │ Published names, unsettled .env                                              │
+  │ main's .env still spells ports — `wtm env main --addressing names` aligns it │
+  ╰──────────────────────────────────────────────────────────────────────────────╯
+
+  → wtm run up        start the jobs
+  → wtm run job add   declare another
+

@@ -1,0 +1,17 @@
+
+  Step 1/17 • What runs
+
+  The jobs to write, each a compose service, an app or a package script (repeatable; default: as run.toml
+  holds them, else every one found)
+
+▌› [x] postgres  postgres:16 · docker compose
+   [x] redis  redis:7 · docker compose
+   [x] mailpit  axllent/mailpit · docker compose
+   [x] admin  apps/admin · pnpm dev
+   [x] api  apps/api · pnpm dev
+   [x] web  apps/web · pnpm dev
+   [x] worker  apps/worker · pnpm start
+   [x] migrate  packages/db · pnpm migrate
+   [x] seed  packages/db · pnpm seed
+
+  ↑↓ navigate • space toggle • a all • / filter • enter confirm • esc cancel

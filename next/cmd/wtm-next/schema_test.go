@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/LucasPcq/wtm/next/internal/api"
 	"github.com/LucasPcq/wtm/next/internal/command/runlogs"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -28,6 +29,13 @@ func TestThePublishedSchemaIsTheOneTheGoTypesGive(t *testing.T) {
 	}
 
 	assert.Equal(t, string(readFile(t, apiSchemaFile)), string(generated), "api.v2.schema.json is stale: run make schema")
+}
+
+func TestEveryNameThePublishedSchemaGivesIsSnakeCase(t *testing.T) {
+	var schema any
+	require.NoError(t, json.Unmarshal(api.Schema(), &schema))
+
+	assert.Empty(t, propertiesNotSnakeCase(schema, "#"), "a field of the API without its json tag")
 }
 
 func TestEachPublishedEnumListsEveryConstantOfItsType(t *testing.T) {

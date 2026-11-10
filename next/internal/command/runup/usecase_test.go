@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/LucasPcq/wtm/next/internal/adapter/configtest"
 	"github.com/LucasPcq/wtm/next/internal/command/runup"
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
@@ -270,7 +271,7 @@ func TestARepositoryWithNoRunTomlIsRefusedFollowedByRunInit(t *testing.T) {
 
 	assert.Equal(t, runup.CodeNotInitialized, refused.Code)
 	assert.Equal(t, domain.KindPrecondition, refused.Kind)
-	assert.Equal(t, "run init", refused.FollowUp.Command)
+	assert.Equal(t, domain.CommandRunInit, refused.FollowUp.Command)
 }
 
 func TestADaemonThatCannotBeMadeSureOfFailsEveryWorktree(t *testing.T) {
@@ -533,4 +534,32 @@ func TestAStartOnAnIndexANewerWtmWroteIsWarnedOf(t *testing.T) {
 	_, warnings := w.plan(t, starting("", featA))
 
 	assert.Contains(t, codes(warnings), runup.Name+domain.IndexFrozen)
+}
+
+func TestKeepingTheOthersJobsAlwaysIsWrittenIntoRunTomlAndAskedNoMore(t *testing.T) {
+	w := newWorld(t)
+	w.up("api", featB, nil)
+	no := false
+
+	outcome, err := w.usecase.Run(t.Context(), runup.Request{Worktrees: []string{featA}, Exclusive: &no, Remember: []string{runup.PathExclusive}}, domain.RunOptions{})
+
+	require.NoError(t, err)
+	assert.Equal(t, domain.StatusDone, itemOf(t, outcome.Result.Items, featA).Status)
+	assert.Contains(t, readFile(t, w.stateDir+"/run.toml"), `concurrency = "parallel"`)
+	assert.Contains(t, outcome.Plan.Recap, domain.RecapRow{Key: "others", Label: "Others' jobs", Path: runup.PathExclusive, Mark: domain.MarkSaved, Values: domain.RecapValues([]string{"kept"})})
+	settled := w.questions(t, starting("", featA)).Exclusive
+	assert.Equal(t, domain.SkipConfigured, settled.Skip)
+	assert.False(t, settled.Value)
+}
+
+func TestARememberRunTomlRefusesIsAWarningAndTheStartGoesOn(t *testing.T) {
+	w := newWorld(t)
+	w.up("api", featB, nil)
+	w.usecase.RunConfig = configtest.NewFake(configtest.FakeParams{Fail: map[string]error{"SaveRun": errors.New("read-only file system")}})
+	no := false
+
+	result, _ := w.apply(t, runup.Request{Worktrees: []string{featA}, Exclusive: &no, Remember: []string{runup.PathExclusive}})
+
+	assert.Equal(t, domain.StatusDone, itemOf(t, result.Items, featA).Status)
+	assert.Equal(t, []string{runup.CodeRememberFailed}, codes(result.Warnings))
 }
