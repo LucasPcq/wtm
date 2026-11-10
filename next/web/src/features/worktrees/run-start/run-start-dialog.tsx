@@ -1,7 +1,7 @@
 import { toast } from 'sonner'
 import type { Applied } from '@/api/queries/commands'
+import { RunDialogContent } from '@/components/run-dialog-content'
 import { Dialog } from '@/components/ui/dialog'
-import { RunDialogContent } from '@/features/worktrees/components/run-dialog-content'
 import { useRun } from '@/features/worktrees/hooks/use-run'
 import {
   type RunStartRan,

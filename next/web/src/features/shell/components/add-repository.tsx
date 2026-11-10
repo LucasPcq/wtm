@@ -3,15 +3,10 @@ import { useNavigate } from '@tanstack/react-router'
 import { CircleCheck, CircleX, Loader2 } from 'lucide-react'
 import { useDeferredValue, useState } from 'react'
 import { addRepo, placeQuery, reposQuery } from '@/api/queries/repos'
+import { DialogBand } from '@/components/dialog-band'
+import { RunDialogContent } from '@/components/run-dialog-content'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { placeAnswer } from '@/features/shell/utils/words'
@@ -41,11 +36,13 @@ export function AddRepository({ open, onOpenChange }: { open: boolean; onOpenCha
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="gap-6 sm:max-w-xl">
+      <RunDialogContent running={false}>
         <DialogHeader>
           <DialogTitle>Add a repository</DialogTitle>
           <DialogDescription>A git repository on this machine, by its path.</DialogDescription>
         </DialogHeader>
+
+        <DialogBand />
 
         <Field className="gap-2" data-invalid={answer?.ok === false}>
           <FieldLabel htmlFor="add-repository-path">Path</FieldLabel>
@@ -98,7 +95,7 @@ export function AddRepository({ open, onOpenChange }: { open: boolean; onOpenCha
             {answer?.primary ?? 'Add'}
           </Button>
         </DialogFooter>
-      </DialogContent>
+      </RunDialogContent>
     </Dialog>
   )
 }

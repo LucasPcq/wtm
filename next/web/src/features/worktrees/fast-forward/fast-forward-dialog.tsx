@@ -1,7 +1,7 @@
 import { toast } from 'sonner'
 import type { Applied } from '@/api/queries/commands'
+import { RunDialogContent } from '@/components/run-dialog-content'
 import { Dialog } from '@/components/ui/dialog'
-import { RunDialogContent } from '@/features/worktrees/components/run-dialog-content'
 import { FastForwardProgress } from '@/features/worktrees/fast-forward/components/fast-forward-progress'
 import { FastForwardWizard } from '@/features/worktrees/fast-forward/components/fast-forward-wizard'
 import { useFastForwardDialog } from '@/features/worktrees/hooks/use-fast-forward-dialog'
