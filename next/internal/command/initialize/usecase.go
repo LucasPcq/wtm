@@ -176,7 +176,7 @@ const CodeConfigNewer = Name + ".config_newer"
 const CodeEditConfig = Name + ".edit_config"
 
 func editConfig() *domain.FollowUp {
-	return &domain.FollowUp{Command: "config edit", Code: CodeEditConfig, Message: "fix it by hand"}
+	return &domain.FollowUp{Command: domain.CommandConfigEdit, Code: CodeEditConfig, Message: "fix it by hand"}
 }
 
 // Observe reads what init decides from: config.toml as written, refused with CodeConfigInvalid when it does not parse or remembers an answer init cannot keep, CodeConfigNewer when a newer wtm wrote it; the repository's worktrees and branches, origin's default branch (else the main worktree's), what its files suggest, and whether run.toml declares anything (an unreadable one counts as declared: run init is not what it needs).

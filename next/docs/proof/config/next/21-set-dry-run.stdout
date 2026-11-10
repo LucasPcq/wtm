@@ -1,0 +1,6 @@
+
+  config set · dry run, nothing applied
+  Worktrees folder  ../wt
+  fingerprint  <FP>
+  → wtm config set --base-path ../wt --on-clean= --expect-fingerprint <FP>   apply this plan
+

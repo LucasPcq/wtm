@@ -136,12 +136,18 @@ func (s *Session[R, Q, O]) Standing(at int) Standing {
 	field := s.Field(at)
 	spec := field.Spec()
 	st := Standing{Value: trailOf(field, s.Words(at)), Origin: spec.Origin, Skip: spec.Skip, Reason: s.reason(spec.Skip), Erred: len(s.Problems(spec.Path)) > 0}
-	st.Given = len(s.given.Values(spec.Path)) > 0
+	st.Given = s.given.Values(spec.Path) != nil
+	st.Kept = s.command.GivenOnly && s.given.Values(spec.Path) == nil && s.answersAny()
 	if st.Given && !positional(worded{Field: field, Words: s.Words(at)}) {
 		st.Flag = s.command.Flags().Spell(spec.Path)
 	}
 
 	return st
+}
+
+// answersAny reports whether the request as given answers one of the form's fields, even with an empty list.
+func (s *Session[R, Q, O]) answersAny() bool {
+	return slices.ContainsFunc(s.form.Fields, func(field domain.Field) bool { return s.given.Values(field.Spec().Path) != nil })
 }
 
 // reason is how the trail words why a step is not asked: the command's own words, else the wizard's, else the code.

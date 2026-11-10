@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/LucasPcq/wtm/next/internal/command/clean"
+	"github.com/LucasPcq/wtm/next/internal/command/configedit"
 	"github.com/LucasPcq/wtm/next/internal/command/daemonrestart"
 	"github.com/LucasPcq/wtm/next/internal/command/exec"
 	"github.com/LucasPcq/wtm/next/internal/command/prune"
@@ -55,7 +56,7 @@ func TestEachRegisteredCommandIsInTheCatalogueOrItsStreamsAndWired(t *testing.T)
 
 	require.NotEmpty(t, registered)
 	assert.Equal(t, streamsListed, streamed, "catalogue.go streams a command the list of streams does not name, or the reverse")
-	assert.ElementsMatch(t, registered, append(listed, streamed...), "main.go registers a command catalogue.go does not list, or the reverse")
+	assert.ElementsMatch(t, registered, slices.Concat(listed, streamed, terminal), "main.go registers a command catalogue.go does not list, or the reverse")
 	for _, name := range registered {
 		// a stream follows every repository: wire.go builds it once, not per repository in app
 		if !slices.Contains(streamsListed, name) && !slices.ContainsFunc(machine, func(m string) bool { return strings.ReplaceAll(m, "-", "") == name }) {
@@ -112,7 +113,7 @@ func TestEachFollowUpOfAMigratedCommandIsSpelledFromItsSchema(t *testing.T) {
 			continue
 		}
 
-		require.Contains(t, []string{initialize.Name, domain.CommandCreate, clean.Name, prune.Name, exec.Name, domain.CommandSync, domain.CommandEnv, runup.Name, runlogs.Name, rundown.Name, runstart.Name, runstop.Name, daemonrestart.Name}, followUp.Command, "%s has migrated: spell its follow-ups from its schema in commandLine", followUp.Command)
+		require.Contains(t, []string{initialize.Name, domain.CommandCreate, clean.Name, prune.Name, exec.Name, domain.CommandSync, domain.CommandEnv, runup.Name, runlogs.Name, rundown.Name, runstart.Name, runstop.Name, daemonrestart.Name, configedit.Name}, followUp.Command, "%s has migrated: spell its follow-ups from its schema in commandLine", followUp.Command)
 		argv := commandLine(followUp)
 		assert.Equal(t, append([]string{cli.Program}, strings.Fields(spelling(followUp.Command))...), argv[:min(1+len(strings.Fields(spelling(followUp.Command))), len(argv))], "%s's follow-up %v does not fold into its request", followUp.Command, followUp.Answers)
 	}

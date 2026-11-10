@@ -9,6 +9,9 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/adapter/shell"
 	checkoutcli "github.com/LucasPcq/wtm/next/internal/command/checkout/cli"
 	cleancli "github.com/LucasPcq/wtm/next/internal/command/clean/cli"
+	configeditcli "github.com/LucasPcq/wtm/next/internal/command/configedit/cli"
+	configsetcli "github.com/LucasPcq/wtm/next/internal/command/configset/cli"
+	configshowcli "github.com/LucasPcq/wtm/next/internal/command/configshow/cli"
 	createcli "github.com/LucasPcq/wtm/next/internal/command/create/cli"
 	daemonrestartcli "github.com/LucasPcq/wtm/next/internal/command/daemonrestart/cli"
 	daemonstatuscli "github.com/LucasPcq/wtm/next/internal/command/daemonstatus/cli"
@@ -79,6 +82,7 @@ func commands(streams *output.Streams, env cli.Env) []*cobra.Command {
 		eventscli.New(streams, env, systemStream(), commandLine),
 		runCmd(runupcli.New(streams, env, openRunUp, commandLine, liveView()), runlogscli.New(streams, env, openRunLogs, commandLine, runlogscli.View{Daemon: wtmDaemon(), Open: openURL}), rundowncli.New(streams, env, openRunDown, commandLine), runstartcli.New(streams, env, openRunStart, commandLine, liveView()), runstopcli.New(streams, env, openRunStop, commandLine), runpscli.New(streams, env, openRunPs, commandLine), runlistcli.New(streams, env, openRunList, commandLine)),
 		daemonCmd(streams, daemonstatuscli.New(streams, env, openDaemonStatus, commandLine), daemonstopcli.New(streams, env, openDaemonStop, commandLine), daemonrestartcli.New(streams, env, openDaemonRestart, commandLine), daemonstopjobscli.New(streams, env, openDaemonStopJobs, commandLine)),
+		configCmd(configshowcli.New(streams, env, openConfigShow, commandLine), configsetcli.New(streams, env, openConfigSet, commandLine), configeditcli.New(streams, env, openConfigEdit, commandLine)),
 		uiCmd(env),
 	}
 }
@@ -90,6 +94,13 @@ func liveView() runview.View {
 
 // withSubcommands is cmd with commands under it: env and env show.
 func withSubcommands(cmd *cobra.Command, commands ...*cobra.Command) *cobra.Command {
+	cmd.AddCommand(commands...)
+	return cmd
+}
+
+// configCmd is config, the parent of the commands that read and change the project's config.toml.
+func configCmd(commands ...*cobra.Command) *cobra.Command {
+	cmd := &cobra.Command{Use: "config", Short: "Read and change the project's settings, config.toml", Args: cobra.NoArgs}
 	cmd.AddCommand(commands...)
 	return cmd
 }

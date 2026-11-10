@@ -1,0 +1,23 @@
+
+  Open config.toml in $VISUAL, else $EDITOR, else vi, and check it once the editor
+  is closed. $EDITOR may carry arguments (code --wait).
+
+  A file that no longer parses, or holds a setting wtm can't use, is kept as edited:
+  each problem is named and the edit offered again. The commands that read it refuse
+  until it is fixed.
+
+  Usage:
+    wtm-next edit [flags]
+
+  Examples:
+    wtm config edit
+
+    EDITOR="code --wait" wtm config edit
+
+  Flags:
+    -h, --help            help for edit
+        --output string   Output format: text or json (default "text")
+
+  Global Flags:
+    -q, --quiet   Silence human output; errors and the exit code are unaffected, and --output json still emits its document
+

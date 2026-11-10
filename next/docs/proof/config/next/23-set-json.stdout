@@ -1,0 +1,56 @@
+{
+  "v": 2,
+  "command": "config-set",
+  "ok": true,
+  "op": "<OP>",
+  "items": [
+    {
+      "subject": "config.toml",
+      "status": "done",
+      "detail": {}
+    }
+  ],
+  "plan": {
+    "changes": [
+      {
+        "path": "env_strategy",
+        "before": [
+          "example"
+        ],
+        "after": [
+          "main"
+        ]
+      }
+    ],
+    "replaces": "<DIGEST>",
+    "recap": [
+      {
+        "key": "env_strategy",
+        "label": ".env from",
+        "path": "env_strategy",
+        "values": [
+          {
+            "value": "main",
+            "text": "main"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [
+    {
+      "command": "config-set",
+      "answers": [
+        {
+          "path": "env_strategy",
+          "values": [
+            "example"
+          ]
+        }
+      ],
+      "code": "config-set.undo",
+      "message": "put back what it held"
+    }
+  ],
+  "warnings": []
+}

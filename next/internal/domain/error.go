@@ -112,6 +112,7 @@ const (
 	CommandSync        = "sync"
 	CommandExec        = "exec"
 	CommandInit        = "init"
+	CommandConfigEdit  = "config-edit"
 	CommandRunUp       = "run-up"
 	CommandRunLogs     = "run-logs"
 	CommandRunDown     = "run-down"

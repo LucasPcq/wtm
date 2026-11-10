@@ -1,0 +1,23 @@
+{
+  "v": 2,
+  "command": "config-show",
+  "ok": false,
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "precondition",
+    "code": "config-show.config_invalid",
+    "message": "invalid config.toml: parse <SB>/acme/.git/wtm/config.toml: toml: line 11 (last key \"worktrees.base_branch\"): expected value but found '\\n' instead",
+    "params": {
+      "column": "14",
+      "key": "worktrees.base_branch",
+      "line": "11",
+      "setting": "base_branch"
+    },
+    "follow_up": {
+      "command": "config-edit",
+      "code": "config-show.edit",
+      "message": "fix it in your editor"
+    }
+  }
+}

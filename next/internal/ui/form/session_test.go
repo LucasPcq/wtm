@@ -28,6 +28,24 @@ func TestAStepGivenByAFlagSaysWhichAndOneLeftOpenIsAsked(t *testing.T) {
 	assert.Equal(t, form.Standing{Value: "feat/a", Given: true}, observed(t, &app{}, request{"branches": {"feat/a"}}).Standing(atBranches))
 }
 
+func TestACommandThatAsksOnlyWhatIsGivenKeepsEveryOtherStepOnceOneIsGiven(t *testing.T) {
+	command := fakeCommand()
+	command.GivenOnly = true
+	session := func(given request) *form.Session[request, questions, outcome] {
+		s := command.Session(t.Context(), &app{}, given, domain.RunOptions{})
+		apply, err := s.Observe(t.Context())
+		require.NoError(t, err)
+		apply()
+		return s
+	}
+
+	given := session(request{"files": {}})
+	assert.Equal(t, form.Standing{Value: "move", Kept: true}, given.Standing(atKeep))
+	assert.True(t, given.Standing(atFiles).Given)
+	assert.False(t, given.Standing(atFiles).Kept)
+	assert.False(t, session(nil).Standing(atKeep).Kept)
+}
+
 func TestAStepARefusedEntryNamesIsErred(t *testing.T) {
 	s := observed(t, &app{}, request{"branches": {"feat/a", "taken"}})
 

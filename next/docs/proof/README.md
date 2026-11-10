@@ -38,6 +38,7 @@ other=$(mktemp -d)/wtm-next && (cd ../../.. && go build -ldflags "-X main.versio
 ./run-start-stop.sh "$wtm" "$next" run-start-stop
 ./clean-data.sh "$wtm" "$next" clean-data
 ./daemon-commands.sh "$wtm" "$next" daemon-commands
+./config.sh "$wtm" "$next" config
 git diff --stat .
 ```
 
@@ -963,3 +964,30 @@ The reference is the legacy `wtm init` of 0.30.1. Next's init writes the same co
   - **Detection** (D6): next also proposes `docker compose down` before a removal when a compose file sits at the root (2: legacy's `on_clean` is empty), and reads package.json's `packageManager` before the lockfiles.
   - **A recap and a confirm on the first init too** (D5, bug 7): legacy writes a first init without one (`tty/legacy/5-outcome.txt`), next shows `tty/next/5-recap.txt`.
   - **The uniform system**: the v2 envelope (7, legacy refuses `--output json`, exit 2) and dry run (1, exit 2 on legacy); an invalid value is an invalid request naming its flag, exit 2 (8: next refuses `copy`; legacy, set up already, says it exists and exits 0, and refuses `copy` with exit 1 on a first init, bug 3); outside a repository `not a git repository`, exit 21 (12, legacy exit 1 with git's error, bug 5); the trail names each step once (bug 4: legacy's "Post-create hooks" twice, "1 files selected"); `relocate` follows up only while a worktree sits outside the folder (bug 6), and `run init` only while run.toml declares nothing (the demo's does, so next does not offer it).
+
+# Proof: `wtm config show|edit` (legacy `surface/cli/configcmd`) vs `wtm-next config show|set|edit`
+
+- `config.sh <wtm> <wtm-next> config`: two identical sandboxes (the `docs/demos` "acme" project, its config.toml as init wrote it), one per binary. Before each scenario config.toml is put back as the scenario wants it: as init wrote it, `strategy = "copy"` (a value wtm can't use), `base_branch =` (doesn't parse), `schema = 9` first (a newer wtm's), or none. Each records `<side>/<n>-<name>.{exit,stdout,stderr,config.diff}`, the diff being config.toml before and after; paths, digests, fingerprints and op ids normalised. The editors are scripts given through `$EDITOR`/`$VISUAL`: one writes a valid file, one a value wtm can't use, one a broken file, one fails, one removes the file. `config/web/config.toml.diff` is config.toml before and after the changes made from the Settings page in a sandbox (a choice, its Undo, the folder saved over a change on disk with Save mine, a create hook added).
+  1. `show` 2. `show --output json`
+  3. `show`, a value wtm can't use 4. the same, JSON
+  5. `show`, a file that doesn't parse 6. the same, JSON
+  7. `show`, a newer wtm's file 8. the same, JSON
+  9. `show`, no config.toml 10. the same, JSON
+  11. `show` outside a repository
+  12. `edit`, the editor writes a valid file 13. a value wtm can't use 14. a broken file 15. the editor fails 16. the editor removes the file 17. `$EDITOR` with arguments (`… --wait`) 18. `$VISUAL` set beside `$EDITOR` 19. no config.toml
+  20. next only: `edit` with neither `$VISUAL` nor `$EDITOR` and no terminal
+  21. next only: `set --base-path ../wt --on-clean= --dry-run` 22. `set --base-path ../wt --on-create "pnpm install" --yes` 23. `set --env-strategy main --yes --output json` 24. `set --base-path /tmp/wt --yes`, refused 25. `set --remembered= --yes` 26. `set` over a newer wtm's file
+- **Bugs of the legacy, fixed, each with its test:**
+  - `$EDITOR` with arguments was run as one path (`fork/exec …/valid --wait: no such file`, scenario 17): next runs it as a shell word list (`adapter/shell` `TestAnEditorWithArgumentsOpensTheFile`).
+  - `$VISUAL` was ignored (scenario 18): next reads `$VISUAL`, else `$EDITOR`, else vi (`TestVisualComesBeforeEditor`).
+  - With no editor and no terminal, legacy started vi with nothing to draw on: next refuses (`TestNoEditorAndNoTerminalIsRefused`, scenario 20).
+  - No config.toml: `show` warned and exited 0, `show --output json` printed an empty config, exit 0, `edit` warned, exit 0 (scenarios 9, 10, 19): next refuses `<command>.config_not_found`, exit 12, `init` as its follow-up (`TestNoConfigOrOneThatDoesNotParseIsRefused`, `TestNoConfigIsRefusedBeforeTheEditor`).
+  - The editor removing the file: `Config file is missing after edit.`, exit 0 (16): next refuses `config-edit.config_not_found`, exit 12 (`TestAnEditThatRemovesTheFileIsNoConfig`).
+  - `show` of a value wtm can't use said nothing, text or JSON (3, 4): next warns `config-show.invalid_value` on its setting (`TestAValueWtmCannotUseIsShownWithItsProblem`).
+  - `show --output json` of a file that doesn't parse printed a framed error on stderr and no JSON (6): next prints the envelope, `config-show.config_invalid` with where it stopped (`TestAConfigThatDoesNotParseSaysWhereAndOffersTheEdit`).
+  - A newer wtm's file: `show` and `--validate` said nothing (7, 8): next reads it and warns `config-show.config_newer`; `set` refuses it, exit 22 (`TestAConfigANewerWtmWroteIsReadAndSaidSo`, `TestAConfigANewerWtmWroteIsNotRewritten`).
+  - Outside a repository: `resolve state dir: … exit status 128`, exit 1 (11): next `git.not_a_repository`, exit 21.
+  - Found while building: a list answered empty (`--on-clean=`) was left out of the command line the engine spells, so a dry run's "apply this plan" replanned without it (`ui/form` `TestAListAnsweredEmptyIsSpelledAndReadsBackEmpty`).
+  - Found while building: a list flag given empty (`--env-file=`) left its step open, the wizard asking what the flag had answered (`ui/form` `TestACommandThatAsksOnlyWhatIsGivenKeepsEveryOtherStepOnceOneIsGiven`).
+- **Departures, owner-approved (LUC-333, Q1–Q6):** `show` prints the settings as a document (label, value, `· default`, the values it takes, what it does) instead of the raw TOML and its path, its JSON the read envelope instead of the raw config; `--validate` is gone: problems are warnings (exit 0), a file that doesn't parse exits 1; `edit` of a file left invalid keeps it, names each problem and offers `config edit` again, exit 1, no reopen loop; no config.toml refuses `<command>.config_not_found`, exit 12, with `init`; `config set` is new, on the command line too, forgetting a remembered answer through `--remembered` (no `config forget`), and in a terminal changes only the settings its flags give, asking the others only when no flag is given; the web's folder help says worktrees already made stay where they are (relocate is not in next).
+- **The Settings page against its design (frames `settings/01–14`):** the .env strategy shows four cards, the core offering `none` beside the design's three; frame 14 (no settings yet) is the shell's repository gate in practice, since a repository with no config.toml leaves the registry, the page's own empty state answering a read refused `config_not_found` meanwhile; frames 01 (loading) and 07 (saving) are transient, covered by the page's skeleton and the dialog's disabled buttons and `Saving` label.

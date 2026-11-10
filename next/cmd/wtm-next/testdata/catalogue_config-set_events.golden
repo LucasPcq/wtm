@@ -1,0 +1,22 @@
+[
+  {
+    "type": "operation.started",
+    "command": "config-set",
+    "surface": "api"
+  },
+  {
+    "type": "unit.started",
+    "subject": "config.toml"
+  },
+  {
+    "type": "unit.finished",
+    "subject": "config.toml",
+    "status": "done"
+  },
+  {
+    "type": "operation.finished",
+    "command": "config-set",
+    "surface": "api",
+    "ok": true
+  }
+]

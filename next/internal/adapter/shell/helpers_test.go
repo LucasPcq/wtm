@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -83,4 +84,12 @@ func resolved(t *testing.T, path string) string {
 	target, err := filepath.EvalSymlinks(path)
 	require.NoError(t, err)
 	return target
+}
+
+// writeEditor writes script as an executable editor in dir and returns its path.
+func writeEditor(t *testing.T, dir, script string) string {
+	t.Helper()
+	path := filepath.Join(dir, "editor-"+strconv.Itoa(len(script)))
+	require.NoError(t, os.WriteFile(path, []byte("#!/bin/sh\n"+script+"\n"), 0o755))
+	return path
 }

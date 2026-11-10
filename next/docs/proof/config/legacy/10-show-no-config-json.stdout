@@ -1,0 +1,15 @@
+{
+  "worktrees": {
+    "base_path": "",
+    "base_branch": ""
+  },
+  "env": {
+    "strategy": "",
+    "files": null
+  },
+  "hooks": {
+    "on_create": null,
+    "on_clean": null
+  },
+  "wizard": {}
+}

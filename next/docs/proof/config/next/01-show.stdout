@@ -1,0 +1,25 @@
+
+  Worktrees
+  Worktrees folder  ../acme.trees
+                    Where new worktrees go, relative to the repository; outside it keeps the main
+                    checkout clean
+  Base branch       main · default
+                    The branch new worktrees start from by default
+
+  .env files
+  .env from         example · default
+                    takes example, main, parent, none
+                    Where a new worktree's .env files come from: a fresh checkout has none of your
+                    local ones
+  .env files        apps/api/.env, apps/web/.env
+                    The .env files every new worktree gets
+
+  Hooks
+  On create         none
+                    Commands run in a worktree once it is created, such as installing its dependencies
+  On clean          none
+                    Commands run in a worktree before it is removed, such as stopping what it started
+
+  Remembered answers
+  none: create asks each question
+

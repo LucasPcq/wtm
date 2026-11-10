@@ -1,0 +1,4 @@
+
+  ✗ invalid config.toml: parse <state>/config.toml: toml: line 5 (last key "worktrees.base_branch"): expected value but found '\n' instead
+  → wtm config-edit   fix it in your editor
+

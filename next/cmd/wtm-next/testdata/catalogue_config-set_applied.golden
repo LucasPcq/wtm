@@ -1,0 +1,52 @@
+{
+  "v": 2,
+  "command": "config-set",
+  "ok": true,
+  "op": "<id>",
+  "items": [
+    {
+      "subject": "config.toml",
+      "status": "done",
+      "detail": {}
+    }
+  ],
+  "plan": {
+    "changes": [
+      {
+        "path": "on_clean",
+        "before": [],
+        "after": [
+          "make down"
+        ]
+      }
+    ],
+    "replaces": "<id>",
+    "recap": [
+      {
+        "key": "on_clean",
+        "label": "On clean",
+        "path": "on_clean",
+        "values": [
+          {
+            "value": "make down",
+            "text": "make down"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [
+    {
+      "command": "config-set",
+      "answers": [
+        {
+          "path": "on_clean",
+          "values": []
+        }
+      ],
+      "code": "config-set.undo",
+      "message": "put back what it held"
+    }
+  ],
+  "warnings": []
+}

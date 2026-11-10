@@ -1,0 +1,26 @@
+{
+  "worktrees": {
+    "base_path": "../acme.trees",
+    "base_branch": "main"
+  },
+  "env": {
+    "strategy": "example",
+    "files": [
+      {
+        "target": "apps/api/.env",
+        "template": "apps/api/.env.example",
+        "local": false
+      },
+      {
+        "target": "apps/web/.env",
+        "template": "apps/web/.env.example",
+        "local": false
+      }
+    ]
+  },
+  "hooks": {
+    "on_create": [],
+    "on_clean": []
+  },
+  "wizard": {}
+}

@@ -1,0 +1,43 @@
+
+  path  <SB>/acme/.git/wtm/config.toml
+
+#:schema ./schemas/project.schema.json
+
+# wtm — Worktree Manager configuration
+# Docs: https://github.com/LucasPcq/wtm
+
+[worktrees]
+# Directory where worktrees are created (relative to repo root)
+base_path = "../acme.trees"
+
+# Branch used as the default base for new worktrees
+base_branch = "main"
+
+[env]
+# Strategy for provisioning .env files in new worktrees:
+#   example — copy .env.example and rename to .env
+#   main    — copy .env from the main checkout
+#   parent  — copy .env from the source worktree
+strategy = "copy"
+
+# Each value file to provision, with its committed template (if any).
+
+[[env.file]]
+target = "apps/api/.env"
+template = "apps/api/.env.example"
+
+[[env.file]]
+target = "apps/web/.env"
+template = "apps/web/.env.example"
+
+[hooks]
+# Commands run after creating a new worktree
+on_create = [
+]
+
+# Commands run right before removing a worktree (e.g. tear down external
+# resources like Docker). A non-zero exit aborts the removal unless the entry
+# sets continue_on_error.
+on_clean = [
+]
+

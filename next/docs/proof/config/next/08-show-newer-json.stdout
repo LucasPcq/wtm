@@ -1,0 +1,149 @@
+{
+  "v": 2,
+  "command": "config-show",
+  "ok": true,
+  "items": [
+    {
+      "subject": "config.toml",
+      "status": "done",
+      "detail": {
+        "digest": "<DIGEST>",
+        "newer": true,
+        "settings": {
+          "fields": [
+            {
+              "kind": "text",
+              "path": "base_path",
+              "origin": "config",
+              "section": "worktrees",
+              "value": "../acme.trees"
+            },
+            {
+              "kind": "select",
+              "path": "base_branch",
+              "origin": "config",
+              "section": "worktrees",
+              "value": "main",
+              "options": [
+                {
+                  "value": "main"
+                }
+              ],
+              "rememberable": false,
+              "remember": false,
+              "refreshable": false,
+              "closed": false
+            },
+            {
+              "kind": "select",
+              "path": "env_strategy",
+              "origin": "config",
+              "section": "env_files",
+              "value": "example",
+              "options": [
+                {
+                  "value": "example"
+                },
+                {
+                  "value": "main"
+                },
+                {
+                  "value": "parent"
+                },
+                {
+                  "value": "none"
+                }
+              ],
+              "rememberable": false,
+              "remember": false,
+              "refreshable": false,
+              "closed": true
+            },
+            {
+              "kind": "multi_select",
+              "path": "env_files",
+              "origin": "config",
+              "section": "env_files",
+              "picked": [
+                "apps/api/.env",
+                "apps/web/.env"
+              ],
+              "options": [
+                {
+                  "value": "apps/api/.env",
+                  "template": "apps/api/.env.example"
+                },
+                {
+                  "value": "apps/web/.env",
+                  "template": "apps/web/.env.example"
+                }
+              ]
+            },
+            {
+              "kind": "hooks",
+              "path": "on_create",
+              "origin": "config",
+              "section": "hooks",
+              "entries": [],
+              "found": [],
+              "dirs": []
+            },
+            {
+              "kind": "hooks",
+              "path": "on_clean",
+              "origin": "config",
+              "section": "hooks",
+              "entries": [],
+              "found": [],
+              "dirs": []
+            }
+          ],
+          "problems": [],
+          "sections": [
+            {
+              "id": "worktrees",
+              "state": "answered"
+            },
+            {
+              "id": "env_files",
+              "state": "answered"
+            },
+            {
+              "id": "hooks",
+              "state": "answered"
+            }
+          ]
+        },
+        "defaults": [
+          {
+            "path": "base_path",
+            "value": "../.trees",
+            "in_use": false
+          },
+          {
+            "path": "base_branch",
+            "value": "main",
+            "in_use": true
+          },
+          {
+            "path": "env_strategy",
+            "value": "example",
+            "in_use": true
+          }
+        ],
+        "remembered": []
+      }
+    }
+  ],
+  "follow_ups": [],
+  "warnings": [
+    {
+      "code": "config-show.config_newer",
+      "params": {
+        "found": "9",
+        "supported": "1"
+      },
+      "message": "config.toml is at schema 9, newer than the 1 this wtm writes: upgrade wtm to use it"
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "v": 2,
+  "command": "config-edit",
+  "ok": false,
+  "items": [
+    {
+      "subject": "config.toml",
+      "status": "failed",
+      "error": {
+        "kind": "precondition",
+        "code": "config-edit.invalid",
+        "message": "config.toml holds a setting wtm can't use: kept as edited",
+        "params": {
+          "count": "1"
+        },
+        "follow_up": {
+          "command": "config-edit",
+          "code": "config-edit.again",
+          "message": "fix it"
+        }
+      },
+      "warnings": [
+        {
+          "code": "config-edit.invalid_value",
+          "params": {
+            "path": "env_strategy",
+            "problem": "one_of",
+            "value": "copy"
+          },
+          "message": "env.strategy must be one of example, main, parent, none, not copy"
+        }
+      ],
+      "detail": {}
+    }
+  ],
+  "follow_ups": [],
+  "warnings": [],
+  "error": {
+    "kind": "precondition",
+    "code": "config-edit.invalid",
+    "message": "config.toml holds a setting wtm can't use: kept as edited",
+    "params": {
+      "count": "1"
+    },
+    "follow_up": {
+      "command": "config-edit",
+      "code": "config-edit.again",
+      "message": "fix it"
+    }
+  }
+}

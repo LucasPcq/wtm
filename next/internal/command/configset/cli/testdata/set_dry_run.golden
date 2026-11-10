@@ -1,0 +1,7 @@
+
+  set · dry run, nothing applied
+  Worktrees folder  ../wt
+  On clean          none
+  fingerprint  0bdf0591354316fc1b1970db
+  → wtm-next set --base-path ../wt --on-clean= --expect-fingerprint 0bdf0591354316fc1b1970db   apply this plan
+

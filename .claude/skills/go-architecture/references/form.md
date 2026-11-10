@@ -15,6 +15,7 @@
 | `Draw(w, applied, view)` | the outcome of an apply, drawn from `output.View`: paths shown from `view.Cwd`, follow-ups spelled by `view.CommandLine` (`output.FollowUpStep`); `form.Query.Draw(w, read, req, view)` takes the same view and the request read, which a layout may follow (`status --all` draws its table however many worktrees) |
 | `ApplyLabel(previewed)` | the recap's option that applies, nil for "Yes, apply" |
 | `Special(session, at, field)` | the command's own step for a field, nil for the step of its kind |
+| `GivenOnly` | once the command line answers one field (a flag given empty included), the wizard asks no other: each step left unanswered is kept, `value · kept` in the trail (`config set` changes only the settings given); no flag asks every step |
 
 `O` satisfies `form.Outcome` (`PlanFingerprint`, `Applied`, `Failure`, `Envelope`), which `domain.Outcome` does: a command's `Outcome` alias needs nothing more.
 

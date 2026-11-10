@@ -1,0 +1,8 @@
+
+  ✓ config set: 1 done
+
+  Worktrees folder  ../wt
+  On clean          none
+
+  → wtm-next set --base-path ../.trees --on-clean '{"cmd":"docker compose down","continue_on_error":true}'   put back what it held
+

@@ -28,6 +28,11 @@ import (
 	"github.com/LucasPcq/wtm/next/internal/command/checkout"
 	"github.com/LucasPcq/wtm/next/internal/command/clean"
 	cleancli "github.com/LucasPcq/wtm/next/internal/command/clean/cli"
+	"github.com/LucasPcq/wtm/next/internal/command/configedit"
+	configeditcli "github.com/LucasPcq/wtm/next/internal/command/configedit/cli"
+	"github.com/LucasPcq/wtm/next/internal/command/configset"
+	configsetcli "github.com/LucasPcq/wtm/next/internal/command/configset/cli"
+	"github.com/LucasPcq/wtm/next/internal/command/configshow"
 	"github.com/LucasPcq/wtm/next/internal/command/create"
 	createcli "github.com/LucasPcq/wtm/next/internal/command/create/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/daemonrestart"
@@ -111,6 +116,9 @@ type app struct {
 	RunPs       runps.UseCase
 	RunList     runlist.UseCase
 	EnvShow     envshow.UseCase
+	ConfigShow  configshow.UseCase
+	ConfigSet   configset.UseCase
+	ConfigEdit  configedit.UseCase
 }
 
 // wire builds each adapter of the repository params locates once and injects it into every use case.
@@ -174,6 +182,7 @@ func wire(params wireParams) app {
 		Number:    provisions.Number,
 		Owing:     teardowns.Owing,
 	}
+	settingsOf := settings.Service{Store: projectConfig}
 	stops := runjobs.Stops{Daemon: runs, Gone: repository.GoneIn(repo), Located: repository.LocatedIn(repo), Locate: repository.LocateIn(repo)}
 
 	return app{
@@ -349,7 +358,36 @@ func wire(params wireParams) app {
 			Operations: operations,
 			Stops:      stops,
 		},
+		ConfigShow: configshow.UseCase{
+			Settings: settingsOf,
+			Git:      repo,
+			Init:     setUp(),
+			Edit:     configEdit(),
+		},
+		ConfigSet: configset.UseCase{
+			Settings:   settingsOf,
+			Git:        repo,
+			Detect:     detect.Repository{Dir: params.MainPath}.Detect,
+			Operations: operations,
+			Init:       setUp(),
+			Edit:       configEdit(),
+		},
+		ConfigEdit: configedit.UseCase{
+			Path:     filepath.Join(params.StateDir, configFile),
+			Editor:   shell.Edit,
+			Settings: settingsOf,
+			Git:      repo,
+			Init:     setUp(),
+		},
 	}
+}
+
+// configFile is the name of the project's config.toml in wtm's state directory.
+const configFile = "config.toml"
+
+// configEdit is config edit, offered by a config.toml that does not parse.
+func configEdit() *domain.FollowUp {
+	return &domain.FollowUp{Command: configedit.Name}
 }
 
 // runSettle is how long a start waits, once its services are launched and no port check waits, for one that fails at once to end: a process that cannot bind its port exits within instants of its spawn, after the start that spawned it returned.
@@ -483,6 +521,10 @@ func commandLine(followUp domain.FollowUp) []string {
 		return daemonrestartcli.Line(followUp)
 	case daemonstopjobs.Name:
 		return daemonstopjobscli.Line(followUp)
+	case configset.Name:
+		return configsetcli.Line(followUp)
+	case configedit.Name:
+		return configeditcli.Line(followUp)
 	}
 
 	argv, _ := spelled(followUp)

@@ -1,0 +1,7 @@
+--- config.toml before
++++ config.toml after
+@@ -37,3 +37,4 @@
+ # sets continue_on_error.
+ on_clean = [
+ ]
++x = [

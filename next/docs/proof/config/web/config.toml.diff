@@ -1,0 +1,54 @@
+--- config.toml before (as written by hand)
++++ config.toml after the web's changes
+@@ -1,12 +1,24 @@
+-schema = 1
++#:schema ./schemas/project.schema.json
+ 
++# wtm — Worktree Manager configuration
++# Docs: https://github.com/LucasPcq/wtm
++
+ [worktrees]
+-base_path = "../.trees"
++# Directory where worktrees are created (relative to repo root)
++base_path = "../worktrees"
++
++# Branch used as the default base for new worktrees
+ base_branch = "main"
+ 
+ [env]
++# Strategy for provisioning .env files in new worktrees:
++#   example — copy .env.example and rename to .env
++#   main    — copy .env from the main checkout
++#   parent  — copy .env from the source worktree
+ strategy = "example"
+ 
++# Each value file to provision, with its committed template (if any).
++
+ [[env.file]]
+ target = "apps/api/.env"
+ template = "apps/api/.env.example"
+@@ -16,9 +28,22 @@
+ template = "apps/web/.env.example"
+ 
+ [hooks]
+-on_create = ["pnpm install", { cmd = "pnpm db:generate", cwd = "apps/api" }]
+-on_clean = ["docker compose down"]
++# Commands run after creating a new worktree
++on_create = [
++  "pnpm install",
++  { cmd = "pnpm db:generate", cwd = "apps/api" },
++  "pnpm build",
++]
+ 
++# Commands run right before removing a worktree (e.g. tear down external
++# resources like Docker). A non-zero exit aborts the removal unless the entry
++# sets continue_on_error.
++on_clean = [
++  "docker compose down",
++]
++
++# Answers the wizard no longer asks, kept by "Always use this answer".
++# --ask asks them again; deleting a line forgets it.
+ [wizard.remembered]
+ env_strategy = "parent"
+ source_update = "ff"
