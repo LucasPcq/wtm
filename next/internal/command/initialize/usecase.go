@@ -5,6 +5,7 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
@@ -18,7 +19,7 @@ import (
 // Name is the command's name, the one its surfaces and its codes spell.
 const Name = domain.CommandInit
 
-// CodeConfigInvalid refuses a re-init of a config.toml that does not parse: it is edited by hand first.
+// CodeConfigInvalid refuses a re-init of a config.toml that does not parse, or that remembers an answer init cannot keep: it is edited by hand first.
 const CodeConfigInvalid = Name + domain.ConfigInvalid
 
 // A UseCase sets wtm up in one repository: the ports it reads the repository through, the one that registers it, and the services it shares with the other commands. MainPath is the main worktree, ConfigPath where config.toml is.
@@ -174,12 +175,15 @@ const CodeConfigNewer = Name + ".config_newer"
 // CodeEditConfig is the step that opens a config.toml init cannot read in an editor.
 const CodeEditConfig = Name + ".edit_config"
 
-// Observe reads what init decides from: config.toml as written, refused with CodeConfigInvalid when it does not parse, CodeConfigNewer when a newer wtm wrote it; the repository's worktrees and branches, origin's default branch (else the main worktree's), what its files suggest, and whether run.toml declares anything (an unreadable one counts as declared: run init is not what it needs).
+func editConfig() *domain.FollowUp {
+	return &domain.FollowUp{Command: "config edit", Code: CodeEditConfig, Message: "fix it by hand"}
+}
+
+// Observe reads what init decides from: config.toml as written, refused with CodeConfigInvalid when it does not parse or remembers an answer init cannot keep, CodeConfigNewer when a newer wtm wrote it; the repository's worktrees and branches, origin's default branch (else the main worktree's), what its files suggest, and whether run.toml declares anything (an unreadable one counts as declared: run init is not what it needs).
 func (u UseCase) Observe(ctx context.Context) (Facts, error) {
 	saved, err := u.Settings.Read()
 	if invalid, ok := errors.AsType[*project.InvalidConfigError](err); ok {
-		edit := &domain.FollowUp{Command: "config edit", Code: CodeEditConfig, Message: "fix it by hand"}
-		return Facts{}, &domain.Error{Kind: domain.KindPrecondition, Code: CodeConfigInvalid, Message: "invalid config.toml: " + invalid.Reason.Error(), FollowUp: edit, Cause: err}
+		return Facts{}, &domain.Error{Kind: domain.KindPrecondition, Code: CodeConfigInvalid, Message: "invalid config.toml: " + invalid.Reason.Error(), FollowUp: editConfig(), Cause: err}
 	}
 	if err != nil {
 		return Facts{}, err
@@ -187,6 +191,14 @@ func (u UseCase) Observe(ctx context.Context) (Facts, error) {
 	if saved != nil && saved.Newer() {
 		newer := &domain.SchemaNewer{Path: u.ConfigPath, Found: saved.Schema, Supported: project.ConfigSchema}
 		return Facts{}, &domain.Error{Kind: domain.KindPrecondition, Code: CodeConfigNewer, Message: newer.Error(), Cause: newer}
+	}
+	// init writes the remembered answers back as they are: one it cannot keep is fixed by hand first
+	if problems := settings.RememberedProblems(Name, saved); len(problems) > 0 {
+		messages := make([]string, 0, len(problems))
+		for _, problem := range problems {
+			messages = append(messages, problem.Message(problem.Path))
+		}
+		return Facts{}, &domain.Error{Kind: domain.KindPrecondition, Code: CodeConfigInvalid, Message: "invalid config.toml: " + strings.Join(messages, "; "), FollowUp: editConfig()}
 	}
 
 	snapshot, err := u.Git.Snapshot(ctx)

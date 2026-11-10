@@ -91,6 +91,23 @@ func TestAConfigThatDoesNotParseIsEditedByHandFirst(t *testing.T) {
 	assert.Equal(t, initialize.CodeEditConfig, failure.FollowUp.Code)
 }
 
+// Review of #282: a remembered answer init cannot keep was a problem of no section of its form, which read answered; init writes the remembered answers back as they are, so it cannot fix one.
+func TestARememberedAnswerInitCannotKeepIsEditedByHandFirst(t *testing.T) {
+	w := newWorld(t)
+	w.configure(t, "[wizard.remembered]\nisolation = \"bogus\"\n")
+
+	_, ran := w.usecase.Run(t.Context(), initialize.Request{}, domain.RunOptions{})
+	_, asked := w.usecase.Questions(t.Context(), initialize.Request{})
+
+	for _, err := range []error{ran, asked} {
+		failure := failureOf(t, err)
+		assert.Equal(t, initialize.CodeConfigInvalid, failure.Code)
+		assert.Contains(t, failure.Message, "remembered.isolation cannot remember bogus")
+		require.NotNil(t, failure.FollowUp)
+		assert.Equal(t, initialize.CodeEditConfig, failure.FollowUp.Code)
+	}
+}
+
 func TestAConfigANewerWtmWroteIsNotSetUpAgain(t *testing.T) {
 	w := newWorld(t)
 	w.configure(t, "schema = 2\n[worktrees]\n")

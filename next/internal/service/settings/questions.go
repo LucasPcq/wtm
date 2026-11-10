@@ -456,6 +456,11 @@ func templatesOf(target string) []string {
 	return templates
 }
 
+// RememberedProblems are those of the answers saved remembers, by question in sorted order, each coded after command: a command that writes them back as they are, and so cannot fix one, refuses them before it asks anything.
+func RememberedProblems(command string, saved *project.Saved) []domain.FieldError {
+	return Questions{command: command, saved: saved}.rememberedProblems()
+}
+
 // rememberedProblems are those of the answers config.toml remembers, by question in sorted order.
 func (q Questions) rememberedProblems() []domain.FieldError {
 	if q.saved == nil {
