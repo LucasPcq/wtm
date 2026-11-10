@@ -98,3 +98,21 @@ func TestTheFileAChangeIsMadeOnAloneKeepsNoSetting(t *testing.T) {
 
 	assert.Contains(t, d.Screen(), "Step 1/9 • Worktrees folder")
 }
+
+func TestARememberedAnswerKeptAsItIsIsDrawnWithTheEdit(t *testing.T) {
+	got := runSet(t, world{Config: strings.Replace(acme, `env_strategy = "parent"`, `env_strategy = "copy"`, 1)}, "--base-path", "../wt", "--dry-run")
+
+	require.Equal(t, uicli.ExitOK, got.Code, got.Stderr)
+	formtest.Golden(t, "set_remembered_kept", got.Stdout)
+}
+
+// a kept step the flags made invalid, once answered, still read "kept" in the trail
+func TestAKeptStepAnsweredReadsAsAnsweredNotKept(t *testing.T) {
+	d := wizard(t, noFiles, configset.Request{Given: settings.Given{EnvStrategy: "main"}})
+	require.Contains(t, d.Screen(), "Step 4/9")
+
+	d.Keys("space", "enter")
+
+	assert.Contains(t, d.Screen(), "✓ .env files: apps/api/.env\n")
+	assert.Contains(t, d.Screen(), "Yes, write config.toml")
+}

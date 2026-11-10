@@ -65,7 +65,7 @@ func (w world) opener(t *testing.T, dir string) func(context.Context, string) (c
 	return func(context.Context, string) (configset.UseCase, error) {
 		locks := &operationtest.Locks{}
 		ops := operation.Service{Locker: locks, Publisher: locks, NewOpID: func() string { return "op-1" }, Now: time.Now}
-		return configset.UseCase{Settings: settings.Service{Store: config.Project{StateDir: dir}}, Git: branches{}, Detect: func() project.Detected { return project.Detected{EnvFiles: w.Found, Dirs: []string{"packages/db"}} }, Operations: ops, Init: &domain.FollowUp{Command: domain.CommandInit}}, nil
+		return configset.UseCase{Settings: settings.Service{Store: config.Project{StateDir: dir}}, Git: branches{}, Detect: func() project.Detected { return project.Detected{EnvFiles: w.Found, Dirs: []string{"packages/db"}} }, Operations: ops, Init: &domain.FollowUp{Command: domain.CommandInit}, Edit: &domain.FollowUp{Command: domain.CommandConfigEdit}}, nil
 	}
 }
 

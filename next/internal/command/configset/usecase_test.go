@@ -269,3 +269,26 @@ func TestARememberedAnswerKeptAsItIsWarnsAndOffersTheEdit(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, forgot.Warnings, "forgetting them leaves none to keep")
 }
+
+// forgetting a remembered answer sent back the others as they are, one wtm cannot keep among them, and was refused
+func TestForgettingAnAnswerKeepsAnotherWtmCannotKeepWithAWarning(t *testing.T) {
+	dir := stateDir(t, strings.Replace(acme, `env_strategy = "parent"`, "env_strategy = \"parent\"\nisolation = \"bogus\"", 1))
+
+	outcome, err := usecase(dir, operations()).Run(t.Context(), answered(t, map[string][]string{configset.PathRemembered: {"isolation=bogus"}}), domain.RunOptions{})
+
+	require.NoError(t, err)
+	require.Len(t, outcome.Warnings, 1)
+	assert.Equal(t, configset.CodeRememberedKept, outcome.Warnings[0].Code)
+	written := read(t, dir)
+	assert.NotContains(t, written, `env_strategy = "parent"`)
+	assert.Contains(t, written, `isolation = "bogus"`)
+}
+
+func TestAnAnswerRememberedAnewThatWtmCannotKeepIsRefused(t *testing.T) {
+	dir := stateDir(t, strings.Replace(acme, `env_strategy = "parent"`, "env_strategy = \"parent\"\nisolation = \"bogus\"", 1))
+
+	_, err := usecase(dir, operations()).Run(t.Context(), answered(t, map[string][]string{configset.PathRemembered: {"isolation=other"}}), domain.RunOptions{})
+
+	_, ok := errors.AsType[*domain.Error](err)
+	assert.True(t, ok, "%v", err)
+}

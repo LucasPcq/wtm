@@ -1,8 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { json } from '@/api/fetch'
+import { HttpError, json } from '@/api/fetch'
 import { narrowed, repoKey } from '@/api/queries/commands'
 import type { ConfigsetDetail, ConfigsetPlan, DomainAnswered, DomainEnvelope, WebCall } from '@/api/types.gen'
+import { fieldProblem } from '@/features/worktrees/settings/utils/words'
 
 const save = async (repo: string, answers: DomainAnswered[]) => {
   const url = `/api/repos/${repo}/commands/config-set`
@@ -32,7 +33,11 @@ export function useSaveSetting(repo: string) {
           ...(undo && { action: { label: 'Undo', onClick: () => void atOnce(saved, undo.answers ?? []) } }),
         })
       },
-      (failed: Error) => toast.error("Couldn't save", { description: failed.message }),
+      (failed: Error) => {
+        const fields = failed instanceof HttpError ? (failed.refusal?.fields ?? []) : []
+        const description = fields.length > 0 ? fields.map(fieldProblem).join('\n') : failed.message
+        toast.error("Couldn't save", { description })
+      },
     )
 
   return { save: mutation.mutateAsync, atOnce, saving: mutation.isPending }

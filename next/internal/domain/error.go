@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"strings"
 )
 
@@ -73,9 +74,9 @@ type FieldError struct {
 	FollowUp *FollowUp // a command that gets past the problem, if any
 }
 
-// Same reports whether other is the same problem of the same field: its path and its code, whatever its words.
+// Same reports whether other is the same problem of the same field: its path, its code and its params, whatever its words.
 func (f FieldError) Same(other FieldError) bool {
-	return f.Path == other.Path && f.Code == other.Code
+	return f.Path == other.Path && f.Code == other.Code && maps.Equal(f.Params, other.Params)
 }
 
 // Message returns the field error's template with its placeholders filled; path is how the caller spells the field (a flag name on the command line), unless Params names a path itself.

@@ -31,7 +31,8 @@ import {
 } from '@/features/worktrees/settings/utils/words'
 import { cn } from '@/lib/utils'
 
-export type Editing = { path: SettingPath; digest: string; newer: boolean; onDisk: string }
+// digest is the file's as the dialog opened on it; current, the one the page reads now, which Save mine writes over
+export type Editing = { path: SettingPath; digest: string; current: string; newer: boolean; onDisk: string }
 
 export function ChangeDialog({
   repo,
@@ -110,7 +111,7 @@ function Editor({
 
   const submit = async (mine: boolean) => {
     const sent: DomainAnswered[] = answers().filter(({ path }) => path === editing.path)
-    const made = mine ? [] : [{ path: 'replaces', values: [editing.digest] }]
+    const made = [{ path: 'replaces', values: [mine ? editing.current : editing.digest] }]
     try {
       await save([...sent, ...made])
       toast.success('Saved', { description: said.label })

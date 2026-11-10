@@ -91,3 +91,11 @@ func TestAFieldErrorSpellsItsPathAsTheSurfaceDoesAndNeverReadsAValueTwice(t *tes
 	assert.Equal(t, "--isolation must be one of isolated, verbatim, not keep", oneOf.Message("--isolation"))
 	assert.Equal(t, "worktree path already exists: /trees/x", located.Message("<branches>[0]"))
 }
+
+func TestAFieldErrorIsTheSameByPathCodeAndParamsNotWords(t *testing.T) {
+	problem := FieldError{Path: "base_branch", Code: "unknown", Params: Params{"value": "dev"}, Template: "{value} is gone"}
+
+	assert.True(t, problem.Same(FieldError{Path: "base_branch", Code: "unknown", Params: Params{"value": "dev"}, Template: "no {value}"}))
+	assert.False(t, problem.Same(FieldError{Path: "base_branch", Code: "unknown", Params: Params{"value": "main"}}))
+	assert.False(t, problem.Same(FieldError{Path: "base_path", Code: "unknown", Params: Params{"value": "dev"}}))
+}

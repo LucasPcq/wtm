@@ -129,6 +129,7 @@ export function fieldProblem(problem: DomainFieldError): string {
     required: 'Required.',
     env_file_outside: `Must be a file of the repository, not ${value}.`,
     env_file_twice: `${value} is listed twice.`,
+    env_files_none: `No .env file is picked while they come from ${value}: pick one, or copy none.`,
     hook_dir_outside: `Must run in a folder of the repository, not ${value}.`,
   }
   return words[problemSuffix(problem.code)] ?? problem.message

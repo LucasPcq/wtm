@@ -2,6 +2,7 @@ package configset
 
 import (
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
@@ -42,15 +43,17 @@ func Decide(facts Facts, req Request) (Plan, error) {
 	asked, was := NewQuestions(facts, req), NewQuestions(facts, Request{})
 	onDisk := was.Problems()
 	if problems := slices.DeleteFunc(asked.Problems(), func(problem domain.FieldError) bool {
-		return req.Values(fieldOf(problem.Path)) == nil && slices.ContainsFunc(onDisk, problem.Same)
+		return req.Values(fieldOf(problem.Path)) == nil && slices.ContainsFunc(onDisk, problem.Same) || req.keepsAsOnDisk(problem, facts.Settings.Saved)
 	}); len(problems) > 0 {
 		return Plan{}, domain.Invalid(problems)
 	}
 
 	plan := Plan{Changes: []Change{}, rewrite: asked.Questions.Rewrite()}
-	if req.Remembered == nil {
-		plan.kept = settings.RememberedProblems(Name, facts.Settings.Saved)
-	}
+	// a remembered answer sent back as config.toml holds it is kept with a warning: only edit fixes it
+	plan.kept = slices.DeleteFunc(settings.RememberedProblems(Name, facts.Settings.Saved), func(problem domain.FieldError) bool {
+		question := strings.TrimPrefix(problem.Path, PathRemembered+".")
+		return req.Remembered != nil && !slices.Contains(req.Remembered, question+"="+facts.Settings.Saved.Config.Remembered[question])
+	})
 	plan.rewrite.Config.Remembered = asked.remembered()
 	plan.Replaces = plan.rewrite.Replaces
 	changed := settings.Changed(was.Document(), asked.Document())
@@ -63,6 +66,17 @@ func Decide(facts Facts, req Request) (Plan, error) {
 	}
 	plan.Recap, plan.Empty = plan.recap(), len(plan.Changes) == 0
 	return plan, nil
+}
+
+// keepsAsOnDisk reports whether problem is that of a remembered answer the request sends back as config.toml holds it.
+func (r Request) keepsAsOnDisk(problem domain.FieldError, saved *project.Saved) bool {
+	index, err := strconv.Atoi(strings.TrimSuffix(strings.TrimPrefix(problem.Path, PathRemembered+"["), "]"))
+	if err != nil || index < 0 || index >= len(r.Remembered) || saved == nil || problem.Code == CodeRememberedTwice {
+		return false
+	}
+	question, value, _ := strings.Cut(r.Remembered[index], "=")
+	held, ok := saved.Config.Remembered[question]
+	return ok && held == value
 }
 
 // fieldOf is the field a problem's path names: env_files of env_files[1], remembered of remembered.isolation.

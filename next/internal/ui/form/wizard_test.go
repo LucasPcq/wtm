@@ -108,6 +108,20 @@ func TestAKeptStepTheAnswersGivenMakeInvalidIsAsked(t *testing.T) {
 	assert.Equal(t, 0, d.Wizard.Current())
 }
 
+// a kept step the answers made invalid, answered then restarted by a stale plan, read "kept" in the trail
+func TestAKeptStepAnsweredReadsAsAnsweredInARestartedForm(t *testing.T) {
+	f := newFake()
+	f.first.standing = form.Standing{Value: "x", Kept: true, Erred: true}
+	d := open(t, f.script())
+	d.Keys("enter")
+	require.Equal(t, 1, d.Wizard.Current())
+
+	f.first.standing = form.Standing{Value: "x", Kept: true}
+	again := start(d.Wizard.Again())
+
+	assert.Contains(t, again.Screen(), "✓ First: x\n")
+}
+
 func TestAKeptDefaultIsItsValueAlone(t *testing.T) {
 	f := newFake()
 	f.first.standing = form.Standing{Value: "yes", Origin: domain.OriginConfig}

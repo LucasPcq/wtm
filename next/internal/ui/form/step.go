@@ -63,14 +63,14 @@ func decided(st Standing, answered bool) mark {
 		return mark{ruled: cmp.Or(st.Reason, string(st.Skip))}
 	case st.Erred:
 		return mark{asked: true}
-	case st.Kept:
-		return mark{line: value + trail + kept}
 	case st.Given && st.Flag != "":
 		return mark{line: value + trail + st.Flag}
 	case st.Given:
 		return mark{line: value}
 	case answered:
 		return mark{line: value}
+	case st.Kept:
+		return mark{line: value + trail + kept}
 	case st.Origin == domain.OriginRemembered:
 		return mark{line: value + trail + string(domain.OriginRemembered)}
 	}

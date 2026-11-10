@@ -98,7 +98,7 @@ export function SettingsPage({ repo }: { repo: string }) {
 
   const opened = ({ path, digest }: { path: SettingPath; digest: string }): Editing => {
     const field = detail.settings.fields.filter(isSetting).find((f) => f.path === path)
-    return { path, digest, newer: detail.newer, onDisk: field ? shown(field) : '' }
+    return { path, digest, current: detail.digest, newer: detail.newer, onDisk: field ? shown(field) : '' }
   }
 
   const choose = (strategy: Strategy) =>
