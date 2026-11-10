@@ -280,3 +280,13 @@ func Redact(plan Plan) Redacted {
 	plan.Entries = entries
 	return Redacted(plan)
 }
+
+// SpelledByPorts reports whether p rewrites an address spelled with a port of this machine into a name: the main checkout, addressed as without wtm, keeps its ports.
+func (p Plan) SpelledByPorts() bool {
+	for _, entry := range p.Rewrites() {
+		if entry.Addressing == project.AddressNames && hasLoopbackOrigin(entry.CurrentValue) {
+			return true
+		}
+	}
+	return false
+}

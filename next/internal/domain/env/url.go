@@ -99,3 +99,15 @@ func joinList(elements []listElement) string {
 	}
 	return strings.Join(parts, ",")
 }
+
+// hasLoopbackOrigin reports whether value holds an http url to this machine.
+func hasLoopbackOrigin(value string) bool {
+	for _, element := range splitList(value) {
+		if _, authority, ok := splitOrigin(element.value); ok {
+			if host, _ := splitHostPort(authority); isLoopbackHost(host) {
+				return true
+			}
+		}
+	}
+	return false
+}

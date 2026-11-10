@@ -14,6 +14,7 @@ import (
 	daemonstatuscli "github.com/LucasPcq/wtm/next/internal/command/daemonstatus/cli"
 	daemonstopcli "github.com/LucasPcq/wtm/next/internal/command/daemonstop/cli"
 	daemonstopjobscli "github.com/LucasPcq/wtm/next/internal/command/daemonstopjobs/cli"
+	envcli "github.com/LucasPcq/wtm/next/internal/command/env/cli"
 	eventscli "github.com/LucasPcq/wtm/next/internal/command/events/cli"
 	execcli "github.com/LucasPcq/wtm/next/internal/command/exec/cli"
 	extractcli "github.com/LucasPcq/wtm/next/internal/command/extract/cli"
@@ -65,6 +66,7 @@ func commands(streams *output.Streams, env cli.Env) []*cobra.Command {
 		prunecli.New(streams, env, openPrune, commandLine),
 		fastforwardcli.New(streams, env, openFastForward, commandLine),
 		synccli.New(streams, env, openSync, commandLine),
+		envcli.New(streams, env, openEnv, commandLine),
 		execcli.New(streams, env, openExec, commandLine),
 		reparentcli.New(streams, env, openReparent, commandLine),
 		listcli.New(streams, env, openList, commandLine),

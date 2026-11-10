@@ -1,0 +1,98 @@
+{
+  "v": 2,
+  "command": "env",
+  "ok": true,
+  "op": "<id>",
+  "items": [
+    {
+      "subject": "feat/e",
+      "status": "done",
+      "detail": {
+        "path": "<root>/.trees/feat-e",
+        "written": [
+          ".env"
+        ],
+        "ports": {
+          "offset": 0,
+          "entries": null,
+          "addressing": "",
+          "applied": false
+        }
+      }
+    }
+  ],
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "feat/e",
+        "path": "<root>/.trees/feat-e",
+        "main": false,
+        "missing": false,
+        "strategy": "main",
+        "isolation": "isolated",
+        "pending": false,
+        "numbered": true,
+        "files": [
+          {
+            "target": ".env",
+            "created": false,
+            "keys": [
+              {
+                "key": "KEY",
+                "status": "add",
+                "settled": true
+              },
+              {
+                "key": "OWN",
+                "status": "orphan",
+                "settled": false
+              }
+            ],
+            "writes": true
+          }
+        ],
+        "ports": {
+          "offset": 0,
+          "entries": null,
+          "addressing": "",
+          "applied": false
+        },
+        "restart": []
+      }
+    ],
+    "overwrite": false,
+    "prune": false,
+    "show_values": false,
+    "recap": [
+      {
+        "key": "worktree",
+        "label": "feat/e",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "KEY",
+            "note": "added",
+            "params": {
+              "file": ".env",
+              "key": "KEY",
+              "status": "add"
+            },
+            "text": ".env  + KEY"
+          },
+          {
+            "value": "OWN",
+            "note": "left",
+            "params": {
+              "file": ".env",
+              "key": "OWN",
+              "status": "orphan"
+            },
+            "text": ".env  OWN left: in no source"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": []
+}

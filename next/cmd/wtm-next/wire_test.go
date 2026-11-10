@@ -91,8 +91,8 @@ func TestAnUndoLeftBehindIsRemovedByCleanForced(t *testing.T) {
 	assert.Equal(t, []string{"wtm-next", "clean", "feat/x", "--force"}, commandLine(wire(wireParams{}).Create.Provision.LeftBehind("feat/x")))
 }
 
-func TestPortsLeftUnsettledAreSettledByTheLegacyEnv(t *testing.T) {
-	assert.Equal(t, []string{"wtm", "env", "feat/x"}, commandLine(wire(wireParams{}).Create.Provision.Settle("feat/x")))
+func TestPortsLeftUnsettledAreSettledByEnv(t *testing.T) {
+	assert.Equal(t, []string{"wtm-next", "env", "feat/x"}, commandLine(wire(wireParams{}).Create.Provision.Settle("feat/x")))
 }
 
 func TestARepositoryWithNoWtmConfigIsFollowedUpByTheLegacyInit(t *testing.T) {
@@ -174,16 +174,16 @@ func TestEveryFollowUpIsSpelledWhole(t *testing.T) {
 		"enter":              {followUp: domain.Enter("feat/notes"), argv: []string{"wtm", "go", "feat/notes"}},
 		"left_behind":        {followUp: leftBehind("feat/x"), argv: []string{"wtm-next", "clean", "feat/x", "--force"}},
 		"init":               {followUp: *initialize(), argv: []string{"wtm", "init"}},
-		"settle":             {followUp: settle("feat/x"), argv: []string{"wtm", "env", "feat/x"}},
+		"settle":             {followUp: settle("feat/x"), argv: []string{"wtm-next", "env", "feat/x"}},
 		"proxy":              {followUp: proxyStatus(), argv: []string{"wtm", "run", "proxy", "status"}},
 		"dry_run":            {followUp: dryRun, argv: []string{"wtm-next", "clean", "feat/x", "--force", "--dry-run"}},
 		"pr_url_only":        {followUp: domain.FollowUp{URL: pr.URL}, argv: []string{"gh", "pr", "view", pr.URL, "--web"}},
 		"merged":             {followUp: *fixes[0].Fix, argv: []string{"wtm-next", "prune", "feat/a"}},
-		"env":                {followUp: *fixes[1].Fix, argv: []string{"wtm", "env", "feat/a"}},
-		"env_example":        {followUp: *fixes[2].Fix, argv: []string{"wtm", "env", "feat/a", "--from", "example"}},
-		"env_main":           {followUp: *fixes[3].Fix, argv: []string{"wtm", "env", "feat/a", "--from", "main"}},
+		"env":                {followUp: *fixes[1].Fix, argv: []string{"wtm-next", "env", "feat/a"}},
+		"env_example":        {followUp: *fixes[2].Fix, argv: []string{"wtm-next", "env", "feat/a", "--from", "example"}},
+		"env_main":           {followUp: *fixes[3].Fix, argv: []string{"wtm-next", "env", "feat/a", "--from", "main"}},
 		"config_edit":        {followUp: *fixes[4].Fix, argv: []string{"wtm", "config", "edit"}},
-		"isolation":          {followUp: *fixes[5].Fix, argv: []string{"wtm", "env", "feat/a", "--isolation", "isolated"}},
+		"isolation":          {followUp: *fixes[5].Fix, argv: []string{"wtm-next", "env", "feat/a", "--isolation", "isolated"}},
 		"run_start":          {followUp: *fixes[6].Fix, argv: []string{"wtm-next", "run", "start", "feat/a", "--detach", "--job", "api"}},
 		"shared":             {followUp: *fixes[7].Fix, argv: []string{"wtm-next", "run", "start", "main", "--detach", "--job", "db"}},
 		"behind":             {followUp: *status.Problems(status.ProblemsParams{Branch: "feat/a", Parent: "feat/b", Lacks: 1, Sync: true})[0].Fix, argv: []string{"wtm-next", "sync", "feat/a"}},

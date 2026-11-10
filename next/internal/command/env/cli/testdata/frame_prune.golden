@@ -1,0 +1,14 @@
+
+  Step 5/8 • Prune
+
+  ✓ Worktrees: feat/billing
+  · All — set by its flag only
+  · Values from — set by its flag only
+  · Overwrite — no key differs from its source
+
+  Drop a key no source has
+
+▌› No, keep it
+   Yes, drop it
+
+  ↑↓ navigate • / filter • enter confirm • esc back

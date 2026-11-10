@@ -1,6 +1,8 @@
 package env
 
 import (
+	"slices"
+
 	"github.com/LucasPcq/wtm/next/internal/domain/dotenv"
 	"github.com/LucasPcq/wtm/next/internal/domain/project"
 )
@@ -21,37 +23,91 @@ type DriftParams struct {
 	Owned    map[string]bool
 }
 
-// KeyDrift counts the drift of params.Child. An expected key is one of the template, the parent's or the main's; its value is the first non-empty one of the parent's, then the main's.
+// KeyDrift counts the drift of params.Child (Keys): a key its source gives a value it lacks is no drift, since reconciling adds it.
 func KeyDrift(params DriftParams) Drift {
-	child, template, parent, main := pairs(params.Child), pairs(params.Template), pairs(params.Parent), pairs(params.Main)
-
 	var drift Drift
-	seen := map[string]bool{}
-	for _, lines := range [][]dotenv.Line{params.Child, params.Template, params.Parent, params.Main} {
-		for _, line := range lines {
-			key := line.Key
-			if line.Kind != dotenv.Pair || seen[key] || params.Owned[key] {
-				continue
-			}
-			seen[key] = true
-
-			value, inChild := child[key]
-			_, inTemplate := template[key]
-			_, inParent := parent[key]
-			_, inMain := main[key]
-			source := cascade(key, parent, main)
-			switch {
-			case inChild && !inTemplate && !inParent && !inMain:
-				drift.Orphan++
-			case inChild && source != "" && source != value:
-				drift.Conflicting++
-			case !inChild && source == "":
-				drift.Missing++
-			}
+	for _, key := range Keys(params) {
+		switch key.Status {
+		case KeyMissing:
+			drift.Missing++
+		case KeyConflict:
+			drift.Conflicting++
+		case KeyOrphan:
+			drift.Orphan++
 		}
 	}
 
 	return drift
+}
+
+// KeyStatus is how one key of a worktree's .env file stands against its sources.
+type KeyStatus string
+
+// The statuses of a key: in step with its source; absent and given a value by its source (Add); expected with no value anywhere (Missing); holding another value than its source's (Conflict); in no source (Orphan).
+const (
+	KeyInStep   KeyStatus = "in_step"
+	KeyAdd      KeyStatus = "add"
+	KeyMissing  KeyStatus = "missing"
+	KeyConflict KeyStatus = "conflict"
+	KeyOrphan   KeyStatus = "orphan"
+)
+
+// A Key is one key of a worktree's .env file against its sources: its status, its value in the file (none when absent) and its source's (none when no source gives one).
+type Key struct {
+	Name   string
+	Status KeyStatus
+	Value  string
+	Source string
+}
+
+// Keys returns every key of params.Child and of its sources but those wtm owns, the child's in file order, then the others in the template's, the parent's, then the main's order. An expected key is one of the template, the parent's or the main's; its value is the first non-empty one of the parent's, then the main's.
+func Keys(params DriftParams) []Key {
+	child, template, parent, main := pairs(params.Child), pairs(params.Template), pairs(params.Parent), pairs(params.Main)
+
+	var keys []Key
+	seen := map[string]bool{}
+	for _, lines := range [][]dotenv.Line{params.Child, params.Template, params.Parent, params.Main} {
+		for _, line := range lines {
+			name := line.Key
+			if line.Kind != dotenv.Pair || seen[name] || params.Owned[name] {
+				continue
+			}
+			seen[name] = true
+
+			value, inChild := child[name]
+			_, inTemplate := template[name]
+			_, inParent := parent[name]
+			_, inMain := main[name]
+			key := Key{Name: name, Status: KeyInStep, Value: value, Source: cascade(name, parent, main)}
+			switch {
+			case inChild && !inTemplate && !inParent && !inMain:
+				key.Status = KeyOrphan
+			case inChild && key.Source != "" && key.Source != value:
+				key.Status = KeyConflict
+			case !inChild && key.Source == "":
+				key.Status = KeyMissing
+			case !inChild:
+				key.Status = KeyAdd
+			}
+			keys = append(keys, key)
+		}
+	}
+
+	return keys
+}
+
+// ApplyKeys returns lines with each of keys settled on its source: an addition added after the last line holding something, a conflict given its source's value, an orphan dropped; a key in step or missing changes nothing.
+func ApplyKeys(lines []dotenv.Line, keys []Key) []dotenv.Line {
+	for _, key := range keys {
+		switch key.Status {
+		case KeyAdd, KeyConflict:
+			lines, _ = dotenv.Set(dotenv.SetParams{Lines: lines, Key: key.Name, Value: key.Source})
+		case KeyOrphan:
+			lines = slices.DeleteFunc(slices.Clone(lines), func(line dotenv.Line) bool { return line.Kind == dotenv.Pair && line.Key == key.Name })
+		}
+	}
+
+	return lines
 }
 
 // Owned are the keys wtm writes in the .env file target: the variables it sets for every job and the keys run.toml links into that file.

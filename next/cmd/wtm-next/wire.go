@@ -32,6 +32,8 @@ import (
 	daemonrestartcli "github.com/LucasPcq/wtm/next/internal/command/daemonrestart/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/daemonstopjobs"
 	daemonstopjobscli "github.com/LucasPcq/wtm/next/internal/command/daemonstopjobs/cli"
+	envcommand "github.com/LucasPcq/wtm/next/internal/command/env"
+	envcli "github.com/LucasPcq/wtm/next/internal/command/env/cli"
 	"github.com/LucasPcq/wtm/next/internal/command/events"
 	"github.com/LucasPcq/wtm/next/internal/command/exec"
 	execcli "github.com/LucasPcq/wtm/next/internal/command/exec/cli"
@@ -86,6 +88,7 @@ type app struct {
 	Clean       clean.UseCase
 	Prune       prune.UseCase
 	FastForward fastforward.UseCase
+	Env         envcommand.UseCase
 	Sync        synccommand.UseCase
 	Exec        exec.UseCase
 	Reparent    reparent.UseCase
@@ -206,6 +209,15 @@ func wire(params wireParams) app {
 			Teardown:     teardowns,
 			Repository:   facts,
 			Operations:   operations,
+		},
+		Env: envcommand.UseCase{
+			Git:        repo,
+			Meta:       meta,
+			EnvFiles:   store.EnvFiles{},
+			Jobs:       jobs,
+			Repository: facts,
+			Operations: operations,
+			Provision:  provisions,
 		},
 		FastForward: fastforward.UseCase{
 			Git:        repo,
@@ -401,7 +413,7 @@ func daemonRestart() *domain.FollowUp {
 	return &domain.FollowUp{Command: daemonrestart.Name}
 }
 
-// settle settles a worktree's env ports, in the legacy wtm until env migrates.
+// settle settles a worktree's env ports: env on that worktree.
 func settle(branch string) domain.FollowUp {
 	return domain.FollowUp{Command: domain.CommandEnv, Answers: []domain.Answered{{Path: domain.PathWorktree, Values: []string{branch}}}}
 }
@@ -420,6 +432,8 @@ func commandLine(followUp domain.FollowUp) []string {
 		return prunecli.Line(followUp)
 	case fastforward.Name:
 		return fastforwardcli.Line(followUp)
+	case envcommand.Name:
+		return envcli.Line(followUp)
 	case synccommand.Name:
 		return synccli.Line(followUp)
 	case exec.Name:

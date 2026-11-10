@@ -1,0 +1,33 @@
+[
+  {
+    "type": "operation.started",
+    "command": "env",
+    "surface": "api"
+  },
+  {
+    "type": "unit.started",
+    "subject": "feat/e"
+  },
+  {
+    "type": "phase.started",
+    "subject": "feat/e",
+    "phase": "env"
+  },
+  {
+    "type": "phase.finished",
+    "subject": "feat/e",
+    "phase": "env",
+    "failed": false
+  },
+  {
+    "type": "unit.finished",
+    "subject": "feat/e",
+    "status": "done"
+  },
+  {
+    "type": "operation.finished",
+    "command": "env",
+    "surface": "api",
+    "ok": true
+  }
+]

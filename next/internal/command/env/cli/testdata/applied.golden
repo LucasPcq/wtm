@@ -1,0 +1,6 @@
+
+  ✓ env: 1 done
+
+  feat/billing  apps/api/.env  + JWT_SECRET, apps/web/.env  PORT → 3020, apps/api/.env  OLD left: in no source
+  feat/billing  . · 1 port settled (offset +20)
+

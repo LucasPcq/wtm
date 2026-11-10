@@ -9,6 +9,7 @@
         "clean",
         "prune",
         "fast-forward",
+        "env",
         "sync",
         "exec",
         "reparent",
@@ -2072,6 +2073,9 @@
           },
           "type": "array"
         },
+        "isolation": {
+          "$ref": "#/$defs/project.Isolation"
+        },
         "jobs": {
           "items": {
             "type": "string"
@@ -2086,6 +2090,9 @@
         },
         "origin": {
           "$ref": "#/$defs/worktree.Origin"
+        },
+        "out_of_step": {
+          "type": "integer"
         },
         "parent": {
           "type": "string"
@@ -2290,7 +2297,9 @@
         "one_profile",
         "alone",
         "configured",
-        "task"
+        "task",
+        "no_key_conflict",
+        "no_key_orphan"
       ]
     },
     "domain.TextField": {
@@ -2386,6 +2395,36 @@
       ],
       "type": "object"
     },
+    "env.Detail": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "ports": {
+          "$ref": "#/$defs/env.Redacted"
+        },
+        "written": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "path",
+        "written",
+        "ports"
+      ],
+      "type": "object"
+    },
     "env.Drift": {
       "additionalProperties": false,
       "properties": {
@@ -2457,6 +2496,66 @@
       ],
       "type": "object"
     },
+    "env.File": {
+      "additionalProperties": false,
+      "properties": {
+        "created": {
+          "type": "boolean"
+        },
+        "keys": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/env.Key"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "target": {
+          "type": "string"
+        },
+        "writes": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "target",
+        "created",
+        "keys",
+        "writes"
+      ],
+      "type": "object"
+    },
+    "env.Key": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "settled": {
+          "type": "boolean"
+        },
+        "source": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "status",
+        "settled"
+      ],
+      "type": "object"
+    },
     "env.Move": {
       "additionalProperties": false,
       "properties": {
@@ -2508,6 +2607,133 @@
       ],
       "type": "object"
     },
+    "env.Plan": {
+      "additionalProperties": false,
+      "properties": {
+        "empty": {
+          "type": "boolean"
+        },
+        "overwrite": {
+          "type": "boolean"
+        },
+        "prune": {
+          "type": "boolean"
+        },
+        "recalled": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "recap": {
+          "items": {
+            "$ref": "#/$defs/domain.RecapRow"
+          },
+          "type": "array"
+        },
+        "show_values": {
+          "type": "boolean"
+        },
+        "worktrees": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/env.Reconcile"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "worktrees",
+        "overwrite",
+        "prune",
+        "show_values"
+      ],
+      "type": "object"
+    },
+    "env.Reconcile": {
+      "additionalProperties": false,
+      "properties": {
+        "files": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/env.File"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "isolation": {
+          "$ref": "#/$defs/project.Isolation"
+        },
+        "main": {
+          "type": "boolean"
+        },
+        "missing": {
+          "type": "boolean"
+        },
+        "numbered": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string"
+        },
+        "pending": {
+          "type": "boolean"
+        },
+        "ports": {
+          "$ref": "#/$defs/env.Redacted"
+        },
+        "records": {
+          "$ref": "#/$defs/project.Isolation"
+        },
+        "restart": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "strategy": {
+          "$ref": "#/$defs/project.EnvStrategy"
+        },
+        "unsettled": {
+          "type": "string"
+        },
+        "worktree": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "worktree",
+        "path",
+        "main",
+        "missing",
+        "strategy",
+        "isolation",
+        "pending",
+        "numbered",
+        "files",
+        "ports",
+        "restart"
+      ],
+      "type": "object"
+    },
     "env.Redacted": {
       "additionalProperties": false,
       "properties": {
@@ -2550,6 +2776,211 @@
         "applied"
       ],
       "type": "object"
+    },
+    "env.envelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/domain.Envelope"
+        }
+      ],
+      "properties": {
+        "command": {
+          "const": "env"
+        },
+        "items": {
+          "items": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/env.Detail"
+                  },
+                  {
+                    "maxProperties": 0,
+                    "type": "object"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "plan": {
+          "$ref": "#/$defs/env.Plan"
+        }
+      }
+    },
+    "env.request": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "worktree"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "all"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "from"
+              },
+              "values": {
+                "items": {
+                  "description": "One of its options, or empty for its default.",
+                  "enum": [
+                    "",
+                    "example",
+                    "main",
+                    "parent"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "overwrite"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "prune"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "isolation"
+              },
+              "values": {
+                "items": {
+                  "description": "One of its options, or empty for its default.",
+                  "enum": [
+                    ""
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "const": "show_values"
+              },
+              "values": {
+                "items": {
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "path",
+              "values"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "type": "array"
     },
     "events.envelope": {
       "allOf": [

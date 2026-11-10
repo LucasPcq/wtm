@@ -4,12 +4,9 @@ package status
 import (
 	"context"
 	"errors"
-	"path/filepath"
 
 	"github.com/LucasPcq/wtm/next/internal/domain"
-	"github.com/LucasPcq/wtm/next/internal/domain/dotenv"
 	"github.com/LucasPcq/wtm/next/internal/domain/env"
-	"github.com/LucasPcq/wtm/next/internal/domain/project"
 	"github.com/LucasPcq/wtm/next/internal/domain/run"
 	"github.com/LucasPcq/wtm/next/internal/domain/worktree"
 	"github.com/LucasPcq/wtm/next/internal/service/repository"
@@ -198,51 +195,11 @@ func (u UseCase) state(ctx context.Context, facts Facts, w worktree.Worktree) St
 }
 
 // envFiles reads each declared .env file of w, with its template, the parent worktree's copy and the main worktree's.
-func (u UseCase) envFiles(facts Facts, w worktree.Worktree) ([]EnvRead, error) {
+func (u UseCase) envFiles(facts Facts, w worktree.Worktree) ([]env.FileRead, error) {
 	parentPath := ""
 	if source := facts.Records[w.Branch()].SourceBranch; source != "" {
 		parentPath = facts.CheckedOutAt(source)
 	}
 
-	var reads []EnvRead
-	for _, file := range facts.Config.Env.Files {
-		read := EnvRead{File: file}
-		paths := []struct {
-			lines *[]dotenv.Line
-			dir   string
-		}{{&read.Child, w.Path}, {&read.Parent, parentPath}, {&read.Main, facts.MainPath}}
-		for _, at := range paths {
-			if at.dir == "" {
-				continue
-			}
-			lines, err := u.EnvFiles.Read(filepath.Join(at.dir, file.Target))
-			if err != nil {
-				return nil, err
-			}
-			*at.lines = lines
-		}
-
-		template, err := u.template(w.Path, file)
-		if err != nil {
-			return nil, err
-		}
-		read.Template = template
-		reads = append(reads, read)
-	}
-
-	return reads, nil
-}
-
-// template reads the template of file in the worktree at dir, as the example strategy finds it in a checkout and as `wtm env` reads it; none when it has none.
-func (u UseCase) template(dir string, file project.EnvFile) ([]dotenv.Line, error) {
-	exists := func(path string) (bool, error) {
-		lines, err := u.EnvFiles.Read(path)
-		return lines != nil, err
-	}
-	sources, _, err := env.Sources(env.CopyRequest{Strategy: project.EnvExample, Files: []project.EnvFile{file}, MainPath: dir}, exists)
-	if err != nil || len(sources) == 0 {
-		return nil, err
-	}
-
-	return u.EnvFiles.Read(sources[0].From)
+	return repository.EnvFiles(u.EnvFiles, repository.EnvFilesParams{Files: facts.Config.Env.Files, Dir: w.Path, ParentDir: parentPath, MainDir: facts.MainPath})
 }

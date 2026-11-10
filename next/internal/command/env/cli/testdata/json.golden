@@ -1,0 +1,185 @@
+{
+  "v": 2,
+  "command": "env",
+  "ok": true,
+  "op": "op-1",
+  "items": [
+    {
+      "subject": "feat/billing",
+      "status": "done",
+      "detail": {
+        "path": "/repo/wt-feat-billing",
+        "written": [
+          "apps/api/.env",
+          "apps/web/.env"
+        ],
+        "ports": {
+          "offset": 20,
+          "entries": [
+            {
+              "file": "apps/api/.env",
+              "key": "PORT",
+              "port": "PORT",
+              "base": 4000,
+              "resolved": 4020,
+              "moves": [
+                {
+                  "port": "PORT",
+                  "job": "api",
+                  "base": 4000,
+                  "resolved": 4020
+                }
+              ],
+              "addressing": "ports",
+              "status": "unchanged"
+            },
+            {
+              "file": "apps/web/.env",
+              "key": "PORT",
+              "port": "PORT",
+              "base": 3000,
+              "resolved": 3020,
+              "moves": [
+                {
+                  "port": "PORT",
+                  "job": "web",
+                  "base": 3000,
+                  "resolved": 3020
+                }
+              ],
+              "addressing": "ports",
+              "status": "rewrite"
+            }
+          ],
+          "addressing": "ports",
+          "applied": true
+        }
+      }
+    }
+  ],
+  "plan": {
+    "worktrees": [
+      {
+        "worktree": "feat/billing",
+        "path": "/repo/wt-feat-billing",
+        "main": false,
+        "missing": false,
+        "strategy": "main",
+        "isolation": "isolated",
+        "pending": false,
+        "numbered": true,
+        "files": [
+          {
+            "target": "apps/api/.env",
+            "created": false,
+            "keys": [
+              {
+                "key": "JWT_SECRET",
+                "status": "add",
+                "settled": true
+              },
+              {
+                "key": "OLD",
+                "status": "orphan",
+                "settled": false
+              }
+            ],
+            "writes": true
+          },
+          {
+            "target": "apps/web/.env",
+            "created": false,
+            "keys": [],
+            "writes": true
+          }
+        ],
+        "ports": {
+          "offset": 20,
+          "entries": [
+            {
+              "file": "apps/api/.env",
+              "key": "PORT",
+              "port": "PORT",
+              "base": 4000,
+              "resolved": 4020,
+              "moves": [
+                {
+                  "port": "PORT",
+                  "job": "api",
+                  "base": 4000,
+                  "resolved": 4020
+                }
+              ],
+              "addressing": "ports",
+              "status": "unchanged"
+            },
+            {
+              "file": "apps/web/.env",
+              "key": "PORT",
+              "port": "PORT",
+              "base": 3000,
+              "resolved": 3020,
+              "moves": [
+                {
+                  "port": "PORT",
+                  "job": "web",
+                  "base": 3000,
+                  "resolved": 3020
+                }
+              ],
+              "addressing": "ports",
+              "status": "rewrite"
+            }
+          ],
+          "addressing": "ports",
+          "applied": false
+        },
+        "restart": []
+      }
+    ],
+    "overwrite": false,
+    "prune": false,
+    "show_values": false,
+    "recap": [
+      {
+        "key": "worktree",
+        "label": "feat/billing",
+        "path": "worktree",
+        "values": [
+          {
+            "value": "JWT_SECRET",
+            "note": "added",
+            "params": {
+              "file": "apps/api/.env",
+              "key": "JWT_SECRET",
+              "status": "add"
+            },
+            "text": "apps/api/.env  + JWT_SECRET"
+          },
+          {
+            "value": "PORT",
+            "note": "rewrite",
+            "params": {
+              "file": "apps/web/.env",
+              "key": "PORT",
+              "to": "3020"
+            },
+            "text": "apps/web/.env  PORT → 3020"
+          },
+          {
+            "value": "OLD",
+            "note": "left",
+            "params": {
+              "file": "apps/api/.env",
+              "key": "OLD",
+              "status": "orphan"
+            },
+            "text": "apps/api/.env  OLD left: in no source"
+          }
+        ]
+      }
+    ]
+  },
+  "follow_ups": [],
+  "warnings": []
+}
