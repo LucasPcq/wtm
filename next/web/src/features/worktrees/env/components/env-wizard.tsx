@@ -294,8 +294,10 @@ function WorktreePlan({
             const { file, change } = lineOf(value)
             return (
               <li key={value.text} className="flex min-w-0 gap-2">
-                <span className="truncate font-mono">{change}</span>
-                <span className="shrink-0 text-muted-foreground">{file}</span>
+                {file && <span className="shrink-0 text-muted-foreground">{file}</span>}
+                <span className="truncate font-mono" title={change}>
+                  {change}
+                </span>
               </li>
             )
           })}
