@@ -177,12 +177,15 @@ func strategyOptions() []domain.Option {
 	return options
 }
 
-// worktreeOptions are the worktrees env may reconcile: each on a branch, the main one first, tagged as every picker tags them from where the caller stands, with the changes reconciling each makes under req's switches and its isolation when it is not isolated.
+// worktreeOptions are the worktrees env may reconcile: each on a branch, the main one first, tagged as every picker tags them from where the caller stands, with the changes reconciling each makes under req's switches, its isolation when it is not isolated, and why it is left as it is when it is (its directory gone, its files unread).
 func (f Facts) worktreeOptions(req Request) []domain.Option {
 	options := domain.WorktreeOptions(f.onBranch(), domain.WorktreeQuery{Cwd: req.Caller.Cwd})
 	for i, option := range options {
 		r := f.reconcile(option.Value, req)
 		options[i].OutOfStep = r.changes()
+		if problem, left := r.leftWhy(); left {
+			options[i].Problem = &problem
+		}
 		if r.Isolation != project.Isolated {
 			options[i].Isolation = r.Isolation
 		}

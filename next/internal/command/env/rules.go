@@ -193,6 +193,19 @@ func (r Reconcile) changes() int {
 	return count + len(envs.Plan(r.Ports).Rewrites())
 }
 
+// leftWhy is why r is left as it is, as the problem of picking it: its directory gone, or its files unread; false when it is not.
+func (r Reconcile) leftWhy() (domain.FieldError, bool) {
+	params := domain.Params{"value": r.Worktree}
+	switch {
+	case r.Missing:
+		return domain.FieldError{Path: domain.PathWorktree, Code: CodeMissing, Template: "{value}'s directory is gone", Params: params}, true
+	case r.Unreadable != "":
+		params["cause"] = r.Unreadable
+		return domain.FieldError{Path: domain.PathWorktree, Code: CodeUnreadable, Template: "{value}'s .env files could not be read", Params: params}, true
+	}
+	return domain.FieldError{}, false
+}
+
 // writes reports whether the apply writes a file of r, numbers it or records its isolation.
 func (r Reconcile) writes() bool {
 	return !r.Missing && r.Unreadable == "" && (!r.Numbered || r.Records != "" || slices.ContainsFunc(r.Files, func(f File) bool { return f.Writes }))
@@ -459,6 +472,7 @@ const (
 	NoteIsolation   = "isolation"
 	NoteInStep      = "in_step"
 	NoteMissing     = "missing"
+	NoteRestored    = "restored"
 	NoteUnreadable  = "unreadable"
 	NoteLeftAlone   = "left_alone"
 )
@@ -532,6 +546,10 @@ func (r Reconcile) recap() []domain.RecapValue {
 		}
 		for _, key := range file.Keys {
 			params := domain.Params{"file": file.Target, "key": key.Key, "status": string(key.Status)}
+			if key.Restored {
+				values = append(values, domain.RecapValue{Value: key.Key, Note: NoteRestored, Params: params, Text: file.Target + "  " + key.Key + " back to its source's"})
+				continue
+			}
 			if key.Settled {
 				values = append(values, domain.RecapValue{Value: key.Key, Note: keyNotes[key.Status], Params: params, Text: file.Target + "  " + keyMarks[key.Status] + key.Key})
 				continue

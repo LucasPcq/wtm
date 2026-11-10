@@ -53,7 +53,12 @@ func worktreeWords(options []domain.Option) map[string]form.OptionWords {
 	labels := map[string]form.OptionWords{}
 	for _, option := range options {
 		said := "in step"
-		if option.OutOfStep > 0 {
+		switch {
+		case option.Problem != nil && option.Problem.Code == envcmd.CodeMissing:
+			said = "its directory is gone"
+		case option.Problem != nil:
+			said = "its .env files could not be read"
+		case option.OutOfStep > 0:
 			said = counted(option.OutOfStep)
 		}
 		if option.Isolation != "" {

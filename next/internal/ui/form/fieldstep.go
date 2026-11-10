@@ -386,11 +386,11 @@ func (s *MultiSelectStep) Widget() widget.Widget {
 	return s.picks
 }
 
-// Answer records the options picked, or none with Chosen when they are the field's default pick, untouched.
+// Answer records the options picked, or none with Chosen when they are the field's default pick, untouched. A field that offers a person another pick than its default (Prechecked) always names what was picked: none would run the default instead.
 func (s *MultiSelectStep) Answer() string {
 	picked := s.picks.Values()
 	answer := domain.Answered{Path: s.path(), Values: picked}
-	if field, ok := s.sheet.Field(s.at).(domain.MultiSelectField); ok && s.Chosen && field.Origin == domain.OriginDefault && slices.Equal(picked, field.Picked) {
+	if field, ok := s.sheet.Field(s.at).(domain.MultiSelectField); ok && s.Chosen && field.Origin == domain.OriginDefault && field.Prechecked == nil && slices.Equal(picked, field.Picked) {
 		answer.Values = nil
 	}
 	s.sheet.Answer(s.at, answer)

@@ -336,3 +336,17 @@ func TestACancelledApplySkipsTheWorktreesNotStarted(t *testing.T) {
 	assert.Equal(t, domain.ReasonInterrupted, result.Items[0].Reason)
 	assert.Equal(t, "PORT=3010\nAPI_URL=http://localhost:4020\n", w.file(t, billing, webEnv))
 }
+
+func TestTheFingerprintCoversWhatIsWrittenNotTheJobsUpNorTheValuesShown(t *testing.T) {
+	s := acmeSeed()
+	plain := newWorld(s).run(t, naming(billing), domain.RunOptions{DryRun: true})
+	shown := newWorld(s).run(t, env.Request{Worktrees: []string{billing}, ShowValues: true}, domain.RunOptions{DryRun: true})
+	s.Jobs = []run.Job{{Name: "web", WorkDir: "/repo/.trees/" + billing, Up: true}}
+	running := newWorld(s).run(t, naming(billing), domain.RunOptions{DryRun: true})
+	s.Files["/repo/.trees/"+billing+"/"+webEnv] = "PORT=3011\nAPI_URL=http://localhost:4020\n"
+	edited := newWorld(s).run(t, naming(billing), domain.RunOptions{DryRun: true})
+
+	assert.Equal(t, plain.Fingerprint, shown.Fingerprint)
+	assert.Equal(t, plain.Fingerprint, running.Fingerprint)
+	assert.NotEqual(t, plain.Fingerprint, edited.Fingerprint)
+}

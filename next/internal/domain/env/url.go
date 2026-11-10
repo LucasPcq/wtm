@@ -124,9 +124,13 @@ func WithoutCredentials(value string) string {
 			return maskedParams(masked + rest)
 		}
 		masked, rest = masked+rest[:at+len(schemeSeparator)], rest[at+len(schemeSeparator):]
-		end := strings.IndexAny(rest, "/?#, ")
-		if end < 0 {
-			end = len(rest)
+		// a password may hold / ? # or a comma: its url's userinfo ends at the last @ before the next url or a space
+		end := len(rest)
+		if next := strings.Index(rest, schemeSeparator); next >= 0 {
+			end = next
+		}
+		if space := strings.IndexAny(rest[:end], " \t"); space >= 0 {
+			end = space
 		}
 		if user := strings.LastIndex(rest[:end], "@"); user >= 0 {
 			masked, rest = masked+"•••", rest[user:]
@@ -139,14 +143,14 @@ func maskedParams(value string) string {
 	for _, name := range passwordParams {
 		for _, sep := range []string{"?", "&"} {
 			key := sep + name + "="
-			for from := 0; ; {
-				at := strings.Index(strings.ToLower(value[from:]), key)
-				if at < 0 {
-					break
+			for at := 0; at+len(key) <= len(value); at++ {
+				// matched on the value's own bytes: lowering it could change its length
+				if !strings.EqualFold(value[at:at+len(key)], key) {
+					continue
 				}
-				start := from + at + len(key)
+				start := at + len(key)
 				end := start + strings.IndexAny(value[start:]+"&", "&#, ")
-				value, from = value[:start]+"•••"+value[end:], start+len("•••")
+				value = value[:start] + "•••" + value[end:]
 			}
 		}
 	}

@@ -136,7 +136,7 @@ func (u UseCase) Apply(ctx context.Context, plan Plan, report domain.Report) Res
 // ----------------------------------------------------------------------------
 // Questions
 
-// Questions is the form the wizard asks for the request: the worktrees it may reconcile, those out of step and the one the caller stands in picked by default, the switches of the run, and the request's problems as field errors.
+// Questions is the form the wizard asks for the request: the worktrees it may reconcile, the one the caller stands in picked by default and those out of step offered beside it, the switches of the run, and the request's problems as field errors.
 func (u UseCase) Questions(ctx context.Context, req Request) (Questions, error) {
 	facts, err := u.Observe(ctx, req)
 	if err != nil {
