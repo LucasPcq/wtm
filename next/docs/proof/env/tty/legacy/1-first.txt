@@ -1,0 +1,12 @@
+$ wtm env; echo EXIT=$?
+
+  Step 1/5 • Select a worktree to reconcile
+
+▌▸ main                                                                        parent  2 change(s)
+   feat/a                                                                              3 change(s)
+   feat/b                                                                              1 change(s)
+   feat/c                                                                                  in sync
+   feat/p                                                                                  in sync
+
+  ↑↓ navigate • / filter • enter confirm • esc cancel
+

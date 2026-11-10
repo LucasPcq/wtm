@@ -1,0 +1,20 @@
+$ wtm env; echo EXIT=$?
+
+┃  = No changes written.
+┃
+┃  Worktree  main
+┃  Mode      add
+┃
+┃  apps/api/.env   strategy: example  ·  source: template
+┃  − JWT_SECRET  orphan — in no source
+┃  − MAILER_URL  orphan — in no source
+┃
+┃  apps/web/.env   strategy: example  ·  source: template
+┃  = in sync — nothing to reconcile
+┃
+┃  apps/docs/.env   strategy: example  ·  source: template
+┃  = in sync — nothing to reconcile
+
+EXIT=0
+$
+

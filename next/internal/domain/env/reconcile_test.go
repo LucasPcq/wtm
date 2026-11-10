@@ -118,3 +118,13 @@ func TestAWorktreeSwitchedToVerbatimGetsTheSourceValuesOfWhatWtmWrote(t *testing
 	assert.Equal(t, "PORT=3000\nCOMPOSE_PROJECT_NAME=shop\nMINE=x\n", string(dotenv.Render(file.After)))
 	assert.Equal(t, []Key{{Name: "MINE", Status: KeyConflict, Value: "x", Source: "y"}}, file.Left)
 }
+
+func TestAWorktreeSwitchedToVerbatimFromItsTemplateGetsTheMainValues(t *testing.T) {
+	// the proof: a worktree whose values come from its template kept the ports wtm had written when switched to verbatim
+	params := linkedResolve()
+	read := FileRead{File: project.EnvFile{Target: ".env"}, Child: lines("PORT=3020\n"), Template: lines("PORT=\n"), Main: lines("PORT=3000\n")}
+
+	file := Reconcile(ReconcileParams{Reads: []FileRead{read}, Strategy: project.EnvExample, Run: params.Run, Verbatim: true, Restore: true}).Files[0]
+
+	assert.Equal(t, "PORT=3000\n", string(dotenv.Render(file.After)))
+}

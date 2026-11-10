@@ -1,0 +1,7 @@
+
+  ✓ env: 1 done
+
+  feat/b  apps/api/.env  ~ JWT_SECRET
+          apps/docs/.env  created from main
+  feat/b  ../acme.trees/feat-b
+

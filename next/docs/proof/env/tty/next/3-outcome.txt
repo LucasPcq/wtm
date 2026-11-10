@@ -1,0 +1,15 @@
+$ wtm env; echo EXIT=$?
+
+┃  ✓ env: 2 done
+┃
+┃  feat/a  apps/web/.env PORT → 24620
+┃          apps/web/.env API_URL → http://api.feat-a.acme.localhost:24612
+┃          apps/api/.env OLD left: in no source
+┃  feat/b  apps/docs/.env created from main
+┃          apps/api/.env JWT_SECRET left: differs from its source
+┃  feat/a  . · 2 ports settled (offset +10)
+┃  feat/b  ../feat-b
+
+EXIT=0
+$
+

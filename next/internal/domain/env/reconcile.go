@@ -75,7 +75,7 @@ func (f FileReconciled) Changed() bool {
 	return f.Created || !bytes.Equal(dotenv.Render(f.Before), dotenv.Render(f.After))
 }
 
-// Reconcile settles each of params' files: a missing one rebuilt from its scaffold, its keys added from their source, a conflict overwritten and an orphan dropped when asked, then what wtm writes set over them, a file wtm owns a value in created when missing. The keys wtm writes are never compared with a source, but under the verbatim isolation, where it writes none: a worktree that just switched to it gets their source's values back.
+// Reconcile settles each of params' files: a missing one rebuilt from its scaffold, its keys added from their source, a conflict overwritten and an orphan dropped when asked, then what wtm writes set over them, a file wtm owns a value in created when missing. The keys wtm writes are never compared with a source, but under the verbatim isolation, where it writes none: a worktree that just switched to it gets their source's values back, else the main worktree's, as without wtm.
 func Reconcile(params ReconcileParams) Reconciled {
 	settledLines := map[string][]dotenv.Line{}
 	files := make([]FileReconciled, 0, len(params.Reads))
@@ -89,13 +89,16 @@ func Reconcile(params ReconcileParams) Reconciled {
 
 		parent, main := read.Sources(params.Strategy)
 		owned, compared := Owned(params.Run, read.File.Target), map[string]bool{}
-		if !params.Verbatim {
+		if !params.Verbatim || params.Restore {
 			compared = owned
+		}
+		if params.Restore {
+			file.Settled = restored(base, owned, cascaded(read, parent, main))
 		}
 		for _, key := range Keys(DriftParams{Child: base, Template: read.Template, Parent: parent, Main: main, Owned: compared}) {
 			switch {
 			case key.Status == KeyInStep:
-			case params.settles(key) || params.Restore && owned[key.Name] && key.Status == KeyConflict:
+			case params.settles(key):
 				file.Settled = append(file.Settled, key)
 			default:
 				file.Left = append(file.Left, key)
@@ -114,6 +117,34 @@ func Reconcile(params ReconcileParams) Reconciled {
 	}
 
 	return Reconciled{Files: files, Ports: params.Writes.Settled(settledLines)}
+}
+
+// cascaded are the values a key wtm wrote goes back to under the verbatim isolation: its source's, else the main worktree's, as without wtm, the template giving none.
+func cascaded(read FileRead, parent, main []dotenv.Line) map[string]string {
+	values := pairs(read.Main)
+	for _, source := range []map[string]string{pairs(main), pairs(parent)} {
+		for key, value := range source {
+			if value != "" {
+				values[key] = value
+			}
+		}
+	}
+	return values
+}
+
+// restored are the keys wtm wrote into lines that go back to their value in values, as conflicts settled.
+func restored(lines []dotenv.Line, owned map[string]bool, values map[string]string) []Key {
+	var keys []Key
+	seen := map[string]bool{}
+	for _, line := range lines {
+		value, back := values[line.Key]
+		if line.Kind != dotenv.Pair || !owned[line.Key] || seen[line.Key] || !back || value == line.Value {
+			continue
+		}
+		seen[line.Key] = true
+		keys = append(keys, Key{Name: line.Key, Status: KeyConflict, Value: line.Value, Source: value})
+	}
+	return keys
 }
 
 // settles reports whether key is settled on its source: an addition always, a conflict when overwritten, an orphan when pruned.

@@ -242,7 +242,7 @@ func (u UseCase) reconcile(ctx context.Context, r Reconcile, show bool, report d
 	params.Reads = reads
 	ports := shown(envs.Reconcile(params).Ports, show)
 	item.Status, item.Detail = domain.StatusDone, &Detail{Path: r.Path, Written: written, Ports: ports}
-	if len(written) == 0 {
+	if len(written) == 0 && r.Records == "" {
 		item.Reason = domain.ReasonUnchanged
 	}
 	if len(r.Restart) > 0 && len(written) > 0 {

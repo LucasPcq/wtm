@@ -1,0 +1,2 @@
+
+  ! feat/p predates isolation: its ports and compose project were left as they are — adopt it with `wtm env feat/p --isolation isolated`

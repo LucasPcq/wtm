@@ -233,3 +233,15 @@ func TestTheMainCheckoutIsAlwaysIsolated(t *testing.T) {
 	require.True(t, ok, err)
 	assert.Equal(t, env.CodeMainIsolated, failure.Fields[0].Code)
 }
+
+func TestRecordingAnIsolationAloneIsAChange(t *testing.T) {
+	// the proof: a worktree whose files were already in line said "unchanged" while its isolation was recorded
+	s := acmeSeed()
+	s.Meta[login] = worktree.Meta{SourceBranch: "main", EnvStrategy: project.EnvMain, Ordinal: 1}
+	w := newWorld(s)
+
+	outcome := w.run(t, env.Request{Worktrees: []string{login}, Isolation: project.Isolated}, domain.RunOptions{})
+
+	assert.Equal(t, domain.StatusDone, outcome.Result.Items[0].Status)
+	assert.Empty(t, outcome.Result.Items[0].Reason)
+}
